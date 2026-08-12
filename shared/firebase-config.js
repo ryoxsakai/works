@@ -1,9 +1,9 @@
 // Firebase Console → プロジェクトの設定 → 全般 → マイアプリ の設定値に置き換える
 export const firebaseConfig = {
-  apiKey: "TODO_API_KEY",
+  apiKey: "AIzaSyBqE2x92dQfiBchfx8bHhttcA5dlEjBqIw",
   authDomain: "grocery-checker-14fd9.firebaseapp.com",
   projectId: "grocery-checker-14fd9",
-  appId: "TODO_APP_ID",
+  appId: "1:196806466819:web:206d119f07cfdbed8a1d36",
 };
 
 // このアプリへのログインを許可するGoogleアカウント(単一ユーザー運用)
