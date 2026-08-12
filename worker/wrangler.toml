@@ -7,7 +7,7 @@ routes = [
 ]
 
 [vars]
-FIREBASE_PROJECT_ID = "TODO_FIREBASE_PROJECT_ID"
+FIREBASE_PROJECT_ID = "grocery-checker-14fd9"
 ALLOWED_EMAIL = "ryoxsakai@gmail.com"
 ALLOWED_ORIGIN = "https://works.lrnr.jp"
 
