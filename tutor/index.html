@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>個別授業管理 | Works</title>
+  <link rel="stylesheet" href="../shared/styles.css" />
+</head>
+<body>
+  <header class="page-header">
+    <h1><a href="/">Works</a> / 個別授業管理</h1>
+  </header>
+
+  <main>
+    <section id="signed-out">
+      <p>このページはログインが必要です。</p>
+      <button id="sign-in">Googleでログイン</button>
+      <p id="auth-error" class="error"></p>
+    </section>
+
+    <section id="signed-in" hidden>
+      <div class="user-bar">
+        <span id="user-email"></span>
+        <button id="sign-out">ログアウト</button>
+      </div>
+
+      <div class="panel">
+        <h2>生徒</h2>
+        <select id="student-select"></select>
+        <form id="add-student-form" class="inline-form">
+          <input id="new-student-name" type="text" placeholder="生徒名" required />
+          <input id="new-student-tag" type="text" placeholder="カレンダー識別タグ(任意)" />
+          <button type="submit">追加</button>
+        </form>
+      </div>
+
+      <div class="panel">
+        <h2>授業予定(カレンダー)</h2>
+        <ul id="event-list"></ul>
+      </div>
+
+      <div class="panel">
+        <h2>授業メモ</h2>
+        <form id="note-form" hidden>
+          <p id="note-event-label"></p>
+          <textarea id="note-text" placeholder="メモ" rows="3"></textarea>
+          <input id="note-score" type="text" placeholder="評価(任意)" />
+          <button type="submit">保存</button>
+        </form>
+        <ul id="note-list"></ul>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

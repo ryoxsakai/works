@@ -1,0 +1,17 @@
+name = "tutor-api"
+main = "src/index.js"
+compatibility_date = "2026-08-01"
+
+routes = [
+  { pattern = "works.lrnr.jp/api/*", zone_name = "lrnr.jp" },
+]
+
+[vars]
+FIREBASE_PROJECT_ID = "TODO_FIREBASE_PROJECT_ID"
+ALLOWED_EMAIL = "ryoxsakai@gmail.com"
+ALLOWED_ORIGIN = "https://works.lrnr.jp"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "tutor-db"
+database_id = "TODO_RUN_WRANGLER_D1_CREATE"
