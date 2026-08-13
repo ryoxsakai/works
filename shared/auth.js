@@ -21,7 +21,7 @@ export function getGoogleAccessToken() {
 
 export function watchAuth({ onSignedIn, onSignedOut }) {
   onAuthStateChanged(auth, (user) => {
-    if (user && user.email === ALLOWED_EMAIL) {
+    if (user && user.email?.toLowerCase() === ALLOWED_EMAIL.toLowerCase()) {
       onSignedIn(user);
     } else {
       if (user) signOut(auth);

@@ -34,7 +34,7 @@ async function verifyFirebaseToken(request, env) {
   });
 
   // 単一ユーザー運用のため、トークンが有効でも許可アドレス以外は拒否する。
-  if (payload.email !== env.ALLOWED_EMAIL || !payload.email_verified) {
+  if (payload.email?.toLowerCase() !== env.ALLOWED_EMAIL.toLowerCase() || !payload.email_verified) {
     throw new Error("not authorized");
   }
 
