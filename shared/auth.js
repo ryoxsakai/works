@@ -37,6 +37,24 @@ export function getGoogleAccessToken() {
   return googleAccessToken;
 }
 
+// 一時的な調査用: リダイレクト認証がどこで止まっているかを画面表示するための情報。
+export async function getDebugInfo() {
+  await redirectResultPromise;
+  return {
+    href: location.href,
+    authDomain: firebaseConfig.authDomain,
+    indexedDBAvailable: typeof indexedDB !== "undefined",
+    cookieEnabled: navigator.cookieEnabled,
+    redirectResultReceived,
+    redirectError: redirectError
+      ? { code: redirectError.code, message: redirectError.message }
+      : null,
+    currentUser: auth.currentUser
+      ? { email: auth.currentUser.email, uid: auth.currentUser.uid }
+      : null,
+  };
+}
+
 export async function watchAuth({ onSignedIn, onSignedOut, onRejected }) {
   await redirectResultPromise;
 

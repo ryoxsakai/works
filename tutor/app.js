@@ -4,6 +4,7 @@ import {
   signOutUser,
   getGoogleAccessToken,
   getIdToken,
+  getDebugInfo,
 } from "../shared/auth.js";
 
 const API_BASE = "/api";
@@ -25,7 +26,12 @@ const els = {
   noteScore: document.querySelector("#note-score"),
   noteList: document.querySelector("#note-list"),
   authError: document.querySelector("#auth-error"),
+  authDebug: document.querySelector("#auth-debug"),
 };
+
+getDebugInfo().then((info) => {
+  els.authDebug.textContent = JSON.stringify(info, null, 2);
+});
 
 let students = [];
 let selectedStudent = null;
