@@ -7,7 +7,7 @@ routes = [
 ]
 
 [vars]
-GOOGLE_CLIENT_ID = "TODO_GOOGLE_CLIENT_ID.apps.googleusercontent.com"
+GOOGLE_CLIENT_ID = "196806466819-2bcole85u4k53h1iqk6jr69ppans7egf.apps.googleusercontent.com"
 ALLOWED_EMAIL = "ryoxsakai@gmail.com"
 ALLOWED_ORIGIN = "https://works.lrnr.jp"
 
