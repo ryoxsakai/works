@@ -94,6 +94,23 @@ main {
   flex-wrap: wrap;
 }
 
+.hint {
+  margin-top: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.calendar-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
+}
+
+.calendar-item input {
+  padding: 0;
+}
+
 input,
 select,
 textarea,

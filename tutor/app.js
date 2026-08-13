@@ -6,6 +6,7 @@ import {
 } from "../shared/auth.js";
 
 const API_BASE = "/api";
+const SELECTED_CALENDARS_KEY = "works_selected_calendars";
 
 const els = {
   signedOut: document.querySelector("#signed-out"),
@@ -13,6 +14,8 @@ const els = {
   userEmail: document.querySelector("#user-email"),
   signInBtn: document.querySelector("#sign-in"),
   signOutBtn: document.querySelector("#sign-out"),
+  actionError: document.querySelector("#action-error"),
+  calendarChecklist: document.querySelector("#calendar-checklist"),
   studentSelect: document.querySelector("#student-select"),
   addStudentForm: document.querySelector("#add-student-form"),
   newStudentName: document.querySelector("#new-student-name"),
@@ -29,6 +32,23 @@ const els = {
 let students = [];
 let selectedStudent = null;
 let selectedEvent = null;
+let selectedCalendarIds = loadSelectedCalendarIds();
+
+function loadSelectedCalendarIds() {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(SELECTED_CALENDARS_KEY) || "[]"));
+  } catch {
+    return new Set();
+  }
+}
+
+function saveSelectedCalendarIds() {
+  localStorage.setItem(SELECTED_CALENDARS_KEY, JSON.stringify([...selectedCalendarIds]));
+}
+
+function showActionError(err) {
+  els.actionError.textContent = err instanceof Error ? err.message : String(err);
+}
 
 els.signInBtn.addEventListener("click", () => {
   els.authError.textContent = "";
@@ -42,8 +62,14 @@ watchAuth({
     els.signedOut.hidden = true;
     els.signedIn.hidden = false;
     els.userEmail.textContent = user.email;
-    await loadStudents();
-    await loadCalendarEvents();
+    els.actionError.textContent = "";
+    try {
+      await loadCalendarList();
+      await loadStudents();
+      await loadCalendarEvents();
+    } catch (err) {
+      showActionError(err);
+    }
   },
   onSignedOut: (message) => {
     els.signedOut.hidden = false;
@@ -69,6 +95,45 @@ async function apiFetch(path, options = {}) {
   return res.status === 204 ? null : res.json();
 }
 
+async function loadCalendarList() {
+  const token = getGoogleAccessToken();
+  const res = await fetch("https://www.googleapis.com/calendar/v3/users/me/calendarList", {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(`カレンダー一覧の取得に失敗しました (${res.status})`);
+  const data = await res.json();
+  const calendars = data.items || [];
+  renderCalendarChecklist(calendars);
+}
+
+function renderCalendarChecklist(calendars) {
+  els.calendarChecklist.innerHTML = calendars
+    .map((c) => {
+      const checked = selectedCalendarIds.has(c.id) ? "checked" : "";
+      return `<label class="calendar-item">
+        <input type="checkbox" value="${escapeHtml(c.id)}" ${checked} />
+        ${escapeHtml(c.summary || c.id)}
+      </label>`;
+    })
+    .join("");
+}
+
+els.calendarChecklist.addEventListener("change", async (e) => {
+  const checkbox = e.target.closest("input[type=checkbox]");
+  if (!checkbox) return;
+  if (checkbox.checked) {
+    selectedCalendarIds.add(checkbox.value);
+  } else {
+    selectedCalendarIds.delete(checkbox.value);
+  }
+  saveSelectedCalendarIds();
+  try {
+    await loadCalendarEvents();
+  } catch (err) {
+    showActionError(err);
+  }
+});
+
 async function loadStudents() {
   students = await apiFetch("/students");
   els.studentSelect.innerHTML =
@@ -80,22 +145,31 @@ els.studentSelect.addEventListener("change", async () => {
   const id = els.studentSelect.value;
   selectedStudent = students.find((s) => String(s.id) === id) || null;
   els.noteForm.hidden = true;
-  await loadCalendarEvents();
-  await loadNotes();
+  try {
+    await loadCalendarEvents();
+    await loadNotes();
+  } catch (err) {
+    showActionError(err);
+  }
 });
 
 els.addStudentForm.addEventListener("submit", async (e) => {
   e.preventDefault();
+  els.actionError.textContent = "";
   const name = els.newStudentName.value.trim();
   const tag = els.newStudentTag.value.trim();
   if (!name) return;
-  await apiFetch("/students", {
-    method: "POST",
-    body: JSON.stringify({ name, calendar_tag: tag }),
-  });
-  els.newStudentName.value = "";
-  els.newStudentTag.value = "";
-  await loadStudents();
+  try {
+    await apiFetch("/students", {
+      method: "POST",
+      body: JSON.stringify({ name, calendar_tag: tag }),
+    });
+    els.newStudentName.value = "";
+    els.newStudentTag.value = "";
+    await loadStudents();
+  } catch (err) {
+    showActionError(err);
+  }
 });
 
 async function loadCalendarEvents() {
@@ -104,6 +178,11 @@ async function loadCalendarEvents() {
     els.eventList.innerHTML = "<li>カレンダーへのアクセス許可を確認しています…</li>";
     return;
   }
+  if (selectedCalendarIds.size === 0) {
+    els.eventList.innerHTML = "<li>上でカレンダーを選択してください</li>";
+    return;
+  }
+
   const timeMin = new Date(Date.now() - 90 * 86400000).toISOString();
   const timeMax = new Date(Date.now() + 90 * 86400000).toISOString();
   const params = new URLSearchParams({
@@ -113,16 +192,25 @@ async function loadCalendarEvents() {
     orderBy: "startTime",
     maxResults: "250",
   });
-  const res = await fetch(
-    `https://www.googleapis.com/calendar/v3/calendars/primary/events?${params}`,
-    { headers: { Authorization: `Bearer ${token}` } }
+
+  const results = await Promise.all(
+    [...selectedCalendarIds].map(async (calendarId) => {
+      const res = await fetch(
+        `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?${params}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (!res.ok) return [];
+      const data = await res.json();
+      return data.items || [];
+    })
   );
-  if (!res.ok) {
-    els.eventList.innerHTML = `<li>カレンダー取得に失敗しました (${res.status})</li>`;
-    return;
-  }
-  const data = await res.json();
-  let events = data.items || [];
+
+  let events = results.flat().sort((a, b) => {
+    const aStart = a.start?.dateTime || a.start?.date || "";
+    const bStart = b.start?.dateTime || b.start?.date || "";
+    return aStart.localeCompare(bStart);
+  });
+
   if (selectedStudent?.calendar_tag) {
     const tag = selectedStudent.calendar_tag.toLowerCase();
     events = events.filter((ev) =>
@@ -164,20 +252,25 @@ els.eventList.addEventListener("click", (e) => {
 
 els.noteForm.addEventListener("submit", async (e) => {
   e.preventDefault();
+  els.actionError.textContent = "";
   if (!selectedStudent || !selectedEvent) return;
-  await apiFetch("/lessons", {
-    method: "POST",
-    body: JSON.stringify({
-      student_id: selectedStudent.id,
-      calendar_event_id: selectedEvent.id,
-      lesson_date: selectedEvent.start,
-      note: els.noteText.value,
-      score: els.noteScore.value,
-    }),
-  });
-  els.noteText.value = "";
-  els.noteScore.value = "";
-  await loadNotes();
+  try {
+    await apiFetch("/lessons", {
+      method: "POST",
+      body: JSON.stringify({
+        student_id: selectedStudent.id,
+        calendar_event_id: selectedEvent.id,
+        lesson_date: selectedEvent.start,
+        note: els.noteText.value,
+        score: els.noteScore.value,
+      }),
+    });
+    els.noteText.value = "";
+    els.noteScore.value = "";
+    await loadNotes();
+  } catch (err) {
+    showActionError(err);
+  }
 });
 
 async function loadNotes() {
