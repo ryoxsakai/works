@@ -46,12 +46,10 @@ watchAuth({
     await loadStudents();
     await loadCalendarEvents();
   },
-  onSignedOut: () => {
+  onSignedOut: (message) => {
     els.signedOut.hidden = false;
     els.signedIn.hidden = true;
-  },
-  onError: (err) => {
-    els.authError.textContent = "ログインに失敗しました: " + err.message;
+    els.authError.textContent = message || "";
   },
 });
 

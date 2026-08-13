@@ -16,6 +16,7 @@ const auth = getAuth(app);
 // カレンダーAPIを叩くには再ログインのたびに取り直しになる(単一ユーザー運用なので許容)。
 let googleAccessToken = null;
 let redirectError = null;
+let redirectResultReceived = false;
 
 // signInWithPopupはモバイルブラウザだとポップアップのライフサイクルが不安定で
 // auth/cancelled-popup-request 等が起きやすいため、リダイレクト方式を使う。
@@ -23,6 +24,7 @@ let redirectError = null;
 const redirectResultPromise = getRedirectResult(auth)
   .then((result) => {
     if (result) {
+      redirectResultReceived = true;
       const credential = GoogleAuthProvider.credentialFromResult(result);
       googleAccessToken = credential?.accessToken ?? null;
     }
@@ -35,17 +37,29 @@ export function getGoogleAccessToken() {
   return googleAccessToken;
 }
 
-export async function watchAuth({ onSignedIn, onSignedOut, onError }) {
+export async function watchAuth({ onSignedIn, onSignedOut, onRejected }) {
   await redirectResultPromise;
-  if (redirectError && onError) onError(redirectError);
 
   onAuthStateChanged(auth, (user) => {
+    if (redirectError) {
+      onSignedOut(`リダイレクトエラー: ${redirectError.code || redirectError.message}`);
+      return;
+    }
     if (user && user.email?.toLowerCase() === ALLOWED_EMAIL.toLowerCase()) {
       onSignedIn(user);
-    } else {
-      if (user) signOut(auth);
-      onSignedOut();
+      return;
     }
+    if (user) {
+      signOut(auth);
+      if (onRejected) onRejected(user.email);
+      onSignedOut(`許可されていないアカウントです: ${user.email}`);
+      return;
+    }
+    onSignedOut(
+      redirectResultReceived
+        ? "リダイレクト後にユーザー情報が取得できませんでした"
+        : null
+    );
   });
 }
 
