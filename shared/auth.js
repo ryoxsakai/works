@@ -2,7 +2,8 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/fireba
 import {
   getAuth,
   GoogleAuthProvider,
-  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   signOut,
   onAuthStateChanged,
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
@@ -12,14 +13,32 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 
 // Firebaseのセッションはリロード後も残るが、Googleのアクセストークンはメモリ上にしか保持しないため
-// カレンダーAPIを叩くにはリロードのたびに再ログインが必要になる(単一ユーザー運用なので許容)。
+// カレンダーAPIを叩くには再ログインのたびに取り直しになる(単一ユーザー運用なので許容)。
 let googleAccessToken = null;
+let redirectError = null;
+
+// signInWithPopupはモバイルブラウザだとポップアップのライフサイクルが不安定で
+// auth/cancelled-popup-request 等が起きやすいため、リダイレクト方式を使う。
+// ログイン後にこのページへ戻ってきた時点でここが実行され、結果を受け取る。
+const redirectResultPromise = getRedirectResult(auth)
+  .then((result) => {
+    if (result) {
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      googleAccessToken = credential?.accessToken ?? null;
+    }
+  })
+  .catch((err) => {
+    redirectError = err;
+  });
 
 export function getGoogleAccessToken() {
   return googleAccessToken;
 }
 
-export function watchAuth({ onSignedIn, onSignedOut }) {
+export async function watchAuth({ onSignedIn, onSignedOut, onError }) {
+  await redirectResultPromise;
+  if (redirectError && onError) onError(redirectError);
+
   onAuthStateChanged(auth, (user) => {
     if (user && user.email?.toLowerCase() === ALLOWED_EMAIL.toLowerCase()) {
       onSignedIn(user);
@@ -30,14 +49,11 @@ export function watchAuth({ onSignedIn, onSignedOut }) {
   });
 }
 
-export async function signIn() {
+export function signIn() {
   const provider = new GoogleAuthProvider();
   provider.addScope("https://www.googleapis.com/auth/calendar.readonly");
   provider.setCustomParameters({ login_hint: ALLOWED_EMAIL });
-  const result = await signInWithPopup(auth, provider);
-  const credential = GoogleAuthProvider.credentialFromResult(result);
-  googleAccessToken = credential?.accessToken ?? null;
-  return result.user;
+  return signInWithRedirect(auth, provider);
 }
 
 export function signOutUser() {

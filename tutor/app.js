@@ -31,13 +31,9 @@ let students = [];
 let selectedStudent = null;
 let selectedEvent = null;
 
-els.signInBtn.addEventListener("click", async () => {
+els.signInBtn.addEventListener("click", () => {
   els.authError.textContent = "";
-  try {
-    await signIn();
-  } catch (err) {
-    els.authError.textContent = "ログインに失敗しました: " + err.message;
-  }
+  signIn();
 });
 
 els.signOutBtn.addEventListener("click", () => signOutUser());
@@ -53,6 +49,9 @@ watchAuth({
   onSignedOut: () => {
     els.signedOut.hidden = false;
     els.signedIn.hidden = true;
+  },
+  onError: (err) => {
+    els.authError.textContent = "ログインに失敗しました: " + err.message;
   },
 });
 
