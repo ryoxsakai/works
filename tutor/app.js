@@ -3,7 +3,7 @@ import {
   signIn,
   signOutUser,
   getGoogleAccessToken,
-} from "../shared/auth.js";
+} from "../shared/auth.js?v=3";
 
 const API_BASE = "/api";
 const SELECTED_CALENDARS_KEY = "works_selected_calendars";

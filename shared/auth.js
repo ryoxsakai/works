@@ -1,4 +1,4 @@
-import { GOOGLE_CLIENT_ID, ALLOWED_EMAIL } from "./google-config.js";
+import { GOOGLE_CLIENT_ID, ALLOWED_EMAIL } from "./google-config.js?v=3";
 
 // カレンダー読み取りとユーザー確認(email)の両方をこのスコープでまとめて取得する。
 const SCOPES = "openid email profile https://www.googleapis.com/auth/calendar.readonly";
