@@ -1,11 +1,3 @@
-import { jwtVerify, createRemoteJWKSet } from "jose";
-
-const JWKS = createRemoteJWKSet(
-  new URL(
-    "https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com"
-  )
-);
-
 function corsHeaders(origin) {
   return {
     "Access-Control-Allow-Origin": origin,
@@ -21,24 +13,26 @@ function json(data, headers, status = 200) {
   });
 }
 
-// Firebase Admin SDK は Workers ランタイムでは動かないため、
-// Firebase の公開JWKSでID Tokenの署名・issuer・audienceを直接検証する。
-async function verifyFirebaseToken(request, env) {
+// クライアントはFirebase Authを介さず直接Googleのアクセストークンを渡してくるので、
+// Googleのtokeninfoエンドポイントに問い合わせてトークンの正当性とemailを確認する。
+async function verifyGoogleToken(request, env) {
   const authHeader = request.headers.get("Authorization") || "";
   const match = authHeader.match(/^Bearer (.+)$/);
   if (!match) throw new Error("missing bearer token");
 
-  const { payload } = await jwtVerify(match[1], JWKS, {
-    issuer: `https://securetoken.google.com/${env.FIREBASE_PROJECT_ID}`,
-    audience: env.FIREBASE_PROJECT_ID,
-  });
+  const res = await fetch(
+    `https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=${encodeURIComponent(match[1])}`
+  );
+  if (!res.ok) throw new Error("not authorized");
+  const info = await res.json();
 
-  // 単一ユーザー運用のため、トークンが有効でも許可アドレス以外は拒否する。
-  if (payload.email?.toLowerCase() !== env.ALLOWED_EMAIL.toLowerCase() || !payload.email_verified) {
+  const audienceOk = [info.aud, info.azp].includes(env.GOOGLE_CLIENT_ID);
+  const emailOk = info.email?.toLowerCase() === env.ALLOWED_EMAIL.toLowerCase();
+  if (!audienceOk || !emailOk || String(info.email_verified) !== "true") {
     throw new Error("not authorized");
   }
 
-  return payload;
+  return info;
 }
 
 async function readStudents(env) {
@@ -91,7 +85,7 @@ export default {
     const url = new URL(request.url);
 
     try {
-      await verifyFirebaseToken(request, env);
+      await verifyGoogleToken(request, env);
 
       if (url.pathname === "/api/students" && request.method === "GET") {
         return json(await readStudents(env), headers);

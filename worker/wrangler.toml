@@ -7,7 +7,7 @@ routes = [
 ]
 
 [vars]
-FIREBASE_PROJECT_ID = "grocery-checker-14fd9"
+GOOGLE_CLIENT_ID = "TODO_GOOGLE_CLIENT_ID.apps.googleusercontent.com"
 ALLOWED_EMAIL = "ryoxsakai@gmail.com"
 ALLOWED_ORIGIN = "https://works.lrnr.jp"
 

@@ -3,8 +3,6 @@ import {
   signIn,
   signOutUser,
   getGoogleAccessToken,
-  getIdToken,
-  getDebugInfo,
 } from "../shared/auth.js";
 
 const API_BASE = "/api";
@@ -26,12 +24,7 @@ const els = {
   noteScore: document.querySelector("#note-score"),
   noteList: document.querySelector("#note-list"),
   authError: document.querySelector("#auth-error"),
-  authDebug: document.querySelector("#auth-debug"),
 };
-
-getDebugInfo().then((info) => {
-  els.authDebug.textContent = JSON.stringify(info, null, 2);
-});
 
 let students = [];
 let selectedStudent = null;
@@ -60,12 +53,13 @@ watchAuth({
 });
 
 async function apiFetch(path, options = {}) {
-  const idToken = await getIdToken();
+  const token = getGoogleAccessToken();
+  if (!token) throw new Error("not signed in");
   const res = await fetch(API_BASE + path, {
     ...options,
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${idToken}`,
+      Authorization: `Bearer ${token}`,
       ...(options.headers || {}),
     },
   });

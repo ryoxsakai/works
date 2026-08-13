@@ -1,100 +1,83 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
-import {
-  getAuth,
-  GoogleAuthProvider,
-  signInWithRedirect,
-  getRedirectResult,
-  signOut,
-  onAuthStateChanged,
-} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
-import { firebaseConfig, ALLOWED_EMAIL } from "./firebase-config.js";
+import { GOOGLE_CLIENT_ID, ALLOWED_EMAIL } from "./google-config.js";
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
+// カレンダー読み取りとユーザー確認(email)の両方をこのスコープでまとめて取得する。
+const SCOPES = "openid email profile https://www.googleapis.com/auth/calendar.readonly";
 
-// Firebaseのセッションはリロード後も残るが、Googleのアクセストークンはメモリ上にしか保持しないため
-// カレンダーAPIを叩くには再ログインのたびに取り直しになる(単一ユーザー運用なので許容)。
-let googleAccessToken = null;
-let redirectError = null;
-let redirectResultReceived = false;
+let accessToken = null;
+let tokenClient = null;
 
-// signInWithPopupはモバイルブラウザだとポップアップのライフサイクルが不安定で
-// auth/cancelled-popup-request 等が起きやすいため、リダイレクト方式を使う。
-// ログイン後にこのページへ戻ってきた時点でここが実行され、結果を受け取る。
-const redirectResultPromise = getRedirectResult(auth)
-  .then((result) => {
-    if (result) {
-      redirectResultReceived = true;
-      const credential = GoogleAuthProvider.credentialFromResult(result);
-      googleAccessToken = credential?.accessToken ?? null;
+function loadGisScript() {
+  return new Promise((resolve, reject) => {
+    if (window.google?.accounts?.oauth2) {
+      resolve();
+      return;
     }
-  })
-  .catch((err) => {
-    redirectError = err;
+    const script = document.createElement("script");
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+    script.defer = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Google Identity Servicesの読み込みに失敗しました"));
+    document.head.appendChild(script);
   });
+}
+
+async function fetchUserInfo(token) {
+  const res = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error("ユーザー情報の取得に失敗しました");
+  return res.json();
+}
 
 export function getGoogleAccessToken() {
-  return googleAccessToken;
+  return accessToken;
 }
 
-// 一時的な調査用: リダイレクト認証がどこで止まっているかを画面表示するための情報。
-export async function getDebugInfo() {
-  await redirectResultPromise;
-  return {
-    href: location.href,
-    authDomain: firebaseConfig.authDomain,
-    indexedDBAvailable: typeof indexedDB !== "undefined",
-    cookieEnabled: navigator.cookieEnabled,
-    redirectResultReceived,
-    redirectError: redirectError
-      ? { code: redirectError.code, message: redirectError.message }
-      : null,
-    currentUser: auth.currentUser
-      ? { email: auth.currentUser.email, uid: auth.currentUser.uid }
-      : null,
-  };
-}
+// GISのトークンクライアントはページ再読み込みごとの自動復元を行わないため、
+// リロードのたびに再ログインが必要になる(単一ユーザー運用なので許容)。
+export async function watchAuth({ onSignedIn, onSignedOut }) {
+  await loadGisScript();
 
-export async function watchAuth({ onSignedIn, onSignedOut, onRejected }) {
-  await redirectResultPromise;
-
-  onAuthStateChanged(auth, (user) => {
-    if (redirectError) {
-      onSignedOut(`リダイレクトエラー: ${redirectError.code || redirectError.message}`);
-      return;
-    }
-    if (user && user.email?.toLowerCase() === ALLOWED_EMAIL.toLowerCase()) {
-      onSignedIn(user);
-      return;
-    }
-    if (user) {
-      signOut(auth);
-      if (onRejected) onRejected(user.email);
-      onSignedOut(`許可されていないアカウントです: ${user.email}`);
-      return;
-    }
-    onSignedOut(
-      redirectResultReceived
-        ? "リダイレクト後にユーザー情報が取得できませんでした"
-        : null
-    );
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: GOOGLE_CLIENT_ID,
+    scope: SCOPES,
+    hint: ALLOWED_EMAIL,
+    callback: async (response) => {
+      if (response.error) {
+        accessToken = null;
+        onSignedOut(`ログインに失敗しました: ${response.error}`);
+        return;
+      }
+      try {
+        const info = await fetchUserInfo(response.access_token);
+        if (
+          info.email?.toLowerCase() !== ALLOWED_EMAIL.toLowerCase() ||
+          !info.email_verified
+        ) {
+          accessToken = null;
+          onSignedOut(`許可されていないアカウントです: ${info.email}`);
+          return;
+        }
+        accessToken = response.access_token;
+        onSignedIn({ email: info.email });
+      } catch (err) {
+        accessToken = null;
+        onSignedOut(err.message);
+      }
+    },
   });
+
+  onSignedOut(null);
 }
 
 export function signIn() {
-  const provider = new GoogleAuthProvider();
-  provider.addScope("https://www.googleapis.com/auth/calendar.readonly");
-  provider.setCustomParameters({ login_hint: ALLOWED_EMAIL });
-  return signInWithRedirect(auth, provider);
+  tokenClient?.requestAccessToken();
 }
 
 export function signOutUser() {
-  googleAccessToken = null;
-  return signOut(auth);
-}
-
-export async function getIdToken() {
-  const user = auth.currentUser;
-  if (!user) throw new Error("not signed in");
-  return user.getIdToken();
+  if (accessToken) {
+    google.accounts.oauth2.revoke(accessToken, () => {});
+  }
+  accessToken = null;
 }
