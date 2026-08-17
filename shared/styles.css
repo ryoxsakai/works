@@ -154,15 +154,144 @@ button {
 }
 
 .event-item {
-  width: 100%;
-  text-align: left;
+  padding: 0.5rem 0.6rem;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 0.25rem;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.event-date {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.name-token {
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+}
+
+.name-token:hover {
+  color: var(--accent);
+}
+
+.error {
+  color: #dc2626;
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.panel-header h2 {
+  margin: 0;
+}
+
+.view-toggle {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.view-toggle-btn {
+  padding: 0.3rem 0.6rem;
+  font-size: 0.8rem;
   background: var(--bg);
   color: var(--fg);
   border: 1px solid var(--border);
 }
 
-.error {
-  color: #dc2626;
+.view-toggle-btn[aria-pressed="true"] {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+#name-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.85rem;
+}
+
+#name-filter-bar button {
+  padding: 0.2rem 0.5rem;
+  font-size: 0.75rem;
+}
+
+.calendar-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.calendar-nav button {
+  padding: 0.3rem 0.7rem;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  font-size: 0.7rem;
+}
+
+.cal-weekday {
+  text-align: center;
+  font-weight: bold;
+  color: var(--muted);
+  padding: 0.25rem 0;
+}
+
+.cal-cell {
+  min-height: 4.5rem;
+  border: 1px solid var(--border);
+  border-radius: 0.2rem;
+  padding: 0.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  overflow: hidden;
+}
+
+.cal-cell-empty {
+  border-color: transparent;
+}
+
+.cal-cell-today {
+  border-color: var(--accent);
+}
+
+.cal-day-num {
+  font-weight: bold;
+}
+
+.cal-event {
+  width: 100%;
+  text-align: left;
+  font-size: 0.65rem;
+  padding: 0.1rem 0.25rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--fg);
+}
+
+.cal-more {
+  font-size: 0.65rem;
+  color: var(--muted);
 }
 
 dialog#settings-modal {

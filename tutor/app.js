@@ -7,6 +7,9 @@ import {
 import { getTheme, setTheme } from "../shared/theme.js?v=5";
 
 const API_BASE = "/api";
+const EVENT_VIEW_KEY = "works_event_view";
+const WEEKDAY_LABELS = ["日", "月", "火", "水", "木", "金", "土"];
+const TOKEN_DELIMITER_RE = /([\s　()()【】\[\]・/,、:：\-])/;
 
 const els = {
   signedOut: document.querySelector("#signed-out"),
@@ -26,7 +29,16 @@ const els = {
   addStudentForm: document.querySelector("#add-student-form"),
   newStudentName: document.querySelector("#new-student-name"),
   newStudentTag: document.querySelector("#new-student-tag"),
+  viewToggleBtns: document.querySelectorAll(".view-toggle-btn"),
+  nameFilterBar: document.querySelector("#name-filter-bar"),
+  nameFilterLabel: document.querySelector("#name-filter-label"),
+  clearNameFilterBtn: document.querySelector("#clear-name-filter"),
   eventList: document.querySelector("#event-list"),
+  calendarView: document.querySelector("#calendar-view"),
+  calMonthLabel: document.querySelector("#cal-month-label"),
+  calPrevBtn: document.querySelector("#cal-prev"),
+  calNextBtn: document.querySelector("#cal-next"),
+  calendarGrid: document.querySelector("#calendar-grid"),
   noteForm: document.querySelector("#note-form"),
   noteEventLabel: document.querySelector("#note-event-label"),
   noteText: document.querySelector("#note-text"),
@@ -39,9 +51,17 @@ let students = [];
 let selectedStudent = null;
 let selectedEvent = null;
 let selectedCalendarIds = new Set();
+let rawEvents = [];
+let nameFilter = null;
+let eventViewMode = localStorage.getItem(EVENT_VIEW_KEY) === "calendar" ? "calendar" : "list";
+let calendarCursor = startOfMonth(new Date());
 
 function showActionError(err) {
   els.actionError.textContent = err instanceof Error ? err.message : String(err);
+}
+
+function startOfMonth(d) {
+  return new Date(d.getFullYear(), d.getMonth(), 1);
 }
 
 // --- 設定モーダル ---
@@ -69,6 +89,34 @@ els.themeRadios.forEach((radio) => {
   radio.addEventListener("change", () => {
     if (radio.checked) setTheme(radio.value);
   });
+});
+
+// --- 授業予定の表示切り替え(リスト / カレンダー) ---
+
+els.viewToggleBtns.forEach((btn) => {
+  btn.setAttribute("aria-pressed", String(btn.dataset.view === eventViewMode));
+  btn.addEventListener("click", () => {
+    eventViewMode = btn.dataset.view;
+    localStorage.setItem(EVENT_VIEW_KEY, eventViewMode);
+    els.viewToggleBtns.forEach((b) => b.setAttribute("aria-pressed", String(b === btn)));
+    renderCurrentView();
+  });
+});
+
+els.calPrevBtn.addEventListener("click", () => {
+  calendarCursor = new Date(calendarCursor.getFullYear(), calendarCursor.getMonth() - 1, 1);
+  renderCurrentView();
+});
+
+els.calNextBtn.addEventListener("click", () => {
+  calendarCursor = new Date(calendarCursor.getFullYear(), calendarCursor.getMonth() + 1, 1);
+  renderCurrentView();
+});
+
+els.clearNameFilterBtn.addEventListener("click", () => {
+  nameFilter = null;
+  els.nameFilterBar.hidden = true;
+  renderCurrentView();
 });
 
 // --- ログイン ---
@@ -210,14 +258,16 @@ els.addStudentForm.addEventListener("submit", async (e) => {
   }
 });
 
+// --- 授業予定の取得・絞り込み・表示 ---
+
 async function loadCalendarEvents() {
   const token = getGoogleAccessToken();
   if (!token) {
-    els.eventList.innerHTML = "<li>カレンダーへのアクセス許可を確認しています…</li>";
+    showEventPlaceholder("カレンダーへのアクセス許可を確認しています…");
     return;
   }
   if (selectedCalendarIds.size === 0) {
-    els.eventList.innerHTML = "<li>設定からカレンダーを選択してください</li>";
+    showEventPlaceholder("設定からカレンダーを選択してください");
     return;
   }
 
@@ -243,22 +293,62 @@ async function loadCalendarEvents() {
     })
   );
 
-  let events = results.flat().sort((a, b) => {
+  rawEvents = results.flat().sort((a, b) => {
     const aStart = a.start?.dateTime || a.start?.date || "";
     const bStart = b.start?.dateTime || b.start?.date || "";
     return aStart.localeCompare(bStart);
   });
 
+  renderCurrentView();
+}
+
+function showEventPlaceholder(message) {
+  els.calendarView.hidden = true;
+  els.eventList.hidden = false;
+  els.eventList.innerHTML = `<li>${escapeHtml(message)}</li>`;
+}
+
+function getFilteredEvents() {
+  let events = rawEvents;
   if (selectedStudent?.calendar_tag) {
     const tag = selectedStudent.calendar_tag.toLowerCase();
     events = events.filter((ev) =>
       `${ev.summary || ""} ${ev.description || ""}`.toLowerCase().includes(tag)
     );
   }
-  renderEvents(events);
+  if (nameFilter) {
+    const needle = nameFilter.toLowerCase();
+    events = events.filter((ev) =>
+      `${ev.summary || ""} ${ev.description || ""}`.toLowerCase().includes(needle)
+    );
+  }
+  return events;
 }
 
-function renderEvents(events) {
+function renderCurrentView() {
+  const events = getFilteredEvents();
+  if (eventViewMode === "calendar") {
+    renderCalendarView(events);
+  } else {
+    renderListView(events);
+  }
+}
+
+function renderTokenizedSummary(summary) {
+  return summary
+    .split(TOKEN_DELIMITER_RE)
+    .filter((part) => part !== "")
+    .map((part) => {
+      if (TOKEN_DELIMITER_RE.test(part) && part.length === 1) return escapeHtml(part);
+      return `<span class="name-token" data-token="${escapeHtml(part)}">${escapeHtml(part)}</span>`;
+    })
+    .join("");
+}
+
+function renderListView(events) {
+  els.calendarView.hidden = true;
+  els.eventList.hidden = false;
+
   if (events.length === 0) {
     els.eventList.innerHTML = "<li>該当する授業予定がありません</li>";
     return;
@@ -266,26 +356,97 @@ function renderEvents(events) {
   els.eventList.innerHTML = events
     .map((ev) => {
       const start = ev.start?.dateTime || ev.start?.date || "";
-      const summary = escapeHtml(ev.summary || "(無題)");
-      return `<li>
-        <button type="button" class="event-item" data-id="${ev.id}" data-summary="${summary}" data-start="${start}">
-          ${formatDate(start)} — ${summary}
-        </button>
+      const summaryRaw = ev.summary || "(無題)";
+      return `<li class="event-item" data-id="${ev.id}" data-summary="${escapeHtml(summaryRaw)}" data-start="${start}">
+        <span class="event-date">${formatDate(start)}</span>
+        <span class="event-summary">${renderTokenizedSummary(summaryRaw)}</span>
       </li>`;
     })
     .join("");
 }
 
-els.eventList.addEventListener("click", (e) => {
-  const btn = e.target.closest(".event-item");
-  if (!btn || !selectedStudent) return;
-  selectedEvent = {
-    id: btn.dataset.id,
-    summary: btn.dataset.summary,
-    start: btn.dataset.start,
-  };
-  els.noteEventLabel.textContent = `${formatDate(selectedEvent.start)} — ${selectedEvent.summary}`;
+function renderCalendarView(events) {
+  els.eventList.hidden = true;
+  els.calendarView.hidden = false;
+
+  const year = calendarCursor.getFullYear();
+  const month = calendarCursor.getMonth();
+  els.calMonthLabel.textContent = `${year}年${month + 1}月`;
+
+  const eventsByDay = {};
+  events.forEach((ev) => {
+    const startStr = ev.start?.dateTime || ev.start?.date;
+    if (!startStr) return;
+    const d = new Date(startStr);
+    const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+    (eventsByDay[key] ||= []).push(ev);
+  });
+
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const startOffset = new Date(year, month, 1).getDay();
+  const today = new Date();
+
+  const cells = [];
+  for (let i = 0; i < startOffset; i++) cells.push(null);
+  for (let day = 1; day <= daysInMonth; day++) cells.push(day);
+
+  let html = WEEKDAY_LABELS.map((w) => `<div class="cal-weekday">${w}</div>`).join("");
+
+  html += cells
+    .map((day) => {
+      if (!day) return `<div class="cal-cell cal-cell-empty"></div>`;
+      const isToday =
+        year === today.getFullYear() && month === today.getMonth() && day === today.getDate();
+      const dayEvents = eventsByDay[`${year}-${month}-${day}`] || [];
+      const visible = dayEvents.slice(0, 3);
+      const overflow = dayEvents.length - visible.length;
+      const eventsHtml = visible
+        .map((ev) => {
+          const summaryRaw = ev.summary || "(無題)";
+          return `<button type="button" class="cal-event" data-id="${ev.id}" data-summary="${escapeHtml(summaryRaw)}" data-start="${ev.start?.dateTime || ev.start?.date || ""}">${escapeHtml(summaryRaw)}</button>`;
+        })
+        .join("");
+      const overflowHtml = overflow > 0 ? `<div class="cal-more">+${overflow}件</div>` : "";
+      return `<div class="cal-cell${isToday ? " cal-cell-today" : ""}">
+        <div class="cal-day-num">${day}</div>
+        ${eventsHtml}
+        ${overflowHtml}
+      </div>`;
+    })
+    .join("");
+
+  els.calendarGrid.innerHTML = html;
+}
+
+function selectEventForNote(id, summary, start) {
+  if (!selectedStudent) return;
+  selectedEvent = { id, summary, start };
+  els.noteEventLabel.textContent = `${formatDate(start)} — ${summary}`;
   els.noteForm.hidden = false;
+}
+
+function applyNameFilter(token) {
+  nameFilter = token;
+  els.nameFilterLabel.textContent = token;
+  els.nameFilterBar.hidden = false;
+  renderCurrentView();
+}
+
+els.eventList.addEventListener("click", (e) => {
+  const tokenEl = e.target.closest(".name-token");
+  if (tokenEl) {
+    applyNameFilter(tokenEl.dataset.token);
+    return;
+  }
+  const item = e.target.closest(".event-item");
+  if (!item) return;
+  selectEventForNote(item.dataset.id, item.dataset.summary, item.dataset.start);
+});
+
+els.calendarGrid.addEventListener("click", (e) => {
+  const btn = e.target.closest(".cal-event");
+  if (!btn) return;
+  selectEventForNote(btn.dataset.id, btn.dataset.summary, btn.dataset.start);
 });
 
 els.noteForm.addEventListener("submit", async (e) => {
