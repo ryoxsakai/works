@@ -10,7 +10,7 @@
       if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
     })();
   </script>
-  <link rel="stylesheet" href="../shared/styles.css?v=6" />
+  <link rel="stylesheet" href="../shared/styles.css?v=7" />
 </head>
 <body>
   <header class="page-header">
@@ -87,11 +87,25 @@
     </div>
     <div class="modal-tabs" role="tablist">
       <button type="button" class="tab-btn" data-tab="calendar" role="tab" aria-selected="true">カレンダー</button>
+      <button type="button" class="tab-btn" data-tab="terms" role="tab" aria-selected="false">学期</button>
       <button type="button" class="tab-btn" data-tab="appearance" role="tab" aria-selected="false">デザイン</button>
     </div>
     <div class="modal-tab-panel" data-tab-panel="calendar">
-      <p class="hint">授業予定が入っているカレンダーにチェックを入れてください(全デバイス共通の設定です)。</p>
+      <p class="hint">授業予定が入っているカレンダーにチェックを入れてください(全デバイス共通の設定です)。色はGoogleカレンダー側の設定がそのまま使われます。</p>
       <div id="calendar-checklist"></div>
+    </div>
+    <div class="modal-tab-panel" data-tab-panel="terms" hidden>
+      <p class="hint">期間を登録してチェックすると、その期間の予定だけに絞り込めます(複数選択可・全デバイス共通)。</p>
+      <div id="term-list"></div>
+      <form id="add-term-form" class="term-form">
+        <input id="new-term-label" type="text" placeholder="例: 2026年度 後期" required />
+        <div class="term-dates">
+          <input id="new-term-start" type="date" required />
+          <span>〜</span>
+          <input id="new-term-end" type="date" required />
+        </div>
+        <button type="submit">追加</button>
+      </form>
     </div>
     <div class="modal-tab-panel" data-tab-panel="appearance" hidden>
       <div class="theme-options">
@@ -102,6 +116,6 @@
     </div>
   </dialog>
 
-  <script type="module" src="./app.js?v=6"></script>
+  <script type="module" src="./app.js?v=7"></script>
 </body>
 </html>

@@ -35,6 +35,11 @@
   box-sizing: border-box;
 }
 
+/* IDセレクタでdisplayを指定している要素があっても、hidden属性を確実に優先させる */
+[hidden] {
+  display: none !important;
+}
+
 body {
   margin: 0;
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -124,6 +129,14 @@ main {
 
 .calendar-item input {
   padding: 0;
+}
+
+.calendar-color-dot {
+  display: inline-block;
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 
 input,
@@ -369,4 +382,58 @@ dialog#settings-modal::backdrop {
 
 .theme-options input {
   padding: 0;
+}
+
+.term-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.85rem;
+}
+
+.term-item:last-child {
+  border-bottom: none;
+}
+
+.term-item input {
+  padding: 0;
+}
+
+.term-item-label {
+  flex: 1;
+}
+
+.term-item-dates {
+  font-size: 0.75rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.term-delete {
+  padding: 0.2rem 0.5rem;
+  font-size: 0.75rem;
+  background: transparent;
+  color: #dc2626;
+  border-color: #dc2626;
+}
+
+.term-form {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+
+.term-dates {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.term-dates input {
+  flex: 1;
+  min-width: 0;
 }

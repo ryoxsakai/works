@@ -1,7 +1,7 @@
 function corsHeaders(origin) {
   return {
     "Access-Control-Allow-Origin": origin,
-    "Access-Control-Allow-Methods": "GET,POST,PUT,OPTIONS",
+    "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type,Authorization",
   };
 }
@@ -96,6 +96,30 @@ async function writeSetting(env, key, value) {
     .run();
 }
 
+// 年度・学期などの期間定義(複数登録して、任意の組み合わせで予定を絞り込むために使う)
+async function readTerms(env) {
+  const { results } = await env.DB.prepare("SELECT * FROM terms ORDER BY start_date").all();
+  return results;
+}
+
+async function createTerm(env, body) {
+  const label = (body.label || "").trim();
+  const startDate = body.start_date;
+  const endDate = body.end_date;
+  if (!label || !startDate || !endDate) {
+    throw new Error("label, start_date, end_date are required");
+  }
+  return env.DB.prepare(
+    "INSERT INTO terms (label, start_date, end_date) VALUES (?, ?, ?) RETURNING *"
+  )
+    .bind(label, startDate, endDate)
+    .first();
+}
+
+async function deleteTerm(env, id) {
+  await env.DB.prepare("DELETE FROM terms WHERE id = ?").bind(id).run();
+}
+
 export default {
   async fetch(request, env) {
     const origin = env.ALLOWED_ORIGIN;
@@ -139,7 +163,25 @@ export default {
         if (Array.isArray(body.selected_calendars)) {
           await writeSetting(env, "selected_calendars", body.selected_calendars);
         }
+        if (Array.isArray(body.selected_term_ids)) {
+          await writeSetting(env, "selected_term_ids", body.selected_term_ids);
+        }
         return json(await readSettings(env), headers);
+      }
+
+      if (url.pathname === "/api/terms" && request.method === "GET") {
+        return json(await readTerms(env), headers);
+      }
+
+      if (url.pathname === "/api/terms" && request.method === "POST") {
+        const body = await request.json();
+        return json(await createTerm(env, body), headers, 201);
+      }
+
+      const termMatch = url.pathname.match(/^\/api\/terms\/(\d+)$/);
+      if (termMatch && request.method === "DELETE") {
+        await deleteTerm(env, termMatch[1]);
+        return json({ ok: true }, headers);
       }
 
       return json({ error: "not found" }, headers, 404);
