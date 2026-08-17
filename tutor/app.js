@@ -3,10 +3,10 @@ import {
   signIn,
   signOutUser,
   getGoogleAccessToken,
-} from "../shared/auth.js?v=4";
+} from "../shared/auth.js?v=5";
+import { getTheme, setTheme } from "../shared/theme.js?v=5";
 
 const API_BASE = "/api";
-const SELECTED_CALENDARS_KEY = "works_selected_calendars";
 
 const els = {
   signedOut: document.querySelector("#signed-out"),
@@ -15,6 +15,12 @@ const els = {
   signInBtn: document.querySelector("#sign-in"),
   signOutBtn: document.querySelector("#sign-out"),
   actionError: document.querySelector("#action-error"),
+  openSettingsBtn: document.querySelector("#open-settings"),
+  settingsModal: document.querySelector("#settings-modal"),
+  settingsCloseBtn: document.querySelector("#settings-close"),
+  tabBtns: document.querySelectorAll(".tab-btn"),
+  tabPanels: document.querySelectorAll(".modal-tab-panel"),
+  themeRadios: document.querySelectorAll('input[name="theme"]'),
   calendarChecklist: document.querySelector("#calendar-checklist"),
   studentSelect: document.querySelector("#student-select"),
   addStudentForm: document.querySelector("#add-student-form"),
@@ -32,23 +38,40 @@ const els = {
 let students = [];
 let selectedStudent = null;
 let selectedEvent = null;
-let selectedCalendarIds = loadSelectedCalendarIds();
-
-function loadSelectedCalendarIds() {
-  try {
-    return new Set(JSON.parse(localStorage.getItem(SELECTED_CALENDARS_KEY) || "[]"));
-  } catch {
-    return new Set();
-  }
-}
-
-function saveSelectedCalendarIds() {
-  localStorage.setItem(SELECTED_CALENDARS_KEY, JSON.stringify([...selectedCalendarIds]));
-}
+let selectedCalendarIds = new Set();
 
 function showActionError(err) {
   els.actionError.textContent = err instanceof Error ? err.message : String(err);
 }
+
+// --- 設定モーダル ---
+
+els.openSettingsBtn.addEventListener("click", () => {
+  const current = getTheme();
+  els.themeRadios.forEach((r) => {
+    r.checked = r.value === current;
+  });
+  els.settingsModal.showModal();
+});
+
+els.settingsCloseBtn.addEventListener("click", () => els.settingsModal.close());
+
+els.tabBtns.forEach((btn) => {
+  btn.addEventListener("click", () => {
+    els.tabBtns.forEach((b) => b.setAttribute("aria-selected", String(b === btn)));
+    els.tabPanels.forEach((panel) => {
+      panel.hidden = panel.dataset.tabPanel !== btn.dataset.tab;
+    });
+  });
+});
+
+els.themeRadios.forEach((radio) => {
+  radio.addEventListener("change", () => {
+    if (radio.checked) setTheme(radio.value);
+  });
+});
+
+// --- ログイン ---
 
 els.signInBtn.addEventListener("click", () => {
   els.authError.textContent = "";
@@ -64,6 +87,7 @@ watchAuth({
     els.userEmail.textContent = user.email;
     els.actionError.textContent = "";
     try {
+      await loadSettings();
       await loadCalendarList();
       await loadStudents();
       await loadCalendarEvents();
@@ -93,6 +117,20 @@ async function apiFetch(path, options = {}) {
     throw new Error(`API error ${res.status}: ${await res.text()}`);
   }
   return res.status === 204 ? null : res.json();
+}
+
+// --- サーバー側設定(対象カレンダー。デバイス間で共有) ---
+
+async function loadSettings() {
+  const settings = await apiFetch("/settings");
+  selectedCalendarIds = new Set(settings.selected_calendars || []);
+}
+
+async function saveSelectedCalendars() {
+  await apiFetch("/settings", {
+    method: "PUT",
+    body: JSON.stringify({ selected_calendars: [...selectedCalendarIds] }),
+  });
 }
 
 async function loadCalendarList() {
@@ -126,8 +164,8 @@ els.calendarChecklist.addEventListener("change", async (e) => {
   } else {
     selectedCalendarIds.delete(checkbox.value);
   }
-  saveSelectedCalendarIds();
   try {
+    await saveSelectedCalendars();
     await loadCalendarEvents();
   } catch (err) {
     showActionError(err);
@@ -179,7 +217,7 @@ async function loadCalendarEvents() {
     return;
   }
   if (selectedCalendarIds.size === 0) {
-    els.eventList.innerHTML = "<li>上でカレンダーを選択してください</li>";
+    els.eventList.innerHTML = "<li>設定からカレンダーを選択してください</li>";
     return;
   }
 

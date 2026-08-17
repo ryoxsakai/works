@@ -1,7 +1,7 @@
 function corsHeaders(origin) {
   return {
     "Access-Control-Allow-Origin": origin,
-    "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+    "Access-Control-Allow-Methods": "GET,POST,PUT,OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type,Authorization",
   };
 }
@@ -73,6 +73,29 @@ async function createLesson(env, body) {
     .first();
 }
 
+// 単一ユーザー運用のアプリ設定(対象カレンダー等)をkey-valueで保存する。
+// デバイスをまたいでも同じ設定が使えるようにするため、localStorageではなくD1に置く。
+async function readSettings(env) {
+  const { results } = await env.DB.prepare("SELECT key, value FROM settings").all();
+  const out = {};
+  for (const row of results) {
+    try {
+      out[row.key] = JSON.parse(row.value);
+    } catch {
+      out[row.key] = row.value;
+    }
+  }
+  return out;
+}
+
+async function writeSetting(env, key, value) {
+  await env.DB.prepare(
+    "INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value"
+  )
+    .bind(key, JSON.stringify(value))
+    .run();
+}
+
 export default {
   async fetch(request, env) {
     const origin = env.ALLOWED_ORIGIN;
@@ -105,6 +128,18 @@ export default {
       if (url.pathname === "/api/lessons" && request.method === "POST") {
         const body = await request.json();
         return json(await createLesson(env, body), headers, 201);
+      }
+
+      if (url.pathname === "/api/settings" && request.method === "GET") {
+        return json(await readSettings(env), headers);
+      }
+
+      if (url.pathname === "/api/settings" && request.method === "PUT") {
+        const body = await request.json();
+        if (Array.isArray(body.selected_calendars)) {
+          await writeSetting(env, "selected_calendars", body.selected_calendars);
+        }
+        return json(await readSettings(env), headers);
       }
 
       return json({ error: "not found" }, headers, 404);

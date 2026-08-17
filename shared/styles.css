@@ -16,6 +16,21 @@
   }
 }
 
+/* 明示的なテーマ選択(設定モーダル)はOSの設定より優先する */
+:root[data-theme="light"] {
+  --bg: #ffffff;
+  --fg: #1a1a1a;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+}
+
+:root[data-theme="dark"] {
+  --bg: #0f172a;
+  --fg: #e5e7eb;
+  --muted: #94a3b8;
+  --border: #1e293b;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -148,4 +163,81 @@ button {
 
 .error {
   color: #dc2626;
+}
+
+dialog#settings-modal {
+  width: min(480px, 92vw);
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+dialog#settings-modal::backdrop {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  color: var(--fg);
+  font-size: 1.25rem;
+  line-height: 1;
+  padding: 0.25rem 0.5rem;
+}
+
+.modal-tabs {
+  display: flex;
+  gap: 1rem;
+  padding: 0 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.tab-btn {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  color: var(--muted);
+  padding: 0.6rem 0.1rem;
+}
+
+.tab-btn[aria-selected="true"] {
+  color: var(--fg);
+  border-bottom-color: var(--accent);
+}
+
+.modal-tab-panel {
+  padding: 1rem;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.theme-options {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.theme-options label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.theme-options input {
+  padding: 0;
 }

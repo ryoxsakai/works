@@ -14,3 +14,8 @@ CREATE TABLE IF NOT EXISTS lesson_notes (
   score TEXT,
   created_at TEXT DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS settings (
+  key TEXT PRIMARY KEY,
+  value TEXT
+);
