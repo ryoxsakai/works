@@ -92,6 +92,10 @@ const els = {
   calPrevBtn: document.querySelector("#cal-prev"),
   calNextBtn: document.querySelector("#cal-next"),
   calendarGrid: document.querySelector("#calendar-grid"),
+  listWeekNav: document.querySelector("#list-week-nav"),
+  listWeekPrevBtn: document.querySelector("#list-week-prev"),
+  listWeekNextBtn: document.querySelector("#list-week-next"),
+  listWeekLabel: document.querySelector("#list-week-label"),
   authError: document.querySelector("#auth-error"),
   pageTabBtns: document.querySelectorAll(".page-tab-btn"),
   pageTabPanels: document.querySelectorAll("[data-page-tab-panel]"),
@@ -152,6 +156,7 @@ let rawEvents = [];
 let nameFilter = null;
 let eventViewMode = localStorage.getItem(EVENT_VIEW_KEY) === "calendar" ? "calendar" : "list";
 let calendarCursor = startOfMonth(new Date());
+let listWeekCursor = startOfWeek(new Date());
 let recordDayOffset = 0; // -1:前日 0:当日 1:翌日
 let goals = [];
 let candidateSchools = [];
@@ -291,6 +296,7 @@ async function loadRecordTable() {
     return {
       eventId: ev.id,
       label,
+      termId: coveringTerm ? coveringTerm.id : "",
       n: n || 1,
       m: m || 1,
       start: ev.start?.dateTime || ev.start?.date || "",
@@ -309,7 +315,7 @@ function renderRecordTable(rows) {
   els.recordTbody.innerHTML = rows
     .map(
       (r) => `<tr data-event-id="${escapeHtml(r.eventId)}" data-completed="${r.completed ? 1 : 0}">
-        <td>${escapeHtml(r.label)}</td>
+        <td><button type="button" class="record-student-link" data-name="${escapeHtml(r.label)}" data-term-id="${r.termId}"><i class="fa-solid fa-book-open"></i> ${escapeHtml(r.label)}</button></td>
         <td>${r.n}/${r.m}回</td>
         <td>${formatDate(r.start)}</td>
         <td><textarea class="record-plan" rows="2">${escapeHtml(r.lessonPlan)}</textarea></td>
@@ -320,6 +326,14 @@ function renderRecordTable(rows) {
     )
     .join("");
 }
+
+els.recordTbody.addEventListener("click", (e) => {
+  const link = e.target.closest(".record-student-link");
+  if (!link) return;
+  const termId = Number(link.dataset.termId);
+  const term = termId ? terms.find((t) => t.id === termId) : undefined;
+  goToCurriculum(link.dataset.name, term);
+});
 
 els.recordTbody.addEventListener("change", async (e) => {
   const row = e.target.closest("tr[data-event-id]");
@@ -598,15 +612,15 @@ function renderYearGroups() {
           ? `<form class="year-edit-form" data-year-id="${y.id}">
               <input type="text" class="edit-year-label" value="${escapeHtml(y.label)}" required />
               <div class="edit-actions">
-                <button type="submit">保存</button>
-                <button type="button" class="cancel-edit-year">キャンセル</button>
+                <button type="submit"><i class="fa-solid fa-check"></i> 保存</button>
+                <button type="button" class="cancel-edit-year"><i class="fa-solid fa-xmark"></i> キャンセル</button>
               </div>
             </form>`
           : `<div class="year-group-header">
               <h3>${escapeHtml(y.label)}</h3>
               <div class="year-actions">
-                <button type="button" class="year-edit" data-id="${y.id}">編集</button>
-                <button type="button" class="year-delete" data-id="${y.id}">削除</button>
+                <button type="button" class="year-edit" data-id="${y.id}" aria-label="編集"><i class="fa-solid fa-pen"></i></button>
+                <button type="button" class="year-delete" data-id="${y.id}" aria-label="削除"><i class="fa-solid fa-trash"></i></button>
               </div>
             </div>`;
       return `<div class="year-group">
@@ -619,7 +633,7 @@ function renderYearGroups() {
             <span>〜</span>
             <input type="date" class="new-term-end" required />
           </div>
-          <button type="submit">学期を追加</button>
+          <button type="submit"><i class="fa-solid fa-plus"></i> 学期を追加</button>
         </form>
       </div>`;
     })
@@ -637,8 +651,8 @@ function renderTermRow(t) {
         <input type="date" class="edit-term-end" value="${t.end_date}" required />
       </div>
       <div class="edit-actions">
-        <button type="submit">保存</button>
-        <button type="button" class="cancel-edit-term">キャンセル</button>
+        <button type="submit"><i class="fa-solid fa-check"></i> 保存</button>
+        <button type="button" class="cancel-edit-term"><i class="fa-solid fa-xmark"></i> キャンセル</button>
       </div>
     </form>`;
   }
@@ -646,8 +660,8 @@ function renderTermRow(t) {
     <input type="checkbox" class="term-checkbox" value="${t.id}" ${checked} />
     <span class="term-item-label">${escapeHtml(t.label)}</span>
     <span class="term-item-dates">${t.start_date} 〜 ${t.end_date}</span>
-    <button type="button" class="term-edit" data-id="${t.id}">編集</button>
-    <button type="button" class="term-delete" data-id="${t.id}">削除</button>
+    <button type="button" class="term-edit" data-id="${t.id}" aria-label="編集"><i class="fa-solid fa-pen"></i></button>
+    <button type="button" class="term-delete" data-id="${t.id}" aria-label="削除"><i class="fa-solid fa-trash"></i></button>
   </div>`;
 }
 
@@ -1053,17 +1067,17 @@ function renderGoalEditLists() {
           return `<form class="goal-edit-form" data-goal-id="${g.id}">
             <input type="text" class="edit-goal-text" value="${escapeHtml(g.text)}" required />
             <div class="edit-actions">
-              <button type="submit">保存</button>
-              <button type="button" class="cancel-edit-goal">キャンセル</button>
+              <button type="submit"><i class="fa-solid fa-check"></i> 保存</button>
+              <button type="button" class="cancel-edit-goal"><i class="fa-solid fa-xmark"></i> キャンセル</button>
             </div>
           </form>`;
         }
         return `<div class="term-item" data-goal-id="${g.id}">
           <span class="term-item-label">${escapeHtml(g.text)}</span>
-          <button type="button" class="goal-move-up" ${i === 0 ? "disabled" : ""}>▲</button>
-          <button type="button" class="goal-move-down" ${i === items.length - 1 ? "disabled" : ""}>▼</button>
-          <button type="button" class="goal-edit">編集</button>
-          <button type="button" class="goal-delete">削除</button>
+          <button type="button" class="goal-move-up" ${i === 0 ? "disabled" : ""} aria-label="上へ"><i class="fa-solid fa-chevron-up"></i></button>
+          <button type="button" class="goal-move-down" ${i === items.length - 1 ? "disabled" : ""} aria-label="下へ"><i class="fa-solid fa-chevron-down"></i></button>
+          <button type="button" class="goal-edit" aria-label="編集"><i class="fa-solid fa-pen"></i></button>
+          <button type="button" class="goal-delete" aria-label="削除"><i class="fa-solid fa-trash"></i></button>
         </div>`;
       })
       .join("");
@@ -1248,18 +1262,18 @@ function renderGoalTemplateLists() {
           return `<form class="template-edit-form" data-template-id="${t.id}">
             <input type="text" class="edit-template-text" value="${escapeHtml(t.text)}" required />
             <div class="edit-actions">
-              <button type="submit">保存</button>
-              <button type="button" class="cancel-edit-template">キャンセル</button>
+              <button type="submit"><i class="fa-solid fa-check"></i> 保存</button>
+              <button type="button" class="cancel-edit-template"><i class="fa-solid fa-xmark"></i> キャンセル</button>
             </div>
           </form>`;
         }
         return `<div class="term-item" data-template-id="${t.id}">
           <span class="term-item-label">${escapeHtml(t.text)}</span>
-          <button type="button" class="template-move-up" ${i === 0 ? "disabled" : ""}>▲</button>
-          <button type="button" class="template-move-down" ${i === items.length - 1 ? "disabled" : ""}>▼</button>
-          <button type="button" class="template-use">追加</button>
-          <button type="button" class="template-edit">編集</button>
-          <button type="button" class="template-delete">削除</button>
+          <button type="button" class="template-move-up" ${i === 0 ? "disabled" : ""} aria-label="上へ"><i class="fa-solid fa-chevron-up"></i></button>
+          <button type="button" class="template-move-down" ${i === items.length - 1 ? "disabled" : ""} aria-label="下へ"><i class="fa-solid fa-chevron-down"></i></button>
+          <button type="button" class="template-use" aria-label="目標として追加"><i class="fa-solid fa-plus"></i></button>
+          <button type="button" class="template-edit" aria-label="編集"><i class="fa-solid fa-pen"></i></button>
+          <button type="button" class="template-delete" aria-label="削除"><i class="fa-solid fa-trash"></i></button>
         </div>`;
       })
       .join("");
@@ -1451,7 +1465,7 @@ function renderSchoolsModal() {
         .map(
           (s) => `<li class="term-item" data-school-id="${s.id}">
             <span class="term-item-label">${escapeHtml(s.school_name)}</span>
-            <button type="button" class="national-school-delete" data-id="${s.id}">削除</button>
+            <button type="button" class="national-school-delete" data-id="${s.id}" aria-label="削除"><i class="fa-solid fa-trash"></i></button>
           </li>`
         )
         .join("")
@@ -1640,6 +1654,7 @@ async function loadCalendarEvents() {
 function showEventPlaceholder(message) {
   els.calendarView.hidden = true;
   els.eventList.hidden = false;
+  els.listWeekNav.hidden = true;
   els.eventList.innerHTML = `<li>${escapeHtml(message)}</li>`;
 }
 
@@ -1679,39 +1694,106 @@ function eventColorStyle(ev) {
   return ` style="background-color:${escapeHtml(color.bg)};color:${escapeHtml(color.fg)};border-color:${escapeHtml(color.raw)}"`;
 }
 
+// トークンのテキスト部分をクリックするとカリキュラムでその名前を検索し、
+// 隣接するフィルタアイコンをクリックするとその場(授業予定)で絞り込む。
 function renderTokenizedSummary(summary) {
   return summary
     .split(TOKEN_DELIMITER_RE)
     .filter((part) => part !== "")
     .map((part) => {
       if (TOKEN_DELIMITER_RE.test(part) && part.length === 1) return escapeHtml(part);
-      return `<span class="name-token" data-token="${escapeHtml(part)}">${escapeHtml(part)}</span>`;
+      return `<span class="name-token">
+        <span class="name-token-text" data-token="${escapeHtml(part)}">${escapeHtml(part)}</span
+        ><button type="button" class="name-token-filter" data-token="${escapeHtml(part)}" aria-label="「${escapeHtml(part)}」で絞り込み"><i class="fa-solid fa-filter"></i></button>
+      </span>`;
     })
     .join("");
+}
+
+function handleTokenClick(e) {
+  const filterBtn = e.target.closest(".name-token-filter");
+  if (filterBtn) {
+    applyNameFilter(filterBtn.dataset.token);
+    return;
+  }
+  const textEl = e.target.closest(".name-token-text");
+  if (textEl) {
+    goToCurriculum(textEl.dataset.token);
+  }
+}
+
+function startOfWeek(d) {
+  const date = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const day = date.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  date.setDate(date.getDate() + diff);
+  return date;
+}
+
+function formatWeekLabel(d) {
+  return `${d.getMonth() + 1}/${d.getDate()}(${WEEKDAY_LABELS[d.getDay()]})`;
+}
+
+function formatEventTime(ev) {
+  if (!ev.start?.dateTime) return "終日";
+  return new Date(ev.start.dateTime).toLocaleTimeString("ja-JP", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 function renderListView(events) {
   els.calendarView.hidden = true;
   els.eventList.hidden = false;
+  els.listWeekNav.hidden = false;
 
-  if (events.length === 0) {
+  const weekStart = listWeekCursor;
+  const weekEnd = new Date(weekStart.getTime() + 6 * 86400000);
+  els.listWeekLabel.textContent = `${formatWeekLabel(weekStart)} 〜 ${formatWeekLabel(weekEnd)}`;
+
+  const eventsByDay = {};
+  let weekEventCount = 0;
+  events.forEach((ev) => {
+    const startStr = ev.start?.dateTime || ev.start?.date;
+    if (!startStr) return;
+    const d = new Date(startStr);
+    const dayOnly = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    if (dayOnly < weekStart || dayOnly > weekEnd) return;
+    const key = formatDateOnly(dayOnly);
+    (eventsByDay[key] ||= []).push(ev);
+    weekEventCount++;
+  });
+
+  if (weekEventCount === 0) {
     els.eventList.innerHTML = "<li>該当する授業予定がありません</li>";
     return;
   }
-  els.eventList.innerHTML = events
-    .map((ev) => {
-      const start = ev.start?.dateTime || ev.start?.date || "";
-      const summaryRaw = ev.summary || "(無題)";
-      return `<li class="event-item"${eventColorStyle(ev)}>
-        <span class="event-date">${formatDate(start)}</span>
-        <span class="event-summary">${renderTokenizedSummary(summaryRaw)}</span>
-      </li>`;
-    })
-    .join("");
+
+  let html = "";
+  for (let i = 0; i < 7; i++) {
+    const day = new Date(weekStart.getTime() + i * 86400000);
+    const dayEvents = (eventsByDay[formatDateOnly(day)] || []).sort((a, b) => {
+      const aStart = a.start?.dateTime || a.start?.date || "";
+      const bStart = b.start?.dateTime || b.start?.date || "";
+      return aStart.localeCompare(bStart);
+    });
+    html += `<li class="event-date-header">${formatWeekLabel(day)}</li>`;
+    html += dayEvents
+      .map((ev) => {
+        const summaryRaw = ev.summary || "(無題)";
+        return `<li class="event-item"${eventColorStyle(ev)}>
+          <span class="event-date">${formatEventTime(ev)}</span>
+          <span class="event-summary">${renderTokenizedSummary(summaryRaw)}</span>
+        </li>`;
+      })
+      .join("");
+  }
+  els.eventList.innerHTML = html;
 }
 
 function renderCalendarView(events) {
   els.eventList.hidden = true;
+  els.listWeekNav.hidden = true;
   els.calendarView.hidden = false;
 
   const year = calendarCursor.getFullYear();
@@ -1748,7 +1830,7 @@ function renderCalendarView(events) {
       const eventsHtml = visible
         .map((ev) => {
           const summaryRaw = ev.summary || "(無題)";
-          return `<span class="cal-event"${eventColorStyle(ev)}>${escapeHtml(summaryRaw)}</span>`;
+          return `<span class="cal-event"${eventColorStyle(ev)}>${renderTokenizedSummary(summaryRaw)}</span>`;
         })
         .join("");
       const overflowHtml = overflow > 0 ? `<div class="cal-more">+${overflow}件</div>` : "";
@@ -1770,10 +1852,41 @@ function applyNameFilter(token) {
   renderCurrentView();
 }
 
-els.eventList.addEventListener("click", (e) => {
-  const tokenEl = e.target.closest(".name-token");
-  if (!tokenEl) return;
-  applyNameFilter(tokenEl.dataset.token);
+// 授業予定・授業記録の生徒名をクリックしたときの遷移先。
+// カリキュラムタブに切り替え、その名前(・分かればその学期)で検索を実行する。
+async function goToCurriculum(name, term) {
+  const curriculumTabBtn = [...els.pageTabBtns].find((b) => b.dataset.pageTab === "curriculum");
+  curriculumTabBtn?.click();
+  els.curriculumName.value = name;
+  if (term) {
+    els.curriculumYearSelect.value = term.year_id;
+    renderCurriculumTermOptions(term.year_id);
+    els.curriculumTermSelect.value = term.id;
+  }
+  els.actionError.textContent = "";
+  saveCurriculumState();
+  try {
+    await loadCurriculumEvents();
+    await loadGoals();
+    await loadCandidateSchools();
+    await loadStudentPref();
+    renderCurriculumSearchSummary();
+  } catch (err) {
+    showActionError(err);
+  }
+}
+
+els.eventList.addEventListener("click", handleTokenClick);
+els.calendarGrid.addEventListener("click", handleTokenClick);
+
+els.listWeekPrevBtn.addEventListener("click", () => {
+  listWeekCursor = new Date(listWeekCursor.getTime() - 7 * 86400000);
+  renderCurrentView();
+});
+
+els.listWeekNextBtn.addEventListener("click", () => {
+  listWeekCursor = new Date(listWeekCursor.getTime() + 7 * 86400000);
+  renderCurrentView();
 });
 
 function formatDate(iso) {

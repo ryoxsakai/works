@@ -185,12 +185,58 @@ button {
 }
 
 .name-token {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.1rem;
+}
+
+.name-token-text {
   cursor: pointer;
   text-decoration: underline dotted;
   text-underline-offset: 2px;
 }
 
-.name-token:hover {
+.name-token-text:hover {
+  color: var(--accent);
+}
+
+.name-token-filter {
+  padding: 0 0.2rem;
+  font-size: 0.75em;
+  line-height: 1;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+}
+
+.name-token-filter:hover {
+  color: var(--accent);
+}
+
+.event-date-header {
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: var(--muted);
+  padding: 0.3rem 0.1rem 0.1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.event-date-header:first-child {
+  padding-top: 0;
+}
+
+.record-student-link {
+  padding: 0.1rem 0.3rem;
+  font-size: 0.85rem;
+  background: transparent;
+  color: var(--fg);
+  border: none;
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+  white-space: nowrap;
+}
+
+.record-student-link:hover {
   color: var(--accent);
 }
 
@@ -721,6 +767,7 @@ dialog.app-modal::backdrop {
   .view-toggle,
   #clear-name-filter,
   .calendar-nav button,
+  .name-token-filter,
   .curriculum-search-bar,
   .curriculum-print-name-row,
   .goals-section .panel-header button,
