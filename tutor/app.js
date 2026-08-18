@@ -101,7 +101,6 @@ const els = {
   schoolsModal: document.querySelector("#schools-modal"),
   schoolsModalCloseBtn: document.querySelector("#schools-modal-close"),
   schoolsSummary: document.querySelector("#schools-summary"),
-  schoolsTabBtns: document.querySelectorAll(".schools-tab-btn"),
   schoolsTabPanels: document.querySelectorAll("[data-schools-tab-panel]"),
   privateSchoolChecklist: document.querySelector("#private-school-checklist"),
   addNationalSchoolForm: document.querySelector("#add-national-school-form"),
@@ -117,6 +116,7 @@ els.tabBtns = els.settingsModal.querySelectorAll(".tab-btn");
 els.tabPanels = els.settingsModal.querySelectorAll(".modal-tab-panel");
 els.goalTabBtns = els.goalModal.querySelectorAll(".tab-btn");
 els.goalTabPanels = els.goalModal.querySelectorAll(".modal-tab-panel");
+els.schoolsTabBtns = els.schoolsModal.querySelectorAll(".tab-btn");
 
 let selectedCalendarIds = new Set();
 let calendarColors = new Map(); // calendarId -> { raw, bg, fg }

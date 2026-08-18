@@ -328,7 +328,7 @@ button {
   color: var(--muted);
 }
 
-dialog#settings-modal {
+dialog.app-modal {
   width: min(480px, 92vw);
   padding: 0;
   border: 1px solid var(--border);
@@ -337,7 +337,7 @@ dialog#settings-modal {
   color: var(--fg);
 }
 
-dialog#settings-modal::backdrop {
+dialog.app-modal::backdrop {
   background: rgba(0, 0, 0, 0.5);
 }
 

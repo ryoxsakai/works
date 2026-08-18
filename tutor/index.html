@@ -10,7 +10,7 @@
       if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
     })();
   </script>
-  <link rel="stylesheet" href="../shared/styles.css?v=13" />
+  <link rel="stylesheet" href="../shared/styles.css?v=14" />
 </head>
 <body>
   <header class="page-header">
@@ -129,7 +129,7 @@
     </section>
   </main>
 
-  <dialog id="settings-modal">
+  <dialog id="settings-modal" class="app-modal">
     <div class="modal-header">
       <h2>設定</h2>
       <button type="button" id="settings-close" class="modal-close" aria-label="閉じる">×</button>
@@ -160,7 +160,7 @@
     </div>
   </dialog>
 
-  <dialog id="goal-modal">
+  <dialog id="goal-modal" class="app-modal">
     <div class="modal-header">
       <h2>目標を編集</h2>
       <button type="button" id="goal-modal-close" class="modal-close" aria-label="閉じる">×</button>
@@ -193,14 +193,14 @@
     </div>
   </dialog>
 
-  <dialog id="schools-modal">
+  <dialog id="schools-modal" class="app-modal">
     <div class="modal-header">
       <h2>受験校・志望校の設定</h2>
       <button type="button" id="schools-modal-close" class="modal-close" aria-label="閉じる">×</button>
     </div>
     <div class="modal-tabs" role="tablist">
-      <button type="button" class="schools-tab-btn" data-schools-tab="select" role="tab" aria-selected="true">学校選択</button>
-      <button type="button" class="schools-tab-btn" data-schools-tab="rank" role="tab" aria-selected="false">志望順位</button>
+      <button type="button" class="tab-btn" data-schools-tab="select" role="tab" aria-selected="true">学校選択</button>
+      <button type="button" class="tab-btn" data-schools-tab="rank" role="tab" aria-selected="false">志望順位</button>
     </div>
     <div class="modal-tab-panel" data-schools-tab-panel="select">
       <p class="hint">私立医学部(あいうえお順)</p>
@@ -228,6 +228,6 @@
     </div>
   </dialog>
 
-  <script type="module" src="./app.js?v=14"></script>
+  <script type="module" src="./app.js?v=15"></script>
 </body>
 </html>
