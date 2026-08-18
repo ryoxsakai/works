@@ -89,7 +89,6 @@ const els = {
   addPeriodForm: document.querySelector("#add-period-form"),
   newPeriodLabel: document.querySelector("#new-period-label"),
   newPeriodStart: document.querySelector("#new-period-start"),
-  newPeriodEnd: document.querySelector("#new-period-end"),
   viewToggleBtns: document.querySelectorAll(".view-toggle-btn"),
   nameFilterBar: document.querySelector("#name-filter-bar"),
   nameFilterLabel: document.querySelector("#name-filter-label"),
@@ -670,15 +669,11 @@ function renderPeriodList() {
     return;
   }
   els.periodList.innerHTML = periods
-    .map((p) => {
+    .map((p, i) => {
       if (editingPeriodId === p.id) {
         return `<form class="period-edit-form" data-period-id="${p.id}">
           <input type="text" class="edit-period-label" value="${escapeHtml(p.label)}" required />
-          <div class="term-dates">
-            <input type="time" class="edit-period-start" value="${p.start_time}" required />
-            <span>〜</span>
-            <input type="time" class="edit-period-end" value="${p.end_time}" required />
-          </div>
+          <input type="time" class="edit-period-start" value="${p.start_time}" required />
           <div class="edit-actions">
             <button type="submit"><i class="fa-solid fa-check"></i> 保存</button>
             <button type="button" class="cancel-edit-period"><i class="fa-solid fa-xmark"></i> キャンセル</button>
@@ -687,7 +682,9 @@ function renderPeriodList() {
       }
       return `<div class="term-item" data-period-id="${p.id}">
         <span class="term-item-label">${escapeHtml(p.label)}</span>
-        <span class="term-item-dates">${p.start_time} 〜 ${p.end_time}</span>
+        <span class="term-item-dates">${p.start_time} 〜</span>
+        <button type="button" class="period-move-up" ${i === 0 ? "disabled" : ""} aria-label="上へ"><i class="fa-solid fa-chevron-up"></i></button>
+        <button type="button" class="period-move-down" ${i === periods.length - 1 ? "disabled" : ""} aria-label="下へ"><i class="fa-solid fa-chevron-down"></i></button>
         <button type="button" class="period-edit" aria-label="編集"><i class="fa-solid fa-pen"></i></button>
         <button type="button" class="period-delete" aria-label="削除"><i class="fa-solid fa-trash"></i></button>
       </div>`;
@@ -700,16 +697,14 @@ els.addPeriodForm.addEventListener("submit", async (e) => {
   els.actionError.textContent = "";
   const label = els.newPeriodLabel.value.trim();
   const startTime = els.newPeriodStart.value;
-  const endTime = els.newPeriodEnd.value;
-  if (!label || !startTime || !endTime) return;
+  if (!label || !startTime) return;
   try {
     await apiFetch("/periods", {
       method: "POST",
-      body: JSON.stringify({ label, start_time: startTime, end_time: endTime }),
+      body: JSON.stringify({ label, start_time: startTime }),
     });
     els.newPeriodLabel.value = "";
     els.newPeriodStart.value = "";
-    els.newPeriodEnd.value = "";
     await loadPeriods();
     await loadRecordTable();
   } catch (err) {
@@ -742,6 +737,27 @@ els.periodList.addEventListener("click", async (e) => {
   if (e.target.closest(".cancel-edit-period")) {
     editingPeriodId = null;
     renderPeriodList();
+    return;
+  }
+
+  const moveUp = e.target.closest(".period-move-up");
+  const moveDown = e.target.closest(".period-move-down");
+  if (moveUp || moveDown) {
+    const id = Number((moveUp || moveDown).closest("[data-period-id]").dataset.periodId);
+    const idx = periods.findIndex((p) => p.id === id);
+    const swapIdx = moveUp ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= periods.length) return;
+    const a = periods[idx];
+    const b = periods[swapIdx];
+    try {
+      await Promise.all([
+        apiFetch(`/periods/${a.id}`, { method: "PUT", body: JSON.stringify({ sort_order: b.sort_order }) }),
+        apiFetch(`/periods/${b.id}`, { method: "PUT", body: JSON.stringify({ sort_order: a.sort_order }) }),
+      ]);
+      await loadPeriods();
+    } catch (err) {
+      showActionError(err);
+    }
   }
 });
 
@@ -753,12 +769,11 @@ els.periodList.addEventListener("submit", async (e) => {
   const id = Number(editForm.dataset.periodId);
   const label = editForm.querySelector(".edit-period-label").value.trim();
   const startTime = editForm.querySelector(".edit-period-start").value;
-  const endTime = editForm.querySelector(".edit-period-end").value;
-  if (!label || !startTime || !endTime) return;
+  if (!label || !startTime) return;
   try {
     await apiFetch(`/periods/${id}`, {
       method: "PUT",
-      body: JSON.stringify({ label, start_time: startTime, end_time: endTime }),
+      body: JSON.stringify({ label, start_time: startTime }),
     });
     editingPeriodId = null;
     await loadPeriods();
@@ -768,6 +783,9 @@ els.periodList.addEventListener("submit", async (e) => {
   }
 });
 
+// 時限は開始時刻だけを持ち、次の時限の開始時刻の直前までをその時限とみなす。
+// 並び順(sort_order)は設定画面の表示順のためだけのものなので、判定はstart_timeで
+// 都度ソートし直してから行う。
 function findPeriodLabel(iso) {
   if (!iso) return null;
   const d = new Date(iso);
@@ -775,7 +793,12 @@ function findPeriodLabel(iso) {
   const hh = String(d.getHours()).padStart(2, "0");
   const mm = String(d.getMinutes()).padStart(2, "0");
   const t = `${hh}:${mm}`;
-  const match = periods.find((p) => t >= p.start_time && t < p.end_time);
+  const sorted = [...periods].sort((a, b) => a.start_time.localeCompare(b.start_time));
+  let match = null;
+  for (const p of sorted) {
+    if (p.start_time > t) break;
+    match = p;
+  }
   return match ? match.label : null;
 }
 
@@ -1898,18 +1921,20 @@ function eventColorStyle(ev) {
 
 // トークンのテキスト部分をクリックするとカリキュラムでその名前を検索し、
 // 隣接するフィルタアイコンをクリックするとその場(授業予定)で絞り込む。
+// 個々の単語(トークン)はカリキュラム遷移用にクリック可能なテキストとして残すが、
+// 絞り込みは1単語ごとではなく元のタイトル全体(全単語)を対象にする。
+// そのため絞り込みアイコンは各予定につき1つだけ、末尾にまとめて置く。
 function renderTokenizedSummary(summary) {
-  return summary
+  const fullText = summary.trim();
+  const tokensHtml = summary
     .split(TOKEN_DELIMITER_RE)
     .filter((part) => part !== "")
     .map((part) => {
       if (TOKEN_DELIMITER_RE.test(part) && part.length === 1) return escapeHtml(part);
-      return `<span class="name-token">
-        <span class="name-token-text" data-token="${escapeHtml(part)}">${escapeHtml(part)}</span
-        ><button type="button" class="name-token-filter" data-token="${escapeHtml(part)}" aria-label="「${escapeHtml(part)}」で絞り込み"><i class="fa-solid fa-filter"></i></button>
-      </span>`;
+      return `<span class="name-token-text" data-token="${escapeHtml(part)}">${escapeHtml(part)}</span>`;
     })
     .join("");
+  return `${tokensHtml}<button type="button" class="name-token-filter" data-token="${escapeHtml(fullText)}" aria-label="「${escapeHtml(fullText)}」で絞り込み"><i class="fa-solid fa-filter"></i></button>`;
 }
 
 function handleTokenClick(e) {

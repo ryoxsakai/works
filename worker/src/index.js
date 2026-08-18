@@ -162,38 +162,50 @@ async function deleteTerm(env, id) {
   await env.DB.prepare("DELETE FROM terms WHERE id = ?").bind(id).run();
 }
 
-// 時限(○限)。開始・終了時刻(HH:MM)の範囲にラベルを付け、授業記録などで
-// 時刻の代わりに時限名を表示するために使う。
+// 時限(○限)。開始時刻(HH:MM)だけを登録し、次の時限の開始時刻の直前までを
+// その時限とみなして、授業記録などで時刻の代わりに時限名を表示するために使う。
+// sort_orderは設定画面での並び順(表示専用)で、時刻とのマッチングには使わない。
 async function readPeriods(env) {
-  const { results } = await env.DB.prepare("SELECT * FROM periods ORDER BY start_time").all();
+  const { results } = await env.DB.prepare("SELECT * FROM periods ORDER BY sort_order").all();
   return results;
 }
 
 async function createPeriod(env, body) {
   const label = (body.label || "").trim();
   const startTime = body.start_time;
-  const endTime = body.end_time;
-  if (!label || !startTime || !endTime) {
-    throw new Error("label, start_time, end_time are required");
+  if (!label || !startTime) {
+    throw new Error("label, start_time are required");
   }
+  const { results } = await env.DB.prepare(
+    "SELECT COALESCE(MAX(sort_order), -1) AS maxOrder FROM periods"
+  ).all();
+  const nextOrder = (results[0]?.maxOrder ?? -1) + 1;
   return env.DB.prepare(
-    "INSERT INTO periods (label, start_time, end_time) VALUES (?, ?, ?) RETURNING *"
+    "INSERT INTO periods (label, start_time, sort_order) VALUES (?, ?, ?) RETURNING *"
   )
-    .bind(label, startTime, endTime)
+    .bind(label, startTime, nextOrder)
     .first();
 }
 
 async function updatePeriod(env, id, body) {
-  const label = (body.label || "").trim();
-  const startTime = body.start_time;
-  const endTime = body.end_time;
-  if (!label || !startTime || !endTime) {
-    throw new Error("label, start_time, end_time are required");
+  const fields = [];
+  const values = [];
+  if (body.label !== undefined) {
+    fields.push("label = ?");
+    values.push(body.label);
   }
-  return env.DB.prepare(
-    "UPDATE periods SET label = ?, start_time = ?, end_time = ? WHERE id = ? RETURNING *"
-  )
-    .bind(label, startTime, endTime, id)
+  if (body.start_time !== undefined) {
+    fields.push("start_time = ?");
+    values.push(body.start_time);
+  }
+  if (body.sort_order !== undefined) {
+    fields.push("sort_order = ?");
+    values.push(body.sort_order);
+  }
+  if (fields.length === 0) throw new Error("nothing to update");
+  values.push(id);
+  return env.DB.prepare(`UPDATE periods SET ${fields.join(", ")} WHERE id = ? RETURNING *`)
+    .bind(...values)
     .first();
 }
 

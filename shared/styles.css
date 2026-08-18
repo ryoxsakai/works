@@ -184,12 +184,6 @@ button {
   color: var(--muted);
 }
 
-.name-token {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.1rem;
-}
-
 .name-token-text {
   cursor: pointer;
   text-decoration: underline dotted;
@@ -201,6 +195,7 @@ button {
 }
 
 .name-token-filter {
+  margin-left: 0.2rem;
   padding: 0 0.2rem;
   font-size: 0.75em;
   line-height: 1;
@@ -732,7 +727,9 @@ dialog.app-modal::backdrop {
 .goal-move-up,
 .goal-move-down,
 .template-move-up,
-.template-move-down {
+.template-move-down,
+.period-move-up,
+.period-move-down {
   padding: 0.2rem 0.4rem;
   font-size: 0.75rem;
   background: transparent;

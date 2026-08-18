@@ -10,7 +10,7 @@
       if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
     })();
   </script>
-  <link rel="stylesheet" href="../shared/styles.css?v=26" />
+  <link rel="stylesheet" href="../shared/styles.css?v=27" />
   <link
     rel="stylesheet"
     href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
@@ -205,15 +205,11 @@
       </form>
     </div>
     <div class="modal-tab-panel" data-tab-panel="periods" hidden>
-      <p class="hint">時刻の範囲に時限名を登録すると、授業記録などで時刻の代わりに時限名(例: 3限)を表示します。</p>
+      <p class="hint">開始時刻を登録すると、次の時限の開始時刻の直前までをその時限とみなし、授業記録などで時刻の代わりに時限名(例: 3限)を表示します。</p>
       <div id="period-list"></div>
-      <form id="add-period-form" class="term-form">
+      <form id="add-period-form" class="inline-form">
         <input id="new-period-label" type="text" placeholder="例: 1限" required />
-        <div class="term-dates">
-          <input type="time" id="new-period-start" required />
-          <span>〜</span>
-          <input type="time" id="new-period-end" required />
-        </div>
+        <input type="time" id="new-period-start" required />
         <button type="submit"><i class="fa-solid fa-plus"></i> 時限を追加</button>
       </form>
     </div>
@@ -336,6 +332,6 @@
     </div>
   </dialog>
 
-  <script type="module" src="./app.js?v=28"></script>
+  <script type="module" src="./app.js?v=29"></script>
 </body>
 </html>

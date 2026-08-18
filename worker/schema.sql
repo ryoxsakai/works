@@ -82,6 +82,6 @@ CREATE TABLE IF NOT EXISTS periods (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   label TEXT NOT NULL,
   start_time TEXT NOT NULL,
-  end_time TEXT NOT NULL,
+  sort_order INTEGER DEFAULT 0,
   created_at TEXT DEFAULT (datetime('now'))
 );
