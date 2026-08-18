@@ -674,8 +674,8 @@ function renderPeriodList() {
           <input type="text" class="edit-period-label" value="${escapeHtml(p.label)}" required />
           <input type="time" class="edit-period-start" value="${p.start_time}" required />
           <div class="edit-actions">
-            <button type="submit"><i class="fa-solid fa-check"></i> 保存</button>
-            <button type="button" class="cancel-edit-period"><i class="fa-solid fa-xmark"></i> キャンセル</button>
+            <button type="submit" class="btn-primary" aria-label="保存"><i class="fa-solid fa-check"></i></button>
+            <button type="button" class="cancel-edit-period" aria-label="キャンセル"><i class="fa-solid fa-xmark"></i></button>
           </div>
         </form>`;
       }
@@ -847,8 +847,8 @@ function renderYearGroups() {
           ? `<form class="year-edit-form" data-year-id="${y.id}">
               <input type="text" class="edit-year-label" value="${escapeHtml(y.label)}" required />
               <div class="edit-actions">
-                <button type="submit"><i class="fa-solid fa-check"></i> 保存</button>
-                <button type="button" class="cancel-edit-year"><i class="fa-solid fa-xmark"></i> キャンセル</button>
+                <button type="submit" class="btn-primary" aria-label="保存"><i class="fa-solid fa-check"></i></button>
+                <button type="button" class="cancel-edit-year" aria-label="キャンセル"><i class="fa-solid fa-xmark"></i></button>
               </div>
             </form>`
           : `<div class="year-group-header">
@@ -868,7 +868,7 @@ function renderYearGroups() {
             <span>〜</span>
             <input type="date" class="new-term-end" required />
           </div>
-          <button type="submit"><i class="fa-solid fa-plus"></i> 学期を追加</button>
+          <button type="submit" class="btn-primary" aria-label="学期を追加"><i class="fa-solid fa-plus"></i></button>
         </form>
       </div>`;
     })
@@ -886,8 +886,8 @@ function renderTermRow(t) {
         <input type="date" class="edit-term-end" value="${t.end_date}" required />
       </div>
       <div class="edit-actions">
-        <button type="submit"><i class="fa-solid fa-check"></i> 保存</button>
-        <button type="button" class="cancel-edit-term"><i class="fa-solid fa-xmark"></i> キャンセル</button>
+        <button type="submit" class="btn-primary" aria-label="保存"><i class="fa-solid fa-check"></i></button>
+        <button type="button" class="cancel-edit-term" aria-label="キャンセル"><i class="fa-solid fa-xmark"></i></button>
       </div>
     </form>`;
   }
@@ -1302,8 +1302,8 @@ function renderGoalEditLists() {
           return `<form class="goal-edit-form" data-goal-id="${g.id}">
             <input type="text" class="edit-goal-text" value="${escapeHtml(g.text)}" required />
             <div class="edit-actions">
-              <button type="submit"><i class="fa-solid fa-check"></i> 保存</button>
-              <button type="button" class="cancel-edit-goal"><i class="fa-solid fa-xmark"></i> キャンセル</button>
+              <button type="submit" class="btn-primary" aria-label="保存"><i class="fa-solid fa-check"></i></button>
+              <button type="button" class="cancel-edit-goal" aria-label="キャンセル"><i class="fa-solid fa-xmark"></i></button>
             </div>
           </form>`;
         }
@@ -1497,8 +1497,8 @@ function renderGoalTemplateLists() {
           return `<form class="template-edit-form" data-template-id="${t.id}">
             <input type="text" class="edit-template-text" value="${escapeHtml(t.text)}" required />
             <div class="edit-actions">
-              <button type="submit"><i class="fa-solid fa-check"></i> 保存</button>
-              <button type="button" class="cancel-edit-template"><i class="fa-solid fa-xmark"></i> キャンセル</button>
+              <button type="submit" class="btn-primary" aria-label="保存"><i class="fa-solid fa-check"></i></button>
+              <button type="button" class="cancel-edit-template" aria-label="キャンセル"><i class="fa-solid fa-xmark"></i></button>
             </div>
           </form>`;
         }

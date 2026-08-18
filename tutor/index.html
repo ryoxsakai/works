@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>個別授業管理 | Works</title>
+  <title>授業管理 | Works</title>
   <script>
     (function () {
       var t = localStorage.getItem("works_theme");
       if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
     })();
   </script>
-  <link rel="stylesheet" href="../shared/styles.css?v=28" />
+  <link rel="stylesheet" href="../shared/styles.css?v=29" />
   <link
     rel="stylesheet"
     href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
@@ -19,33 +19,33 @@
 </head>
 <body>
   <header class="page-header">
-    <h1><a href="/">Works</a> / 個別授業管理</h1>
+    <h1><a href="/">授業管理</a></h1>
   </header>
 
   <main>
     <section id="signed-out">
       <p>このページはログインが必要です。</p>
-      <button id="sign-in"><i class="fa-solid fa-right-to-bracket"></i> Googleでログイン</button>
+      <button id="sign-in" class="btn-primary"><i class="fa-solid fa-right-to-bracket"></i> Googleでログイン</button>
       <p id="auth-error" class="error"></p>
     </section>
 
     <section id="signed-in" hidden>
       <div class="user-bar">
         <button id="sign-out" type="button" class="user-icon-btn" aria-label="ログアウト"><i class="fa-solid fa-circle-user"></i></button>
-        <button id="open-settings" type="button"><i class="fa-solid fa-gear"></i> 設定</button>
+        <button id="open-settings" type="button" aria-label="設定"><i class="fa-solid fa-gear"></i></button>
       </div>
       <p id="action-error" class="error"></p>
 
       <div class="page-tabs" role="tablist">
-        <button type="button" class="page-tab-btn" data-page-tab="record" aria-selected="true">授業記録</button>
-        <button type="button" class="page-tab-btn" data-page-tab="schedule" aria-selected="false">授業予定</button>
-        <button type="button" class="page-tab-btn" data-page-tab="curriculum" aria-selected="false">カリキュラム</button>
+        <button type="button" class="page-tab-btn" data-page-tab="record" aria-selected="true"><i class="fa-solid fa-clipboard-list"></i> 授業記録</button>
+        <button type="button" class="page-tab-btn" data-page-tab="schedule" aria-selected="false"><i class="fa-solid fa-calendar-days"></i> 授業予定</button>
+        <button type="button" class="page-tab-btn" data-page-tab="curriculum" aria-selected="false"><i class="fa-solid fa-graduation-cap"></i> カリキュラム</button>
       </div>
 
       <div data-page-tab-panel="record">
         <div class="panel">
           <div class="panel-header">
-            <h2>授業記録</h2>
+            <h2><i class="fa-solid fa-clipboard-list"></i> 授業記録</h2>
             <div class="view-toggle" role="group" aria-label="日付切り替え">
               <button type="button" class="record-day-btn" data-day="prev"><i class="fa-solid fa-chevron-left"></i> 前日</button>
               <button type="button" class="record-day-btn" data-day="today" aria-pressed="true"><i class="fa-solid fa-calendar-day"></i> 当日</button>
@@ -75,28 +75,28 @@
       <div data-page-tab-panel="schedule" hidden>
         <div class="panel">
           <div class="panel-header">
-            <h2>授業予定</h2>
+            <h2><i class="fa-solid fa-calendar-days"></i> 授業予定</h2>
             <div class="view-toggle" role="group" aria-label="表示切り替え">
-              <button type="button" class="view-toggle-btn" data-view="list"><i class="fa-solid fa-list"></i> リスト</button>
-              <button type="button" class="view-toggle-btn" data-view="calendar"><i class="fa-solid fa-calendar-days"></i> カレンダー</button>
+              <button type="button" class="view-toggle-btn" data-view="list" aria-label="リスト表示"><i class="fa-solid fa-list"></i></button>
+              <button type="button" class="view-toggle-btn" data-view="calendar" aria-label="カレンダー表示"><i class="fa-solid fa-calendar-days"></i></button>
             </div>
-            <button type="button" id="print-schedule" class="print-btn"><i class="fa-solid fa-print"></i> 印刷</button>
+            <button type="button" id="print-schedule" class="print-btn" aria-label="印刷"><i class="fa-solid fa-print"></i></button>
           </div>
           <p id="name-filter-bar" hidden>
             <i class="fa-solid fa-filter"></i> フィルタ: <strong id="name-filter-label"></strong>
-            <button type="button" id="clear-name-filter"><i class="fa-solid fa-xmark"></i> 解除</button>
+            <button type="button" id="clear-name-filter" aria-label="フィルタ解除"><i class="fa-solid fa-xmark"></i></button>
           </p>
           <div id="list-week-nav" class="calendar-nav">
-            <button type="button" id="list-week-prev"><i class="fa-solid fa-chevron-left"></i> 前週</button>
+            <button type="button" id="list-week-prev" aria-label="前週"><i class="fa-solid fa-chevron-left"></i></button>
             <span id="list-week-label"></span>
-            <button type="button" id="list-week-next">翌週 <i class="fa-solid fa-chevron-right"></i></button>
+            <button type="button" id="list-week-next" aria-label="翌週"><i class="fa-solid fa-chevron-right"></i></button>
           </div>
           <ul id="event-list"></ul>
           <div id="calendar-view" hidden>
             <div class="calendar-nav">
-              <button type="button" id="cal-prev"><i class="fa-solid fa-chevron-left"></i> 前月</button>
+              <button type="button" id="cal-prev" aria-label="前月"><i class="fa-solid fa-chevron-left"></i></button>
               <span id="cal-month-label"></span>
-              <button type="button" id="cal-next">翌月 <i class="fa-solid fa-chevron-right"></i></button>
+              <button type="button" id="cal-next" aria-label="翌月"><i class="fa-solid fa-chevron-right"></i></button>
             </div>
             <div id="calendar-grid" class="calendar-grid"></div>
           </div>
@@ -106,12 +106,12 @@
       <div data-page-tab-panel="curriculum" hidden>
         <div class="panel">
           <div class="panel-header">
-            <h2>カリキュラム</h2>
-            <button type="button" id="print-curriculum" class="print-btn"><i class="fa-solid fa-print"></i> 印刷</button>
+            <h2><i class="fa-solid fa-graduation-cap"></i> カリキュラム</h2>
+            <button type="button" id="print-curriculum" class="print-btn" aria-label="印刷"><i class="fa-solid fa-print"></i></button>
           </div>
           <div class="panel-header curriculum-search-bar">
             <p id="curriculum-search-summary" class="hint">名前を検索してください。</p>
-            <button type="button" id="open-curriculum-search-modal"><i class="fa-solid fa-magnifying-glass"></i> 検索</button>
+            <button type="button" id="open-curriculum-search-modal" aria-label="検索"><i class="fa-solid fa-magnifying-glass"></i></button>
           </div>
           <div class="curriculum-print-name-row">
             <label for="curriculum-print-name">印刷名前</label>
@@ -121,8 +121,8 @@
 
           <div class="goals-section">
             <div class="panel-header">
-              <h3>目標</h3>
-              <button type="button" id="open-goals-modal"><i class="fa-solid fa-pen"></i> 編集</button>
+              <h3><i class="fa-solid fa-bullseye"></i> 目標</h3>
+              <button type="button" id="open-goals-modal" aria-label="編集"><i class="fa-solid fa-pen"></i></button>
             </div>
             <div class="goals-columns">
               <div class="goals-column">
@@ -142,8 +142,8 @@
 
           <div class="schools-section">
             <div class="panel-header">
-              <h3>受験校・志望校</h3>
-              <button type="button" id="open-schools-modal"><i class="fa-solid fa-gear"></i> 設定</button>
+              <h3><i class="fa-solid fa-school"></i> 受験校・志望校</h3>
+              <button type="button" id="open-schools-modal" aria-label="設定"><i class="fa-solid fa-gear"></i></button>
             </div>
             <p id="schools-summary" class="hint">名前を入力して「表示」を押すと設定できます。</p>
           </div>
@@ -171,15 +171,15 @@
 
   <dialog id="settings-modal" class="app-modal">
     <div class="modal-header">
-      <h2>設定</h2>
+      <h2><i class="fa-solid fa-gear"></i> 設定</h2>
       <button type="button" id="settings-close" class="modal-close" aria-label="閉じる"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <div class="modal-tabs" role="tablist">
-      <button type="button" class="tab-btn" data-tab="calendar" role="tab" aria-selected="true">カレンダー</button>
-      <button type="button" class="tab-btn" data-tab="terms" role="tab" aria-selected="false">学期</button>
-      <button type="button" class="tab-btn" data-tab="periods" role="tab" aria-selected="false">時限</button>
-      <button type="button" class="tab-btn" data-tab="excluded" role="tab" aria-selected="false">空き枠</button>
-      <button type="button" class="tab-btn" data-tab="appearance" role="tab" aria-selected="false">デザイン</button>
+      <button type="button" class="tab-btn" data-tab="calendar" role="tab" aria-selected="true"><i class="fa-solid fa-calendar-days"></i> カレンダー</button>
+      <button type="button" class="tab-btn" data-tab="terms" role="tab" aria-selected="false"><i class="fa-solid fa-layer-group"></i> 学期</button>
+      <button type="button" class="tab-btn" data-tab="periods" role="tab" aria-selected="false"><i class="fa-solid fa-clock"></i> 時限</button>
+      <button type="button" class="tab-btn" data-tab="excluded" role="tab" aria-selected="false"><i class="fa-solid fa-ban"></i> 空き枠</button>
+      <button type="button" class="tab-btn" data-tab="appearance" role="tab" aria-selected="false"><i class="fa-solid fa-palette"></i> デザイン</button>
     </div>
     <div class="modal-tab-panel" data-tab-panel="calendar">
       <p class="hint">授業予定が入っているカレンダーにチェックを入れてください(全デバイス共通の設定です)。色はGoogleカレンダー側の設定がそのまま使われます。</p>
@@ -189,7 +189,7 @@
       <p class="hint">タイトルが完全一致する予定を、授業予定・カリキュラム・授業記録などすべての表示から除外します(空き枠など)。</p>
       <form id="add-excluded-title-form" class="inline-form">
         <input id="new-excluded-title" type="text" placeholder="例: ○" required />
-        <button type="submit"><i class="fa-solid fa-plus"></i> 追加</button>
+        <button type="submit" class="btn-primary" aria-label="追加"><i class="fa-solid fa-plus"></i></button>
       </form>
       <ul id="excluded-title-list" class="term-items"></ul>
     </div>
@@ -198,7 +198,7 @@
       <div id="year-groups"></div>
       <form id="add-year-form" class="term-form">
         <input id="new-year-label" type="text" placeholder="例: 2026年度" required />
-        <button type="submit"><i class="fa-solid fa-plus"></i> 年度を追加</button>
+        <button type="submit" class="btn-primary" aria-label="年度を追加"><i class="fa-solid fa-plus"></i></button>
       </form>
     </div>
     <div class="modal-tab-panel" data-tab-panel="periods" hidden>
@@ -207,7 +207,7 @@
       <form id="add-period-form" class="inline-form">
         <input id="new-period-label" type="text" placeholder="例: 1限" required />
         <input type="time" id="new-period-start" required />
-        <button type="submit"><i class="fa-solid fa-plus"></i> 時限を追加</button>
+        <button type="submit" class="btn-primary" aria-label="時限を追加"><i class="fa-solid fa-plus"></i></button>
       </form>
     </div>
     <div class="modal-tab-panel" data-tab-panel="appearance" hidden>
@@ -221,7 +221,7 @@
 
   <dialog id="curriculum-search-modal" class="app-modal">
     <div class="modal-header">
-      <h2>カリキュラムを検索</h2>
+      <h2><i class="fa-solid fa-magnifying-glass"></i> カリキュラムを検索</h2>
       <button type="button" id="curriculum-search-modal-close" class="modal-close" aria-label="閉じる"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <form id="curriculum-filter-form" class="modal-tab-panel">
@@ -235,33 +235,33 @@
         <option value="">学期を選択</option>
       </select>
       <div class="edit-actions">
-        <button type="submit"><i class="fa-solid fa-magnifying-glass"></i> 表示</button>
+        <button type="submit" class="btn-primary" aria-label="表示"><i class="fa-solid fa-magnifying-glass"></i></button>
       </div>
     </form>
   </dialog>
 
   <dialog id="goal-modal" class="app-modal">
     <div class="modal-header">
-      <h2>目標を編集</h2>
+      <h2><i class="fa-solid fa-bullseye"></i> 目標を編集</h2>
       <button type="button" id="goal-modal-close" class="modal-close" aria-label="閉じる"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <div class="modal-tabs" role="tablist">
-      <button type="button" class="tab-btn" data-goal-tab="short" role="tab" aria-selected="true">短期目標</button>
-      <button type="button" class="tab-btn" data-goal-tab="mid" role="tab" aria-selected="false">中期目標</button>
-      <button type="button" class="tab-btn" data-goal-tab="long" role="tab" aria-selected="false">長期目標</button>
+      <button type="button" class="tab-btn" data-goal-tab="short" role="tab" aria-selected="true"><i class="fa-solid fa-hourglass-start"></i> 短期目標</button>
+      <button type="button" class="tab-btn" data-goal-tab="mid" role="tab" aria-selected="false"><i class="fa-solid fa-hourglass-half"></i> 中期目標</button>
+      <button type="button" class="tab-btn" data-goal-tab="long" role="tab" aria-selected="false"><i class="fa-solid fa-hourglass-end"></i> 長期目標</button>
     </div>
     <div class="modal-tab-panel" data-goal-tab-panel="short">
       <p class="hint">テンプレート</p>
       <div class="goal-template-list" data-category="short"></div>
       <form class="add-goal-template-form inline-form" data-category="short">
         <input type="text" class="new-goal-template-text" placeholder="テンプレートを入力" required />
-        <button type="submit"><i class="fa-solid fa-plus"></i> テンプレートに追加</button>
+        <button type="submit" class="btn-primary" aria-label="テンプレートに追加"><i class="fa-solid fa-plus"></i></button>
       </form>
       <p class="hint">現在の目標</p>
       <div class="goal-edit-list" data-category="short"></div>
       <form class="add-goal-form inline-form" data-category="short">
         <input type="text" class="new-goal-text" placeholder="目標を入力" required />
-        <button type="submit"><i class="fa-solid fa-plus"></i> 追加</button>
+        <button type="submit" class="btn-primary" aria-label="追加"><i class="fa-solid fa-plus"></i></button>
       </form>
     </div>
     <div class="modal-tab-panel" data-goal-tab-panel="mid" hidden>
@@ -269,13 +269,13 @@
       <div class="goal-template-list" data-category="mid"></div>
       <form class="add-goal-template-form inline-form" data-category="mid">
         <input type="text" class="new-goal-template-text" placeholder="テンプレートを入力" required />
-        <button type="submit"><i class="fa-solid fa-plus"></i> テンプレートに追加</button>
+        <button type="submit" class="btn-primary" aria-label="テンプレートに追加"><i class="fa-solid fa-plus"></i></button>
       </form>
       <p class="hint">現在の目標</p>
       <div class="goal-edit-list" data-category="mid"></div>
       <form class="add-goal-form inline-form" data-category="mid">
         <input type="text" class="new-goal-text" placeholder="目標を入力" required />
-        <button type="submit"><i class="fa-solid fa-plus"></i> 追加</button>
+        <button type="submit" class="btn-primary" aria-label="追加"><i class="fa-solid fa-plus"></i></button>
       </form>
     </div>
     <div class="modal-tab-panel" data-goal-tab-panel="long" hidden>
@@ -283,25 +283,25 @@
       <div class="goal-template-list" data-category="long"></div>
       <form class="add-goal-template-form inline-form" data-category="long">
         <input type="text" class="new-goal-template-text" placeholder="テンプレートを入力" required />
-        <button type="submit"><i class="fa-solid fa-plus"></i> テンプレートに追加</button>
+        <button type="submit" class="btn-primary" aria-label="テンプレートに追加"><i class="fa-solid fa-plus"></i></button>
       </form>
       <p class="hint">現在の目標</p>
       <div class="goal-edit-list" data-category="long"></div>
       <form class="add-goal-form inline-form" data-category="long">
         <input type="text" class="new-goal-text" placeholder="目標を入力" required />
-        <button type="submit"><i class="fa-solid fa-plus"></i> 追加</button>
+        <button type="submit" class="btn-primary" aria-label="追加"><i class="fa-solid fa-plus"></i></button>
       </form>
     </div>
   </dialog>
 
   <dialog id="schools-modal" class="app-modal">
     <div class="modal-header">
-      <h2>受験校・志望校の設定</h2>
+      <h2><i class="fa-solid fa-school"></i> 受験校・志望校の設定</h2>
       <button type="button" id="schools-modal-close" class="modal-close" aria-label="閉じる"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <div class="modal-tabs" role="tablist">
-      <button type="button" class="tab-btn" data-schools-tab="select" role="tab" aria-selected="true">学校選択</button>
-      <button type="button" class="tab-btn" data-schools-tab="rank" role="tab" aria-selected="false">志望順位</button>
+      <button type="button" class="tab-btn" data-schools-tab="select" role="tab" aria-selected="true"><i class="fa-solid fa-list-check"></i> 学校選択</button>
+      <button type="button" class="tab-btn" data-schools-tab="rank" role="tab" aria-selected="false"><i class="fa-solid fa-ranking-star"></i> 志望順位</button>
     </div>
     <div class="modal-tab-panel" data-schools-tab-panel="select">
       <p class="hint">私立医学部(あいうえお順)</p>
@@ -309,7 +309,7 @@
       <p class="hint">国公立(自由入力)</p>
       <form id="add-national-school-form" class="inline-form">
         <input id="new-national-school" type="text" placeholder="例: 東京大学" required />
-        <button type="submit"><i class="fa-solid fa-plus"></i> 追加</button>
+        <button type="submit" class="btn-primary" aria-label="追加"><i class="fa-solid fa-plus"></i></button>
       </form>
       <ul id="national-school-list" class="term-items"></ul>
     </div>
@@ -329,6 +329,6 @@
     </div>
   </dialog>
 
-  <script type="module" src="./app.js?v=31"></script>
+  <script type="module" src="./app.js?v=32"></script>
 </body>
 </html>
