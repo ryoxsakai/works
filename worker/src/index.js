@@ -281,10 +281,20 @@ async function createGoalTemplate(env, body) {
 }
 
 async function updateGoalTemplate(env, id, body) {
-  const text = (body.text || "").trim();
-  if (!text) throw new Error("text is required");
-  return env.DB.prepare("UPDATE goal_templates SET text = ? WHERE id = ? RETURNING *")
-    .bind(text, id)
+  const fields = [];
+  const values = [];
+  if (body.text !== undefined) {
+    fields.push("text = ?");
+    values.push(body.text);
+  }
+  if (body.sort_order !== undefined) {
+    fields.push("sort_order = ?");
+    values.push(body.sort_order);
+  }
+  if (fields.length === 0) throw new Error("nothing to update");
+  values.push(id);
+  return env.DB.prepare(`UPDATE goal_templates SET ${fields.join(", ")} WHERE id = ? RETURNING *`)
+    .bind(...values)
     .first();
 }
 

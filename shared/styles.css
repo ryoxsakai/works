@@ -659,7 +659,9 @@ dialog.app-modal::backdrop {
 }
 
 .goal-move-up,
-.goal-move-down {
+.goal-move-down,
+.template-move-up,
+.template-move-down {
   padding: 0.2rem 0.4rem;
   font-size: 0.75rem;
   background: transparent;

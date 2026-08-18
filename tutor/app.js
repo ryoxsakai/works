@@ -987,7 +987,7 @@ function renderGoalTemplateLists() {
       return;
     }
     container.innerHTML = items
-      .map((t) => {
+      .map((t, i) => {
         if (editingTemplateId === t.id) {
           return `<form class="template-edit-form" data-template-id="${t.id}">
             <input type="text" class="edit-template-text" value="${escapeHtml(t.text)}" required />
@@ -999,6 +999,8 @@ function renderGoalTemplateLists() {
         }
         return `<div class="term-item" data-template-id="${t.id}">
           <span class="term-item-label">${escapeHtml(t.text)}</span>
+          <button type="button" class="template-move-up" ${i === 0 ? "disabled" : ""}>▲</button>
+          <button type="button" class="template-move-down" ${i === items.length - 1 ? "disabled" : ""}>▼</button>
           <button type="button" class="template-use">追加</button>
           <button type="button" class="template-edit">編集</button>
           <button type="button" class="template-delete">削除</button>
@@ -1073,6 +1075,32 @@ els.goalTemplateLists.forEach((container) => {
       if (!confirm("このテンプレートを削除しますか?")) return;
       try {
         await apiFetch(`/goal-templates/${id}`, { method: "DELETE" });
+        await loadGoalTemplates();
+      } catch (err) {
+        showActionError(err);
+      }
+      return;
+    }
+
+    const moveUp = e.target.closest(".template-move-up");
+    const moveDown = e.target.closest(".template-move-down");
+    if (moveUp || moveDown) {
+      const items = templatesForCategory(t.category);
+      const idx = items.findIndex((x) => x.id === id);
+      const swapIdx = moveUp ? idx - 1 : idx + 1;
+      if (swapIdx < 0 || swapIdx >= items.length) return;
+      const other = items[swapIdx];
+      try {
+        await Promise.all([
+          apiFetch(`/goal-templates/${t.id}`, {
+            method: "PUT",
+            body: JSON.stringify({ sort_order: other.sort_order }),
+          }),
+          apiFetch(`/goal-templates/${other.id}`, {
+            method: "PUT",
+            body: JSON.stringify({ sort_order: t.sort_order }),
+          }),
+        ]);
         await loadGoalTemplates();
       } catch (err) {
         showActionError(err);
