@@ -591,6 +591,22 @@ dialog.app-modal::backdrop {
   padding: 0;
 }
 
+.curriculum-search-bar {
+  margin-bottom: 0.5rem;
+}
+
+.curriculum-print-name-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.curriculum-print-name-row input {
+  flex: 1;
+  max-width: 260px;
+}
+
 .goals-section,
 .schools-section {
   margin-top: 1.25rem;
@@ -703,7 +719,8 @@ dialog.app-modal::backdrop {
   .view-toggle,
   #clear-name-filter,
   .calendar-nav button,
-  .curriculum-controls,
+  .curriculum-search-bar,
+  .curriculum-print-name-row,
   .goals-section .panel-header button,
   .schools-section .panel-header button,
   dialog {

@@ -302,19 +302,19 @@ async function deleteGoalTemplate(env, id) {
   await env.DB.prepare("DELETE FROM goal_templates WHERE id = ?").bind(id).run();
 }
 
-// 生徒(name)ごとの表示設定(印刷時の敬称など)。
+// 生徒(name)ごとの表示設定(印刷時に使う名前)。
 async function readStudentPref(env, name) {
   return env.DB.prepare("SELECT * FROM student_prefs WHERE name = ?").bind(name).first();
 }
 
 async function upsertStudentPref(env, name, body) {
-  const honorific = body.honorific === undefined ? null : body.honorific;
+  const printName = body.print_name === undefined ? null : body.print_name;
   await env.DB.prepare(
-    `INSERT INTO student_prefs (name, honorific, updated_at)
+    `INSERT INTO student_prefs (name, print_name, updated_at)
      VALUES (?, ?, datetime('now'))
-     ON CONFLICT(name) DO UPDATE SET honorific = excluded.honorific, updated_at = excluded.updated_at`
+     ON CONFLICT(name) DO UPDATE SET print_name = excluded.print_name, updated_at = excluded.updated_at`
   )
-    .bind(name, honorific)
+    .bind(name, printName)
     .run();
   return env.DB.prepare("SELECT * FROM student_prefs WHERE name = ?").bind(name).first();
 }

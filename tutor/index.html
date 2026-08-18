@@ -10,7 +10,7 @@
       if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
     })();
   </script>
-  <link rel="stylesheet" href="../shared/styles.css?v=22" />
+  <link rel="stylesheet" href="../shared/styles.css?v=23" />
 </head>
 <body>
   <header class="page-header">
@@ -71,25 +71,13 @@
             <h2>カリキュラム</h2>
             <button type="button" id="print-curriculum" class="print-btn">印刷</button>
           </div>
-          <div class="curriculum-controls">
-            <p class="hint">名前・年度・学期を選ぶと、その名前を含む予定が期間内から自動で第1回・第2回…と並びます。</p>
-            <form id="curriculum-filter-form" class="inline-form">
-              <input id="curriculum-name" type="text" placeholder="生徒名など" required list="curriculum-name-list" autocomplete="off" />
-              <datalist id="curriculum-name-list"></datalist>
-              <select id="curriculum-honorific">
-                <option value="">敬称なし</option>
-                <option value="くん">くん</option>
-                <option value="さん">さん</option>
-                <option value="様">様</option>
-              </select>
-              <select id="curriculum-year-select">
-                <option value="">年度を選択</option>
-              </select>
-              <select id="curriculum-term-select">
-                <option value="">学期を選択</option>
-              </select>
-              <button type="submit">表示</button>
-            </form>
+          <div class="panel-header curriculum-search-bar">
+            <p id="curriculum-search-summary" class="hint">名前を検索してください。</p>
+            <button type="button" id="open-curriculum-search-modal">検索</button>
+          </div>
+          <div class="curriculum-print-name-row">
+            <label for="curriculum-print-name">印刷名前</label>
+            <input id="curriculum-print-name" type="text" placeholder="未設定の場合は検索名をそのまま使用" />
           </div>
           <p id="curriculum-print-header" class="print-only"></p>
 
@@ -172,6 +160,27 @@
         <label><input type="radio" name="theme" value="dark" /> ダーク</label>
       </div>
     </div>
+  </dialog>
+
+  <dialog id="curriculum-search-modal" class="app-modal">
+    <div class="modal-header">
+      <h2>カリキュラムを検索</h2>
+      <button type="button" id="curriculum-search-modal-close" class="modal-close" aria-label="閉じる">×</button>
+    </div>
+    <form id="curriculum-filter-form" class="modal-tab-panel">
+      <p class="hint">名前・年度・学期を選ぶと、その名前を含む予定が期間内から自動で第1回・第2回…と並びます。</p>
+      <input id="curriculum-name" type="text" placeholder="生徒名など" required list="curriculum-name-list" autocomplete="off" />
+      <datalist id="curriculum-name-list"></datalist>
+      <select id="curriculum-year-select">
+        <option value="">年度を選択</option>
+      </select>
+      <select id="curriculum-term-select">
+        <option value="">学期を選択</option>
+      </select>
+      <div class="edit-actions">
+        <button type="submit">表示</button>
+      </div>
+    </form>
   </dialog>
 
   <dialog id="goal-modal" class="app-modal">
@@ -263,6 +272,6 @@
     </div>
   </dialog>
 
-  <script type="module" src="./app.js?v=23"></script>
+  <script type="module" src="./app.js?v=24"></script>
 </body>
 </html>

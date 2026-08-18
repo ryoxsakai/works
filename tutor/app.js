@@ -97,11 +97,15 @@ const els = {
   pageTabPanels: document.querySelectorAll("[data-page-tab-panel]"),
   curriculumFilterForm: document.querySelector("#curriculum-filter-form"),
   curriculumName: document.querySelector("#curriculum-name"),
-  curriculumHonorificSelect: document.querySelector("#curriculum-honorific"),
   curriculumNameList: document.querySelector("#curriculum-name-list"),
   curriculumYearSelect: document.querySelector("#curriculum-year-select"),
   curriculumTermSelect: document.querySelector("#curriculum-term-select"),
   curriculumTbody: document.querySelector("#curriculum-tbody"),
+  openCurriculumSearchModalBtn: document.querySelector("#open-curriculum-search-modal"),
+  curriculumSearchModal: document.querySelector("#curriculum-search-modal"),
+  curriculumSearchModalCloseBtn: document.querySelector("#curriculum-search-modal-close"),
+  curriculumSearchSummary: document.querySelector("#curriculum-search-summary"),
+  curriculumPrintNameInput: document.querySelector("#curriculum-print-name"),
   goalLists: document.querySelectorAll(".goal-list"),
   openGoalsModalBtn: document.querySelector("#open-goals-modal"),
   goalModal: document.querySelector("#goal-modal"),
@@ -250,6 +254,7 @@ watchAuth({
       renderYearGroups();
       renderCurriculumYearOptions();
       restoreCurriculumState();
+      renderCurriculumSearchSummary();
       if (els.curriculumName.value && els.curriculumTermSelect.value) {
         await loadCurriculumEvents();
       }
@@ -657,29 +662,50 @@ function restoreCurriculumState() {
   }
 }
 
-// 生徒(name)ごとの敬称(印刷時の名前表示に使う。例: 田﨑 → 田﨑くん)。
+// 生徒(name)ごとの印刷名前(検索名とは別に、印刷時だけ自由な表記(例: 田﨑くん)を使える)。
 async function loadStudentPref() {
   const name = els.curriculumName.value.trim();
   if (!name) {
-    els.curriculumHonorificSelect.value = "";
+    els.curriculumPrintNameInput.value = "";
     return;
   }
   const pref = await apiFetch(`/student-prefs?name=${encodeURIComponent(name)}`);
-  els.curriculumHonorificSelect.value = pref?.honorific || "";
+  els.curriculumPrintNameInput.value = pref?.print_name || "";
 }
 
-els.curriculumHonorificSelect.addEventListener("change", async () => {
+els.curriculumPrintNameInput.addEventListener("change", async () => {
   const name = els.curriculumName.value.trim();
-  if (!name) return;
+  if (!name) {
+    showActionError(new Error("先に名前を検索してください"));
+    return;
+  }
   try {
     await apiFetch("/student-prefs", {
       method: "PUT",
-      body: JSON.stringify({ name, honorific: els.curriculumHonorificSelect.value || null }),
+      body: JSON.stringify({ name, print_name: els.curriculumPrintNameInput.value.trim() || null }),
     });
   } catch (err) {
     showActionError(err);
   }
 });
+
+// ページ上部の検索バーに、現在絞り込み中の名前・年度・学期を表示する。
+function renderCurriculumSearchSummary() {
+  const name = els.curriculumName.value.trim();
+  if (!name) {
+    els.curriculumSearchSummary.textContent = "名前を検索してください。";
+    return;
+  }
+  const yearLabel = els.curriculumYearSelect.selectedOptions[0]?.textContent || "";
+  const termLabel = els.curriculumTermSelect.selectedOptions[0]?.textContent || "";
+  els.curriculumSearchSummary.textContent = [name, yearLabel, termLabel].filter(Boolean).join("　/　");
+}
+
+els.openCurriculumSearchModalBtn.addEventListener("click", () => {
+  els.curriculumSearchModal.showModal();
+});
+
+els.curriculumSearchModalCloseBtn.addEventListener("click", () => els.curriculumSearchModal.close());
 
 // 名前入力欄の候補(datalist)を、現在読み込まれている授業予定(rawEvents)のタイトル・説明を
 // トークン化して作る。D1に別途登録する方式ではなく、カレンダーの内容から直接候補を出すことで、
@@ -704,6 +730,8 @@ els.curriculumFilterForm.addEventListener("submit", async (e) => {
     await loadGoals();
     await loadCandidateSchools();
     await loadStudentPref();
+    renderCurriculumSearchSummary();
+    els.curriculumSearchModal.close();
   } catch (err) {
     showActionError(err);
   }
@@ -1373,7 +1401,7 @@ els.printScheduleBtn.addEventListener("click", () => window.print());
 
 els.printCurriculumBtn.addEventListener("click", () => {
   const name = els.curriculumName.value.trim();
-  const displayName = name + (els.curriculumHonorificSelect.value || "");
+  const displayName = els.curriculumPrintNameInput.value.trim() || name;
   const yearLabel = els.curriculumYearSelect.selectedOptions[0]?.textContent || "";
   const termLabel = els.curriculumTermSelect.selectedOptions[0]?.textContent || "";
   els.curriculumPrintHeader.textContent = [displayName, yearLabel, termLabel].filter(Boolean).join("　/　");
