@@ -742,7 +742,8 @@ dialog.app-modal::backdrop {
 
   .curriculum-table th:nth-child(3),
   .curriculum-table td:nth-child(3) {
-    width: 12%;
+    width: 16%;
+    white-space: normal;
   }
 
   .curriculum-table th:nth-child(4),
@@ -753,7 +754,7 @@ dialog.app-modal::backdrop {
   .curriculum-table td:nth-child(6),
   .curriculum-table th:nth-child(7),
   .curriculum-table td:nth-child(7) {
-    width: 19%;
+    width: 18%;
   }
 
   .curriculum-table textarea {
