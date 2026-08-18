@@ -181,11 +181,14 @@
       <button type="button" class="tab-btn" data-tab="calendar" role="tab" aria-selected="true">カレンダー</button>
       <button type="button" class="tab-btn" data-tab="terms" role="tab" aria-selected="false">学期</button>
       <button type="button" class="tab-btn" data-tab="periods" role="tab" aria-selected="false">時限</button>
+      <button type="button" class="tab-btn" data-tab="excluded" role="tab" aria-selected="false">空き枠</button>
       <button type="button" class="tab-btn" data-tab="appearance" role="tab" aria-selected="false">デザイン</button>
     </div>
     <div class="modal-tab-panel" data-tab-panel="calendar">
       <p class="hint">授業予定が入っているカレンダーにチェックを入れてください(全デバイス共通の設定です)。色はGoogleカレンダー側の設定がそのまま使われます。</p>
       <div id="calendar-checklist"></div>
+    </div>
+    <div class="modal-tab-panel" data-tab-panel="excluded" hidden>
       <p class="hint">タイトルが完全一致する予定を、授業予定・カリキュラム・授業記録などすべての表示から除外します(空き枠など)。</p>
       <form id="add-excluded-title-form" class="inline-form">
         <input id="new-excluded-title" type="text" placeholder="例: ○" required />
