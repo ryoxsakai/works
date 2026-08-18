@@ -410,12 +410,22 @@ dialog#settings-modal::backdrop {
   white-space: nowrap;
 }
 
-.term-delete {
+.term-delete,
+.year-delete {
   padding: 0.2rem 0.5rem;
   font-size: 0.75rem;
   background: transparent;
   color: #dc2626;
   border-color: #dc2626;
+}
+
+.term-edit,
+.year-edit {
+  padding: 0.2rem 0.5rem;
+  font-size: 0.75rem;
+  background: transparent;
+  color: var(--fg);
+  border-color: var(--border);
 }
 
 .term-form {
@@ -459,16 +469,37 @@ dialog#settings-modal::backdrop {
   font-size: 0.95rem;
 }
 
-.year-delete {
-  padding: 0.2rem 0.5rem;
-  font-size: 0.7rem;
-  background: transparent;
-  color: #dc2626;
-  border-color: #dc2626;
+.year-actions {
+  display: flex;
+  gap: 0.35rem;
 }
 
 .term-items {
   margin-bottom: 0.5rem;
+}
+
+.year-edit-form,
+.term-edit-form {
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.4rem 0;
+}
+
+.edit-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.edit-actions button {
+  padding: 0.3rem 0.6rem;
+  font-size: 0.8rem;
+}
+
+.cancel-edit-year,
+.cancel-edit-term {
+  background: transparent;
+  color: var(--fg);
+  border-color: var(--border);
 }
 
 .add-term-form {

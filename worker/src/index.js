@@ -111,6 +111,14 @@ async function createYear(env, body) {
     .first();
 }
 
+async function updateYear(env, id, body) {
+  const label = (body.label || "").trim();
+  if (!label) throw new Error("label is required");
+  return env.DB.prepare("UPDATE academic_years SET label = ? WHERE id = ? RETURNING *")
+    .bind(label, id)
+    .first();
+}
+
 async function deleteYear(env, id) {
   await env.DB.prepare("DELETE FROM terms WHERE year_id = ?").bind(id).run();
   await env.DB.prepare("DELETE FROM academic_years WHERE id = ?").bind(id).run();
@@ -133,6 +141,20 @@ async function createTerm(env, body) {
     "INSERT INTO terms (year_id, label, start_date, end_date) VALUES (?, ?, ?, ?) RETURNING *"
   )
     .bind(yearId, label, startDate, endDate)
+    .first();
+}
+
+async function updateTerm(env, id, body) {
+  const label = (body.label || "").trim();
+  const startDate = body.start_date;
+  const endDate = body.end_date;
+  if (!label || !startDate || !endDate) {
+    throw new Error("label, start_date, end_date are required");
+  }
+  return env.DB.prepare(
+    "UPDATE terms SET label = ?, start_date = ?, end_date = ? WHERE id = ? RETURNING *"
+  )
+    .bind(label, startDate, endDate, id)
     .first();
 }
 
@@ -199,6 +221,11 @@ export default {
       }
 
       const yearMatch = url.pathname.match(/^\/api\/years\/(\d+)$/);
+      if (yearMatch && request.method === "PUT") {
+        const body = await request.json();
+        return json(await updateYear(env, yearMatch[1], body), headers);
+      }
+
       if (yearMatch && request.method === "DELETE") {
         await deleteYear(env, yearMatch[1]);
         return json({ ok: true }, headers);
@@ -214,6 +241,11 @@ export default {
       }
 
       const termMatch = url.pathname.match(/^\/api\/terms\/(\d+)$/);
+      if (termMatch && request.method === "PUT") {
+        const body = await request.json();
+        return json(await updateTerm(env, termMatch[1], body), headers);
+      }
+
       if (termMatch && request.method === "DELETE") {
         await deleteTerm(env, termMatch[1]);
         return json({ ok: true }, headers);

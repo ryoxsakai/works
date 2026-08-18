@@ -56,6 +56,8 @@ let calendarColors = new Map(); // calendarId -> { raw, bg, fg }
 let years = [];
 let terms = [];
 let selectedTermIds = new Set();
+let editingYearId = null;
+let editingTermId = null;
 let rawEvents = [];
 let nameFilter = null;
 let eventViewMode = localStorage.getItem(EVENT_VIEW_KEY) === "calendar" ? "calendar" : "list";
@@ -281,23 +283,26 @@ function renderYearGroups() {
     .map((y) => {
       const yearTerms = terms.filter((t) => t.year_id === y.id);
       const termsHtml = yearTerms.length
-        ? yearTerms
-            .map((t) => {
-              const checked = selectedTermIds.has(t.id) ? "checked" : "";
-              return `<div class="term-item">
-                <input type="checkbox" class="term-checkbox" value="${t.id}" ${checked} />
-                <span class="term-item-label">${escapeHtml(t.label)}</span>
-                <span class="term-item-dates">${t.start_date} 〜 ${t.end_date}</span>
-                <button type="button" class="term-delete" data-id="${t.id}">削除</button>
-              </div>`;
-            })
-            .join("")
+        ? yearTerms.map((t) => renderTermRow(t)).join("")
         : `<p class="hint">この年度にはまだ学期がありません。</p>`;
+      const headerHtml =
+        editingYearId === y.id
+          ? `<form class="year-edit-form" data-year-id="${y.id}">
+              <input type="text" class="edit-year-label" value="${escapeHtml(y.label)}" required />
+              <div class="edit-actions">
+                <button type="submit">保存</button>
+                <button type="button" class="cancel-edit-year">キャンセル</button>
+              </div>
+            </form>`
+          : `<div class="year-group-header">
+              <h3>${escapeHtml(y.label)}</h3>
+              <div class="year-actions">
+                <button type="button" class="year-edit" data-id="${y.id}">編集</button>
+                <button type="button" class="year-delete" data-id="${y.id}">削除</button>
+              </div>
+            </div>`;
       return `<div class="year-group">
-        <div class="year-group-header">
-          <h3>${escapeHtml(y.label)}</h3>
-          <button type="button" class="year-delete" data-id="${y.id}">年度を削除</button>
-        </div>
+        ${headerHtml}
         <div class="term-items">${termsHtml}</div>
         <form class="add-term-form" data-year-id="${y.id}">
           <input type="text" class="new-term-label" placeholder="例: 前期" required />
@@ -311,6 +316,31 @@ function renderYearGroups() {
       </div>`;
     })
     .join("");
+}
+
+function renderTermRow(t) {
+  const checked = selectedTermIds.has(t.id) ? "checked" : "";
+  if (editingTermId === t.id) {
+    return `<form class="term-edit-form" data-term-id="${t.id}">
+      <input type="text" class="edit-term-label" value="${escapeHtml(t.label)}" required />
+      <div class="term-dates">
+        <input type="date" class="edit-term-start" value="${t.start_date}" required />
+        <span>〜</span>
+        <input type="date" class="edit-term-end" value="${t.end_date}" required />
+      </div>
+      <div class="edit-actions">
+        <button type="submit">保存</button>
+        <button type="button" class="cancel-edit-term">キャンセル</button>
+      </div>
+    </form>`;
+  }
+  return `<div class="term-item">
+    <input type="checkbox" class="term-checkbox" value="${t.id}" ${checked} />
+    <span class="term-item-label">${escapeHtml(t.label)}</span>
+    <span class="term-item-dates">${t.start_date} 〜 ${t.end_date}</span>
+    <button type="button" class="term-edit" data-id="${t.id}">編集</button>
+    <button type="button" class="term-delete" data-id="${t.id}">削除</button>
+  </div>`;
 }
 
 els.addYearForm.addEventListener("submit", async (e) => {
@@ -375,28 +405,97 @@ els.yearGroups.addEventListener("click", async (e) => {
     } catch (err) {
       showActionError(err);
     }
+    return;
+  }
+
+  const editYearBtn = e.target.closest(".year-edit");
+  if (editYearBtn) {
+    editingYearId = Number(editYearBtn.dataset.id);
+    renderYearGroups();
+    return;
+  }
+
+  const editTermBtn = e.target.closest(".term-edit");
+  if (editTermBtn) {
+    editingTermId = Number(editTermBtn.dataset.id);
+    renderYearGroups();
+    return;
+  }
+
+  if (e.target.closest(".cancel-edit-year")) {
+    editingYearId = null;
+    renderYearGroups();
+    return;
+  }
+
+  if (e.target.closest(".cancel-edit-term")) {
+    editingTermId = null;
+    renderYearGroups();
   }
 });
 
 els.yearGroups.addEventListener("submit", async (e) => {
-  const form = e.target.closest(".add-term-form");
-  if (!form) return;
-  e.preventDefault();
-  els.actionError.textContent = "";
-  const yearId = Number(form.dataset.yearId);
-  const label = form.querySelector(".new-term-label").value.trim();
-  const startDate = form.querySelector(".new-term-start").value;
-  const endDate = form.querySelector(".new-term-end").value;
-  if (!label || !startDate || !endDate) return;
-  try {
-    await apiFetch("/terms", {
-      method: "POST",
-      body: JSON.stringify({ year_id: yearId, label, start_date: startDate, end_date: endDate }),
-    });
-    await loadTerms();
-    renderYearGroups();
-  } catch (err) {
-    showActionError(err);
+  const addForm = e.target.closest(".add-term-form");
+  if (addForm) {
+    e.preventDefault();
+    els.actionError.textContent = "";
+    const yearId = Number(addForm.dataset.yearId);
+    const label = addForm.querySelector(".new-term-label").value.trim();
+    const startDate = addForm.querySelector(".new-term-start").value;
+    const endDate = addForm.querySelector(".new-term-end").value;
+    if (!label || !startDate || !endDate) return;
+    try {
+      await apiFetch("/terms", {
+        method: "POST",
+        body: JSON.stringify({ year_id: yearId, label, start_date: startDate, end_date: endDate }),
+      });
+      await loadTerms();
+      renderYearGroups();
+    } catch (err) {
+      showActionError(err);
+    }
+    return;
+  }
+
+  const yearEditForm = e.target.closest(".year-edit-form");
+  if (yearEditForm) {
+    e.preventDefault();
+    els.actionError.textContent = "";
+    const yearId = Number(yearEditForm.dataset.yearId);
+    const label = yearEditForm.querySelector(".edit-year-label").value.trim();
+    if (!label) return;
+    try {
+      await apiFetch(`/years/${yearId}`, { method: "PUT", body: JSON.stringify({ label }) });
+      editingYearId = null;
+      await loadYears();
+      renderYearGroups();
+    } catch (err) {
+      showActionError(err);
+    }
+    return;
+  }
+
+  const termEditForm = e.target.closest(".term-edit-form");
+  if (termEditForm) {
+    e.preventDefault();
+    els.actionError.textContent = "";
+    const termId = Number(termEditForm.dataset.termId);
+    const label = termEditForm.querySelector(".edit-term-label").value.trim();
+    const startDate = termEditForm.querySelector(".edit-term-start").value;
+    const endDate = termEditForm.querySelector(".edit-term-end").value;
+    if (!label || !startDate || !endDate) return;
+    try {
+      await apiFetch(`/terms/${termId}`, {
+        method: "PUT",
+        body: JSON.stringify({ label, start_date: startDate, end_date: endDate }),
+      });
+      editingTermId = null;
+      await loadTerms();
+      renderYearGroups();
+      await loadCalendarEvents();
+    } catch (err) {
+      showActionError(err);
+    }
   }
 });
 
