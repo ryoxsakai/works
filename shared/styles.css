@@ -437,7 +437,8 @@ dialog.app-modal::backdrop {
 
 .term-delete,
 .year-delete,
-.goal-delete {
+.goal-delete,
+.template-delete {
   padding: 0.2rem 0.5rem;
   font-size: 0.75rem;
   background: transparent;
@@ -447,12 +448,18 @@ dialog.app-modal::backdrop {
 
 .term-edit,
 .year-edit,
-.goal-edit {
+.goal-edit,
+.template-edit {
   padding: 0.2rem 0.5rem;
   font-size: 0.75rem;
   background: transparent;
   color: var(--fg);
   border-color: var(--border);
+}
+
+.template-use {
+  padding: 0.2rem 0.5rem;
+  font-size: 0.75rem;
 }
 
 .term-form {
@@ -646,7 +653,8 @@ dialog.app-modal::backdrop {
   color: var(--muted);
 }
 
-.goal-edit-list {
+.goal-edit-list,
+.goal-template-list {
   margin-bottom: 0.5rem;
 }
 

@@ -253,6 +253,45 @@ async function deleteGoal(env, id) {
   await env.DB.prepare("DELETE FROM goals WHERE id = ?").bind(id).run();
 }
 
+// 目標のテンプレート。生徒(name)に紐付かず、短期・中期・長期ごとに使い回す文言集。
+async function readGoalTemplates(env) {
+  const { results } = await env.DB.prepare(
+    "SELECT * FROM goal_templates ORDER BY category, sort_order"
+  ).all();
+  return results;
+}
+
+async function createGoalTemplate(env, body) {
+  const category = body.category;
+  const text = (body.text || "").trim();
+  if (!["short", "mid", "long"].includes(category) || !text) {
+    throw new Error("category(short/mid/long), text are required");
+  }
+  const { results } = await env.DB.prepare(
+    "SELECT COALESCE(MAX(sort_order), -1) AS maxOrder FROM goal_templates WHERE category = ?"
+  )
+    .bind(category)
+    .all();
+  const nextOrder = (results[0]?.maxOrder ?? -1) + 1;
+  return env.DB.prepare(
+    "INSERT INTO goal_templates (category, text, sort_order) VALUES (?, ?, ?) RETURNING *"
+  )
+    .bind(category, text, nextOrder)
+    .first();
+}
+
+async function updateGoalTemplate(env, id, body) {
+  const text = (body.text || "").trim();
+  if (!text) throw new Error("text is required");
+  return env.DB.prepare("UPDATE goal_templates SET text = ? WHERE id = ? RETURNING *")
+    .bind(text, id)
+    .first();
+}
+
+async function deleteGoalTemplate(env, id) {
+  await env.DB.prepare("DELETE FROM goal_templates WHERE id = ?").bind(id).run();
+}
+
 // 生徒(name)ごとの受験校候補(私立の選択 / 国公立の自由入力)と志望順位。
 async function readCandidateSchools(env, name) {
   const { results } = await env.DB.prepare(
@@ -406,6 +445,26 @@ export default {
 
       if (goalMatch && request.method === "DELETE") {
         await deleteGoal(env, goalMatch[1]);
+        return json({ ok: true }, headers);
+      }
+
+      if (url.pathname === "/api/goal-templates" && request.method === "GET") {
+        return json(await readGoalTemplates(env), headers);
+      }
+
+      if (url.pathname === "/api/goal-templates" && request.method === "POST") {
+        const body = await request.json();
+        return json(await createGoalTemplate(env, body), headers, 201);
+      }
+
+      const templateMatch = url.pathname.match(/^\/api\/goal-templates\/(\d+)$/);
+      if (templateMatch && request.method === "PUT") {
+        const body = await request.json();
+        return json(await updateGoalTemplate(env, templateMatch[1], body), headers);
+      }
+
+      if (templateMatch && request.method === "DELETE") {
+        await deleteGoalTemplate(env, templateMatch[1]);
         return json({ ok: true }, headers);
       }
 

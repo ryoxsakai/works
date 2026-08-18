@@ -97,6 +97,8 @@ const els = {
   goalModalCloseBtn: document.querySelector("#goal-modal-close"),
   goalEditLists: document.querySelectorAll(".goal-edit-list"),
   addGoalForms: document.querySelectorAll(".add-goal-form"),
+  goalTemplateLists: document.querySelectorAll(".goal-template-list"),
+  addGoalTemplateForms: document.querySelectorAll(".add-goal-template-form"),
   openSchoolsModalBtn: document.querySelector("#open-schools-modal"),
   schoolsModal: document.querySelector("#schools-modal"),
   schoolsModalCloseBtn: document.querySelector("#schools-modal-close"),
@@ -135,6 +137,8 @@ let calendarCursor = startOfMonth(new Date());
 let goals = [];
 let candidateSchools = [];
 let editingGoalId = null;
+let goalTemplates = [];
+let editingTemplateId = null;
 
 function showActionError(err) {
   els.actionError.textContent = err instanceof Error ? err.message : String(err);
@@ -231,6 +235,7 @@ watchAuth({
       await loadCalendarList();
       await loadYears();
       await loadTerms();
+      await loadGoalTemplates();
       renderYearGroups();
       renderCurriculumYearOptions();
       restoreCurriculumState();
@@ -828,12 +833,15 @@ els.openGoalsModalBtn.addEventListener("click", () => {
   }
   els.actionError.textContent = "";
   editingGoalId = null;
+  editingTemplateId = null;
   renderGoalEditLists();
+  renderGoalTemplateLists();
   els.goalModal.showModal();
 });
 
 els.goalModalCloseBtn.addEventListener("click", () => {
   editingGoalId = null;
+  editingTemplateId = null;
   els.goalModal.close();
 });
 
@@ -955,6 +963,135 @@ els.goalEditLists.forEach((container) => {
       editingGoalId = null;
       await loadGoals();
       renderGoalEditLists();
+    } catch (err) {
+      showActionError(err);
+    }
+  });
+});
+
+// 目標テンプレート。生徒名に紐付かず短期・中期・長期ごとに使い回す文言集で、
+// 「追加」ボタンを押すと現在選択中の生徒の目標としてコピーされる。
+
+function templatesForCategory(category) {
+  return goalTemplates
+    .filter((t) => t.category === category)
+    .sort((a, b) => a.sort_order - b.sort_order);
+}
+
+function renderGoalTemplateLists() {
+  els.goalTemplateLists.forEach((container) => {
+    const category = container.dataset.category;
+    const items = templatesForCategory(category);
+    if (items.length === 0) {
+      container.innerHTML = `<p class="hint">まだテンプレートがありません</p>`;
+      return;
+    }
+    container.innerHTML = items
+      .map((t) => {
+        if (editingTemplateId === t.id) {
+          return `<form class="template-edit-form" data-template-id="${t.id}">
+            <input type="text" class="edit-template-text" value="${escapeHtml(t.text)}" required />
+            <div class="edit-actions">
+              <button type="submit">保存</button>
+              <button type="button" class="cancel-edit-template">キャンセル</button>
+            </div>
+          </form>`;
+        }
+        return `<div class="term-item" data-template-id="${t.id}">
+          <span class="term-item-label">${escapeHtml(t.text)}</span>
+          <button type="button" class="template-use">追加</button>
+          <button type="button" class="template-edit">編集</button>
+          <button type="button" class="template-delete">削除</button>
+        </div>`;
+      })
+      .join("");
+  });
+}
+
+async function loadGoalTemplates() {
+  goalTemplates = await apiFetch("/goal-templates");
+  renderGoalTemplateLists();
+}
+
+els.addGoalTemplateForms.forEach((form) => {
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    els.actionError.textContent = "";
+    const input = form.querySelector(".new-goal-template-text");
+    const text = input.value.trim();
+    const category = form.dataset.category;
+    if (!text) return;
+    try {
+      await apiFetch("/goal-templates", {
+        method: "POST",
+        body: JSON.stringify({ category, text }),
+      });
+      input.value = "";
+      await loadGoalTemplates();
+    } catch (err) {
+      showActionError(err);
+    }
+  });
+});
+
+els.goalTemplateLists.forEach((container) => {
+  container.addEventListener("click", async (e) => {
+    const row = e.target.closest("[data-template-id]");
+    if (!row) return;
+    const id = Number(row.dataset.templateId);
+    const t = goalTemplates.find((x) => x.id === id);
+    if (!t) return;
+
+    if (e.target.closest(".template-use")) {
+      try {
+        const name = els.curriculumName.value.trim();
+        await apiFetch("/goals", {
+          method: "POST",
+          body: JSON.stringify({ name, category: t.category, text: t.text }),
+        });
+        await loadGoals();
+        renderGoalEditLists();
+      } catch (err) {
+        showActionError(err);
+      }
+      return;
+    }
+
+    if (e.target.closest(".template-edit")) {
+      editingTemplateId = id;
+      renderGoalTemplateLists();
+      return;
+    }
+
+    if (e.target.closest(".cancel-edit-template")) {
+      editingTemplateId = null;
+      renderGoalTemplateLists();
+      return;
+    }
+
+    if (e.target.closest(".template-delete")) {
+      if (!confirm("このテンプレートを削除しますか?")) return;
+      try {
+        await apiFetch(`/goal-templates/${id}`, { method: "DELETE" });
+        await loadGoalTemplates();
+      } catch (err) {
+        showActionError(err);
+      }
+    }
+  });
+
+  container.addEventListener("submit", async (e) => {
+    const editForm = e.target.closest(".template-edit-form");
+    if (!editForm) return;
+    e.preventDefault();
+    els.actionError.textContent = "";
+    const id = Number(editForm.dataset.templateId);
+    const text = editForm.querySelector(".edit-template-text").value.trim();
+    if (!text) return;
+    try {
+      await apiFetch(`/goal-templates/${id}`, { method: "PUT", body: JSON.stringify({ text }) });
+      editingTemplateId = null;
+      await loadGoalTemplates();
     } catch (err) {
       showActionError(err);
     }

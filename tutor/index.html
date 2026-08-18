@@ -10,7 +10,7 @@
       if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
     })();
   </script>
-  <link rel="stylesheet" href="../shared/styles.css?v=20" />
+  <link rel="stylesheet" href="../shared/styles.css?v=21" />
 </head>
 <body>
   <header class="page-header">
@@ -178,6 +178,13 @@
       <button type="button" class="tab-btn" data-goal-tab="long" role="tab" aria-selected="false">長期目標</button>
     </div>
     <div class="modal-tab-panel" data-goal-tab-panel="short">
+      <p class="hint">テンプレート</p>
+      <div class="goal-template-list" data-category="short"></div>
+      <form class="add-goal-template-form inline-form" data-category="short">
+        <input type="text" class="new-goal-template-text" placeholder="テンプレートを入力" required />
+        <button type="submit">テンプレートに追加</button>
+      </form>
+      <p class="hint">現在の目標</p>
       <div class="goal-edit-list" data-category="short"></div>
       <form class="add-goal-form inline-form" data-category="short">
         <input type="text" class="new-goal-text" placeholder="目標を入力" required />
@@ -185,6 +192,13 @@
       </form>
     </div>
     <div class="modal-tab-panel" data-goal-tab-panel="mid" hidden>
+      <p class="hint">テンプレート</p>
+      <div class="goal-template-list" data-category="mid"></div>
+      <form class="add-goal-template-form inline-form" data-category="mid">
+        <input type="text" class="new-goal-template-text" placeholder="テンプレートを入力" required />
+        <button type="submit">テンプレートに追加</button>
+      </form>
+      <p class="hint">現在の目標</p>
       <div class="goal-edit-list" data-category="mid"></div>
       <form class="add-goal-form inline-form" data-category="mid">
         <input type="text" class="new-goal-text" placeholder="目標を入力" required />
@@ -192,6 +206,13 @@
       </form>
     </div>
     <div class="modal-tab-panel" data-goal-tab-panel="long" hidden>
+      <p class="hint">テンプレート</p>
+      <div class="goal-template-list" data-category="long"></div>
+      <form class="add-goal-template-form inline-form" data-category="long">
+        <input type="text" class="new-goal-template-text" placeholder="テンプレートを入力" required />
+        <button type="submit">テンプレートに追加</button>
+      </form>
+      <p class="hint">現在の目標</p>
       <div class="goal-edit-list" data-category="long"></div>
       <form class="add-goal-form inline-form" data-category="long">
         <input type="text" class="new-goal-text" placeholder="目標を入力" required />
@@ -235,6 +256,6 @@
     </div>
   </dialog>
 
-  <script type="module" src="./app.js?v=16"></script>
+  <script type="module" src="./app.js?v=17"></script>
 </body>
 </html>
