@@ -133,6 +133,7 @@ els.calNextBtn.addEventListener("click", () => {
 
 els.clearNameFilterBtn.addEventListener("click", () => {
   nameFilter = null;
+  els.nameFilterLabel.textContent = "";
   els.nameFilterBar.hidden = true;
   renderCurrentView();
 });
@@ -217,15 +218,27 @@ async function loadCalendarList() {
   const data = await res.json();
   const calendars = data.items || [];
   calendarColors = new Map(
-    calendars.map((c, i) => [
-      c.id,
-      {
-        bg: c.backgroundColor || PASTEL_FALLBACK_COLORS[i % PASTEL_FALLBACK_COLORS.length],
-        fg: c.foregroundColor || "#1a1a1a",
-      },
-    ])
+    calendars.map((c, i) => {
+      const fallback = PASTEL_FALLBACK_COLORS[i % PASTEL_FALLBACK_COLORS.length];
+      const raw = c.backgroundColor || fallback;
+      const bg = c.backgroundColor ? lightenHexColor(c.backgroundColor, 0.72) : fallback;
+      return [c.id, { raw, bg, fg: "#1f2937" }];
+    })
   );
   renderCalendarChecklist(calendars);
+}
+
+// Googleカレンダーの色はそのままだと予定チップの背景としては濃すぎるため、
+// 白と混ぜて薄くしたものを背景に使い、元の色は縁取り・スウォッチ用に残す。
+function lightenHexColor(hex, amount) {
+  const m = /^#([0-9a-f]{6})$/i.exec(hex || "");
+  if (!m) return hex;
+  const num = parseInt(m[1], 16);
+  const r = (num >> 16) & 0xff;
+  const g = (num >> 8) & 0xff;
+  const b = num & 0xff;
+  const mix = (c) => Math.round(c + (255 - c) * amount);
+  return `rgb(${mix(r)}, ${mix(g)}, ${mix(b)})`;
 }
 
 function renderCalendarChecklist(calendars) {
@@ -234,7 +247,7 @@ function renderCalendarChecklist(calendars) {
       const checked = selectedCalendarIds.has(c.id) ? "checked" : "";
       const color = calendarColors.get(c.id);
       const dot = color
-        ? `<span class="calendar-color-dot" style="background-color:${escapeHtml(color.bg)}"></span>`
+        ? `<span class="calendar-color-dot" style="background-color:${escapeHtml(color.raw)}"></span>`
         : "";
       return `<label class="calendar-item">
         <input type="checkbox" value="${escapeHtml(c.id)}" ${checked} />
@@ -476,7 +489,7 @@ function renderCurrentView() {
 function eventColorStyle(ev) {
   const color = calendarColors.get(ev._calendarId);
   if (!color) return "";
-  return ` style="background-color:${escapeHtml(color.bg)};color:${escapeHtml(color.fg)};border-color:${escapeHtml(color.bg)}"`;
+  return ` style="background-color:${escapeHtml(color.bg)};color:${escapeHtml(color.fg)};border-color:${escapeHtml(color.raw)}"`;
 }
 
 function renderTokenizedSummary(summary) {
