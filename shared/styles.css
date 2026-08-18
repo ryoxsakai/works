@@ -704,6 +704,11 @@ dialog.app-modal::backdrop {
     display: block;
   }
 
+  main {
+    max-width: none;
+    padding: 0;
+  }
+
   .panel {
     margin-bottom: 0;
   }
@@ -714,14 +719,51 @@ dialog.app-modal::backdrop {
 
   .curriculum-table {
     min-width: 0;
-    font-size: 0.75rem;
+    width: 100%;
+    table-layout: fixed;
+    font-size: 0.7rem;
+  }
+
+  .curriculum-table th,
+  .curriculum-table td {
+    padding: 0.25rem 0.3rem;
+    word-break: break-word;
+  }
+
+  .curriculum-table th:nth-child(1),
+  .curriculum-table td:nth-child(1) {
+    width: 5%;
+  }
+
+  .curriculum-table th:nth-child(2),
+  .curriculum-table td:nth-child(2) {
+    width: 7%;
+  }
+
+  .curriculum-table th:nth-child(3),
+  .curriculum-table td:nth-child(3) {
+    width: 12%;
+  }
+
+  .curriculum-table th:nth-child(4),
+  .curriculum-table td:nth-child(4),
+  .curriculum-table th:nth-child(5),
+  .curriculum-table td:nth-child(5),
+  .curriculum-table th:nth-child(6),
+  .curriculum-table td:nth-child(6),
+  .curriculum-table th:nth-child(7),
+  .curriculum-table td:nth-child(7) {
+    width: 19%;
   }
 
   .curriculum-table textarea {
+    width: 100%;
+    min-width: 0;
     border: none;
     padding: 0;
     resize: none;
     overflow: visible;
     background: transparent;
+    word-break: break-word;
   }
 }
