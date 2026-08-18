@@ -35,11 +35,9 @@ const els = {
   tabPanels: document.querySelectorAll(".modal-tab-panel"),
   themeRadios: document.querySelectorAll('input[name="theme"]'),
   calendarChecklist: document.querySelector("#calendar-checklist"),
-  termList: document.querySelector("#term-list"),
-  addTermForm: document.querySelector("#add-term-form"),
-  newTermLabel: document.querySelector("#new-term-label"),
-  newTermStart: document.querySelector("#new-term-start"),
-  newTermEnd: document.querySelector("#new-term-end"),
+  yearGroups: document.querySelector("#year-groups"),
+  addYearForm: document.querySelector("#add-year-form"),
+  newYearLabel: document.querySelector("#new-year-label"),
   viewToggleBtns: document.querySelectorAll(".view-toggle-btn"),
   nameFilterBar: document.querySelector("#name-filter-bar"),
   nameFilterLabel: document.querySelector("#name-filter-label"),
@@ -55,6 +53,7 @@ const els = {
 
 let selectedCalendarIds = new Set();
 let calendarColors = new Map(); // calendarId -> { raw, bg, fg }
+let years = [];
 let terms = [];
 let selectedTermIds = new Set();
 let rawEvents = [];
@@ -144,7 +143,9 @@ watchAuth({
     try {
       await loadSettings();
       await loadCalendarList();
+      await loadYears();
       await loadTerms();
+      renderYearGroups();
       await loadCalendarEvents();
     } catch (err) {
       showActionError(err);
@@ -260,32 +261,74 @@ els.calendarChecklist.addEventListener("change", async (e) => {
   }
 });
 
-// --- 学期(期間)設定。デバイス間で共有し、複数選択で予定を絞り込む ---
+// --- 年度(academic_years)・学期(terms)。年度を親、学期を子とした階層で管理する ---
+// デバイス間で共有し、学期を複数選択して予定を絞り込む。
+
+async function loadYears() {
+  years = await apiFetch("/years");
+}
 
 async function loadTerms() {
   terms = await apiFetch("/terms");
-  renderTermsList();
 }
 
-function renderTermsList() {
-  if (terms.length === 0) {
-    els.termList.innerHTML = `<p class="hint">まだ期間が登録されていません。</p>`;
+function renderYearGroups() {
+  if (years.length === 0) {
+    els.yearGroups.innerHTML = `<p class="hint">まだ年度が登録されていません。下のフォームから追加してください。</p>`;
     return;
   }
-  els.termList.innerHTML = terms
-    .map((t) => {
-      const checked = selectedTermIds.has(t.id) ? "checked" : "";
-      return `<div class="term-item">
-        <input type="checkbox" class="term-checkbox" value="${t.id}" ${checked} />
-        <span class="term-item-label">${escapeHtml(t.label)}</span>
-        <span class="term-item-dates">${t.start_date} 〜 ${t.end_date}</span>
-        <button type="button" class="term-delete" data-id="${t.id}">削除</button>
+  els.yearGroups.innerHTML = years
+    .map((y) => {
+      const yearTerms = terms.filter((t) => t.year_id === y.id);
+      const termsHtml = yearTerms.length
+        ? yearTerms
+            .map((t) => {
+              const checked = selectedTermIds.has(t.id) ? "checked" : "";
+              return `<div class="term-item">
+                <input type="checkbox" class="term-checkbox" value="${t.id}" ${checked} />
+                <span class="term-item-label">${escapeHtml(t.label)}</span>
+                <span class="term-item-dates">${t.start_date} 〜 ${t.end_date}</span>
+                <button type="button" class="term-delete" data-id="${t.id}">削除</button>
+              </div>`;
+            })
+            .join("")
+        : `<p class="hint">この年度にはまだ学期がありません。</p>`;
+      return `<div class="year-group">
+        <div class="year-group-header">
+          <h3>${escapeHtml(y.label)}</h3>
+          <button type="button" class="year-delete" data-id="${y.id}">年度を削除</button>
+        </div>
+        <div class="term-items">${termsHtml}</div>
+        <form class="add-term-form" data-year-id="${y.id}">
+          <input type="text" class="new-term-label" placeholder="例: 前期" required />
+          <div class="term-dates">
+            <input type="date" class="new-term-start" required />
+            <span>〜</span>
+            <input type="date" class="new-term-end" required />
+          </div>
+          <button type="submit">学期を追加</button>
+        </form>
       </div>`;
     })
     .join("");
 }
 
-els.termList.addEventListener("change", async (e) => {
+els.addYearForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  els.actionError.textContent = "";
+  const label = els.newYearLabel.value.trim();
+  if (!label) return;
+  try {
+    await apiFetch("/years", { method: "POST", body: JSON.stringify({ label }) });
+    els.newYearLabel.value = "";
+    await loadYears();
+    renderYearGroups();
+  } catch (err) {
+    showActionError(err);
+  }
+});
+
+els.yearGroups.addEventListener("change", async (e) => {
   const checkbox = e.target.closest(".term-checkbox");
   if (!checkbox) return;
   const id = Number(checkbox.value);
@@ -302,37 +345,56 @@ els.termList.addEventListener("change", async (e) => {
   }
 });
 
-els.termList.addEventListener("click", async (e) => {
-  const btn = e.target.closest(".term-delete");
-  if (!btn) return;
-  if (!confirm("この期間設定を削除しますか?")) return;
-  try {
-    await apiFetch(`/terms/${btn.dataset.id}`, { method: "DELETE" });
-    selectedTermIds.delete(Number(btn.dataset.id));
-    await loadTerms();
-    await saveSelectedTerms();
-    await loadCalendarEvents();
-  } catch (err) {
-    showActionError(err);
+els.yearGroups.addEventListener("click", async (e) => {
+  const deleteTermBtn = e.target.closest(".term-delete");
+  if (deleteTermBtn) {
+    if (!confirm("この学期を削除しますか?")) return;
+    try {
+      await apiFetch(`/terms/${deleteTermBtn.dataset.id}`, { method: "DELETE" });
+      selectedTermIds.delete(Number(deleteTermBtn.dataset.id));
+      await loadTerms();
+      renderYearGroups();
+      await saveSelectedTerms();
+      await loadCalendarEvents();
+    } catch (err) {
+      showActionError(err);
+    }
+    return;
+  }
+
+  const deleteYearBtn = e.target.closest(".year-delete");
+  if (deleteYearBtn) {
+    if (!confirm("この年度を削除しますか?(登録されている学期もすべて削除されます)")) return;
+    try {
+      await apiFetch(`/years/${deleteYearBtn.dataset.id}`, { method: "DELETE" });
+      await loadYears();
+      await loadTerms();
+      renderYearGroups();
+      await saveSelectedTerms();
+      await loadCalendarEvents();
+    } catch (err) {
+      showActionError(err);
+    }
   }
 });
 
-els.addTermForm.addEventListener("submit", async (e) => {
+els.yearGroups.addEventListener("submit", async (e) => {
+  const form = e.target.closest(".add-term-form");
+  if (!form) return;
   e.preventDefault();
   els.actionError.textContent = "";
-  const label = els.newTermLabel.value.trim();
-  const startDate = els.newTermStart.value;
-  const endDate = els.newTermEnd.value;
+  const yearId = Number(form.dataset.yearId);
+  const label = form.querySelector(".new-term-label").value.trim();
+  const startDate = form.querySelector(".new-term-start").value;
+  const endDate = form.querySelector(".new-term-end").value;
   if (!label || !startDate || !endDate) return;
   try {
     await apiFetch("/terms", {
       method: "POST",
-      body: JSON.stringify({ label, start_date: startDate, end_date: endDate }),
+      body: JSON.stringify({ year_id: yearId, label, start_date: startDate, end_date: endDate }),
     });
-    els.newTermLabel.value = "";
-    els.newTermStart.value = "";
-    els.newTermEnd.value = "";
     await loadTerms();
+    renderYearGroups();
   } catch (err) {
     showActionError(err);
   }

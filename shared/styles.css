@@ -436,3 +436,42 @@ dialog#settings-modal::backdrop {
   flex: 1;
   min-width: 0;
 }
+
+.year-group {
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.year-group:last-child {
+  border-bottom: none;
+}
+
+.year-group-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.4rem;
+}
+
+.year-group-header h3 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.year-delete {
+  padding: 0.2rem 0.5rem;
+  font-size: 0.7rem;
+  background: transparent;
+  color: #dc2626;
+  border-color: #dc2626;
+}
+
+.term-items {
+  margin-bottom: 0.5rem;
+}
+
+.add-term-form {
+  display: grid;
+  gap: 0.4rem;
+}

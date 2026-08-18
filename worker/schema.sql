@@ -20,8 +20,15 @@ CREATE TABLE IF NOT EXISTS settings (
   value TEXT
 );
 
+CREATE TABLE IF NOT EXISTS academic_years (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  label TEXT NOT NULL,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS terms (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  year_id INTEGER REFERENCES academic_years(id),
   label TEXT NOT NULL,
   start_date TEXT NOT NULL,
   end_date TEXT NOT NULL,

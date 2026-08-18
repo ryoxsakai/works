@@ -96,7 +96,26 @@ async function writeSetting(env, key, value) {
     .run();
 }
 
-// 年度・学期などの期間定義(複数登録して、任意の組み合わせで予定を絞り込むために使う)
+// 年度(academic_years)を親、学期(terms)を子とした階層で期間を管理する。
+// 複数の学期を組み合わせて選択し、予定を絞り込むために使う。
+async function readYears(env) {
+  const { results } = await env.DB.prepare("SELECT * FROM academic_years ORDER BY label").all();
+  return results;
+}
+
+async function createYear(env, body) {
+  const label = (body.label || "").trim();
+  if (!label) throw new Error("label is required");
+  return env.DB.prepare("INSERT INTO academic_years (label) VALUES (?) RETURNING *")
+    .bind(label)
+    .first();
+}
+
+async function deleteYear(env, id) {
+  await env.DB.prepare("DELETE FROM terms WHERE year_id = ?").bind(id).run();
+  await env.DB.prepare("DELETE FROM academic_years WHERE id = ?").bind(id).run();
+}
+
 async function readTerms(env) {
   const { results } = await env.DB.prepare("SELECT * FROM terms ORDER BY start_date").all();
   return results;
@@ -106,13 +125,14 @@ async function createTerm(env, body) {
   const label = (body.label || "").trim();
   const startDate = body.start_date;
   const endDate = body.end_date;
-  if (!label || !startDate || !endDate) {
-    throw new Error("label, start_date, end_date are required");
+  const yearId = body.year_id;
+  if (!yearId || !label || !startDate || !endDate) {
+    throw new Error("year_id, label, start_date, end_date are required");
   }
   return env.DB.prepare(
-    "INSERT INTO terms (label, start_date, end_date) VALUES (?, ?, ?) RETURNING *"
+    "INSERT INTO terms (year_id, label, start_date, end_date) VALUES (?, ?, ?, ?) RETURNING *"
   )
-    .bind(label, startDate, endDate)
+    .bind(yearId, label, startDate, endDate)
     .first();
 }
 
@@ -167,6 +187,21 @@ export default {
           await writeSetting(env, "selected_term_ids", body.selected_term_ids);
         }
         return json(await readSettings(env), headers);
+      }
+
+      if (url.pathname === "/api/years" && request.method === "GET") {
+        return json(await readYears(env), headers);
+      }
+
+      if (url.pathname === "/api/years" && request.method === "POST") {
+        const body = await request.json();
+        return json(await createYear(env, body), headers, 201);
+      }
+
+      const yearMatch = url.pathname.match(/^\/api\/years\/(\d+)$/);
+      if (yearMatch && request.method === "DELETE") {
+        await deleteYear(env, yearMatch[1]);
+        return json({ ok: true }, headers);
       }
 
       if (url.pathname === "/api/terms" && request.method === "GET") {
