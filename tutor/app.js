@@ -3,7 +3,7 @@ import {
   signIn,
   signOutUser,
   getGoogleAccessToken,
-} from "../shared/auth.js?v=5";
+} from "../shared/auth.js?v=6";
 import { getTheme, setTheme } from "../shared/theme.js?v=5";
 
 const PASTEL_FALLBACK_COLORS = [

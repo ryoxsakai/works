@@ -10,6 +10,20 @@ const STORAGE_KEY = "works_google_token";
 let accessToken = null;
 let tokenClient = null;
 let isInteractiveAttempt = false;
+let isBackgroundRefresh = false;
+let refreshTimer = null;
+
+// Googleのアクセストークンは約1時間で失効するため、タブを開きっぱなしでも
+// ログアウトまでログイン状態を維持できるよう、失効前に静かに(prompt: "none")
+// 再取得し続ける。
+function scheduleRefresh(expiresInSeconds) {
+  if (refreshTimer) clearTimeout(refreshTimer);
+  const delayMs = Math.max((expiresInSeconds - 300) * 1000, 30 * 1000);
+  refreshTimer = setTimeout(() => {
+    isBackgroundRefresh = true;
+    tokenClient.requestAccessToken({ prompt: "none" });
+  }, delayMs);
+}
 
 function loadStoredToken() {
   try {
@@ -67,14 +81,22 @@ export async function watchAuth({ onSignedIn, onSignedOut }) {
     hint: ALLOWED_EMAIL,
     callback: async (response) => {
       const wasInteractive = isInteractiveAttempt;
+      const wasBackgroundRefresh = isBackgroundRefresh;
       isInteractiveAttempt = false;
+      isBackgroundRefresh = false;
 
       if (response.error) {
         accessToken = null;
         clearStoredToken();
-        // サイレント再認証(ページ読み込み時の自動試行)の失敗は、
+        // サイレント再認証(ページ読み込み時・バックグラウンド更新)の失敗は、
         // 単にログインボタンを出すだけで静かに扱う。
-        onSignedOut(wasInteractive ? `ログインに失敗しました: ${response.error}` : null);
+        onSignedOut(
+          wasInteractive
+            ? `ログインに失敗しました: ${response.error}`
+            : wasBackgroundRefresh
+              ? "ログイン状態の維持に失敗しました。再度ログインしてください。"
+              : null
+        );
         return;
       }
       try {
@@ -90,7 +112,12 @@ export async function watchAuth({ onSignedIn, onSignedOut }) {
         }
         accessToken = response.access_token;
         storeToken(response.access_token, response.expires_in);
-        onSignedIn({ email: info.email });
+        scheduleRefresh(response.expires_in);
+        // バックグラウンド更新はトークンを差し替えるだけにとどめ、
+        // onSignedInによる画面の再読み込み(タブの状態リセット等)は起こさない。
+        if (!wasBackgroundRefresh) {
+          onSignedIn({ email: info.email });
+        }
       } catch (err) {
         accessToken = null;
         clearStoredToken();
@@ -105,6 +132,7 @@ export async function watchAuth({ onSignedIn, onSignedOut }) {
       const info = await fetchUserInfo(stored.access_token);
       if (info.email?.toLowerCase() === ALLOWED_EMAIL.toLowerCase() && info.email_verified) {
         accessToken = stored.access_token;
+        scheduleRefresh(Math.max((stored.expires_at - Date.now()) / 1000, 60));
         onSignedIn({ email: info.email });
         return;
       }
@@ -126,6 +154,10 @@ export function signIn() {
 }
 
 export function signOutUser() {
+  if (refreshTimer) {
+    clearTimeout(refreshTimer);
+    refreshTimer = null;
+  }
   if (accessToken) {
     google.accounts.oauth2.revoke(accessToken, () => {});
   }
