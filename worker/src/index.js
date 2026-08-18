@@ -162,6 +162,39 @@ async function deleteTerm(env, id) {
   await env.DB.prepare("DELETE FROM terms WHERE id = ?").bind(id).run();
 }
 
+// カリキュラム表の1行(=1つのGoogleカレンダー予定)ごとの入力内容。
+// 予定そのものはGoogle Calendar側にあるため、ここではcalendar_event_idをキーに
+// 完了チェック・授業予定・確認テスト・授業メモだけを保存する。
+async function readCurriculumEntries(env) {
+  const { results } = await env.DB.prepare("SELECT * FROM curriculum_entries").all();
+  return results;
+}
+
+async function upsertCurriculumEntry(env, eventId, body) {
+  if (!eventId) throw new Error("event id is required");
+  await env.DB.prepare(
+    `INSERT INTO curriculum_entries (calendar_event_id, completed, lesson_plan, confirmation_test, lesson_memo, updated_at)
+     VALUES (?, ?, ?, ?, ?, datetime('now'))
+     ON CONFLICT(calendar_event_id) DO UPDATE SET
+       completed = excluded.completed,
+       lesson_plan = excluded.lesson_plan,
+       confirmation_test = excluded.confirmation_test,
+       lesson_memo = excluded.lesson_memo,
+       updated_at = excluded.updated_at`
+  )
+    .bind(
+      eventId,
+      body.completed ? 1 : 0,
+      body.lesson_plan || null,
+      body.confirmation_test || null,
+      body.lesson_memo || null
+    )
+    .run();
+  return env.DB.prepare("SELECT * FROM curriculum_entries WHERE calendar_event_id = ?")
+    .bind(eventId)
+    .first();
+}
+
 export default {
   async fetch(request, env) {
     const origin = env.ALLOWED_ORIGIN;
@@ -249,6 +282,17 @@ export default {
       if (termMatch && request.method === "DELETE") {
         await deleteTerm(env, termMatch[1]);
         return json({ ok: true }, headers);
+      }
+
+      if (url.pathname === "/api/curriculum" && request.method === "GET") {
+        return json(await readCurriculumEntries(env), headers);
+      }
+
+      const curriculumMatch = url.pathname.match(/^\/api\/curriculum\/(.+)$/);
+      if (curriculumMatch && request.method === "PUT") {
+        const body = await request.json();
+        const eventId = decodeURIComponent(curriculumMatch[1]);
+        return json(await upsertCurriculumEntry(env, eventId, body), headers);
       }
 
       return json({ error: "not found" }, headers, 404);

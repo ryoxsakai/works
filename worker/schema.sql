@@ -34,3 +34,12 @@ CREATE TABLE IF NOT EXISTS terms (
   end_date TEXT NOT NULL,
   created_at TEXT DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS curriculum_entries (
+  calendar_event_id TEXT PRIMARY KEY,
+  completed INTEGER DEFAULT 0,
+  lesson_plan TEXT,
+  confirmation_test TEXT,
+  lesson_memo TEXT,
+  updated_at TEXT DEFAULT (datetime('now'))
+);

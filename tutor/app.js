@@ -18,6 +18,7 @@ const PASTEL_FALLBACK_COLORS = [
 
 const API_BASE = "/api";
 const EVENT_VIEW_KEY = "works_event_view";
+const CURRICULUM_STATE_KEY = "works_curriculum_state";
 const WEEKDAY_LABELS = ["日", "月", "火", "水", "木", "金", "土"];
 const TOKEN_DELIMITER_RE = /([\s　()()【】\[\]・/,、:：\-])/;
 
@@ -49,6 +50,13 @@ const els = {
   calNextBtn: document.querySelector("#cal-next"),
   calendarGrid: document.querySelector("#calendar-grid"),
   authError: document.querySelector("#auth-error"),
+  pageTabBtns: document.querySelectorAll(".page-tab-btn"),
+  pageTabPanels: document.querySelectorAll("[data-page-tab-panel]"),
+  curriculumFilterForm: document.querySelector("#curriculum-filter-form"),
+  curriculumName: document.querySelector("#curriculum-name"),
+  curriculumYearSelect: document.querySelector("#curriculum-year-select"),
+  curriculumTermSelect: document.querySelector("#curriculum-term-select"),
+  curriculumTbody: document.querySelector("#curriculum-tbody"),
 };
 
 let selectedCalendarIds = new Set();
@@ -95,6 +103,17 @@ els.tabBtns.forEach((btn) => {
 els.themeRadios.forEach((radio) => {
   radio.addEventListener("change", () => {
     if (radio.checked) setTheme(radio.value);
+  });
+});
+
+// --- ページ上部のタブ(授業予定 / カリキュラム作成) ---
+
+els.pageTabBtns.forEach((btn) => {
+  btn.addEventListener("click", () => {
+    els.pageTabBtns.forEach((b) => b.setAttribute("aria-selected", String(b === btn)));
+    els.pageTabPanels.forEach((panel) => {
+      panel.hidden = panel.dataset.pageTabPanel !== btn.dataset.pageTab;
+    });
   });
 });
 
@@ -148,6 +167,11 @@ watchAuth({
       await loadYears();
       await loadTerms();
       renderYearGroups();
+      renderCurriculumYearOptions();
+      restoreCurriculumState();
+      if (els.curriculumName.value && els.curriculumTermSelect.value) {
+        await loadCurriculumEvents();
+      }
       await loadCalendarEvents();
     } catch (err) {
       showActionError(err);
@@ -496,6 +520,158 @@ els.yearGroups.addEventListener("submit", async (e) => {
     } catch (err) {
       showActionError(err);
     }
+  }
+});
+
+// --- カリキュラム作成 ---
+// 名前・年度・学期で絞り込んだGoogleカレンダーの予定を「第N回」として並べ、
+// 完了チェックと3種類のメモをcalendar_event_id単位でD1に保存する。
+
+function renderCurriculumYearOptions() {
+  els.curriculumYearSelect.innerHTML =
+    `<option value="">年度を選択</option>` +
+    years.map((y) => `<option value="${y.id}">${escapeHtml(y.label)}</option>`).join("");
+}
+
+function renderCurriculumTermOptions(yearId) {
+  const filtered = terms.filter((t) => t.year_id === yearId);
+  els.curriculumTermSelect.innerHTML =
+    `<option value="">学期を選択</option>` +
+    filtered.map((t) => `<option value="${t.id}">${escapeHtml(t.label)}</option>`).join("");
+}
+
+els.curriculumYearSelect.addEventListener("change", () => {
+  renderCurriculumTermOptions(Number(els.curriculumYearSelect.value) || null);
+});
+
+function saveCurriculumState() {
+  localStorage.setItem(
+    CURRICULUM_STATE_KEY,
+    JSON.stringify({
+      name: els.curriculumName.value,
+      yearId: els.curriculumYearSelect.value,
+      termId: els.curriculumTermSelect.value,
+    })
+  );
+}
+
+function restoreCurriculumState() {
+  let saved;
+  try {
+    saved = JSON.parse(localStorage.getItem(CURRICULUM_STATE_KEY) || "null");
+  } catch {
+    return;
+  }
+  if (!saved) return;
+  els.curriculumName.value = saved.name || "";
+  if (saved.yearId) {
+    els.curriculumYearSelect.value = saved.yearId;
+    renderCurriculumTermOptions(Number(saved.yearId));
+    if (saved.termId) els.curriculumTermSelect.value = saved.termId;
+  }
+}
+
+els.curriculumFilterForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  els.actionError.textContent = "";
+  saveCurriculumState();
+  try {
+    await loadCurriculumEvents();
+  } catch (err) {
+    showActionError(err);
+  }
+});
+
+async function loadCurriculumEvents() {
+  const token = getGoogleAccessToken();
+  const name = els.curriculumName.value.trim();
+  const term = terms.find((t) => t.id === Number(els.curriculumTermSelect.value));
+  if (!token || !name || !term || selectedCalendarIds.size === 0) {
+    els.curriculumTbody.innerHTML = "";
+    return;
+  }
+
+  const timeMin = new Date(`${term.start_date}T00:00:00`).toISOString();
+  const timeMax = new Date(`${term.end_date}T23:59:59`).toISOString();
+  const params = new URLSearchParams({
+    timeMin,
+    timeMax,
+    singleEvents: "true",
+    orderBy: "startTime",
+    maxResults: "250",
+  });
+
+  const results = await Promise.all(
+    [...selectedCalendarIds].map(async (calendarId) => {
+      const res = await fetch(
+        `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?${params}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (!res.ok) return [];
+      const data = await res.json();
+      return data.items || [];
+    })
+  );
+
+  const needle = name.toLowerCase();
+  const matched = results
+    .flat()
+    .filter((ev) => `${ev.summary || ""} ${ev.description || ""}`.toLowerCase().includes(needle))
+    .sort((a, b) => {
+      const aStart = a.start?.dateTime || a.start?.date || "";
+      const bStart = b.start?.dateTime || b.start?.date || "";
+      return aStart.localeCompare(bStart);
+    });
+
+  await renderCurriculumTable(matched);
+}
+
+async function renderCurriculumTable(events) {
+  if (events.length === 0) {
+    els.curriculumTbody.innerHTML = `<tr><td colspan="6">該当する予定がありません</td></tr>`;
+    return;
+  }
+
+  const entries = await apiFetch("/curriculum");
+  const entryMap = new Map(entries.map((entry) => [entry.calendar_event_id, entry]));
+
+  els.curriculumTbody.innerHTML = events
+    .map((ev, i) => {
+      const saved = entryMap.get(ev.id) || {};
+      const start = ev.start?.dateTime || ev.start?.date || "";
+      const checked = saved.completed ? "checked" : "";
+      return `<tr data-event-id="${escapeHtml(ev.id)}">
+        <td><input type="checkbox" class="curriculum-completed" ${checked} /></td>
+        <td>第${i + 1}回</td>
+        <td>${formatDate(start)}</td>
+        <td><textarea class="curriculum-plan" rows="2">${escapeHtml(saved.lesson_plan || "")}</textarea></td>
+        <td><textarea class="curriculum-test" rows="2">${escapeHtml(saved.confirmation_test || "")}</textarea></td>
+        <td><textarea class="curriculum-memo" rows="2">${escapeHtml(saved.lesson_memo || "")}</textarea></td>
+      </tr>`;
+    })
+    .join("");
+}
+
+els.curriculumTbody.addEventListener("change", async (e) => {
+  const row = e.target.closest("tr[data-event-id]");
+  if (!row) return;
+  const eventId = row.dataset.eventId;
+  const completed = row.querySelector(".curriculum-completed").checked;
+  const lessonPlan = row.querySelector(".curriculum-plan").value;
+  const confirmationTest = row.querySelector(".curriculum-test").value;
+  const lessonMemo = row.querySelector(".curriculum-memo").value;
+  try {
+    await apiFetch(`/curriculum/${encodeURIComponent(eventId)}`, {
+      method: "PUT",
+      body: JSON.stringify({
+        completed,
+        lesson_plan: lessonPlan,
+        confirmation_test: confirmationTest,
+        lesson_memo: lessonMemo,
+      }),
+    });
+  } catch (err) {
+    showActionError(err);
   }
 });
 

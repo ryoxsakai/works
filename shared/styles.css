@@ -195,6 +195,28 @@ button {
   color: #dc2626;
 }
 
+.page-tabs {
+  display: flex;
+  gap: 1.25rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.page-tab-btn {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  color: var(--muted);
+  padding: 0.6rem 0.1rem;
+  font-size: 1rem;
+}
+
+.page-tab-btn[aria-selected="true"] {
+  color: var(--fg);
+  border-bottom-color: var(--accent);
+}
+
 .panel-header {
   display: flex;
   justify-content: space-between;
@@ -505,4 +527,54 @@ dialog#settings-modal::backdrop {
 .add-term-form {
   display: grid;
   gap: 0.4rem;
+}
+
+.table-scroll {
+  overflow-x: auto;
+  margin-top: 1rem;
+  -webkit-overflow-scrolling: touch;
+}
+
+.curriculum-table {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 720px;
+  font-size: 0.85rem;
+}
+
+.curriculum-table th,
+.curriculum-table td {
+  border: 1px solid var(--border);
+  padding: 0.4rem 0.5rem;
+  vertical-align: top;
+  text-align: left;
+}
+
+.curriculum-table th {
+  background: var(--bg);
+  color: var(--muted);
+  font-weight: 600;
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+}
+
+.curriculum-table td:nth-child(1),
+.curriculum-table td:nth-child(2) {
+  white-space: nowrap;
+  text-align: center;
+}
+
+.curriculum-table td:nth-child(3) {
+  white-space: nowrap;
+}
+
+.curriculum-table textarea {
+  width: 100%;
+  min-width: 160px;
+  resize: vertical;
+}
+
+.curriculum-table input[type="checkbox"] {
+  padding: 0;
 }

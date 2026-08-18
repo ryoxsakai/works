@@ -10,7 +10,7 @@
       if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
     })();
   </script>
-  <link rel="stylesheet" href="../shared/styles.css?v=10" />
+  <link rel="stylesheet" href="../shared/styles.css?v=11" />
 </head>
 <body>
   <header class="page-header">
@@ -34,29 +34,68 @@
       </div>
       <p id="action-error" class="error"></p>
 
-      <div class="panel">
-        <div class="panel-header">
-          <h2>授業予定</h2>
-          <div class="view-toggle" role="group" aria-label="表示切り替え">
-            <button type="button" class="view-toggle-btn" data-view="list">リスト</button>
-            <button type="button" class="view-toggle-btn" data-view="calendar">カレンダー</button>
+      <div class="page-tabs" role="tablist">
+        <button type="button" class="page-tab-btn" data-page-tab="schedule" aria-selected="true">授業予定</button>
+        <button type="button" class="page-tab-btn" data-page-tab="curriculum" aria-selected="false">カリキュラム作成</button>
+      </div>
+
+      <div data-page-tab-panel="schedule">
+        <div class="panel">
+          <div class="panel-header">
+            <h2>授業予定</h2>
+            <div class="view-toggle" role="group" aria-label="表示切り替え">
+              <button type="button" class="view-toggle-btn" data-view="list">リスト</button>
+              <button type="button" class="view-toggle-btn" data-view="calendar">カレンダー</button>
+            </div>
           </div>
-        </div>
-        <p id="name-filter-bar" hidden>
-          フィルタ: <strong id="name-filter-label"></strong>
-          <button type="button" id="clear-name-filter">解除</button>
-        </p>
-        <ul id="event-list"></ul>
-        <div id="calendar-view" hidden>
-          <div class="calendar-nav">
-            <button type="button" id="cal-prev">‹ 前月</button>
-            <span id="cal-month-label"></span>
-            <button type="button" id="cal-next">翌月 ›</button>
+          <p id="name-filter-bar" hidden>
+            フィルタ: <strong id="name-filter-label"></strong>
+            <button type="button" id="clear-name-filter">解除</button>
+          </p>
+          <ul id="event-list"></ul>
+          <div id="calendar-view" hidden>
+            <div class="calendar-nav">
+              <button type="button" id="cal-prev">‹ 前月</button>
+              <span id="cal-month-label"></span>
+              <button type="button" id="cal-next">翌月 ›</button>
+            </div>
+            <div id="calendar-grid" class="calendar-grid"></div>
           </div>
-          <div id="calendar-grid" class="calendar-grid"></div>
         </div>
       </div>
 
+      <div data-page-tab-panel="curriculum" hidden>
+        <div class="panel">
+          <h2>カリキュラム作成</h2>
+          <p class="hint">名前・年度・学期を選ぶと、その名前を含む予定が期間内から自動で第1回・第2回…と並びます。</p>
+          <form id="curriculum-filter-form" class="inline-form">
+            <input id="curriculum-name" type="text" placeholder="生徒名など" required />
+            <select id="curriculum-year-select">
+              <option value="">年度を選択</option>
+            </select>
+            <select id="curriculum-term-select">
+              <option value="">学期を選択</option>
+            </select>
+            <button type="submit">表示</button>
+          </form>
+
+          <div class="table-scroll">
+            <table id="curriculum-table" class="curriculum-table">
+              <thead>
+                <tr>
+                  <th>完了</th>
+                  <th>回数</th>
+                  <th>日付</th>
+                  <th>授業予定</th>
+                  <th>確認テスト</th>
+                  <th>授業メモ</th>
+                </tr>
+              </thead>
+              <tbody id="curriculum-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
     </section>
   </main>
 
@@ -91,6 +130,6 @@
     </div>
   </dialog>
 
-  <script type="module" src="./app.js?v=11"></script>
+  <script type="module" src="./app.js?v=12"></script>
 </body>
 </html>
