@@ -162,6 +162,45 @@ async function deleteTerm(env, id) {
   await env.DB.prepare("DELETE FROM terms WHERE id = ?").bind(id).run();
 }
 
+// 時限(○限)。開始・終了時刻(HH:MM)の範囲にラベルを付け、授業記録などで
+// 時刻の代わりに時限名を表示するために使う。
+async function readPeriods(env) {
+  const { results } = await env.DB.prepare("SELECT * FROM periods ORDER BY start_time").all();
+  return results;
+}
+
+async function createPeriod(env, body) {
+  const label = (body.label || "").trim();
+  const startTime = body.start_time;
+  const endTime = body.end_time;
+  if (!label || !startTime || !endTime) {
+    throw new Error("label, start_time, end_time are required");
+  }
+  return env.DB.prepare(
+    "INSERT INTO periods (label, start_time, end_time) VALUES (?, ?, ?) RETURNING *"
+  )
+    .bind(label, startTime, endTime)
+    .first();
+}
+
+async function updatePeriod(env, id, body) {
+  const label = (body.label || "").trim();
+  const startTime = body.start_time;
+  const endTime = body.end_time;
+  if (!label || !startTime || !endTime) {
+    throw new Error("label, start_time, end_time are required");
+  }
+  return env.DB.prepare(
+    "UPDATE periods SET label = ?, start_time = ?, end_time = ? WHERE id = ? RETURNING *"
+  )
+    .bind(label, startTime, endTime, id)
+    .first();
+}
+
+async function deletePeriod(env, id) {
+  await env.DB.prepare("DELETE FROM periods WHERE id = ?").bind(id).run();
+}
+
 // カリキュラム表の1行(=1つのGoogleカレンダー予定)ごとの入力内容。
 // 予定そのものはGoogle Calendar側にあるため、ここではcalendar_event_idをキーに
 // 完了チェック・授業予定・確認テスト・授業メモだけを保存する。
@@ -399,6 +438,9 @@ export default {
         if (Array.isArray(body.selected_term_ids)) {
           await writeSetting(env, "selected_term_ids", body.selected_term_ids);
         }
+        if (Array.isArray(body.excluded_titles)) {
+          await writeSetting(env, "excluded_titles", body.excluded_titles);
+        }
         return json(await readSettings(env), headers);
       }
 
@@ -439,6 +481,26 @@ export default {
 
       if (termMatch && request.method === "DELETE") {
         await deleteTerm(env, termMatch[1]);
+        return json({ ok: true }, headers);
+      }
+
+      if (url.pathname === "/api/periods" && request.method === "GET") {
+        return json(await readPeriods(env), headers);
+      }
+
+      if (url.pathname === "/api/periods" && request.method === "POST") {
+        const body = await request.json();
+        return json(await createPeriod(env, body), headers, 201);
+      }
+
+      const periodMatch = url.pathname.match(/^\/api\/periods\/(\d+)$/);
+      if (periodMatch && request.method === "PUT") {
+        const body = await request.json();
+        return json(await updatePeriod(env, periodMatch[1], body), headers);
+      }
+
+      if (periodMatch && request.method === "DELETE") {
+        await deletePeriod(env, periodMatch[1]);
         return json({ ok: true }, headers);
       }
 

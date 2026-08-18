@@ -486,7 +486,9 @@ dialog.app-modal::backdrop {
 .term-delete,
 .year-delete,
 .goal-delete,
-.template-delete {
+.template-delete,
+.excluded-title-delete,
+.period-delete {
   padding: 0.2rem 0.5rem;
   font-size: 0.75rem;
   background: transparent;
@@ -497,7 +499,8 @@ dialog.app-modal::backdrop {
 .term-edit,
 .year-edit,
 .goal-edit,
-.template-edit {
+.template-edit,
+.period-edit {
   padding: 0.2rem 0.5rem;
   font-size: 0.75rem;
   background: transparent;
@@ -627,6 +630,10 @@ dialog.app-modal::backdrop {
 
 .curriculum-table td:nth-child(3) {
   white-space: nowrap;
+}
+
+#record-table td:nth-child(1) {
+  text-align: left;
 }
 
 .curriculum-table textarea {

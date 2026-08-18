@@ -77,3 +77,11 @@ CREATE TABLE IF NOT EXISTS student_prefs (
   print_name TEXT,
   updated_at TEXT DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS periods (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  label TEXT NOT NULL,
+  start_time TEXT NOT NULL,
+  end_time TEXT NOT NULL,
+  created_at TEXT DEFAULT (datetime('now'))
+);

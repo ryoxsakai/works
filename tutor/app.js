@@ -82,6 +82,14 @@ const els = {
   yearGroups: document.querySelector("#year-groups"),
   addYearForm: document.querySelector("#add-year-form"),
   newYearLabel: document.querySelector("#new-year-label"),
+  addExcludedTitleForm: document.querySelector("#add-excluded-title-form"),
+  newExcludedTitleInput: document.querySelector("#new-excluded-title"),
+  excludedTitleList: document.querySelector("#excluded-title-list"),
+  periodList: document.querySelector("#period-list"),
+  addPeriodForm: document.querySelector("#add-period-form"),
+  newPeriodLabel: document.querySelector("#new-period-label"),
+  newPeriodStart: document.querySelector("#new-period-start"),
+  newPeriodEnd: document.querySelector("#new-period-end"),
   viewToggleBtns: document.querySelectorAll(".view-toggle-btn"),
   nameFilterBar: document.querySelector("#name-filter-bar"),
   nameFilterLabel: document.querySelector("#name-filter-label"),
@@ -150,6 +158,9 @@ let calendarColors = new Map(); // calendarId -> { raw, bg, fg }
 let years = [];
 let terms = [];
 let selectedTermIds = new Set();
+let excludedTitles = new Set();
+let periods = [];
+let editingPeriodId = null;
 let editingYearId = null;
 let editingTermId = null;
 let rawEvents = [];
@@ -249,7 +260,8 @@ async function loadRecordTable() {
   const dayEvents = (
     await fetchCalendarEvents(
       new Date(`${dayStr}T00:00:00`).toISOString(),
-      new Date(`${dayStr}T23:59:59`).toISOString()
+      new Date(`${dayStr}T23:59:59`).toISOString(),
+      { withCalendarId: true }
     )
   ).sort((a, b) => {
     const aStart = a.start?.dateTime || a.start?.date || "";
@@ -300,6 +312,7 @@ async function loadRecordTable() {
       n: n || 1,
       m: m || 1,
       start: ev.start?.dateTime || ev.start?.date || "",
+      colorStyle: eventColorStyle(ev),
       completed: !!saved.completed,
       lessonPlan: saved.lesson_plan || "",
       confirmationTest: saved.confirmation_test || "",
@@ -314,10 +327,10 @@ async function loadRecordTable() {
 function renderRecordTable(rows) {
   els.recordTbody.innerHTML = rows
     .map(
-      (r) => `<tr data-event-id="${escapeHtml(r.eventId)}" data-completed="${r.completed ? 1 : 0}">
+      (r) => `<tr data-event-id="${escapeHtml(r.eventId)}" data-completed="${r.completed ? 1 : 0}"${r.colorStyle}>
         <td><button type="button" class="record-student-link" data-name="${escapeHtml(r.label)}" data-term-id="${r.termId}"><i class="fa-solid fa-book-open"></i> ${escapeHtml(r.label)}</button></td>
         <td>${r.n}/${r.m}回</td>
-        <td>${formatDate(r.start)}</td>
+        <td>${formatTimeOrPeriod(r.start)}</td>
         <td><textarea class="record-plan" rows="2">${escapeHtml(r.lessonPlan)}</textarea></td>
         <td><textarea class="record-test" rows="2">${escapeHtml(r.confirmationTest)}</textarea></td>
         <td><textarea class="record-homework" rows="2">${escapeHtml(r.homework)}</textarea></td>
@@ -423,7 +436,9 @@ watchAuth({
       await loadYears();
       await loadTerms();
       await loadGoalTemplates();
+      await loadPeriods();
       renderYearGroups();
+      renderExcludedTitleList();
       renderCurriculumYearOptions();
       restoreCurriculumState();
       renderCurriculumSearchSummary();
@@ -488,7 +503,7 @@ async function fetchCalendarEvents(timeMin, timeMax, { withCalendarId = false } 
       return withCalendarId ? items.map((ev) => ({ ...ev, _calendarId: calendarId })) : items;
     })
   );
-  return results.flat();
+  return results.flat().filter((ev) => !excludedTitles.has((ev.summary || "").trim()));
 }
 
 function formatDateOnly(d) {
@@ -504,6 +519,7 @@ async function loadSettings() {
   const settings = await apiFetch("/settings");
   selectedCalendarIds = new Set(settings.selected_calendars || []);
   selectedTermIds = new Set(settings.selected_term_ids || []);
+  excludedTitles = new Set(settings.excluded_titles || []);
 }
 
 async function saveSelectedCalendars() {
@@ -584,6 +600,192 @@ els.calendarChecklist.addEventListener("change", async (e) => {
     showActionError(err);
   }
 });
+
+// --- 表示しない予定(タイトル完全一致で除外。空き枠など) ---
+
+function renderExcludedTitleList() {
+  const items = [...excludedTitles];
+  els.excludedTitleList.innerHTML = items.length
+    ? items
+        .map(
+          (title) => `<li class="term-item" data-title="${escapeHtml(title)}">
+            <span class="term-item-label">${escapeHtml(title)}</span>
+            <button type="button" class="excluded-title-delete" aria-label="削除"><i class="fa-solid fa-trash"></i></button>
+          </li>`
+        )
+        .join("")
+    : `<li class="hint">まだ登録されていません</li>`;
+}
+
+async function saveExcludedTitles() {
+  await apiFetch("/settings", {
+    method: "PUT",
+    body: JSON.stringify({ excluded_titles: [...excludedTitles] }),
+  });
+}
+
+els.addExcludedTitleForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  els.actionError.textContent = "";
+  const title = els.newExcludedTitleInput.value.trim();
+  if (!title) return;
+  excludedTitles.add(title);
+  els.newExcludedTitleInput.value = "";
+  renderExcludedTitleList();
+  try {
+    await saveExcludedTitles();
+    await loadCalendarEvents();
+    await loadRecordTable();
+  } catch (err) {
+    showActionError(err);
+  }
+});
+
+els.excludedTitleList.addEventListener("click", async (e) => {
+  const deleteBtn = e.target.closest(".excluded-title-delete");
+  if (!deleteBtn) return;
+  const title = deleteBtn.closest("[data-title]")?.dataset.title;
+  if (title === undefined) return;
+  excludedTitles.delete(title);
+  renderExcludedTitleList();
+  try {
+    await saveExcludedTitles();
+    await loadCalendarEvents();
+    await loadRecordTable();
+  } catch (err) {
+    showActionError(err);
+  }
+});
+
+// --- 時限(○限)。時刻の範囲にラベルを付け、授業記録などで時刻の代わりに表示する ---
+
+async function loadPeriods() {
+  periods = await apiFetch("/periods");
+  renderPeriodList();
+}
+
+function renderPeriodList() {
+  if (periods.length === 0) {
+    els.periodList.innerHTML = `<p class="hint">まだ時限が登録されていません。</p>`;
+    return;
+  }
+  els.periodList.innerHTML = periods
+    .map((p) => {
+      if (editingPeriodId === p.id) {
+        return `<form class="period-edit-form" data-period-id="${p.id}">
+          <input type="text" class="edit-period-label" value="${escapeHtml(p.label)}" required />
+          <div class="term-dates">
+            <input type="time" class="edit-period-start" value="${p.start_time}" required />
+            <span>〜</span>
+            <input type="time" class="edit-period-end" value="${p.end_time}" required />
+          </div>
+          <div class="edit-actions">
+            <button type="submit"><i class="fa-solid fa-check"></i> 保存</button>
+            <button type="button" class="cancel-edit-period"><i class="fa-solid fa-xmark"></i> キャンセル</button>
+          </div>
+        </form>`;
+      }
+      return `<div class="term-item" data-period-id="${p.id}">
+        <span class="term-item-label">${escapeHtml(p.label)}</span>
+        <span class="term-item-dates">${p.start_time} 〜 ${p.end_time}</span>
+        <button type="button" class="period-edit" aria-label="編集"><i class="fa-solid fa-pen"></i></button>
+        <button type="button" class="period-delete" aria-label="削除"><i class="fa-solid fa-trash"></i></button>
+      </div>`;
+    })
+    .join("");
+}
+
+els.addPeriodForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  els.actionError.textContent = "";
+  const label = els.newPeriodLabel.value.trim();
+  const startTime = els.newPeriodStart.value;
+  const endTime = els.newPeriodEnd.value;
+  if (!label || !startTime || !endTime) return;
+  try {
+    await apiFetch("/periods", {
+      method: "POST",
+      body: JSON.stringify({ label, start_time: startTime, end_time: endTime }),
+    });
+    els.newPeriodLabel.value = "";
+    els.newPeriodStart.value = "";
+    els.newPeriodEnd.value = "";
+    await loadPeriods();
+    await loadRecordTable();
+  } catch (err) {
+    showActionError(err);
+  }
+});
+
+els.periodList.addEventListener("click", async (e) => {
+  const editBtn = e.target.closest(".period-edit");
+  if (editBtn) {
+    editingPeriodId = Number(editBtn.closest("[data-period-id]").dataset.periodId);
+    renderPeriodList();
+    return;
+  }
+
+  const deleteBtn = e.target.closest(".period-delete");
+  if (deleteBtn) {
+    if (!confirm("この時限を削除しますか?")) return;
+    const id = Number(deleteBtn.closest("[data-period-id]").dataset.periodId);
+    try {
+      await apiFetch(`/periods/${id}`, { method: "DELETE" });
+      await loadPeriods();
+      await loadRecordTable();
+    } catch (err) {
+      showActionError(err);
+    }
+    return;
+  }
+
+  if (e.target.closest(".cancel-edit-period")) {
+    editingPeriodId = null;
+    renderPeriodList();
+  }
+});
+
+els.periodList.addEventListener("submit", async (e) => {
+  const editForm = e.target.closest(".period-edit-form");
+  if (!editForm) return;
+  e.preventDefault();
+  els.actionError.textContent = "";
+  const id = Number(editForm.dataset.periodId);
+  const label = editForm.querySelector(".edit-period-label").value.trim();
+  const startTime = editForm.querySelector(".edit-period-start").value;
+  const endTime = editForm.querySelector(".edit-period-end").value;
+  if (!label || !startTime || !endTime) return;
+  try {
+    await apiFetch(`/periods/${id}`, {
+      method: "PUT",
+      body: JSON.stringify({ label, start_time: startTime, end_time: endTime }),
+    });
+    editingPeriodId = null;
+    await loadPeriods();
+    await loadRecordTable();
+  } catch (err) {
+    showActionError(err);
+  }
+});
+
+function findPeriodLabel(iso) {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  const t = `${hh}:${mm}`;
+  const match = periods.find((p) => t >= p.start_time && t < p.end_time);
+  return match ? match.label : null;
+}
+
+function formatTimeOrPeriod(iso) {
+  const periodLabel = findPeriodLabel(iso);
+  if (periodLabel) return periodLabel;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" });
+}
 
 // --- 年度(academic_years)・学期(terms)。年度を親、学期を子とした階層で管理する ---
 // デバイス間で共有し、学期を複数選択して予定を絞り込む。
