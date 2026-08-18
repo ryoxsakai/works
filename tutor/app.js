@@ -70,7 +70,6 @@ const PRIVATE_MED_SCHOOLS = [
 const els = {
   signedOut: document.querySelector("#signed-out"),
   signedIn: document.querySelector("#signed-in"),
-  userEmail: document.querySelector("#user-email"),
   signInBtn: document.querySelector("#sign-in"),
   signOutBtn: document.querySelector("#sign-out"),
   actionError: document.querySelector("#action-error"),
@@ -427,7 +426,7 @@ watchAuth({
   onSignedIn: async (user) => {
     els.signedOut.hidden = true;
     els.signedIn.hidden = false;
-    els.userEmail.textContent = user.email;
+    els.signOutBtn.title = `${user.email} (クリックでログアウト)`;
     els.actionError.textContent = "";
     try {
       await loadSettings();
