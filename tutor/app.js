@@ -108,6 +108,9 @@ const els = {
   nationalSchoolList: document.querySelector("#national-school-list"),
   rankSelects: document.querySelectorAll(".rank-select"),
   otherSchoolList: document.querySelector("#other-school-list"),
+  printScheduleBtn: document.querySelector("#print-schedule"),
+  printCurriculumBtn: document.querySelector("#print-curriculum"),
+  curriculumPrintHeader: document.querySelector("#curriculum-print-header"),
 };
 
 // 設定モーダル・目標モーダルはどちらも共通の.tab-btn/.modal-tab-panelクラスを使うため、
@@ -1143,6 +1146,34 @@ els.rankSelects.forEach((select) => {
     } catch (err) {
       showActionError(err);
     }
+  });
+});
+
+// --- 印刷モード。授業予定・カリキュラムそれぞれに印刷ボタンを設置し、
+// 印刷時はCSS(@media print)でフォーム・タブ・設定ボタン等の操作UIを非表示にする。
+// カリキュラム表のtextareaは行数固定だと複数行の内容が印刷時に見切れるため、
+// 印刷直前に内容の高さへ自動調整する。
+
+els.printScheduleBtn.addEventListener("click", () => window.print());
+
+els.printCurriculumBtn.addEventListener("click", () => {
+  const name = els.curriculumName.value.trim();
+  const yearLabel = els.curriculumYearSelect.selectedOptions[0]?.textContent || "";
+  const termLabel = els.curriculumTermSelect.selectedOptions[0]?.textContent || "";
+  els.curriculumPrintHeader.textContent = [name, yearLabel, termLabel].filter(Boolean).join("　/　");
+  window.print();
+});
+
+window.addEventListener("beforeprint", () => {
+  els.curriculumTbody.querySelectorAll("textarea").forEach((t) => {
+    t.style.height = "auto";
+    t.style.height = `${t.scrollHeight}px`;
+  });
+});
+
+window.addEventListener("afterprint", () => {
+  els.curriculumTbody.querySelectorAll("textarea").forEach((t) => {
+    t.style.height = "";
   });
 });
 

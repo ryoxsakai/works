@@ -672,3 +672,50 @@ dialog.app-modal::backdrop {
 .rank-select {
   flex: 1;
 }
+
+.print-only {
+  display: none;
+}
+
+@media print {
+  .page-header,
+  .user-bar,
+  #action-error,
+  #auth-error,
+  .page-tabs,
+  .print-btn,
+  .view-toggle,
+  #clear-name-filter,
+  .calendar-nav button,
+  .curriculum-controls,
+  .goals-section .panel-header button,
+  .schools-section .panel-header button,
+  dialog {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block;
+  }
+
+  .panel {
+    margin-bottom: 0;
+  }
+
+  .table-scroll {
+    overflow: visible;
+  }
+
+  .curriculum-table {
+    min-width: 0;
+    font-size: 0.75rem;
+  }
+
+  .curriculum-table textarea {
+    border: none;
+    padding: 0;
+    resize: none;
+    overflow: visible;
+    background: transparent;
+  }
+}

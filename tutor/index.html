@@ -10,7 +10,7 @@
       if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
     })();
   </script>
-  <link rel="stylesheet" href="../shared/styles.css?v=16" />
+  <link rel="stylesheet" href="../shared/styles.css?v=17" />
 </head>
 <body>
   <header class="page-header">
@@ -47,6 +47,7 @@
               <button type="button" class="view-toggle-btn" data-view="list">リスト</button>
               <button type="button" class="view-toggle-btn" data-view="calendar">カレンダー</button>
             </div>
+            <button type="button" id="print-schedule" class="print-btn">印刷</button>
           </div>
           <p id="name-filter-bar" hidden>
             フィルタ: <strong id="name-filter-label"></strong>
@@ -66,18 +67,24 @@
 
       <div data-page-tab-panel="curriculum" hidden>
         <div class="panel">
-          <h2>カリキュラム作成</h2>
-          <p class="hint">名前・年度・学期を選ぶと、その名前を含む予定が期間内から自動で第1回・第2回…と並びます。</p>
-          <form id="curriculum-filter-form" class="inline-form">
-            <input id="curriculum-name" type="text" placeholder="生徒名など" required />
-            <select id="curriculum-year-select">
-              <option value="">年度を選択</option>
-            </select>
-            <select id="curriculum-term-select">
-              <option value="">学期を選択</option>
-            </select>
-            <button type="submit">表示</button>
-          </form>
+          <div class="panel-header">
+            <h2>カリキュラム作成</h2>
+            <button type="button" id="print-curriculum" class="print-btn">印刷</button>
+          </div>
+          <div class="curriculum-controls">
+            <p class="hint">名前・年度・学期を選ぶと、その名前を含む予定が期間内から自動で第1回・第2回…と並びます。</p>
+            <form id="curriculum-filter-form" class="inline-form">
+              <input id="curriculum-name" type="text" placeholder="生徒名など" required />
+              <select id="curriculum-year-select">
+                <option value="">年度を選択</option>
+              </select>
+              <select id="curriculum-term-select">
+                <option value="">学期を選択</option>
+              </select>
+              <button type="submit">表示</button>
+            </form>
+          </div>
+          <p id="curriculum-print-header" class="print-only"></p>
 
           <div class="goals-section">
             <div class="panel-header">
@@ -228,6 +235,6 @@
     </div>
   </dialog>
 
-  <script type="module" src="./app.js?v=15"></script>
+  <script type="module" src="./app.js?v=16"></script>
 </body>
 </html>
