@@ -150,7 +150,6 @@ let candidateSchools = [];
 let editingGoalId = null;
 let goalTemplates = [];
 let editingTemplateId = null;
-let knownNames = [];
 
 function showActionError(err) {
   els.actionError.textContent = err instanceof Error ? err.message : String(err);
@@ -248,7 +247,6 @@ watchAuth({
       await loadYears();
       await loadTerms();
       await loadGoalTemplates();
-      await loadKnownNames();
       renderYearGroups();
       renderCurriculumYearOptions();
       restoreCurriculumState();
@@ -683,23 +681,18 @@ els.curriculumHonorificSelect.addEventListener("change", async () => {
   }
 });
 
-// 予定が実際に見つかった名前をD1に控えておき、名前入力欄の候補(datalist)として出す。
-// 「田」と入力しただけで「田﨑」を候補に出せるので、正確な表記を毎回打たなくて済む。
-function renderKnownNamesList() {
-  els.curriculumNameList.innerHTML = knownNames.map((n) => `<option value="${escapeHtml(n)}"></option>`).join("");
-}
-
-async function loadKnownNames() {
-  knownNames = await apiFetch("/known-names");
-  renderKnownNamesList();
-}
-
-async function registerKnownName(name) {
-  await apiFetch("/known-names", { method: "POST", body: JSON.stringify({ name }) });
-  if (!knownNames.includes(name)) {
-    knownNames.push(name);
-    renderKnownNamesList();
-  }
+// 名前入力欄の候補(datalist)を、現在読み込まれている授業予定(rawEvents)のタイトル・説明を
+// トークン化して作る。D1に別途登録する方式ではなく、カレンダーの内容から直接候補を出すことで、
+// カリキュラム側で一度も検索していない名前や、直近マッチが0件だった名前も候補に出せる。
+function renderCurriculumNameSuggestions() {
+  const tokens = new Set();
+  rawEvents.forEach((ev) => {
+    tokenizeText(`${ev.summary || ""} ${ev.description || ""}`).forEach((t) => tokens.add(t));
+  });
+  els.curriculumNameList.innerHTML = [...tokens]
+    .sort()
+    .map((t) => `<option value="${escapeHtml(t)}"></option>`)
+    .join("");
 }
 
 els.curriculumFilterForm.addEventListener("submit", async (e) => {
@@ -755,10 +748,6 @@ async function loadCurriculumEvents() {
       const bStart = b.start?.dateTime || b.start?.date || "";
       return aStart.localeCompare(bStart);
     });
-
-  if (matched.length > 0) {
-    await registerKnownName(name);
-  }
 
   await renderCurriculumTable(matched);
 }
@@ -1456,6 +1445,7 @@ async function loadCalendarEvents() {
     return aStart.localeCompare(bStart);
   });
 
+  renderCurriculumNameSuggestions();
   renderCurrentView();
 }
 

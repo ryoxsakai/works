@@ -319,21 +319,6 @@ async function upsertStudentPref(env, name, body) {
   return env.DB.prepare("SELECT * FROM student_prefs WHERE name = ?").bind(name).first();
 }
 
-// カリキュラムで実際に予定が見つかった名前を控えておき、入力候補(datalist)として使う。
-async function readKnownNames(env) {
-  const { results } = await env.DB.prepare("SELECT name FROM known_names ORDER BY name").all();
-  return results.map((r) => r.name);
-}
-
-async function upsertKnownName(env, name) {
-  await env.DB.prepare(
-    `INSERT INTO known_names (name, updated_at) VALUES (?, datetime('now'))
-     ON CONFLICT(name) DO UPDATE SET updated_at = excluded.updated_at`
-  )
-    .bind(name)
-    .run();
-}
-
 // 生徒(name)ごとの受験校候補(私立の選択 / 国公立の自由入力)と志望順位。
 async function readCandidateSchools(env, name) {
   const { results } = await env.DB.prepare(
@@ -522,18 +507,6 @@ export default {
         const name = (body.name || "").trim();
         if (!name) return json({ error: "name is required" }, headers, 400);
         return json(await upsertStudentPref(env, name, body), headers);
-      }
-
-      if (url.pathname === "/api/known-names" && request.method === "GET") {
-        return json(await readKnownNames(env), headers);
-      }
-
-      if (url.pathname === "/api/known-names" && request.method === "POST") {
-        const body = await request.json();
-        const name = (body.name || "").trim();
-        if (!name) return json({ error: "name is required" }, headers, 400);
-        await upsertKnownName(env, name);
-        return json({ ok: true }, headers, 201);
       }
 
       if (url.pathname === "/api/schools" && request.method === "GET") {

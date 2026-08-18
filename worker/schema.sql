@@ -77,8 +77,3 @@ CREATE TABLE IF NOT EXISTS student_prefs (
   honorific TEXT,
   updated_at TEXT DEFAULT (datetime('now'))
 );
-
-CREATE TABLE IF NOT EXISTS known_names (
-  name TEXT PRIMARY KEY,
-  updated_at TEXT DEFAULT (datetime('now'))
-);
