@@ -312,7 +312,7 @@ async function loadRecordTable() {
       n: n || 1,
       m: m || 1,
       start: ev.start?.dateTime || ev.start?.date || "",
-      colorStyle: eventColorStyle(ev),
+      iconColor: calendarColors.get(ev._calendarId)?.raw || "",
       completed: !!saved.completed,
       lessonPlan: saved.lesson_plan || "",
       confirmationTest: saved.confirmation_test || "",
@@ -327,8 +327,8 @@ async function loadRecordTable() {
 function renderRecordTable(rows) {
   els.recordTbody.innerHTML = rows
     .map(
-      (r) => `<tr data-event-id="${escapeHtml(r.eventId)}" data-completed="${r.completed ? 1 : 0}"${r.colorStyle}>
-        <td><button type="button" class="record-student-link" data-name="${escapeHtml(r.label)}" data-term-id="${r.termId}"><i class="fa-solid fa-book-open"></i> ${escapeHtml(r.label)}</button></td>
+      (r) => `<tr data-event-id="${escapeHtml(r.eventId)}" data-completed="${r.completed ? 1 : 0}">
+        <td><button type="button" class="record-student-link" data-name="${escapeHtml(r.label)}" data-term-id="${r.termId}"><i class="fa-solid fa-book-open"${r.iconColor ? ` style="color:${escapeHtml(r.iconColor)}"` : ""}></i> ${escapeHtml(r.label)}</button></td>
         <td>${r.n}/${r.m}回</td>
         <td>${formatTimeOrPeriod(r.start)}</td>
         <td><textarea class="record-plan" rows="2">${escapeHtml(r.lessonPlan)}</textarea></td>
