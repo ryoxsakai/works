@@ -605,9 +605,6 @@ dialog.app-modal::backdrop {
 .goals-column {
   flex: 1 0 200px;
   min-width: 200px;
-  border: 1px solid var(--border);
-  border-radius: 0.5rem;
-  padding: 0.6rem;
 }
 
 .goals-column h4 {
@@ -629,9 +626,6 @@ dialog.app-modal::backdrop {
   align-items: flex-start;
   gap: 0.35rem;
   font-size: 0.8rem;
-  padding: 0.3rem;
-  border: 1px solid var(--border);
-  border-radius: 0.3rem;
 }
 
 .goal-item input[type="checkbox"] {
