@@ -95,6 +95,9 @@ const els = {
   authError: document.querySelector("#auth-error"),
   pageTabBtns: document.querySelectorAll(".page-tab-btn"),
   pageTabPanels: document.querySelectorAll("[data-page-tab-panel]"),
+  recordDayBtns: document.querySelectorAll(".record-day-btn"),
+  recordDateLabel: document.querySelector("#record-date-label"),
+  recordTbody: document.querySelector("#record-tbody"),
   curriculumFilterForm: document.querySelector("#curriculum-filter-form"),
   curriculumName: document.querySelector("#curriculum-name"),
   curriculumNameList: document.querySelector("#curriculum-name-list"),
@@ -149,6 +152,7 @@ let rawEvents = [];
 let nameFilter = null;
 let eventViewMode = localStorage.getItem(EVENT_VIEW_KEY) === "calendar" ? "calendar" : "list";
 let calendarCursor = startOfMonth(new Date());
+let recordDayOffset = 0; // -1:前日 0:当日 1:翌日
 let goals = [];
 let candidateSchools = [];
 let editingGoalId = null;
@@ -190,7 +194,7 @@ els.themeRadios.forEach((radio) => {
   });
 });
 
-// --- ページ上部のタブ(授業予定 / カリキュラム作成) ---
+// --- ページ上部のタブ(授業記録 / 授業予定 / カリキュラム) ---
 
 els.pageTabBtns.forEach((btn) => {
   btn.addEventListener("click", () => {
@@ -198,6 +202,160 @@ els.pageTabBtns.forEach((btn) => {
     els.pageTabPanels.forEach((panel) => {
       panel.hidden = panel.dataset.pageTabPanel !== btn.dataset.pageTab;
     });
+  });
+});
+
+// --- 授業記録。前日・当日・翌日にカレンダー上で見つかった予定を、
+// 生徒名を事前登録せずカレンダーの内容だけから一覧化する。
+// 回数(N/M回)は、同じタイトルの予定を対象日を含む学期(選択中の学期の中から)の
+// 期間内で数えて算出する(該当する学期が無ければ前後90日をフォールバック範囲にする)。
+
+function computeRecordTargetDate() {
+  const d = new Date();
+  d.setDate(d.getDate() + recordDayOffset);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function renderRecordDateLabel() {
+  const d = computeRecordTargetDate();
+  els.recordDateLabel.textContent = d.toLocaleDateString("ja-JP", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    weekday: "short",
+  });
+}
+
+async function loadRecordTable() {
+  renderRecordDateLabel();
+  const token = getGoogleAccessToken();
+  if (!token) {
+    els.recordTbody.innerHTML = `<tr><td colspan="7">カレンダーへのアクセス許可を確認しています…</td></tr>`;
+    return;
+  }
+  if (selectedCalendarIds.size === 0) {
+    els.recordTbody.innerHTML = `<tr><td colspan="7">設定からカレンダーを選択してください</td></tr>`;
+    return;
+  }
+
+  const targetDate = computeRecordTargetDate();
+  const dayStr = formatDateOnly(targetDate);
+  const dayEvents = (
+    await fetchCalendarEvents(
+      new Date(`${dayStr}T00:00:00`).toISOString(),
+      new Date(`${dayStr}T23:59:59`).toISOString()
+    )
+  ).sort((a, b) => {
+    const aStart = a.start?.dateTime || a.start?.date || "";
+    const bStart = b.start?.dateTime || b.start?.date || "";
+    return aStart.localeCompare(bStart);
+  });
+
+  if (dayEvents.length === 0) {
+    els.recordTbody.innerHTML = `<tr><td colspan="7">この日の予定はありません</td></tr>`;
+    return;
+  }
+
+  const coveringTerm = terms.find(
+    (t) => selectedTermIds.has(t.id) && dayStr >= t.start_date && dayStr <= t.end_date
+  );
+  let rangeStart, rangeEnd;
+  if (coveringTerm) {
+    rangeStart = coveringTerm.start_date;
+    rangeEnd = coveringTerm.end_date;
+  } else {
+    rangeStart = formatDateOnly(new Date(targetDate.getTime() - 90 * 86400000));
+    rangeEnd = formatDateOnly(new Date(targetDate.getTime() + 90 * 86400000));
+  }
+  const rangeEvents = await fetchCalendarEvents(
+    new Date(`${rangeStart}T00:00:00`).toISOString(),
+    new Date(`${rangeEnd}T23:59:59`).toISOString()
+  );
+
+  const entries = await apiFetch("/curriculum");
+  const entryMap = new Map(entries.map((entry) => [entry.calendar_event_id, entry]));
+
+  const rows = dayEvents.map((ev) => {
+    const label = (ev.summary || "(無題)").trim();
+    const sameLabelEvents = rangeEvents
+      .filter((e) => (e.summary || "").trim() === label)
+      .sort((a, b) => {
+        const aStart = a.start?.dateTime || a.start?.date || "";
+        const bStart = b.start?.dateTime || b.start?.date || "";
+        return aStart.localeCompare(bStart);
+      });
+    const n = sameLabelEvents.findIndex((e) => e.id === ev.id) + 1;
+    const m = sameLabelEvents.length;
+    const saved = entryMap.get(ev.id) || {};
+    return {
+      eventId: ev.id,
+      label,
+      n: n || 1,
+      m: m || 1,
+      start: ev.start?.dateTime || ev.start?.date || "",
+      completed: !!saved.completed,
+      lessonPlan: saved.lesson_plan || "",
+      confirmationTest: saved.confirmation_test || "",
+      homework: saved.homework || "",
+      lessonMemo: saved.lesson_memo || "",
+    };
+  });
+
+  renderRecordTable(rows);
+}
+
+function renderRecordTable(rows) {
+  els.recordTbody.innerHTML = rows
+    .map(
+      (r) => `<tr data-event-id="${escapeHtml(r.eventId)}" data-completed="${r.completed ? 1 : 0}">
+        <td>${escapeHtml(r.label)}</td>
+        <td>${r.n}/${r.m}回</td>
+        <td>${formatDate(r.start)}</td>
+        <td><textarea class="record-plan" rows="2">${escapeHtml(r.lessonPlan)}</textarea></td>
+        <td><textarea class="record-test" rows="2">${escapeHtml(r.confirmationTest)}</textarea></td>
+        <td><textarea class="record-homework" rows="2">${escapeHtml(r.homework)}</textarea></td>
+        <td><textarea class="record-memo" rows="2">${escapeHtml(r.lessonMemo)}</textarea></td>
+      </tr>`
+    )
+    .join("");
+}
+
+els.recordTbody.addEventListener("change", async (e) => {
+  const row = e.target.closest("tr[data-event-id]");
+  if (!row) return;
+  const eventId = row.dataset.eventId;
+  const completed = row.dataset.completed === "1";
+  const lessonPlan = row.querySelector(".record-plan").value;
+  const confirmationTest = row.querySelector(".record-test").value;
+  const homework = row.querySelector(".record-homework").value;
+  const lessonMemo = row.querySelector(".record-memo").value;
+  try {
+    await apiFetch(`/curriculum/${encodeURIComponent(eventId)}`, {
+      method: "PUT",
+      body: JSON.stringify({
+        completed,
+        lesson_plan: lessonPlan,
+        confirmation_test: confirmationTest,
+        homework,
+        lesson_memo: lessonMemo,
+      }),
+    });
+  } catch (err) {
+    showActionError(err);
+  }
+});
+
+els.recordDayBtns.forEach((btn) => {
+  btn.addEventListener("click", async () => {
+    recordDayOffset = { prev: -1, today: 0, next: 1 }[btn.dataset.day];
+    els.recordDayBtns.forEach((b) => b.setAttribute("aria-pressed", String(b === btn)));
+    els.actionError.textContent = "";
+    try {
+      await loadRecordTable();
+    } catch (err) {
+      showActionError(err);
+    }
   });
 });
 
@@ -264,6 +422,7 @@ watchAuth({
         await loadStudentPref();
       }
       await loadCalendarEvents();
+      await loadRecordTable();
     } catch (err) {
       showActionError(err);
     }
@@ -290,6 +449,39 @@ async function apiFetch(path, options = {}) {
     throw new Error(`API error ${res.status}: ${await res.text()}`);
   }
   return res.status === 204 ? null : res.json();
+}
+
+// 選択中の全カレンダーから指定期間の予定を横断取得する共通ヘルパー。
+// withCalendarId=trueのときは各予定に_calendarId(色分け用)を付与する。
+async function fetchCalendarEvents(timeMin, timeMax, { withCalendarId = false } = {}) {
+  const token = getGoogleAccessToken();
+  const params = new URLSearchParams({
+    timeMin,
+    timeMax,
+    singleEvents: "true",
+    orderBy: "startTime",
+    maxResults: "250",
+  });
+  const results = await Promise.all(
+    [...selectedCalendarIds].map(async (calendarId) => {
+      const res = await fetch(
+        `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?${params}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (!res.ok) return [];
+      const data = await res.json();
+      const items = data.items || [];
+      return withCalendarId ? items.map((ev) => ({ ...ev, _calendarId: calendarId })) : items;
+    })
+  );
+  return results.flat();
+}
+
+function formatDateOnly(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 // --- サーバー側設定(対象カレンダー。デバイス間で共有) ---
@@ -373,6 +565,7 @@ els.calendarChecklist.addEventListener("change", async (e) => {
   try {
     await saveSelectedCalendars();
     await loadCalendarEvents();
+    await loadRecordTable();
   } catch (err) {
     showActionError(err);
   }
@@ -485,6 +678,7 @@ els.yearGroups.addEventListener("change", async (e) => {
   try {
     await saveSelectedTerms();
     await loadCalendarEvents();
+    await loadRecordTable();
   } catch (err) {
     showActionError(err);
   }
@@ -501,6 +695,7 @@ els.yearGroups.addEventListener("click", async (e) => {
       renderYearGroups();
       await saveSelectedTerms();
       await loadCalendarEvents();
+      await loadRecordTable();
     } catch (err) {
       showActionError(err);
     }
@@ -517,6 +712,7 @@ els.yearGroups.addEventListener("click", async (e) => {
       renderYearGroups();
       await saveSelectedTerms();
       await loadCalendarEvents();
+      await loadRecordTable();
     } catch (err) {
       showActionError(err);
     }
@@ -608,6 +804,7 @@ els.yearGroups.addEventListener("submit", async (e) => {
       await loadTerms();
       renderYearGroups();
       await loadCalendarEvents();
+      await loadRecordTable();
     } catch (err) {
       showActionError(err);
     }
@@ -748,28 +945,9 @@ async function loadCurriculumEvents() {
 
   const timeMin = new Date(`${term.start_date}T00:00:00`).toISOString();
   const timeMax = new Date(`${term.end_date}T23:59:59`).toISOString();
-  const params = new URLSearchParams({
-    timeMin,
-    timeMax,
-    singleEvents: "true",
-    orderBy: "startTime",
-    maxResults: "250",
-  });
+  const events = await fetchCalendarEvents(timeMin, timeMax);
 
-  const results = await Promise.all(
-    [...selectedCalendarIds].map(async (calendarId) => {
-      const res = await fetch(
-        `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?${params}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      if (!res.ok) return [];
-      const data = await res.json();
-      return data.items || [];
-    })
-  );
-
-  const matched = results
-    .flat()
+  const matched = events
     .filter((ev) => tokenizeText(`${ev.summary || ""} ${ev.description || ""}`).includes(name))
     .sort((a, b) => {
       const aStart = a.start?.dateTime || a.start?.date || "";
@@ -1447,27 +1625,9 @@ async function loadCalendarEvents() {
     timeMin = new Date(Date.now() - 90 * 86400000).toISOString();
     timeMax = new Date(Date.now() + 90 * 86400000).toISOString();
   }
-  const params = new URLSearchParams({
-    timeMin,
-    timeMax,
-    singleEvents: "true",
-    orderBy: "startTime",
-    maxResults: "250",
-  });
+  const events = await fetchCalendarEvents(timeMin, timeMax, { withCalendarId: true });
 
-  const results = await Promise.all(
-    [...selectedCalendarIds].map(async (calendarId) => {
-      const res = await fetch(
-        `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?${params}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      if (!res.ok) return [];
-      const data = await res.json();
-      return (data.items || []).map((ev) => ({ ...ev, _calendarId: calendarId }));
-    })
-  );
-
-  rawEvents = results.flat().sort((a, b) => {
+  rawEvents = events.sort((a, b) => {
     const aStart = a.start?.dateTime || a.start?.date || "";
     const bStart = b.start?.dateTime || b.start?.date || "";
     return aStart.localeCompare(bStart);
