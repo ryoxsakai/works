@@ -22,6 +22,15 @@ const CURRICULUM_STATE_KEY = "works_curriculum_state";
 const WEEKDAY_LABELS = ["日", "月", "火", "水", "木", "金", "土"];
 const TOKEN_DELIMITER_RE = /([\s　()()【】\[\]・/,、:：\-])/;
 
+// summary/descriptionを名前として区切れる単位(スペースや括弧などの区切り文字)に分解する。
+// 「田」のような部分一致で別の生徒(例: 田﨑)まで拾ってしまわないよう、
+// カリキュラムの名前検索はこのトークンとの完全一致で判定する。
+function tokenizeText(text) {
+  return text
+    .split(TOKEN_DELIMITER_RE)
+    .filter((part) => part !== "" && !(part.length === 1 && TOKEN_DELIMITER_RE.test(part)));
+}
+
 // あいうえお順(私立医学部31校)。分類に迷う大学(自治医科大学・産業医科大学など)も含めているため、
 // 必要に応じて調整してください。
 const PRIVATE_MED_SCHOOLS = [
@@ -689,10 +698,9 @@ async function loadCurriculumEvents() {
     })
   );
 
-  const needle = name.toLowerCase();
   const matched = results
     .flat()
-    .filter((ev) => `${ev.summary || ""} ${ev.description || ""}`.toLowerCase().includes(needle))
+    .filter((ev) => tokenizeText(`${ev.summary || ""} ${ev.description || ""}`).includes(name))
     .sort((a, b) => {
       const aStart = a.start?.dateTime || a.start?.date || "";
       const bStart = b.start?.dateTime || b.start?.date || "";
