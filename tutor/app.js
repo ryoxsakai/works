@@ -810,6 +810,17 @@ function formatTimeOrPeriod(iso) {
   return d.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" });
 }
 
+// カリキュラム表の日付欄用: mm/dd (曜) 時限(登録がなければ時刻)。
+function formatCurriculumDate(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const weekday = WEEKDAY_LABELS[d.getDay()];
+  return `${mm}/${dd} (${weekday}) ${formatTimeOrPeriod(iso)}`;
+}
+
 // --- 年度(academic_years)・学期(terms)。年度を親、学期を子とした階層で管理する ---
 // デバイス間で共有し、学期を複数選択して予定を絞り込む。
 
@@ -1214,7 +1225,7 @@ async function renderCurriculumTable(events) {
       return `<tr data-event-id="${escapeHtml(ev.id)}">
         <td><input type="checkbox" class="curriculum-completed" ${checked} /></td>
         <td>第${i + 1}回</td>
-        <td>${formatDate(start)}</td>
+        <td>${formatCurriculumDate(start)}</td>
         <td><textarea class="curriculum-plan" rows="2">${escapeHtml(saved.lesson_plan || "")}</textarea></td>
         <td><textarea class="curriculum-test" rows="2">${escapeHtml(saved.confirmation_test || "")}</textarea></td>
         <td><textarea class="curriculum-homework" rows="2">${escapeHtml(saved.homework || "")}</textarea></td>
