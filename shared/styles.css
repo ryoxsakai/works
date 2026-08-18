@@ -433,7 +433,8 @@ dialog#settings-modal::backdrop {
 }
 
 .term-delete,
-.year-delete {
+.year-delete,
+.goal-delete {
   padding: 0.2rem 0.5rem;
   font-size: 0.75rem;
   background: transparent;
@@ -442,7 +443,8 @@ dialog#settings-modal::backdrop {
 }
 
 .term-edit,
-.year-edit {
+.year-edit,
+.goal-edit {
   padding: 0.2rem 0.5rem;
   font-size: 0.75rem;
   background: transparent;
@@ -608,22 +610,10 @@ dialog#settings-modal::backdrop {
   padding: 0.6rem;
 }
 
-.goals-column-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.4rem;
-}
-
-.goals-column-header h4 {
-  margin: 0;
+.goals-column h4 {
+  margin: 0 0 0.4rem;
   font-size: 0.85rem;
   color: var(--muted);
-}
-
-.add-goal-btn {
-  padding: 0.1rem 0.55rem;
-  line-height: 1.4;
 }
 
 .goal-list {
@@ -659,23 +649,17 @@ dialog#settings-modal::backdrop {
   color: var(--muted);
 }
 
-.goal-item-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 0.1rem;
+.goal-edit-list {
+  margin-bottom: 0.5rem;
 }
 
-.goal-item-actions button {
-  padding: 0.05rem 0.3rem;
-  font-size: 0.65rem;
+.goal-move-up,
+.goal-move-down {
+  padding: 0.2rem 0.4rem;
+  font-size: 0.75rem;
   background: transparent;
   color: var(--fg);
   border-color: var(--border);
-}
-
-.goal-item-actions .goal-delete {
-  color: #dc2626;
-  border-color: #dc2626;
 }
 
 .school-checklist {

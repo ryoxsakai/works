@@ -68,8 +68,6 @@ const els = {
   openSettingsBtn: document.querySelector("#open-settings"),
   settingsModal: document.querySelector("#settings-modal"),
   settingsCloseBtn: document.querySelector("#settings-close"),
-  tabBtns: document.querySelectorAll(".tab-btn"),
-  tabPanels: document.querySelectorAll(".modal-tab-panel"),
   themeRadios: document.querySelectorAll('input[name="theme"]'),
   calendarChecklist: document.querySelector("#calendar-checklist"),
   yearGroups: document.querySelector("#year-groups"),
@@ -94,12 +92,11 @@ const els = {
   curriculumTermSelect: document.querySelector("#curriculum-term-select"),
   curriculumTbody: document.querySelector("#curriculum-tbody"),
   goalLists: document.querySelectorAll(".goal-list"),
-  addGoalBtns: document.querySelectorAll(".add-goal-btn"),
+  openGoalsModalBtn: document.querySelector("#open-goals-modal"),
   goalModal: document.querySelector("#goal-modal"),
-  goalModalTitle: document.querySelector("#goal-modal-title"),
   goalModalCloseBtn: document.querySelector("#goal-modal-close"),
-  goalForm: document.querySelector("#goal-form"),
-  goalTextInput: document.querySelector("#goal-text-input"),
+  goalEditLists: document.querySelectorAll(".goal-edit-list"),
+  addGoalForms: document.querySelectorAll(".add-goal-form"),
   openSchoolsModalBtn: document.querySelector("#open-schools-modal"),
   schoolsModal: document.querySelector("#schools-modal"),
   schoolsModalCloseBtn: document.querySelector("#schools-modal-close"),
@@ -114,6 +111,13 @@ const els = {
   otherSchoolList: document.querySelector("#other-school-list"),
 };
 
+// 設定モーダル・目標モーダルはどちらも共通の.tab-btn/.modal-tab-panelクラスを使うため、
+// document全体ではなく各モーダル内に絞ってクエリし、互いのタブ切り替えが干渉しないようにする。
+els.tabBtns = els.settingsModal.querySelectorAll(".tab-btn");
+els.tabPanels = els.settingsModal.querySelectorAll(".modal-tab-panel");
+els.goalTabBtns = els.goalModal.querySelectorAll(".tab-btn");
+els.goalTabPanels = els.goalModal.querySelectorAll(".modal-tab-panel");
+
 let selectedCalendarIds = new Set();
 let calendarColors = new Map(); // calendarId -> { raw, bg, fg }
 let years = [];
@@ -127,7 +131,6 @@ let eventViewMode = localStorage.getItem(EVENT_VIEW_KEY) === "calendar" ? "calen
 let calendarCursor = startOfMonth(new Date());
 let goals = [];
 let candidateSchools = [];
-let pendingGoalCategory = null;
 let editingGoalId = null;
 
 function showActionError(err) {
@@ -743,13 +746,16 @@ els.curriculumTbody.addEventListener("change", async (e) => {
   }
 });
 
-// --- 目標(短期・中期・長期)。名前ごとにD1へ保存し、並べ替えはsort_orderの入れ替えで行う ---
+// --- 目標(短期・中期・長期)。名前ごとにD1へ保存し、並べ替えはsort_orderの入れ替えで行う。
+// ページ上のカラムでは完了チェックのみ操作でき、追加・編集・削除・並べ替えは目標モーダル(設定モーダルと同じ
+// タブ構成)から行う。 ---
 
 function goalsForCategory(category) {
   return goals.filter((g) => g.category === category).sort((a, b) => a.sort_order - b.sort_order);
 }
 
-function renderGoals() {
+// ページ上のカラム表示(チェックボックスのみ操作可能)
+function renderGoalColumns() {
   els.goalLists.forEach((list) => {
     const category = list.dataset.category;
     const items = goalsForCategory(category);
@@ -759,17 +765,43 @@ function renderGoals() {
     }
     list.innerHTML = items
       .map(
-        (g, i) => `<li class="goal-item${g.completed ? " completed" : ""}" data-goal-id="${g.id}">
+        (g) => `<li class="goal-item${g.completed ? " completed" : ""}" data-goal-id="${g.id}">
           <input type="checkbox" class="goal-checkbox" ${g.completed ? "checked" : ""} />
           <span class="goal-item-text">${escapeHtml(g.text)}</span>
-          <div class="goal-item-actions">
-            <button type="button" class="goal-move-up" ${i === 0 ? "disabled" : ""}>▲</button>
-            <button type="button" class="goal-move-down" ${i === items.length - 1 ? "disabled" : ""}>▼</button>
-            <button type="button" class="goal-edit">編集</button>
-            <button type="button" class="goal-delete">削除</button>
-          </div>
         </li>`
       )
+      .join("");
+  });
+}
+
+// 目標モーダル内の一覧表示(編集・削除・並べ替え)
+function renderGoalEditLists() {
+  els.goalEditLists.forEach((container) => {
+    const category = container.dataset.category;
+    const items = goalsForCategory(category);
+    if (items.length === 0) {
+      container.innerHTML = `<p class="hint">まだ目標がありません</p>`;
+      return;
+    }
+    container.innerHTML = items
+      .map((g, i) => {
+        if (editingGoalId === g.id) {
+          return `<form class="goal-edit-form" data-goal-id="${g.id}">
+            <input type="text" class="edit-goal-text" value="${escapeHtml(g.text)}" required />
+            <div class="edit-actions">
+              <button type="submit">保存</button>
+              <button type="button" class="cancel-edit-goal">キャンセル</button>
+            </div>
+          </form>`;
+        }
+        return `<div class="term-item" data-goal-id="${g.id}">
+          <span class="term-item-label">${escapeHtml(g.text)}</span>
+          <button type="button" class="goal-move-up" ${i === 0 ? "disabled" : ""}>▲</button>
+          <button type="button" class="goal-move-down" ${i === items.length - 1 ? "disabled" : ""}>▼</button>
+          <button type="button" class="goal-edit">編集</button>
+          <button type="button" class="goal-delete">削除</button>
+        </div>`;
+      })
       .join("");
   });
 }
@@ -778,51 +810,37 @@ async function loadGoals() {
   const name = els.curriculumName.value.trim();
   if (!name) {
     goals = [];
-    renderGoals();
+    renderGoalColumns();
     return;
   }
   goals = await apiFetch(`/goals?name=${encodeURIComponent(name)}`);
-  renderGoals();
+  renderGoalColumns();
 }
 
-els.addGoalBtns.forEach((btn) => {
-  btn.addEventListener("click", () => {
-    const name = els.curriculumName.value.trim();
-    if (!name) {
-      showActionError(new Error("先に名前を入力してください"));
-      return;
-    }
-    els.actionError.textContent = "";
-    pendingGoalCategory = btn.dataset.category;
-    editingGoalId = null;
-    els.goalModalTitle.textContent = "目標を追加";
-    els.goalTextInput.value = "";
-    els.goalModal.showModal();
-  });
+els.openGoalsModalBtn.addEventListener("click", () => {
+  const name = els.curriculumName.value.trim();
+  if (!name) {
+    showActionError(new Error("先に名前を入力してください"));
+    return;
+  }
+  els.actionError.textContent = "";
+  editingGoalId = null;
+  renderGoalEditLists();
+  els.goalModal.showModal();
 });
 
-els.goalModalCloseBtn.addEventListener("click", () => els.goalModal.close());
+els.goalModalCloseBtn.addEventListener("click", () => {
+  editingGoalId = null;
+  els.goalModal.close();
+});
 
-els.goalForm.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  els.actionError.textContent = "";
-  const text = els.goalTextInput.value.trim();
-  if (!text) return;
-  try {
-    if (editingGoalId) {
-      await apiFetch(`/goals/${editingGoalId}`, { method: "PUT", body: JSON.stringify({ text }) });
-    } else {
-      const name = els.curriculumName.value.trim();
-      await apiFetch("/goals", {
-        method: "POST",
-        body: JSON.stringify({ name, category: pendingGoalCategory, text }),
-      });
-    }
-    els.goalModal.close();
-    await loadGoals();
-  } catch (err) {
-    showActionError(err);
-  }
+els.goalTabBtns.forEach((btn) => {
+  btn.addEventListener("click", () => {
+    els.goalTabBtns.forEach((b) => b.setAttribute("aria-selected", String(b === btn)));
+    els.goalTabPanels.forEach((panel) => {
+      panel.hidden = panel.dataset.goalTabPanel !== btn.dataset.goalTab;
+    });
+  });
 });
 
 els.goalLists.forEach((list) => {
@@ -843,20 +861,48 @@ els.goalLists.forEach((list) => {
       showActionError(err);
     }
   });
+});
 
-  list.addEventListener("click", async (e) => {
-    const li = e.target.closest("[data-goal-id]");
-    if (!li) return;
-    const id = Number(li.dataset.goalId);
+els.addGoalForms.forEach((form) => {
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    els.actionError.textContent = "";
+    const input = form.querySelector(".new-goal-text");
+    const text = input.value.trim();
+    const category = form.dataset.category;
+    const name = els.curriculumName.value.trim();
+    if (!text) return;
+    try {
+      await apiFetch("/goals", {
+        method: "POST",
+        body: JSON.stringify({ name, category, text }),
+      });
+      input.value = "";
+      await loadGoals();
+      renderGoalEditLists();
+    } catch (err) {
+      showActionError(err);
+    }
+  });
+});
+
+els.goalEditLists.forEach((container) => {
+  container.addEventListener("click", async (e) => {
+    const row = e.target.closest("[data-goal-id]");
+    if (!row) return;
+    const id = Number(row.dataset.goalId);
     const g = goals.find((x) => x.id === id);
     if (!g) return;
 
     if (e.target.closest(".goal-edit")) {
-      pendingGoalCategory = g.category;
       editingGoalId = id;
-      els.goalModalTitle.textContent = "目標を編集";
-      els.goalTextInput.value = g.text;
-      els.goalModal.showModal();
+      renderGoalEditLists();
+      return;
+    }
+
+    if (e.target.closest(".cancel-edit-goal")) {
+      editingGoalId = null;
+      renderGoalEditLists();
       return;
     }
 
@@ -865,6 +911,7 @@ els.goalLists.forEach((list) => {
       try {
         await apiFetch(`/goals/${id}`, { method: "DELETE" });
         await loadGoals();
+        renderGoalEditLists();
       } catch (err) {
         showActionError(err);
       }
@@ -885,9 +932,28 @@ els.goalLists.forEach((list) => {
           apiFetch(`/goals/${other.id}`, { method: "PUT", body: JSON.stringify({ sort_order: g.sort_order }) }),
         ]);
         await loadGoals();
+        renderGoalEditLists();
       } catch (err) {
         showActionError(err);
       }
+    }
+  });
+
+  container.addEventListener("submit", async (e) => {
+    const editForm = e.target.closest(".goal-edit-form");
+    if (!editForm) return;
+    e.preventDefault();
+    els.actionError.textContent = "";
+    const id = Number(editForm.dataset.goalId);
+    const text = editForm.querySelector(".edit-goal-text").value.trim();
+    if (!text) return;
+    try {
+      await apiFetch(`/goals/${id}`, { method: "PUT", body: JSON.stringify({ text }) });
+      editingGoalId = null;
+      await loadGoals();
+      renderGoalEditLists();
+    } catch (err) {
+      showActionError(err);
     }
   });
 });
