@@ -98,6 +98,7 @@ const els = {
   curriculumFilterForm: document.querySelector("#curriculum-filter-form"),
   curriculumName: document.querySelector("#curriculum-name"),
   curriculumHonorificSelect: document.querySelector("#curriculum-honorific"),
+  curriculumNameList: document.querySelector("#curriculum-name-list"),
   curriculumYearSelect: document.querySelector("#curriculum-year-select"),
   curriculumTermSelect: document.querySelector("#curriculum-term-select"),
   curriculumTbody: document.querySelector("#curriculum-tbody"),
@@ -149,6 +150,7 @@ let candidateSchools = [];
 let editingGoalId = null;
 let goalTemplates = [];
 let editingTemplateId = null;
+let knownNames = [];
 
 function showActionError(err) {
   els.actionError.textContent = err instanceof Error ? err.message : String(err);
@@ -246,6 +248,7 @@ watchAuth({
       await loadYears();
       await loadTerms();
       await loadGoalTemplates();
+      await loadKnownNames();
       renderYearGroups();
       renderCurriculumYearOptions();
       restoreCurriculumState();
@@ -680,6 +683,25 @@ els.curriculumHonorificSelect.addEventListener("change", async () => {
   }
 });
 
+// 予定が実際に見つかった名前をD1に控えておき、名前入力欄の候補(datalist)として出す。
+// 「田」と入力しただけで「田﨑」を候補に出せるので、正確な表記を毎回打たなくて済む。
+function renderKnownNamesList() {
+  els.curriculumNameList.innerHTML = knownNames.map((n) => `<option value="${escapeHtml(n)}"></option>`).join("");
+}
+
+async function loadKnownNames() {
+  knownNames = await apiFetch("/known-names");
+  renderKnownNamesList();
+}
+
+async function registerKnownName(name) {
+  await apiFetch("/known-names", { method: "POST", body: JSON.stringify({ name }) });
+  if (!knownNames.includes(name)) {
+    knownNames.push(name);
+    renderKnownNamesList();
+  }
+}
+
 els.curriculumFilterForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   els.actionError.textContent = "";
@@ -733,6 +755,10 @@ async function loadCurriculumEvents() {
       const bStart = b.start?.dateTime || b.start?.date || "";
       return aStart.localeCompare(bStart);
     });
+
+  if (matched.length > 0) {
+    await registerKnownName(name);
+  }
 
   await renderCurriculumTable(matched);
 }

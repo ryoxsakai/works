@@ -74,7 +74,8 @@
           <div class="curriculum-controls">
             <p class="hint">名前・年度・学期を選ぶと、その名前を含む予定が期間内から自動で第1回・第2回…と並びます。</p>
             <form id="curriculum-filter-form" class="inline-form">
-              <input id="curriculum-name" type="text" placeholder="生徒名など" required />
+              <input id="curriculum-name" type="text" placeholder="生徒名など" required list="curriculum-name-list" autocomplete="off" />
+              <datalist id="curriculum-name-list"></datalist>
               <select id="curriculum-honorific">
                 <option value="">敬称なし</option>
                 <option value="くん">くん</option>
@@ -262,6 +263,6 @@
     </div>
   </dialog>
 
-  <script type="module" src="./app.js?v=20"></script>
+  <script type="module" src="./app.js?v=21"></script>
 </body>
 </html>
