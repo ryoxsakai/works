@@ -302,6 +302,23 @@ async function deleteGoalTemplate(env, id) {
   await env.DB.prepare("DELETE FROM goal_templates WHERE id = ?").bind(id).run();
 }
 
+// 生徒(name)ごとの表示設定(印刷時の敬称など)。
+async function readStudentPref(env, name) {
+  return env.DB.prepare("SELECT * FROM student_prefs WHERE name = ?").bind(name).first();
+}
+
+async function upsertStudentPref(env, name, body) {
+  const honorific = body.honorific === undefined ? null : body.honorific;
+  await env.DB.prepare(
+    `INSERT INTO student_prefs (name, honorific, updated_at)
+     VALUES (?, ?, datetime('now'))
+     ON CONFLICT(name) DO UPDATE SET honorific = excluded.honorific, updated_at = excluded.updated_at`
+  )
+    .bind(name, honorific)
+    .run();
+  return env.DB.prepare("SELECT * FROM student_prefs WHERE name = ?").bind(name).first();
+}
+
 // 生徒(name)ごとの受験校候補(私立の選択 / 国公立の自由入力)と志望順位。
 async function readCandidateSchools(env, name) {
   const { results } = await env.DB.prepare(
@@ -476,6 +493,20 @@ export default {
       if (templateMatch && request.method === "DELETE") {
         await deleteGoalTemplate(env, templateMatch[1]);
         return json({ ok: true }, headers);
+      }
+
+      if (url.pathname === "/api/student-prefs" && request.method === "GET") {
+        const name = url.searchParams.get("name");
+        if (!name) return json({ error: "name is required" }, headers, 400);
+        const pref = await readStudentPref(env, name);
+        return json(pref || { name, honorific: null }, headers);
+      }
+
+      if (url.pathname === "/api/student-prefs" && request.method === "PUT") {
+        const body = await request.json();
+        const name = (body.name || "").trim();
+        if (!name) return json({ error: "name is required" }, headers, 400);
+        return json(await upsertStudentPref(env, name, body), headers);
       }
 
       if (url.pathname === "/api/schools" && request.method === "GET") {

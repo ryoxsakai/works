@@ -97,6 +97,7 @@ const els = {
   pageTabPanels: document.querySelectorAll("[data-page-tab-panel]"),
   curriculumFilterForm: document.querySelector("#curriculum-filter-form"),
   curriculumName: document.querySelector("#curriculum-name"),
+  curriculumHonorificSelect: document.querySelector("#curriculum-honorific"),
   curriculumYearSelect: document.querySelector("#curriculum-year-select"),
   curriculumTermSelect: document.querySelector("#curriculum-term-select"),
   curriculumTbody: document.querySelector("#curriculum-tbody"),
@@ -254,6 +255,7 @@ watchAuth({
       if (els.curriculumName.value) {
         await loadGoals();
         await loadCandidateSchools();
+        await loadStudentPref();
       }
       await loadCalendarEvents();
     } catch (err) {
@@ -654,6 +656,30 @@ function restoreCurriculumState() {
   }
 }
 
+// 生徒(name)ごとの敬称(印刷時の名前表示に使う。例: 田﨑 → 田﨑くん)。
+async function loadStudentPref() {
+  const name = els.curriculumName.value.trim();
+  if (!name) {
+    els.curriculumHonorificSelect.value = "";
+    return;
+  }
+  const pref = await apiFetch(`/student-prefs?name=${encodeURIComponent(name)}`);
+  els.curriculumHonorificSelect.value = pref?.honorific || "";
+}
+
+els.curriculumHonorificSelect.addEventListener("change", async () => {
+  const name = els.curriculumName.value.trim();
+  if (!name) return;
+  try {
+    await apiFetch("/student-prefs", {
+      method: "PUT",
+      body: JSON.stringify({ name, honorific: els.curriculumHonorificSelect.value || null }),
+    });
+  } catch (err) {
+    showActionError(err);
+  }
+});
+
 els.curriculumFilterForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   els.actionError.textContent = "";
@@ -662,6 +688,7 @@ els.curriculumFilterForm.addEventListener("submit", async (e) => {
     await loadCurriculumEvents();
     await loadGoals();
     await loadCandidateSchools();
+    await loadStudentPref();
   } catch (err) {
     showActionError(err);
   }
@@ -1331,9 +1358,10 @@ els.printScheduleBtn.addEventListener("click", () => window.print());
 
 els.printCurriculumBtn.addEventListener("click", () => {
   const name = els.curriculumName.value.trim();
+  const displayName = name + (els.curriculumHonorificSelect.value || "");
   const yearLabel = els.curriculumYearSelect.selectedOptions[0]?.textContent || "";
   const termLabel = els.curriculumTermSelect.selectedOptions[0]?.textContent || "";
-  els.curriculumPrintHeader.textContent = [name, yearLabel, termLabel].filter(Boolean).join("　/　");
+  els.curriculumPrintHeader.textContent = [displayName, yearLabel, termLabel].filter(Boolean).join("　/　");
   window.print();
 });
 

@@ -71,3 +71,9 @@ CREATE TABLE IF NOT EXISTS goal_templates (
   sort_order INTEGER DEFAULT 0,
   created_at TEXT DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS student_prefs (
+  name TEXT PRIMARY KEY,
+  honorific TEXT,
+  updated_at TEXT DEFAULT (datetime('now'))
+);
