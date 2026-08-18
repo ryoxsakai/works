@@ -40,6 +40,26 @@ CREATE TABLE IF NOT EXISTS curriculum_entries (
   completed INTEGER DEFAULT 0,
   lesson_plan TEXT,
   confirmation_test TEXT,
+  homework TEXT,
   lesson_memo TEXT,
   updated_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS goals (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  category TEXT NOT NULL,
+  text TEXT NOT NULL,
+  completed INTEGER DEFAULT 0,
+  sort_order INTEGER DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS candidate_schools (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  school_name TEXT NOT NULL,
+  school_type TEXT NOT NULL,
+  rank INTEGER,
+  created_at TEXT DEFAULT (datetime('now'))
 );

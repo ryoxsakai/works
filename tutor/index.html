@@ -10,7 +10,7 @@
       if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
     })();
   </script>
-  <link rel="stylesheet" href="../shared/styles.css?v=11" />
+  <link rel="stylesheet" href="../shared/styles.css?v=12" />
 </head>
 <body>
   <header class="page-header">
@@ -79,6 +79,41 @@
             <button type="submit">表示</button>
           </form>
 
+          <div class="goals-section">
+            <h3>目標</h3>
+            <div class="goals-columns">
+              <div class="goals-column">
+                <div class="goals-column-header">
+                  <h4>短期目標</h4>
+                  <button type="button" class="add-goal-btn" data-category="short">＋</button>
+                </div>
+                <ul class="goal-list" data-category="short"></ul>
+              </div>
+              <div class="goals-column">
+                <div class="goals-column-header">
+                  <h4>中期目標</h4>
+                  <button type="button" class="add-goal-btn" data-category="mid">＋</button>
+                </div>
+                <ul class="goal-list" data-category="mid"></ul>
+              </div>
+              <div class="goals-column">
+                <div class="goals-column-header">
+                  <h4>長期目標</h4>
+                  <button type="button" class="add-goal-btn" data-category="long">＋</button>
+                </div>
+                <ul class="goal-list" data-category="long"></ul>
+              </div>
+            </div>
+          </div>
+
+          <div class="schools-section">
+            <div class="panel-header">
+              <h3>受験校・志望校</h3>
+              <button type="button" id="open-schools-modal">設定</button>
+            </div>
+            <p id="schools-summary" class="hint">名前を入力して「表示」を押すと設定できます。</p>
+          </div>
+
           <div class="table-scroll">
             <table id="curriculum-table" class="curriculum-table">
               <thead>
@@ -88,6 +123,7 @@
                   <th>日付</th>
                   <th>授業予定</th>
                   <th>確認テスト</th>
+                  <th>宿題</th>
                   <th>授業メモ</th>
                 </tr>
               </thead>
@@ -130,6 +166,54 @@
     </div>
   </dialog>
 
-  <script type="module" src="./app.js?v=12"></script>
+  <dialog id="goal-modal">
+    <div class="modal-header">
+      <h2 id="goal-modal-title">目標を追加</h2>
+      <button type="button" id="goal-modal-close" class="modal-close" aria-label="閉じる">×</button>
+    </div>
+    <form id="goal-form" class="modal-tab-panel">
+      <textarea id="goal-text-input" rows="3" placeholder="目標を入力" required></textarea>
+      <div class="edit-actions">
+        <button type="submit">保存</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="schools-modal">
+    <div class="modal-header">
+      <h2>受験校・志望校の設定</h2>
+      <button type="button" id="schools-modal-close" class="modal-close" aria-label="閉じる">×</button>
+    </div>
+    <div class="modal-tabs" role="tablist">
+      <button type="button" class="schools-tab-btn" data-schools-tab="select" role="tab" aria-selected="true">学校選択</button>
+      <button type="button" class="schools-tab-btn" data-schools-tab="rank" role="tab" aria-selected="false">志望順位</button>
+    </div>
+    <div class="modal-tab-panel" data-schools-tab-panel="select">
+      <p class="hint">私立医学部(あいうえお順)</p>
+      <div id="private-school-checklist" class="school-checklist"></div>
+      <p class="hint">国公立(自由入力)</p>
+      <form id="add-national-school-form" class="inline-form">
+        <input id="new-national-school" type="text" placeholder="例: 東京大学" required />
+        <button type="submit">追加</button>
+      </form>
+      <ul id="national-school-list" class="term-items"></ul>
+    </div>
+    <div class="modal-tab-panel" data-schools-tab-panel="rank" hidden>
+      <p class="hint">選択した学校の中から志望順位を選んでください。</p>
+      <label class="rank-select-row">第1志望
+        <select id="rank1-select" class="rank-select" data-rank="1"><option value="">指定なし</option></select>
+      </label>
+      <label class="rank-select-row">第2志望
+        <select id="rank2-select" class="rank-select" data-rank="2"><option value="">指定なし</option></select>
+      </label>
+      <label class="rank-select-row">第3志望
+        <select id="rank3-select" class="rank-select" data-rank="3"><option value="">指定なし</option></select>
+      </label>
+      <p class="hint">その他の受験校</p>
+      <ul id="other-school-list" class="term-items"></ul>
+    </div>
+  </dialog>
+
+  <script type="module" src="./app.js?v=13"></script>
 </body>
 </html>

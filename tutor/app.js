@@ -22,6 +22,42 @@ const CURRICULUM_STATE_KEY = "works_curriculum_state";
 const WEEKDAY_LABELS = ["日", "月", "火", "水", "木", "金", "土"];
 const TOKEN_DELIMITER_RE = /([\s　()()【】\[\]・/,、:：\-])/;
 
+// あいうえお順(私立医学部31校)。分類に迷う大学(自治医科大学・産業医科大学など)も含めているため、
+// 必要に応じて調整してください。
+const PRIVATE_MED_SCHOOLS = [
+  "愛知医科大学",
+  "岩手医科大学",
+  "大阪医科薬科大学",
+  "金沢医科大学",
+  "川崎医科大学",
+  "関西医科大学",
+  "北里大学",
+  "杏林大学",
+  "近畿大学",
+  "久留米大学",
+  "慶應義塾大学",
+  "国際医療福祉大学",
+  "埼玉医科大学",
+  "産業医科大学",
+  "昭和大学",
+  "自治医科大学",
+  "順天堂大学",
+  "聖マリアンナ医科大学",
+  "帝京大学",
+  "東海大学",
+  "東京医科大学",
+  "東京慈恵会医科大学",
+  "東京女子医科大学",
+  "東邦大学",
+  "東北医科薬科大学",
+  "獨協医科大学",
+  "日本医科大学",
+  "日本大学",
+  "兵庫医科大学",
+  "福岡大学",
+  "藤田医科大学",
+];
+
 const els = {
   signedOut: document.querySelector("#signed-out"),
   signedIn: document.querySelector("#signed-in"),
@@ -57,6 +93,25 @@ const els = {
   curriculumYearSelect: document.querySelector("#curriculum-year-select"),
   curriculumTermSelect: document.querySelector("#curriculum-term-select"),
   curriculumTbody: document.querySelector("#curriculum-tbody"),
+  goalLists: document.querySelectorAll(".goal-list"),
+  addGoalBtns: document.querySelectorAll(".add-goal-btn"),
+  goalModal: document.querySelector("#goal-modal"),
+  goalModalTitle: document.querySelector("#goal-modal-title"),
+  goalModalCloseBtn: document.querySelector("#goal-modal-close"),
+  goalForm: document.querySelector("#goal-form"),
+  goalTextInput: document.querySelector("#goal-text-input"),
+  openSchoolsModalBtn: document.querySelector("#open-schools-modal"),
+  schoolsModal: document.querySelector("#schools-modal"),
+  schoolsModalCloseBtn: document.querySelector("#schools-modal-close"),
+  schoolsSummary: document.querySelector("#schools-summary"),
+  schoolsTabBtns: document.querySelectorAll(".schools-tab-btn"),
+  schoolsTabPanels: document.querySelectorAll("[data-schools-tab-panel]"),
+  privateSchoolChecklist: document.querySelector("#private-school-checklist"),
+  addNationalSchoolForm: document.querySelector("#add-national-school-form"),
+  newNationalSchoolInput: document.querySelector("#new-national-school"),
+  nationalSchoolList: document.querySelector("#national-school-list"),
+  rankSelects: document.querySelectorAll(".rank-select"),
+  otherSchoolList: document.querySelector("#other-school-list"),
 };
 
 let selectedCalendarIds = new Set();
@@ -70,6 +125,10 @@ let rawEvents = [];
 let nameFilter = null;
 let eventViewMode = localStorage.getItem(EVENT_VIEW_KEY) === "calendar" ? "calendar" : "list";
 let calendarCursor = startOfMonth(new Date());
+let goals = [];
+let candidateSchools = [];
+let pendingGoalCategory = null;
+let editingGoalId = null;
 
 function showActionError(err) {
   els.actionError.textContent = err instanceof Error ? err.message : String(err);
@@ -171,6 +230,10 @@ watchAuth({
       restoreCurriculumState();
       if (els.curriculumName.value && els.curriculumTermSelect.value) {
         await loadCurriculumEvents();
+      }
+      if (els.curriculumName.value) {
+        await loadGoals();
+        await loadCandidateSchools();
       }
       await loadCalendarEvents();
     } catch (err) {
@@ -577,6 +640,8 @@ els.curriculumFilterForm.addEventListener("submit", async (e) => {
   saveCurriculumState();
   try {
     await loadCurriculumEvents();
+    await loadGoals();
+    await loadCandidateSchools();
   } catch (err) {
     showActionError(err);
   }
@@ -628,7 +693,7 @@ async function loadCurriculumEvents() {
 
 async function renderCurriculumTable(events) {
   if (events.length === 0) {
-    els.curriculumTbody.innerHTML = `<tr><td colspan="6">該当する予定がありません</td></tr>`;
+    els.curriculumTbody.innerHTML = `<tr><td colspan="7">該当する予定がありません</td></tr>`;
     return;
   }
 
@@ -646,6 +711,7 @@ async function renderCurriculumTable(events) {
         <td>${formatDate(start)}</td>
         <td><textarea class="curriculum-plan" rows="2">${escapeHtml(saved.lesson_plan || "")}</textarea></td>
         <td><textarea class="curriculum-test" rows="2">${escapeHtml(saved.confirmation_test || "")}</textarea></td>
+        <td><textarea class="curriculum-homework" rows="2">${escapeHtml(saved.homework || "")}</textarea></td>
         <td><textarea class="curriculum-memo" rows="2">${escapeHtml(saved.lesson_memo || "")}</textarea></td>
       </tr>`;
     })
@@ -659,6 +725,7 @@ els.curriculumTbody.addEventListener("change", async (e) => {
   const completed = row.querySelector(".curriculum-completed").checked;
   const lessonPlan = row.querySelector(".curriculum-plan").value;
   const confirmationTest = row.querySelector(".curriculum-test").value;
+  const homework = row.querySelector(".curriculum-homework").value;
   const lessonMemo = row.querySelector(".curriculum-memo").value;
   try {
     await apiFetch(`/curriculum/${encodeURIComponent(eventId)}`, {
@@ -667,12 +734,350 @@ els.curriculumTbody.addEventListener("change", async (e) => {
         completed,
         lesson_plan: lessonPlan,
         confirmation_test: confirmationTest,
+        homework,
         lesson_memo: lessonMemo,
       }),
     });
   } catch (err) {
     showActionError(err);
   }
+});
+
+// --- 目標(短期・中期・長期)。名前ごとにD1へ保存し、並べ替えはsort_orderの入れ替えで行う ---
+
+function goalsForCategory(category) {
+  return goals.filter((g) => g.category === category).sort((a, b) => a.sort_order - b.sort_order);
+}
+
+function renderGoals() {
+  els.goalLists.forEach((list) => {
+    const category = list.dataset.category;
+    const items = goalsForCategory(category);
+    if (items.length === 0) {
+      list.innerHTML = `<li class="hint">まだ目標がありません</li>`;
+      return;
+    }
+    list.innerHTML = items
+      .map(
+        (g, i) => `<li class="goal-item${g.completed ? " completed" : ""}" data-goal-id="${g.id}">
+          <input type="checkbox" class="goal-checkbox" ${g.completed ? "checked" : ""} />
+          <span class="goal-item-text">${escapeHtml(g.text)}</span>
+          <div class="goal-item-actions">
+            <button type="button" class="goal-move-up" ${i === 0 ? "disabled" : ""}>▲</button>
+            <button type="button" class="goal-move-down" ${i === items.length - 1 ? "disabled" : ""}>▼</button>
+            <button type="button" class="goal-edit">編集</button>
+            <button type="button" class="goal-delete">削除</button>
+          </div>
+        </li>`
+      )
+      .join("");
+  });
+}
+
+async function loadGoals() {
+  const name = els.curriculumName.value.trim();
+  if (!name) {
+    goals = [];
+    renderGoals();
+    return;
+  }
+  goals = await apiFetch(`/goals?name=${encodeURIComponent(name)}`);
+  renderGoals();
+}
+
+els.addGoalBtns.forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const name = els.curriculumName.value.trim();
+    if (!name) {
+      showActionError(new Error("先に名前を入力してください"));
+      return;
+    }
+    els.actionError.textContent = "";
+    pendingGoalCategory = btn.dataset.category;
+    editingGoalId = null;
+    els.goalModalTitle.textContent = "目標を追加";
+    els.goalTextInput.value = "";
+    els.goalModal.showModal();
+  });
+});
+
+els.goalModalCloseBtn.addEventListener("click", () => els.goalModal.close());
+
+els.goalForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  els.actionError.textContent = "";
+  const text = els.goalTextInput.value.trim();
+  if (!text) return;
+  try {
+    if (editingGoalId) {
+      await apiFetch(`/goals/${editingGoalId}`, { method: "PUT", body: JSON.stringify({ text }) });
+    } else {
+      const name = els.curriculumName.value.trim();
+      await apiFetch("/goals", {
+        method: "POST",
+        body: JSON.stringify({ name, category: pendingGoalCategory, text }),
+      });
+    }
+    els.goalModal.close();
+    await loadGoals();
+  } catch (err) {
+    showActionError(err);
+  }
+});
+
+els.goalLists.forEach((list) => {
+  list.addEventListener("change", async (e) => {
+    const checkbox = e.target.closest(".goal-checkbox");
+    if (!checkbox) return;
+    const li = e.target.closest("[data-goal-id]");
+    const id = Number(li.dataset.goalId);
+    try {
+      await apiFetch(`/goals/${id}`, {
+        method: "PUT",
+        body: JSON.stringify({ completed: checkbox.checked }),
+      });
+      const g = goals.find((x) => x.id === id);
+      if (g) g.completed = checkbox.checked ? 1 : 0;
+      li.classList.toggle("completed", checkbox.checked);
+    } catch (err) {
+      showActionError(err);
+    }
+  });
+
+  list.addEventListener("click", async (e) => {
+    const li = e.target.closest("[data-goal-id]");
+    if (!li) return;
+    const id = Number(li.dataset.goalId);
+    const g = goals.find((x) => x.id === id);
+    if (!g) return;
+
+    if (e.target.closest(".goal-edit")) {
+      pendingGoalCategory = g.category;
+      editingGoalId = id;
+      els.goalModalTitle.textContent = "目標を編集";
+      els.goalTextInput.value = g.text;
+      els.goalModal.showModal();
+      return;
+    }
+
+    if (e.target.closest(".goal-delete")) {
+      if (!confirm("この目標を削除しますか?")) return;
+      try {
+        await apiFetch(`/goals/${id}`, { method: "DELETE" });
+        await loadGoals();
+      } catch (err) {
+        showActionError(err);
+      }
+      return;
+    }
+
+    const moveUp = e.target.closest(".goal-move-up");
+    const moveDown = e.target.closest(".goal-move-down");
+    if (moveUp || moveDown) {
+      const items = goalsForCategory(g.category);
+      const idx = items.findIndex((x) => x.id === id);
+      const swapIdx = moveUp ? idx - 1 : idx + 1;
+      if (swapIdx < 0 || swapIdx >= items.length) return;
+      const other = items[swapIdx];
+      try {
+        await Promise.all([
+          apiFetch(`/goals/${g.id}`, { method: "PUT", body: JSON.stringify({ sort_order: other.sort_order }) }),
+          apiFetch(`/goals/${other.id}`, { method: "PUT", body: JSON.stringify({ sort_order: g.sort_order }) }),
+        ]);
+        await loadGoals();
+      } catch (err) {
+        showActionError(err);
+      }
+    }
+  });
+});
+
+// --- 受験校・志望校。私立医学部リストからの選択+国公立の自由入力、第1〜第3志望の設定 ---
+
+function renderSchoolsSummary() {
+  const name = els.curriculumName.value.trim();
+  if (candidateSchools.length === 0) {
+    els.schoolsSummary.textContent = name
+      ? "まだ受験校が設定されていません。「設定」から登録してください。"
+      : "名前を入力して「表示」を押すと設定できます。";
+    return;
+  }
+  const ranked = [1, 2, 3]
+    .map((rank) => candidateSchools.find((s) => s.rank === rank))
+    .filter(Boolean)
+    .map((s) => `第${s.rank}志望: ${s.school_name}`);
+  const others = candidateSchools.filter((s) => !s.rank).map((s) => s.school_name);
+  const parts = [];
+  if (ranked.length) parts.push(ranked.join(" / "));
+  if (others.length) parts.push(`その他: ${others.join("、")}`);
+  els.schoolsSummary.textContent = parts.join("　|　") || "受験校が設定されています。";
+}
+
+async function loadCandidateSchools() {
+  const name = els.curriculumName.value.trim();
+  if (!name) {
+    candidateSchools = [];
+    renderSchoolsSummary();
+    return;
+  }
+  candidateSchools = await apiFetch(`/schools?name=${encodeURIComponent(name)}`);
+  renderSchoolsSummary();
+}
+
+function renderRankSelects() {
+  const options = candidateSchools
+    .map((s) => `<option value="${s.id}">${escapeHtml(s.school_name)}</option>`)
+    .join("");
+  els.rankSelects.forEach((select) => {
+    const rank = Number(select.dataset.rank);
+    const current = candidateSchools.find((s) => s.rank === rank);
+    select.innerHTML = `<option value="">指定なし</option>` + options;
+    select.value = current ? String(current.id) : "";
+  });
+
+  const others = candidateSchools.filter((s) => !s.rank);
+  els.otherSchoolList.innerHTML = others.length
+    ? others
+        .map((s) => `<li class="term-item"><span class="term-item-label">${escapeHtml(s.school_name)}</span></li>`)
+        .join("")
+    : `<li class="hint">なし</li>`;
+}
+
+function renderSchoolsModal() {
+  const selectedPrivate = new Set(
+    candidateSchools.filter((s) => s.school_type === "private").map((s) => s.school_name)
+  );
+  els.privateSchoolChecklist.innerHTML = PRIVATE_MED_SCHOOLS.map((name) => {
+    const checked = selectedPrivate.has(name) ? "checked" : "";
+    return `<label class="calendar-item">
+      <input type="checkbox" class="private-school-checkbox" value="${escapeHtml(name)}" ${checked} />
+      ${escapeHtml(name)}
+    </label>`;
+  }).join("");
+
+  const nationalSchools = candidateSchools.filter((s) => s.school_type === "national");
+  els.nationalSchoolList.innerHTML = nationalSchools.length
+    ? nationalSchools
+        .map(
+          (s) => `<li class="term-item" data-school-id="${s.id}">
+            <span class="term-item-label">${escapeHtml(s.school_name)}</span>
+            <button type="button" class="national-school-delete" data-id="${s.id}">削除</button>
+          </li>`
+        )
+        .join("")
+    : `<li class="hint">まだ登録されていません</li>`;
+
+  renderRankSelects();
+}
+
+els.openSchoolsModalBtn.addEventListener("click", async () => {
+  const name = els.curriculumName.value.trim();
+  if (!name) {
+    showActionError(new Error("先に名前を入力してください"));
+    return;
+  }
+  els.actionError.textContent = "";
+  try {
+    await loadCandidateSchools();
+    renderSchoolsModal();
+    els.schoolsModal.showModal();
+  } catch (err) {
+    showActionError(err);
+  }
+});
+
+els.schoolsModalCloseBtn.addEventListener("click", () => {
+  els.schoolsModal.close();
+  renderSchoolsSummary();
+});
+
+els.schoolsTabBtns.forEach((btn) => {
+  btn.addEventListener("click", () => {
+    els.schoolsTabBtns.forEach((b) => b.setAttribute("aria-selected", String(b === btn)));
+    els.schoolsTabPanels.forEach((panel) => {
+      panel.hidden = panel.dataset.schoolsTabPanel !== btn.dataset.schoolsTab;
+    });
+    if (btn.dataset.schoolsTab === "rank") renderRankSelects();
+  });
+});
+
+els.privateSchoolChecklist.addEventListener("change", async (e) => {
+  const checkbox = e.target.closest(".private-school-checkbox");
+  if (!checkbox) return;
+  const name = els.curriculumName.value.trim();
+  els.actionError.textContent = "";
+  try {
+    if (checkbox.checked) {
+      await apiFetch("/schools", {
+        method: "POST",
+        body: JSON.stringify({ name, school_name: checkbox.value, school_type: "private" }),
+      });
+    } else {
+      const existing = candidateSchools.find(
+        (s) => s.school_type === "private" && s.school_name === checkbox.value
+      );
+      if (existing) await apiFetch(`/schools/${existing.id}`, { method: "DELETE" });
+    }
+    candidateSchools = await apiFetch(`/schools?name=${encodeURIComponent(name)}`);
+    renderRankSelects();
+  } catch (err) {
+    showActionError(err);
+  }
+});
+
+els.addNationalSchoolForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  els.actionError.textContent = "";
+  const name = els.curriculumName.value.trim();
+  const schoolName = els.newNationalSchoolInput.value.trim();
+  if (!schoolName) return;
+  try {
+    await apiFetch("/schools", {
+      method: "POST",
+      body: JSON.stringify({ name, school_name: schoolName, school_type: "national" }),
+    });
+    els.newNationalSchoolInput.value = "";
+    candidateSchools = await apiFetch(`/schools?name=${encodeURIComponent(name)}`);
+    renderSchoolsModal();
+  } catch (err) {
+    showActionError(err);
+  }
+});
+
+els.nationalSchoolList.addEventListener("click", async (e) => {
+  const deleteBtn = e.target.closest(".national-school-delete");
+  if (!deleteBtn) return;
+  els.actionError.textContent = "";
+  try {
+    await apiFetch(`/schools/${deleteBtn.dataset.id}`, { method: "DELETE" });
+    const name = els.curriculumName.value.trim();
+    candidateSchools = await apiFetch(`/schools?name=${encodeURIComponent(name)}`);
+    renderSchoolsModal();
+  } catch (err) {
+    showActionError(err);
+  }
+});
+
+els.rankSelects.forEach((select) => {
+  select.addEventListener("change", async () => {
+    const rank = Number(select.dataset.rank);
+    const newId = select.value ? Number(select.value) : null;
+    els.actionError.textContent = "";
+    try {
+      const previousHolder = candidateSchools.find((s) => s.rank === rank);
+      if (previousHolder && previousHolder.id !== newId) {
+        await apiFetch(`/schools/${previousHolder.id}`, { method: "PUT", body: JSON.stringify({ rank: null }) });
+      }
+      if (newId) {
+        await apiFetch(`/schools/${newId}`, { method: "PUT", body: JSON.stringify({ rank }) });
+      }
+      const name = els.curriculumName.value.trim();
+      candidateSchools = await apiFetch(`/schools?name=${encodeURIComponent(name)}`);
+      renderRankSelects();
+    } catch (err) {
+      showActionError(err);
+    }
+  });
 });
 
 // --- 授業予定の取得・絞り込み・表示 ---

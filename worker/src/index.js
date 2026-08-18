@@ -173,12 +173,13 @@ async function readCurriculumEntries(env) {
 async function upsertCurriculumEntry(env, eventId, body) {
   if (!eventId) throw new Error("event id is required");
   await env.DB.prepare(
-    `INSERT INTO curriculum_entries (calendar_event_id, completed, lesson_plan, confirmation_test, lesson_memo, updated_at)
-     VALUES (?, ?, ?, ?, ?, datetime('now'))
+    `INSERT INTO curriculum_entries (calendar_event_id, completed, lesson_plan, confirmation_test, homework, lesson_memo, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
      ON CONFLICT(calendar_event_id) DO UPDATE SET
        completed = excluded.completed,
        lesson_plan = excluded.lesson_plan,
        confirmation_test = excluded.confirmation_test,
+       homework = excluded.homework,
        lesson_memo = excluded.lesson_memo,
        updated_at = excluded.updated_at`
   )
@@ -187,12 +188,103 @@ async function upsertCurriculumEntry(env, eventId, body) {
       body.completed ? 1 : 0,
       body.lesson_plan || null,
       body.confirmation_test || null,
+      body.homework || null,
       body.lesson_memo || null
     )
     .run();
   return env.DB.prepare("SELECT * FROM curriculum_entries WHERE calendar_event_id = ?")
     .bind(eventId)
     .first();
+}
+
+// 生徒(name)ごとの短期・中期・長期目標。sort_orderで並べ替えを保持する。
+async function readGoals(env, name) {
+  const { results } = await env.DB.prepare(
+    "SELECT * FROM goals WHERE name = ? ORDER BY category, sort_order"
+  )
+    .bind(name)
+    .all();
+  return results;
+}
+
+async function createGoal(env, body) {
+  const name = (body.name || "").trim();
+  const category = body.category;
+  const text = (body.text || "").trim();
+  if (!name || !["short", "mid", "long"].includes(category) || !text) {
+    throw new Error("name, category(short/mid/long), text are required");
+  }
+  const { results } = await env.DB.prepare(
+    "SELECT COALESCE(MAX(sort_order), -1) AS maxOrder FROM goals WHERE name = ? AND category = ?"
+  )
+    .bind(name, category)
+    .all();
+  const nextOrder = (results[0]?.maxOrder ?? -1) + 1;
+  return env.DB.prepare(
+    "INSERT INTO goals (name, category, text, sort_order) VALUES (?, ?, ?, ?) RETURNING *"
+  )
+    .bind(name, category, text, nextOrder)
+    .first();
+}
+
+async function updateGoal(env, id, body) {
+  const fields = [];
+  const values = [];
+  if (body.text !== undefined) {
+    fields.push("text = ?");
+    values.push(body.text);
+  }
+  if (body.completed !== undefined) {
+    fields.push("completed = ?");
+    values.push(body.completed ? 1 : 0);
+  }
+  if (body.sort_order !== undefined) {
+    fields.push("sort_order = ?");
+    values.push(body.sort_order);
+  }
+  if (fields.length === 0) throw new Error("nothing to update");
+  values.push(id);
+  return env.DB.prepare(`UPDATE goals SET ${fields.join(", ")} WHERE id = ? RETURNING *`)
+    .bind(...values)
+    .first();
+}
+
+async function deleteGoal(env, id) {
+  await env.DB.prepare("DELETE FROM goals WHERE id = ?").bind(id).run();
+}
+
+// 生徒(name)ごとの受験校候補(私立の選択 / 国公立の自由入力)と志望順位。
+async function readCandidateSchools(env, name) {
+  const { results } = await env.DB.prepare(
+    "SELECT * FROM candidate_schools WHERE name = ? ORDER BY school_type, school_name"
+  )
+    .bind(name)
+    .all();
+  return results;
+}
+
+async function createCandidateSchool(env, body) {
+  const name = (body.name || "").trim();
+  const schoolName = (body.school_name || "").trim();
+  const schoolType = body.school_type;
+  if (!name || !schoolName || !["private", "national"].includes(schoolType)) {
+    throw new Error("name, school_name, school_type(private/national) are required");
+  }
+  return env.DB.prepare(
+    "INSERT INTO candidate_schools (name, school_name, school_type) VALUES (?, ?, ?) RETURNING *"
+  )
+    .bind(name, schoolName, schoolType)
+    .first();
+}
+
+async function updateCandidateSchool(env, id, body) {
+  return env.DB.prepare("UPDATE candidate_schools SET rank = ? WHERE id = ? RETURNING *")
+    .bind(body.rank === undefined || body.rank === null ? null : body.rank, id)
+    .first();
+}
+
+async function deleteCandidateSchool(env, id) {
+  await env.DB.prepare("DELETE FROM candidate_schools WHERE id = ?").bind(id).run();
 }
 
 export default {
@@ -293,6 +385,50 @@ export default {
         const body = await request.json();
         const eventId = decodeURIComponent(curriculumMatch[1]);
         return json(await upsertCurriculumEntry(env, eventId, body), headers);
+      }
+
+      if (url.pathname === "/api/goals" && request.method === "GET") {
+        const name = url.searchParams.get("name");
+        if (!name) return json({ error: "name is required" }, headers, 400);
+        return json(await readGoals(env, name), headers);
+      }
+
+      if (url.pathname === "/api/goals" && request.method === "POST") {
+        const body = await request.json();
+        return json(await createGoal(env, body), headers, 201);
+      }
+
+      const goalMatch = url.pathname.match(/^\/api\/goals\/(\d+)$/);
+      if (goalMatch && request.method === "PUT") {
+        const body = await request.json();
+        return json(await updateGoal(env, goalMatch[1], body), headers);
+      }
+
+      if (goalMatch && request.method === "DELETE") {
+        await deleteGoal(env, goalMatch[1]);
+        return json({ ok: true }, headers);
+      }
+
+      if (url.pathname === "/api/schools" && request.method === "GET") {
+        const name = url.searchParams.get("name");
+        if (!name) return json({ error: "name is required" }, headers, 400);
+        return json(await readCandidateSchools(env, name), headers);
+      }
+
+      if (url.pathname === "/api/schools" && request.method === "POST") {
+        const body = await request.json();
+        return json(await createCandidateSchool(env, body), headers, 201);
+      }
+
+      const schoolMatch = url.pathname.match(/^\/api\/schools\/(\d+)$/);
+      if (schoolMatch && request.method === "PUT") {
+        const body = await request.json();
+        return json(await updateCandidateSchool(env, schoolMatch[1], body), headers);
+      }
+
+      if (schoolMatch && request.method === "DELETE") {
+        await deleteCandidateSchool(env, schoolMatch[1]);
+        return json({ ok: true }, headers);
       }
 
       return json({ error: "not found" }, headers, 404);

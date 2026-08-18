@@ -578,3 +578,122 @@ dialog#settings-modal::backdrop {
 .curriculum-table input[type="checkbox"] {
   padding: 0;
 }
+
+.goals-section,
+.schools-section {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.goals-section h3,
+.schools-section h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+}
+
+.goals-columns {
+  display: flex;
+  gap: 0.75rem;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 0.25rem;
+}
+
+.goals-column {
+  flex: 1 0 200px;
+  min-width: 200px;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 0.6rem;
+}
+
+.goals-column-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.4rem;
+}
+
+.goals-column-header h4 {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.add-goal-btn {
+  padding: 0.1rem 0.55rem;
+  line-height: 1.4;
+}
+
+.goal-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.goal-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  padding: 0.3rem;
+  border: 1px solid var(--border);
+  border-radius: 0.3rem;
+}
+
+.goal-item input[type="checkbox"] {
+  padding: 0;
+  margin-top: 0.15rem;
+}
+
+.goal-item-text {
+  flex: 1;
+  word-break: break-word;
+}
+
+.goal-item.completed .goal-item-text {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
+.goal-item-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.goal-item-actions button {
+  padding: 0.05rem 0.3rem;
+  font-size: 0.65rem;
+  background: transparent;
+  color: var(--fg);
+  border-color: var(--border);
+}
+
+.goal-item-actions .goal-delete {
+  color: #dc2626;
+  border-color: #dc2626;
+}
+
+.school-checklist {
+  max-height: 40vh;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 0.4rem;
+  padding: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.rank-select-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.rank-select {
+  flex: 1;
+}
