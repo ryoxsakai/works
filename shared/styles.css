@@ -63,6 +63,12 @@ main {
   padding: 1.5rem;
 }
 
+@media (min-width: 900px) {
+  main {
+    max-width: min(1600px, 95vw);
+  }
+}
+
 .module-grid {
   list-style: none;
   padding: 0;
