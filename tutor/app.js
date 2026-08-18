@@ -40,10 +40,6 @@ const els = {
   newTermLabel: document.querySelector("#new-term-label"),
   newTermStart: document.querySelector("#new-term-start"),
   newTermEnd: document.querySelector("#new-term-end"),
-  studentSelect: document.querySelector("#student-select"),
-  addStudentForm: document.querySelector("#add-student-form"),
-  newStudentName: document.querySelector("#new-student-name"),
-  newStudentTag: document.querySelector("#new-student-tag"),
   viewToggleBtns: document.querySelectorAll(".view-toggle-btn"),
   nameFilterBar: document.querySelector("#name-filter-bar"),
   nameFilterLabel: document.querySelector("#name-filter-label"),
@@ -54,19 +50,11 @@ const els = {
   calPrevBtn: document.querySelector("#cal-prev"),
   calNextBtn: document.querySelector("#cal-next"),
   calendarGrid: document.querySelector("#calendar-grid"),
-  noteForm: document.querySelector("#note-form"),
-  noteEventLabel: document.querySelector("#note-event-label"),
-  noteText: document.querySelector("#note-text"),
-  noteScore: document.querySelector("#note-score"),
-  noteList: document.querySelector("#note-list"),
   authError: document.querySelector("#auth-error"),
 };
 
-let students = [];
-let selectedStudent = null;
-let selectedEvent = null;
 let selectedCalendarIds = new Set();
-let calendarColors = new Map(); // calendarId -> { bg, fg }
+let calendarColors = new Map(); // calendarId -> { raw, bg, fg }
 let terms = [];
 let selectedTermIds = new Set();
 let rawEvents = [];
@@ -157,7 +145,6 @@ watchAuth({
       await loadSettings();
       await loadCalendarList();
       await loadTerms();
-      await loadStudents();
       await loadCalendarEvents();
     } catch (err) {
       showActionError(err);
@@ -257,6 +244,22 @@ function renderCalendarChecklist(calendars) {
     .join("");
 }
 
+els.calendarChecklist.addEventListener("change", async (e) => {
+  const checkbox = e.target.closest("input[type=checkbox]");
+  if (!checkbox) return;
+  if (checkbox.checked) {
+    selectedCalendarIds.add(checkbox.value);
+  } else {
+    selectedCalendarIds.delete(checkbox.value);
+  }
+  try {
+    await saveSelectedCalendars();
+    await loadCalendarEvents();
+  } catch (err) {
+    showActionError(err);
+  }
+});
+
 // --- 学期(期間)設定。デバイス間で共有し、複数選択で予定を絞り込む ---
 
 async function loadTerms() {
@@ -335,60 +338,6 @@ els.addTermForm.addEventListener("submit", async (e) => {
   }
 });
 
-els.calendarChecklist.addEventListener("change", async (e) => {
-  const checkbox = e.target.closest("input[type=checkbox]");
-  if (!checkbox) return;
-  if (checkbox.checked) {
-    selectedCalendarIds.add(checkbox.value);
-  } else {
-    selectedCalendarIds.delete(checkbox.value);
-  }
-  try {
-    await saveSelectedCalendars();
-    await loadCalendarEvents();
-  } catch (err) {
-    showActionError(err);
-  }
-});
-
-async function loadStudents() {
-  students = await apiFetch("/students");
-  els.studentSelect.innerHTML =
-    `<option value="">生徒を選択</option>` +
-    students.map((s) => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join("");
-}
-
-els.studentSelect.addEventListener("change", async () => {
-  const id = els.studentSelect.value;
-  selectedStudent = students.find((s) => String(s.id) === id) || null;
-  els.noteForm.hidden = true;
-  try {
-    await loadCalendarEvents();
-    await loadNotes();
-  } catch (err) {
-    showActionError(err);
-  }
-});
-
-els.addStudentForm.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  els.actionError.textContent = "";
-  const name = els.newStudentName.value.trim();
-  const tag = els.newStudentTag.value.trim();
-  if (!name) return;
-  try {
-    await apiFetch("/students", {
-      method: "POST",
-      body: JSON.stringify({ name, calendar_tag: tag }),
-    });
-    els.newStudentName.value = "";
-    els.newStudentTag.value = "";
-    await loadStudents();
-  } catch (err) {
-    showActionError(err);
-  }
-});
-
 // --- 授業予定の取得・絞り込み・表示 ---
 
 async function loadCalendarEvents() {
@@ -462,12 +411,6 @@ function isWithinSelectedTerms(ev) {
 
 function getFilteredEvents() {
   let events = rawEvents.filter(isWithinSelectedTerms);
-  if (selectedStudent?.calendar_tag) {
-    const tag = selectedStudent.calendar_tag.toLowerCase();
-    events = events.filter((ev) =>
-      `${ev.summary || ""} ${ev.description || ""}`.toLowerCase().includes(tag)
-    );
-  }
   if (nameFilter) {
     const needle = nameFilter.toLowerCase();
     events = events.filter((ev) =>
@@ -515,7 +458,7 @@ function renderListView(events) {
     .map((ev) => {
       const start = ev.start?.dateTime || ev.start?.date || "";
       const summaryRaw = ev.summary || "(無題)";
-      return `<li class="event-item" data-id="${ev.id}" data-summary="${escapeHtml(summaryRaw)}" data-start="${start}"${eventColorStyle(ev)}>
+      return `<li class="event-item"${eventColorStyle(ev)}>
         <span class="event-date">${formatDate(start)}</span>
         <span class="event-summary">${renderTokenizedSummary(summaryRaw)}</span>
       </li>`;
@@ -561,7 +504,7 @@ function renderCalendarView(events) {
       const eventsHtml = visible
         .map((ev) => {
           const summaryRaw = ev.summary || "(無題)";
-          return `<button type="button" class="cal-event" data-id="${ev.id}" data-summary="${escapeHtml(summaryRaw)}" data-start="${ev.start?.dateTime || ev.start?.date || ""}"${eventColorStyle(ev)}>${escapeHtml(summaryRaw)}</button>`;
+          return `<span class="cal-event"${eventColorStyle(ev)}>${escapeHtml(summaryRaw)}</span>`;
         })
         .join("");
       const overflowHtml = overflow > 0 ? `<div class="cal-more">+${overflow}件</div>` : "";
@@ -576,13 +519,6 @@ function renderCalendarView(events) {
   els.calendarGrid.innerHTML = html;
 }
 
-function selectEventForNote(id, summary, start) {
-  if (!selectedStudent) return;
-  selectedEvent = { id, summary, start };
-  els.noteEventLabel.textContent = `${formatDate(start)} — ${summary}`;
-  els.noteForm.hidden = false;
-}
-
 function applyNameFilter(token) {
   nameFilter = token;
   els.nameFilterLabel.textContent = token;
@@ -592,58 +528,9 @@ function applyNameFilter(token) {
 
 els.eventList.addEventListener("click", (e) => {
   const tokenEl = e.target.closest(".name-token");
-  if (tokenEl) {
-    applyNameFilter(tokenEl.dataset.token);
-    return;
-  }
-  const item = e.target.closest(".event-item");
-  if (!item) return;
-  selectEventForNote(item.dataset.id, item.dataset.summary, item.dataset.start);
+  if (!tokenEl) return;
+  applyNameFilter(tokenEl.dataset.token);
 });
-
-els.calendarGrid.addEventListener("click", (e) => {
-  const btn = e.target.closest(".cal-event");
-  if (!btn) return;
-  selectEventForNote(btn.dataset.id, btn.dataset.summary, btn.dataset.start);
-});
-
-els.noteForm.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  els.actionError.textContent = "";
-  if (!selectedStudent || !selectedEvent) return;
-  try {
-    await apiFetch("/lessons", {
-      method: "POST",
-      body: JSON.stringify({
-        student_id: selectedStudent.id,
-        calendar_event_id: selectedEvent.id,
-        lesson_date: selectedEvent.start,
-        note: els.noteText.value,
-        score: els.noteScore.value,
-      }),
-    });
-    els.noteText.value = "";
-    els.noteScore.value = "";
-    await loadNotes();
-  } catch (err) {
-    showActionError(err);
-  }
-});
-
-async function loadNotes() {
-  if (!selectedStudent) {
-    els.noteList.innerHTML = "";
-    return;
-  }
-  const notes = await apiFetch(`/lessons?student_id=${selectedStudent.id}`);
-  els.noteList.innerHTML = notes
-    .map((n) => {
-      const note = escapeHtml(n.note || "");
-      const score = n.score ? ` (評価: ${escapeHtml(n.score)})` : "";
-      return `<li>${formatDate(n.lesson_date)} — ${note}${score}</li>`;
-    })
-    .join("");
-}
 
 function formatDate(iso) {
   if (!iso) return "";
