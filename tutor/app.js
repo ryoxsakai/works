@@ -3,7 +3,7 @@ import {
   signIn,
   signOutUser,
   getGoogleAccessToken,
-} from "../shared/auth.js?v=6";
+} from "../shared/auth.js?v=7";
 import { getTheme, setTheme } from "../shared/theme.js?v=5";
 
 const PASTEL_FALLBACK_COLORS = [
@@ -72,6 +72,8 @@ const els = {
   signedIn: document.querySelector("#signed-in"),
   signInBtn: document.querySelector("#sign-in"),
   signOutBtn: document.querySelector("#sign-out"),
+  userAvatar: document.querySelector("#user-avatar"),
+  userAvatarFallback: document.querySelector("#user-avatar-fallback"),
   actionError: document.querySelector("#action-error"),
   openSettingsBtn: document.querySelector("#open-settings"),
   settingsModal: document.querySelector("#settings-modal"),
@@ -427,6 +429,14 @@ watchAuth({
     els.signedOut.hidden = true;
     els.signedIn.hidden = false;
     els.signOutBtn.title = `${user.email} (クリックでログアウト)`;
+    if (user.picture) {
+      els.userAvatar.src = user.picture;
+      els.userAvatar.hidden = false;
+      els.userAvatarFallback.hidden = true;
+    } else {
+      els.userAvatar.hidden = true;
+      els.userAvatarFallback.hidden = false;
+    }
     els.actionError.textContent = "";
     try {
       await loadSettings();

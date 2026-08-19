@@ -116,7 +116,7 @@ export async function watchAuth({ onSignedIn, onSignedOut }) {
         // バックグラウンド更新はトークンを差し替えるだけにとどめ、
         // onSignedInによる画面の再読み込み(タブの状態リセット等)は起こさない。
         if (!wasBackgroundRefresh) {
-          onSignedIn({ email: info.email });
+          onSignedIn({ email: info.email, picture: info.picture });
         }
       } catch (err) {
         accessToken = null;
@@ -133,7 +133,7 @@ export async function watchAuth({ onSignedIn, onSignedOut }) {
       if (info.email?.toLowerCase() === ALLOWED_EMAIL.toLowerCase() && info.email_verified) {
         accessToken = stored.access_token;
         scheduleRefresh(Math.max((stored.expires_at - Date.now()) / 1000, 60));
-        onSignedIn({ email: info.email });
+        onSignedIn({ email: info.email, picture: info.picture });
         return;
       }
     } catch {

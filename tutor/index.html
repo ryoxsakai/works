@@ -10,7 +10,7 @@
       if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
     })();
   </script>
-  <link rel="stylesheet" href="../shared/styles.css?v=29" />
+  <link rel="stylesheet" href="../shared/styles.css?v=30" />
   <link
     rel="stylesheet"
     href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
@@ -39,7 +39,10 @@
 
     <section id="signed-in" hidden>
       <div class="user-bar">
-        <button id="sign-out" type="button" class="user-icon-btn" aria-label="ログアウト"><i class="fa-solid fa-circle-user"></i></button>
+        <button id="sign-out" type="button" class="user-icon-btn" aria-label="ログアウト">
+          <img id="user-avatar" alt="" hidden />
+          <i class="fa-solid fa-circle-user" id="user-avatar-fallback"></i>
+        </button>
         <button id="open-settings" type="button" aria-label="設定"><i class="fa-solid fa-gear"></i></button>
       </div>
       <p id="action-error" class="error"></p>
@@ -337,6 +340,6 @@
     </div>
   </dialog>
 
-  <script type="module" src="./app.js?v=32"></script>
+  <script type="module" src="./app.js?v=33"></script>
 </body>
 </html>
