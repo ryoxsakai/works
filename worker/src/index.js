@@ -213,6 +213,178 @@ async function deletePeriod(env, id) {
   await env.DB.prepare("DELETE FROM periods WHERE id = ?").bind(id).run();
 }
 
+// 教材(materials)。生徒に紐付かないグローバルな一覧。sort_orderで並べ替える。
+async function readMaterials(env) {
+  const { results } = await env.DB.prepare("SELECT * FROM materials ORDER BY sort_order").all();
+  return results;
+}
+
+async function createMaterial(env, body) {
+  const name = (body.name || "").trim();
+  if (!name) throw new Error("name is required");
+  const { results } = await env.DB.prepare(
+    "SELECT COALESCE(MAX(sort_order), -1) AS maxOrder FROM materials"
+  ).all();
+  const nextOrder = (results[0]?.maxOrder ?? -1) + 1;
+  return env.DB.prepare("INSERT INTO materials (name, sort_order) VALUES (?, ?) RETURNING *")
+    .bind(name, nextOrder)
+    .first();
+}
+
+async function updateMaterial(env, id, body) {
+  const fields = [];
+  const values = [];
+  if (body.name !== undefined) {
+    fields.push("name = ?");
+    values.push(body.name);
+  }
+  if (body.sort_order !== undefined) {
+    fields.push("sort_order = ?");
+    values.push(body.sort_order);
+  }
+  if (fields.length === 0) throw new Error("nothing to update");
+  values.push(id);
+  return env.DB.prepare(`UPDATE materials SET ${fields.join(", ")} WHERE id = ? RETURNING *`)
+    .bind(...values)
+    .first();
+}
+
+async function deleteMaterial(env, id) {
+  const { results: chapters } = await env.DB.prepare(
+    "SELECT id FROM material_chapters WHERE material_id = ?"
+  )
+    .bind(id)
+    .all();
+  for (const chapter of chapters) {
+    await env.DB.prepare("DELETE FROM chapter_progress WHERE chapter_id = ?").bind(chapter.id).run();
+  }
+  await env.DB.prepare("DELETE FROM material_chapters WHERE material_id = ?").bind(id).run();
+  await env.DB.prepare("DELETE FROM student_materials WHERE material_id = ?").bind(id).run();
+  await env.DB.prepare("DELETE FROM materials WHERE id = ?").bind(id).run();
+}
+
+// 教材のチャプター(章)。教材(material_id)に紐付き、sort_orderで並べ替える。
+async function readChapters(env, materialId) {
+  const { results } = await env.DB.prepare(
+    "SELECT * FROM material_chapters WHERE material_id = ? ORDER BY sort_order"
+  )
+    .bind(materialId)
+    .all();
+  return results;
+}
+
+async function createChapter(env, materialId, body) {
+  const name = (body.name || "").trim();
+  if (!name) throw new Error("name is required");
+  const { results } = await env.DB.prepare(
+    "SELECT COALESCE(MAX(sort_order), -1) AS maxOrder FROM material_chapters WHERE material_id = ?"
+  )
+    .bind(materialId)
+    .all();
+  const nextOrder = (results[0]?.maxOrder ?? -1) + 1;
+  return env.DB.prepare(
+    "INSERT INTO material_chapters (material_id, name, sort_order) VALUES (?, ?, ?) RETURNING *"
+  )
+    .bind(materialId, name, nextOrder)
+    .first();
+}
+
+async function updateChapter(env, id, body) {
+  const fields = [];
+  const values = [];
+  if (body.name !== undefined) {
+    fields.push("name = ?");
+    values.push(body.name);
+  }
+  if (body.sort_order !== undefined) {
+    fields.push("sort_order = ?");
+    values.push(body.sort_order);
+  }
+  if (fields.length === 0) throw new Error("nothing to update");
+  values.push(id);
+  return env.DB.prepare(`UPDATE material_chapters SET ${fields.join(", ")} WHERE id = ? RETURNING *`)
+    .bind(...values)
+    .first();
+}
+
+async function deleteChapter(env, id) {
+  await env.DB.prepare("DELETE FROM chapter_progress WHERE chapter_id = ?").bind(id).run();
+  await env.DB.prepare("DELETE FROM material_chapters WHERE id = ?").bind(id).run();
+}
+
+// 生徒(name)ごとの使用教材登録(サブヘッダー)+チャプターごとの進捗チェック。
+async function readStudentMaterials(env, name) {
+  const { results: links } = await env.DB.prepare(
+    `SELECT sm.id, sm.material_id, sm.sort_order, m.name AS material_name
+     FROM student_materials sm
+     JOIN materials m ON m.id = sm.material_id
+     WHERE sm.name = ?
+     ORDER BY sm.sort_order`
+  )
+    .bind(name)
+    .all();
+
+  const out = [];
+  for (const link of links) {
+    const { results: chapters } = await env.DB.prepare(
+      `SELECT c.id, c.name, c.sort_order, COALESCE(p.completed, 0) AS completed
+       FROM material_chapters c
+       LEFT JOIN chapter_progress p ON p.chapter_id = c.id AND p.name = ?
+       WHERE c.material_id = ?
+       ORDER BY c.sort_order`
+    )
+      .bind(name, link.material_id)
+      .all();
+    out.push({ ...link, chapters });
+  }
+  return out;
+}
+
+async function addStudentMaterial(env, body) {
+  const name = (body.name || "").trim();
+  const materialId = body.material_id;
+  if (!name || !materialId) throw new Error("name, material_id are required");
+  const existing = await env.DB.prepare(
+    "SELECT id FROM student_materials WHERE name = ? AND material_id = ?"
+  )
+    .bind(name, materialId)
+    .first();
+  if (existing) return existing;
+  const { results } = await env.DB.prepare(
+    "SELECT COALESCE(MAX(sort_order), -1) AS maxOrder FROM student_materials WHERE name = ?"
+  )
+    .bind(name)
+    .all();
+  const nextOrder = (results[0]?.maxOrder ?? -1) + 1;
+  return env.DB.prepare(
+    "INSERT INTO student_materials (name, material_id, sort_order) VALUES (?, ?, ?) RETURNING *"
+  )
+    .bind(name, materialId, nextOrder)
+    .first();
+}
+
+async function reorderStudentMaterials(env, name, orderedIds) {
+  for (let i = 0; i < orderedIds.length; i++) {
+    await env.DB.prepare("UPDATE student_materials SET sort_order = ? WHERE id = ? AND name = ?")
+      .bind(i, orderedIds[i], name)
+      .run();
+  }
+}
+
+async function removeStudentMaterial(env, id) {
+  await env.DB.prepare("DELETE FROM student_materials WHERE id = ?").bind(id).run();
+}
+
+async function setChapterProgress(env, name, chapterId, completed) {
+  await env.DB.prepare(
+    `INSERT INTO chapter_progress (name, chapter_id, completed, updated_at)
+     VALUES (?, ?, ?, datetime('now'))
+     ON CONFLICT(name, chapter_id) DO UPDATE SET completed = excluded.completed, updated_at = excluded.updated_at`
+  )
+    .bind(name, chapterId, completed ? 1 : 0)
+    .run();
+}
+
 // カリキュラム表の1行(=1つのGoogleカレンダー予定)ごとの入力内容。
 // 予定そのものはGoogle Calendar側にあるため、ここではcalendar_event_idをキーに
 // 完了チェック・授業予定・確認テスト・授業メモだけを保存する。
@@ -513,6 +685,83 @@ export default {
 
       if (periodMatch && request.method === "DELETE") {
         await deletePeriod(env, periodMatch[1]);
+        return json({ ok: true }, headers);
+      }
+
+      if (url.pathname === "/api/materials" && request.method === "GET") {
+        return json(await readMaterials(env), headers);
+      }
+
+      if (url.pathname === "/api/materials" && request.method === "POST") {
+        const body = await request.json();
+        return json(await createMaterial(env, body), headers, 201);
+      }
+
+      const materialMatch = url.pathname.match(/^\/api\/materials\/(\d+)$/);
+      if (materialMatch && request.method === "PUT") {
+        const body = await request.json();
+        return json(await updateMaterial(env, materialMatch[1], body), headers);
+      }
+
+      if (materialMatch && request.method === "DELETE") {
+        await deleteMaterial(env, materialMatch[1]);
+        return json({ ok: true }, headers);
+      }
+
+      const chaptersListMatch = url.pathname.match(/^\/api\/materials\/(\d+)\/chapters$/);
+      if (chaptersListMatch && request.method === "GET") {
+        return json(await readChapters(env, chaptersListMatch[1]), headers);
+      }
+
+      if (chaptersListMatch && request.method === "POST") {
+        const body = await request.json();
+        return json(await createChapter(env, chaptersListMatch[1], body), headers, 201);
+      }
+
+      const chapterMatch = url.pathname.match(/^\/api\/chapters\/(\d+)$/);
+      if (chapterMatch && request.method === "PUT") {
+        const body = await request.json();
+        return json(await updateChapter(env, chapterMatch[1], body), headers);
+      }
+
+      if (chapterMatch && request.method === "DELETE") {
+        await deleteChapter(env, chapterMatch[1]);
+        return json({ ok: true }, headers);
+      }
+
+      if (url.pathname === "/api/student-materials" && request.method === "GET") {
+        const name = url.searchParams.get("name");
+        if (!name) return json({ error: "name is required" }, headers, 400);
+        return json(await readStudentMaterials(env, name), headers);
+      }
+
+      if (url.pathname === "/api/student-materials" && request.method === "POST") {
+        const body = await request.json();
+        return json(await addStudentMaterial(env, body), headers, 201);
+      }
+
+      if (url.pathname === "/api/student-materials/reorder" && request.method === "PUT") {
+        const body = await request.json();
+        const name = (body.name || "").trim();
+        if (!name || !Array.isArray(body.order)) {
+          return json({ error: "name, order[] are required" }, headers, 400);
+        }
+        await reorderStudentMaterials(env, name, body.order);
+        return json({ ok: true }, headers);
+      }
+
+      const studentMaterialMatch = url.pathname.match(/^\/api\/student-materials\/(\d+)$/);
+      if (studentMaterialMatch && request.method === "DELETE") {
+        await removeStudentMaterial(env, studentMaterialMatch[1]);
+        return json({ ok: true }, headers);
+      }
+
+      const chapterProgressMatch = url.pathname.match(/^\/api\/chapter-progress\/(\d+)$/);
+      if (chapterProgressMatch && request.method === "PUT") {
+        const body = await request.json();
+        const name = (body.name || "").trim();
+        if (!name) return json({ error: "name is required" }, headers, 400);
+        await setChapterProgress(env, name, chapterProgressMatch[1], body.completed);
         return json({ ok: true }, headers);
       }
 

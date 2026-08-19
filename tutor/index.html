@@ -10,7 +10,7 @@
       if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
     })();
   </script>
-  <link rel="stylesheet" href="../shared/styles.css?v=33" />
+  <link rel="stylesheet" href="../shared/styles.css?v=34" />
   <link
     rel="stylesheet"
     href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
@@ -204,7 +204,13 @@
               </h3>
             </div>
             <div class="accordion-body" data-section-body="materials">
-              <p class="hint">準備中です。</p>
+              <div class="materials-add-row">
+                <select id="add-student-material-select"><option value="">教材を選択...</option></select>
+                <button type="button" id="add-student-material-btn" class="btn-add" aria-label="使用教材を追加"><i class="fa-solid fa-plus"></i></button>
+              </div>
+              <div id="student-materials-grid" class="materials-grid">
+                <p class="hint">名前を入力して「表示」を押すと設定できます。</p>
+              </div>
             </div>
           </div>
         </div>
@@ -218,11 +224,20 @@
       <button type="button" id="settings-close" class="modal-close" aria-label="閉じる"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <div class="modal-tabs" role="tablist">
+      <button type="button" class="tab-btn" data-tab="materials" role="tab" aria-selected="false"><i class="fa-solid fa-book"></i> 教材</button>
       <button type="button" class="tab-btn" data-tab="calendar" role="tab" aria-selected="true"><i class="fa-solid fa-calendar-days"></i> カレンダー</button>
       <button type="button" class="tab-btn" data-tab="terms" role="tab" aria-selected="false"><i class="fa-solid fa-layer-group"></i> 学期</button>
       <button type="button" class="tab-btn" data-tab="periods" role="tab" aria-selected="false"><i class="fa-solid fa-clock"></i> 時限</button>
       <button type="button" class="tab-btn" data-tab="excluded" role="tab" aria-selected="false"><i class="fa-solid fa-ban"></i> 空き枠</button>
       <button type="button" class="tab-btn" data-tab="appearance" role="tab" aria-selected="false"><i class="fa-solid fa-palette"></i> デザイン</button>
+    </div>
+    <div class="modal-tab-panel" data-tab-panel="materials" hidden>
+      <p class="hint">教材を登録すると、生徒情報タブの「教材・提出物進捗」で使用教材として選べます。詳細アイコンからチャプター(章)を登録してください。</p>
+      <div id="material-list"></div>
+      <form id="add-material-form" class="inline-form">
+        <input id="new-material-name" type="text" placeholder="例: 青チャート数学I+A" required />
+        <button type="submit" class="btn-add" aria-label="教材を追加"><i class="fa-solid fa-plus"></i></button>
+      </form>
     </div>
     <div class="modal-tab-panel" data-tab-panel="calendar">
       <p class="hint">授業予定が入っているカレンダーにチェックを入れてください(全デバイス共通の設定です)。色はGoogleカレンダー側の設定がそのまま使われます。</p>
@@ -259,6 +274,20 @@
         <label><input type="radio" name="theme" value="light" /> ライト</label>
         <label><input type="radio" name="theme" value="dark" /> ダーク</label>
       </div>
+    </div>
+  </dialog>
+
+  <dialog id="material-chapters-modal" class="app-modal">
+    <div class="modal-header">
+      <h2><i class="fa-solid fa-list-ol"></i> <span id="material-chapters-title">教材のチャプター</span></h2>
+      <button type="button" id="material-chapters-close" class="modal-close" aria-label="閉じる"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="modal-tab-panel">
+      <div id="chapter-list"></div>
+      <form id="add-chapter-form" class="inline-form">
+        <input id="new-chapter-name" type="text" placeholder="例: 第1章 二次関数" required />
+        <button type="submit" class="btn-add" aria-label="チャプターを追加"><i class="fa-solid fa-plus"></i></button>
+      </form>
     </div>
   </dialog>
 
@@ -372,6 +401,6 @@
     </div>
   </dialog>
 
-  <script type="module" src="./app.js?v=37"></script>
+  <script type="module" src="./app.js?v=38"></script>
 </body>
 </html>

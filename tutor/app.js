@@ -92,6 +92,18 @@ const els = {
   addPeriodForm: document.querySelector("#add-period-form"),
   newPeriodLabel: document.querySelector("#new-period-label"),
   newPeriodStart: document.querySelector("#new-period-start"),
+  materialList: document.querySelector("#material-list"),
+  addMaterialForm: document.querySelector("#add-material-form"),
+  newMaterialName: document.querySelector("#new-material-name"),
+  materialChaptersModal: document.querySelector("#material-chapters-modal"),
+  materialChaptersCloseBtn: document.querySelector("#material-chapters-close"),
+  materialChaptersTitle: document.querySelector("#material-chapters-title"),
+  chapterList: document.querySelector("#chapter-list"),
+  addChapterForm: document.querySelector("#add-chapter-form"),
+  newChapterName: document.querySelector("#new-chapter-name"),
+  addStudentMaterialSelect: document.querySelector("#add-student-material-select"),
+  addStudentMaterialBtn: document.querySelector("#add-student-material-btn"),
+  studentMaterialsGrid: document.querySelector("#student-materials-grid"),
   viewToggleBtns: document.querySelectorAll(".view-toggle-btn"),
   nameFilterBar: document.querySelector("#name-filter-bar"),
   nameFilterLabel: document.querySelector("#name-filter-label"),
@@ -163,6 +175,13 @@ let selectedTermIds = new Set();
 let excludedTitles = new Set();
 let periods = [];
 let editingPeriodId = null;
+let materials = [];
+let editingMaterialId = null;
+let currentMaterialId = null;
+let materialChapters = [];
+let editingChapterId = null;
+let studentMaterials = [];
+let touchDragState = null;
 let editingYearId = null;
 let editingTermId = null;
 let rawEvents = [];
@@ -504,6 +523,7 @@ watchAuth({
       await loadTerms();
       await loadGoalTemplates();
       await loadPeriods();
+      await loadMaterials();
       renderYearGroups();
       renderExcludedTitleList();
       renderCurriculumYearOptions();
@@ -516,6 +536,7 @@ watchAuth({
         await loadGoals();
         await loadCandidateSchools();
         await loadStudentPref();
+        await loadStudentMaterials();
       }
       await loadCalendarEvents();
       await loadRecordTable();
@@ -864,6 +885,469 @@ els.periodList.addEventListener("submit", async (e) => {
     await loadRecordTable();
   } catch (err) {
     showActionError(err);
+  }
+});
+
+// --- 教材(設定タブ)。教材名を登録し、詳細アイコンからチャプター(章)を管理する ---
+
+async function loadMaterials() {
+  materials = await apiFetch("/materials");
+  renderMaterialList();
+}
+
+function renderMaterialList() {
+  if (materials.length === 0) {
+    els.materialList.innerHTML = `<p class="hint">まだ教材が登録されていません。</p>`;
+    return;
+  }
+  els.materialList.innerHTML = materials
+    .map((m, i) => {
+      if (editingMaterialId === m.id) {
+        return `<form class="material-edit-form" data-material-id="${m.id}">
+          <input type="text" class="edit-material-name" value="${escapeHtml(m.name)}" required />
+          <div class="edit-actions">
+            <button type="submit" class="btn-primary" aria-label="保存"><i class="fa-solid fa-check"></i></button>
+            <button type="button" class="cancel-edit-material" aria-label="キャンセル"><i class="fa-solid fa-xmark"></i></button>
+          </div>
+        </form>`;
+      }
+      return `<div class="term-item" data-material-id="${m.id}">
+        <span class="term-item-label">${escapeHtml(m.name)}</span>
+        <button type="button" class="material-move-up" ${i === 0 ? "disabled" : ""} aria-label="上へ"><i class="fa-solid fa-chevron-up"></i></button>
+        <button type="button" class="material-move-down" ${i === materials.length - 1 ? "disabled" : ""} aria-label="下へ"><i class="fa-solid fa-chevron-down"></i></button>
+        <button type="button" class="material-detail" aria-label="詳細"><i class="fa-solid fa-list-ol"></i></button>
+        <button type="button" class="material-edit" aria-label="編集"><i class="fa-solid fa-pen"></i></button>
+        <button type="button" class="material-delete" aria-label="削除"><i class="fa-solid fa-trash"></i></button>
+      </div>`;
+    })
+    .join("");
+}
+
+els.addMaterialForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  els.actionError.textContent = "";
+  const name = els.newMaterialName.value.trim();
+  if (!name) return;
+  try {
+    await apiFetch("/materials", { method: "POST", body: JSON.stringify({ name }) });
+    els.newMaterialName.value = "";
+    await loadMaterials();
+  } catch (err) {
+    showActionError(err);
+  }
+});
+
+els.materialList.addEventListener("click", async (e) => {
+  const detailBtn = e.target.closest(".material-detail");
+  if (detailBtn) {
+    const id = Number(detailBtn.closest("[data-material-id]").dataset.materialId);
+    const material = materials.find((m) => m.id === id);
+    await openMaterialChaptersModal(id, material?.name || "");
+    return;
+  }
+
+  const editBtn = e.target.closest(".material-edit");
+  if (editBtn) {
+    editingMaterialId = Number(editBtn.closest("[data-material-id]").dataset.materialId);
+    renderMaterialList();
+    return;
+  }
+
+  const deleteBtn = e.target.closest(".material-delete");
+  if (deleteBtn) {
+    if (!confirm("この教材を削除しますか?(登録済みのチャプターや生徒の進捗も削除されます)")) return;
+    const id = Number(deleteBtn.closest("[data-material-id]").dataset.materialId);
+    try {
+      await apiFetch(`/materials/${id}`, { method: "DELETE" });
+      await loadMaterials();
+    } catch (err) {
+      showActionError(err);
+    }
+    return;
+  }
+
+  if (e.target.closest(".cancel-edit-material")) {
+    editingMaterialId = null;
+    renderMaterialList();
+    return;
+  }
+
+  const moveUp = e.target.closest(".material-move-up");
+  const moveDown = e.target.closest(".material-move-down");
+  if (moveUp || moveDown) {
+    const id = Number((moveUp || moveDown).closest("[data-material-id]").dataset.materialId);
+    const idx = materials.findIndex((m) => m.id === id);
+    const swapIdx = moveUp ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= materials.length) return;
+    const a = materials[idx];
+    const b = materials[swapIdx];
+    try {
+      await Promise.all([
+        apiFetch(`/materials/${a.id}`, { method: "PUT", body: JSON.stringify({ sort_order: b.sort_order }) }),
+        apiFetch(`/materials/${b.id}`, { method: "PUT", body: JSON.stringify({ sort_order: a.sort_order }) }),
+      ]);
+      await loadMaterials();
+    } catch (err) {
+      showActionError(err);
+    }
+  }
+});
+
+els.materialList.addEventListener("submit", async (e) => {
+  const editForm = e.target.closest(".material-edit-form");
+  if (!editForm) return;
+  e.preventDefault();
+  els.actionError.textContent = "";
+  const id = Number(editForm.dataset.materialId);
+  const name = editForm.querySelector(".edit-material-name").value.trim();
+  if (!name) return;
+  try {
+    await apiFetch(`/materials/${id}`, { method: "PUT", body: JSON.stringify({ name }) });
+    editingMaterialId = null;
+    await loadMaterials();
+  } catch (err) {
+    showActionError(err);
+  }
+});
+
+// --- 教材のチャプター(章)管理モーダル ---
+
+async function openMaterialChaptersModal(materialId, materialName) {
+  currentMaterialId = materialId;
+  editingChapterId = null;
+  els.materialChaptersTitle.textContent = materialName;
+  try {
+    await loadMaterialChapters();
+  } catch (err) {
+    showActionError(err);
+  }
+  els.materialChaptersModal.showModal();
+}
+
+async function loadMaterialChapters() {
+  materialChapters = await apiFetch(`/materials/${currentMaterialId}/chapters`);
+  renderMaterialChapterList();
+}
+
+function renderMaterialChapterList() {
+  if (materialChapters.length === 0) {
+    els.chapterList.innerHTML = `<p class="hint">まだチャプターが登録されていません。</p>`;
+    return;
+  }
+  els.chapterList.innerHTML = materialChapters
+    .map((c, i) => {
+      if (editingChapterId === c.id) {
+        return `<form class="chapter-edit-form" data-chapter-id="${c.id}">
+          <input type="text" class="edit-chapter-name" value="${escapeHtml(c.name)}" required />
+          <div class="edit-actions">
+            <button type="submit" class="btn-primary" aria-label="保存"><i class="fa-solid fa-check"></i></button>
+            <button type="button" class="cancel-edit-chapter" aria-label="キャンセル"><i class="fa-solid fa-xmark"></i></button>
+          </div>
+        </form>`;
+      }
+      return `<div class="term-item" data-chapter-id="${c.id}">
+        <span class="term-item-label">${escapeHtml(c.name)}</span>
+        <button type="button" class="chapter-move-up" ${i === 0 ? "disabled" : ""} aria-label="上へ"><i class="fa-solid fa-chevron-up"></i></button>
+        <button type="button" class="chapter-move-down" ${i === materialChapters.length - 1 ? "disabled" : ""} aria-label="下へ"><i class="fa-solid fa-chevron-down"></i></button>
+        <button type="button" class="chapter-edit" aria-label="編集"><i class="fa-solid fa-pen"></i></button>
+        <button type="button" class="chapter-delete" aria-label="削除"><i class="fa-solid fa-trash"></i></button>
+      </div>`;
+    })
+    .join("");
+}
+
+els.materialChaptersCloseBtn.addEventListener("click", () => els.materialChaptersModal.close());
+
+els.addChapterForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  els.actionError.textContent = "";
+  const name = els.newChapterName.value.trim();
+  if (!name) return;
+  try {
+    await apiFetch(`/materials/${currentMaterialId}/chapters`, {
+      method: "POST",
+      body: JSON.stringify({ name }),
+    });
+    els.newChapterName.value = "";
+    await loadMaterialChapters();
+  } catch (err) {
+    showActionError(err);
+  }
+});
+
+els.chapterList.addEventListener("click", async (e) => {
+  const editBtn = e.target.closest(".chapter-edit");
+  if (editBtn) {
+    editingChapterId = Number(editBtn.closest("[data-chapter-id]").dataset.chapterId);
+    renderMaterialChapterList();
+    return;
+  }
+
+  const deleteBtn = e.target.closest(".chapter-delete");
+  if (deleteBtn) {
+    if (!confirm("このチャプターを削除しますか?")) return;
+    const id = Number(deleteBtn.closest("[data-chapter-id]").dataset.chapterId);
+    try {
+      await apiFetch(`/chapters/${id}`, { method: "DELETE" });
+      await loadMaterialChapters();
+    } catch (err) {
+      showActionError(err);
+    }
+    return;
+  }
+
+  if (e.target.closest(".cancel-edit-chapter")) {
+    editingChapterId = null;
+    renderMaterialChapterList();
+    return;
+  }
+
+  const moveUp = e.target.closest(".chapter-move-up");
+  const moveDown = e.target.closest(".chapter-move-down");
+  if (moveUp || moveDown) {
+    const id = Number((moveUp || moveDown).closest("[data-chapter-id]").dataset.chapterId);
+    const idx = materialChapters.findIndex((c) => c.id === id);
+    const swapIdx = moveUp ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= materialChapters.length) return;
+    const a = materialChapters[idx];
+    const b = materialChapters[swapIdx];
+    try {
+      await Promise.all([
+        apiFetch(`/chapters/${a.id}`, { method: "PUT", body: JSON.stringify({ sort_order: b.sort_order }) }),
+        apiFetch(`/chapters/${b.id}`, { method: "PUT", body: JSON.stringify({ sort_order: a.sort_order }) }),
+      ]);
+      await loadMaterialChapters();
+    } catch (err) {
+      showActionError(err);
+    }
+  }
+});
+
+els.chapterList.addEventListener("submit", async (e) => {
+  const editForm = e.target.closest(".chapter-edit-form");
+  if (!editForm) return;
+  e.preventDefault();
+  els.actionError.textContent = "";
+  const id = Number(editForm.dataset.chapterId);
+  const name = editForm.querySelector(".edit-chapter-name").value.trim();
+  if (!name) return;
+  try {
+    await apiFetch(`/chapters/${id}`, { method: "PUT", body: JSON.stringify({ name }) });
+    editingChapterId = null;
+    await loadMaterialChapters();
+  } catch (err) {
+    showActionError(err);
+  }
+});
+
+// --- 生徒情報タブ: 教材・提出物進捗(使用教材の登録とチャプター単位の進捗チェック) ---
+
+async function loadStudentMaterials() {
+  const name = els.curriculumName.value.trim();
+  if (!name) {
+    studentMaterials = [];
+    renderStudentMaterials();
+    renderAddStudentMaterialOptions();
+    return;
+  }
+  studentMaterials = await apiFetch(`/student-materials?name=${encodeURIComponent(name)}`);
+  renderStudentMaterials();
+  renderAddStudentMaterialOptions();
+}
+
+function renderAddStudentMaterialOptions() {
+  const usedIds = new Set(studentMaterials.map((sm) => sm.material_id));
+  const options = materials
+    .filter((m) => !usedIds.has(m.id))
+    .map((m) => `<option value="${m.id}">${escapeHtml(m.name)}</option>`)
+    .join("");
+  els.addStudentMaterialSelect.innerHTML = `<option value="">教材を選択...</option>${options}`;
+}
+
+function renderStudentMaterials() {
+  if (studentMaterials.length === 0) {
+    els.studentMaterialsGrid.innerHTML = `<p class="hint">まだ使用教材が登録されていません。</p>`;
+    return;
+  }
+  els.studentMaterialsGrid.innerHTML = studentMaterials
+    .map(
+      (sm) => `<div class="material-block" draggable="true" data-student-material-id="${sm.id}">
+        <div class="material-block-header">
+          <i class="fa-solid fa-grip-lines material-drag-handle" aria-hidden="true"></i>
+          <h4>${escapeHtml(sm.material_name)}</h4>
+          <button type="button" class="material-block-remove" aria-label="この教材を外す"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <ul class="chapter-progress-list">
+          ${sm.chapters
+            .map(
+              (c) => `<li>
+                <label>
+                  <input type="checkbox" class="chapter-progress-checkbox" data-chapter-id="${c.id}" ${c.completed ? "checked" : ""} />
+                  <span${c.completed ? ' class="completed"' : ""}>${escapeHtml(c.name)}</span>
+                </label>
+              </li>`
+            )
+            .join("")}
+        </ul>
+      </div>`
+    )
+    .join("");
+}
+
+els.addStudentMaterialBtn.addEventListener("click", async () => {
+  const materialId = Number(els.addStudentMaterialSelect.value);
+  const name = els.curriculumName.value.trim();
+  if (!materialId || !name) return;
+  els.actionError.textContent = "";
+  try {
+    await apiFetch("/student-materials", {
+      method: "POST",
+      body: JSON.stringify({ name, material_id: materialId }),
+    });
+    await loadStudentMaterials();
+  } catch (err) {
+    showActionError(err);
+  }
+});
+
+els.studentMaterialsGrid.addEventListener("click", async (e) => {
+  const removeBtn = e.target.closest(".material-block-remove");
+  if (!removeBtn) return;
+  if (!confirm("この教材を生徒から外しますか?(進捗の記録は保持されます)")) return;
+  const id = Number(removeBtn.closest(".material-block").dataset.studentMaterialId);
+  try {
+    await apiFetch(`/student-materials/${id}`, { method: "DELETE" });
+    await loadStudentMaterials();
+  } catch (err) {
+    showActionError(err);
+  }
+});
+
+els.studentMaterialsGrid.addEventListener("change", async (e) => {
+  const checkbox = e.target.closest(".chapter-progress-checkbox");
+  if (!checkbox) return;
+  const chapterId = Number(checkbox.dataset.chapterId);
+  const completed = checkbox.checked;
+  checkbox.parentElement.querySelector("span")?.classList.toggle("completed", completed);
+  const name = els.curriculumName.value.trim();
+  try {
+    await apiFetch(`/chapter-progress/${chapterId}`, {
+      method: "PUT",
+      body: JSON.stringify({ name, completed }),
+    });
+  } catch (err) {
+    showActionError(err);
+  }
+});
+
+// 使用教材(サブヘッダー)の並べ替え。PCはネイティブドラッグ&ドロップ、
+// タッチ端末はタップアンドホールド(長押し)で開始する。
+async function persistStudentMaterialsOrder() {
+  const ids = [...els.studentMaterialsGrid.querySelectorAll(".material-block")].map((el) =>
+    Number(el.dataset.studentMaterialId)
+  );
+  const name = els.curriculumName.value.trim();
+  try {
+    await apiFetch("/student-materials/reorder", {
+      method: "PUT",
+      body: JSON.stringify({ name, order: ids }),
+    });
+    studentMaterials.sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id));
+  } catch (err) {
+    showActionError(err);
+  }
+}
+
+function reorderBlockAt(draggingId, clientX, clientY) {
+  const target = document.elementFromPoint(clientX, clientY)?.closest(".material-block");
+  const dragging = els.studentMaterialsGrid.querySelector(
+    `[data-student-material-id="${draggingId}"]`
+  );
+  if (!target || !dragging || target === dragging) return;
+  const rect = target.getBoundingClientRect();
+  const after = clientY - rect.top > rect.height / 2;
+  target.parentNode.insertBefore(dragging, after ? target.nextSibling : target);
+}
+
+let draggingStudentMaterialId = null;
+
+els.studentMaterialsGrid.addEventListener("dragstart", (e) => {
+  const block = e.target.closest(".material-block");
+  if (!block) return;
+  draggingStudentMaterialId = block.dataset.studentMaterialId;
+  e.dataTransfer.effectAllowed = "move";
+  block.classList.add("dragging");
+});
+
+els.studentMaterialsGrid.addEventListener("dragover", (e) => {
+  if (!draggingStudentMaterialId) return;
+  e.preventDefault();
+  reorderBlockAt(draggingStudentMaterialId, e.clientX, e.clientY);
+});
+
+els.studentMaterialsGrid.addEventListener("dragend", async (e) => {
+  const block = e.target.closest(".material-block");
+  block?.classList.remove("dragging");
+  if (draggingStudentMaterialId) {
+    draggingStudentMaterialId = null;
+    await persistStudentMaterialsOrder();
+  }
+});
+
+els.studentMaterialsGrid.addEventListener(
+  "touchstart",
+  (e) => {
+    const header = e.target.closest(".material-block-header");
+    if (!header || e.target.closest(".material-block-remove")) return;
+    const block = header.closest(".material-block");
+    const touch = e.touches[0];
+    touchDragState = {
+      id: block.dataset.studentMaterialId,
+      startX: touch.clientX,
+      startY: touch.clientY,
+      dragging: false,
+      timer: setTimeout(() => {
+        if (!touchDragState) return;
+        touchDragState.dragging = true;
+        block.classList.add("dragging");
+        if (navigator.vibrate) navigator.vibrate(15);
+      }, 450),
+    };
+  },
+  { passive: true }
+);
+
+els.studentMaterialsGrid.addEventListener(
+  "touchmove",
+  (e) => {
+    if (!touchDragState) return;
+    const touch = e.touches[0];
+    if (!touchDragState.dragging) {
+      if (
+        Math.abs(touch.clientX - touchDragState.startX) > 10 ||
+        Math.abs(touch.clientY - touchDragState.startY) > 10
+      ) {
+        clearTimeout(touchDragState.timer);
+        touchDragState = null;
+      }
+      return;
+    }
+    e.preventDefault();
+    reorderBlockAt(touchDragState.id, touch.clientX, touch.clientY);
+  },
+  { passive: false }
+);
+
+els.studentMaterialsGrid.addEventListener("touchend", async () => {
+  if (!touchDragState) return;
+  clearTimeout(touchDragState.timer);
+  const state = touchDragState;
+  touchDragState = null;
+  if (state.dragging) {
+    document
+      .querySelector(`[data-student-material-id="${state.id}"]`)
+      ?.classList.remove("dragging");
+    await persistStudentMaterialsOrder();
   }
 });
 
@@ -1261,6 +1745,7 @@ els.curriculumFilterForm.addEventListener("submit", async (e) => {
     await loadGoals();
     await loadCandidateSchools();
     await loadStudentPref();
+    await loadStudentMaterials();
     renderCurriculumSearchSummary();
     els.curriculumSearchModal.close();
   } catch (err) {
@@ -2192,6 +2677,7 @@ async function goToCurriculum(name, term) {
     await loadGoals();
     await loadCandidateSchools();
     await loadStudentPref();
+    await loadStudentMaterials();
     renderCurriculumSearchSummary();
   } catch (err) {
     showActionError(err);

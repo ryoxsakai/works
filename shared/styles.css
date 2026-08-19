@@ -924,6 +924,94 @@ dialog.app-modal::backdrop {
   flex: 1;
 }
 
+.materials-add-row {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.materials-add-row select {
+  flex: 1;
+  min-width: 0;
+}
+
+.materials-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+}
+
+@media (min-width: 641px) {
+  .materials-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.material-block {
+  border: 1px solid var(--border);
+  border-radius: 0.9rem;
+  background: var(--bg-elevated);
+  padding: 0.6rem 0.7rem;
+}
+
+.material-block.dragging {
+  opacity: 0.5;
+}
+
+.material-block-header {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.4rem;
+  cursor: grab;
+  touch-action: none;
+}
+
+.material-block-header h4 {
+  flex: 1;
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.material-drag-handle {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.material-block-remove {
+  min-width: 1.9rem;
+  min-height: 1.9rem;
+  padding: 0.3rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.chapter-progress-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.chapter-progress-list label {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.chapter-progress-list input[type="checkbox"] {
+  padding: 0;
+  margin-top: 0.15rem;
+}
+
+.chapter-progress-list .completed {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
 .print-only {
   display: none;
 }
@@ -943,6 +1031,9 @@ dialog.app-modal::backdrop {
   .curriculum-print-name-row,
   .collapsible-section .panel-header button,
   .section-chevron,
+  .materials-add-row,
+  .material-drag-handle,
+  .material-block-remove,
   dialog {
     display: none !important;
   }
@@ -954,6 +1045,11 @@ dialog.app-modal::backdrop {
   /* アコーディオンの折りたたみ状態に関わらず、印刷時は全セクションを表示する */
   .accordion-body[hidden] {
     display: block !important;
+  }
+
+  /* 使用教材は画面幅に関わらず印刷時は常に3列表示にする */
+  .materials-grid {
+    grid-template-columns: repeat(3, 1fr) !important;
   }
 
   main {
