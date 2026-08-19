@@ -70,6 +70,7 @@ const PRIVATE_MED_SCHOOLS = [
 const els = {
   signedOut: document.querySelector("#signed-out"),
   signedIn: document.querySelector("#signed-in"),
+  userBar: document.querySelector(".user-bar"),
   signInBtn: document.querySelector("#sign-in"),
   signOutBtn: document.querySelector("#sign-out"),
   userAvatar: document.querySelector("#user-avatar"),
@@ -428,6 +429,7 @@ watchAuth({
   onSignedIn: async (user) => {
     els.signedOut.hidden = true;
     els.signedIn.hidden = false;
+    els.userBar.hidden = false;
     els.signOutBtn.title = `${user.email} (クリックでログアウト)`;
     if (user.picture) {
       els.userAvatar.src = user.picture;
@@ -467,6 +469,7 @@ watchAuth({
   onSignedOut: (message) => {
     els.signedOut.hidden = false;
     els.signedIn.hidden = true;
+    els.userBar.hidden = true;
     els.authError.textContent = message || "";
   },
 });

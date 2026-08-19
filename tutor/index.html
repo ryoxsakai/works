@@ -10,7 +10,7 @@
       if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
     })();
   </script>
-  <link rel="stylesheet" href="../shared/styles.css?v=31" />
+  <link rel="stylesheet" href="../shared/styles.css?v=32" />
   <link
     rel="stylesheet"
     href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
@@ -20,6 +20,13 @@
 <body>
   <header class="page-header">
     <h1><a href="/"><span class="page-header-icon"><i class="fa-solid fa-graduation-cap"></i></span> 授業管理</a></h1>
+    <div class="user-bar" hidden>
+      <button id="open-settings" type="button" aria-label="設定"><i class="fa-solid fa-gear"></i></button>
+      <button id="sign-out" type="button" class="user-icon-btn" aria-label="ログアウト">
+        <img id="user-avatar" alt="" hidden />
+        <i class="fa-solid fa-circle-user" id="user-avatar-fallback"></i>
+      </button>
+    </div>
   </header>
 
   <main>
@@ -38,13 +45,6 @@
     </section>
 
     <section id="signed-in" hidden>
-      <div class="user-bar">
-        <button id="sign-out" type="button" class="user-icon-btn" aria-label="ログアウト">
-          <img id="user-avatar" alt="" hidden />
-          <i class="fa-solid fa-circle-user" id="user-avatar-fallback"></i>
-        </button>
-        <button id="open-settings" type="button" aria-label="設定"><i class="fa-solid fa-gear"></i></button>
-      </div>
       <p id="action-error" class="error"></p>
 
       <div class="page-tabs" role="tablist">
@@ -340,6 +340,6 @@
     </div>
   </dialog>
 
-  <script type="module" src="./app.js?v=34"></script>
+  <script type="module" src="./app.js?v=35"></script>
 </body>
 </html>
