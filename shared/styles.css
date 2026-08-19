@@ -66,14 +66,32 @@ body {
 }
 
 .page-header h1 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   margin: 0;
   font-size: 0.95rem;
   font-weight: 600;
 }
 
 .page-header a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
   color: inherit;
   text-decoration: none;
+}
+
+.page-header-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 0.6rem;
+  background: var(--bg-elevated);
+  color: var(--fg);
+  font-size: 0.9rem;
 }
 
 main {
@@ -188,7 +206,7 @@ textarea {
   font-size: 1rem;
   padding: 0.5rem 0.7rem;
   border: 1px solid var(--border);
-  border-radius: 0.5rem;
+  border-radius: 0.7rem;
   background: var(--bg-elevated);
   color: var(--fg);
 }
@@ -214,7 +232,7 @@ button {
   min-height: 2.5rem;
   padding: 0.5rem 0.7rem;
   border: none;
-  border-radius: 0.6rem;
+  border-radius: 999px;
   background: transparent;
   color: var(--muted);
   transition: background-color 0.15s ease, color 0.15s ease;
@@ -243,6 +261,20 @@ button:disabled {
   background: var(--bg-hover);
 }
 
+/* 「追加」系のボタンは、参考UIの丸い塗りつぶし+ボタンに合わせて
+   濃色の円形ボタンにし、他の目立たないアイコンボタンと差をつける。 */
+.btn-add {
+  background: var(--fg);
+  color: var(--bg);
+  border: none;
+  font-weight: 600;
+}
+
+.btn-add:hover {
+  background: var(--fg);
+  opacity: 0.85;
+}
+
 #event-list {
   list-style: none;
   padding: 0;
@@ -255,7 +287,7 @@ button:disabled {
   background: var(--bg-elevated);
   color: var(--fg);
   border: 1px solid var(--border);
-  border-radius: 0.5rem;
+  border-radius: 0.9rem;
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
@@ -429,7 +461,7 @@ button:disabled {
 .cal-cell {
   min-height: 4.5rem;
   border: 1px solid var(--border);
-  border-radius: 0.4rem;
+  border-radius: 0.6rem;
   padding: 0.2rem;
   display: flex;
   flex-direction: column;
@@ -460,7 +492,7 @@ button:disabled {
   text-overflow: ellipsis;
   background: var(--bg-elevated);
   border: 1px solid var(--border);
-  border-radius: 0.25rem;
+  border-radius: 0.4rem;
   color: var(--fg);
 }
 
@@ -473,9 +505,10 @@ dialog.app-modal {
   width: min(480px, 92vw);
   padding: 0;
   border: 1px solid var(--border);
-  border-radius: 0.75rem;
+  border-radius: 1.25rem;
   background: var(--bg);
   color: var(--fg);
+  overflow: hidden;
 }
 
 dialog.app-modal::backdrop {
@@ -555,13 +588,16 @@ dialog.app-modal::backdrop {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.4rem 0;
-  border-bottom: 1px solid var(--border);
+  padding: 0.5rem 0.7rem;
+  margin-bottom: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--bg-elevated);
   font-size: 0.85rem;
 }
 
 .term-item:last-child {
-  border-bottom: none;
+  margin-bottom: 0;
 }
 
 .term-item input {

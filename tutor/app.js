@@ -878,7 +878,7 @@ function renderYearGroups() {
             <span>〜</span>
             <input type="date" class="new-term-end" required />
           </div>
-          <button type="submit" class="btn-primary" aria-label="学期を追加"><i class="fa-solid fa-plus"></i></button>
+          <button type="submit" class="btn-add" aria-label="学期を追加"><i class="fa-solid fa-plus"></i></button>
         </form>
       </div>`;
     })

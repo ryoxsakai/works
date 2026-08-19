@@ -10,7 +10,7 @@
       if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
     })();
   </script>
-  <link rel="stylesheet" href="../shared/styles.css?v=30" />
+  <link rel="stylesheet" href="../shared/styles.css?v=31" />
   <link
     rel="stylesheet"
     href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
@@ -19,7 +19,7 @@
 </head>
 <body>
   <header class="page-header">
-    <h1><a href="/">授業管理</a></h1>
+    <h1><a href="/"><span class="page-header-icon"><i class="fa-solid fa-graduation-cap"></i></span> 授業管理</a></h1>
   </header>
 
   <main>
@@ -200,7 +200,7 @@
       <p class="hint">タイトルが完全一致する予定を、授業予定・カリキュラム・授業記録などすべての表示から除外します(空き枠など)。</p>
       <form id="add-excluded-title-form" class="inline-form">
         <input id="new-excluded-title" type="text" placeholder="例: ○" required />
-        <button type="submit" class="btn-primary" aria-label="追加"><i class="fa-solid fa-plus"></i></button>
+        <button type="submit" class="btn-add" aria-label="追加"><i class="fa-solid fa-plus"></i></button>
       </form>
       <ul id="excluded-title-list" class="term-items"></ul>
     </div>
@@ -209,7 +209,7 @@
       <div id="year-groups"></div>
       <form id="add-year-form" class="term-form">
         <input id="new-year-label" type="text" placeholder="例: 2026年度" required />
-        <button type="submit" class="btn-primary" aria-label="年度を追加"><i class="fa-solid fa-plus"></i></button>
+        <button type="submit" class="btn-add" aria-label="年度を追加"><i class="fa-solid fa-plus"></i></button>
       </form>
     </div>
     <div class="modal-tab-panel" data-tab-panel="periods" hidden>
@@ -218,7 +218,7 @@
       <form id="add-period-form" class="inline-form">
         <input id="new-period-label" type="text" placeholder="例: 1限" required />
         <input type="time" id="new-period-start" required />
-        <button type="submit" class="btn-primary" aria-label="時限を追加"><i class="fa-solid fa-plus"></i></button>
+        <button type="submit" class="btn-add" aria-label="時限を追加"><i class="fa-solid fa-plus"></i></button>
       </form>
     </div>
     <div class="modal-tab-panel" data-tab-panel="appearance" hidden>
@@ -266,13 +266,13 @@
       <div class="goal-template-list" data-category="short"></div>
       <form class="add-goal-template-form inline-form" data-category="short">
         <input type="text" class="new-goal-template-text" placeholder="テンプレートを入力" required />
-        <button type="submit" class="btn-primary" aria-label="テンプレートに追加"><i class="fa-solid fa-plus"></i></button>
+        <button type="submit" class="btn-add" aria-label="テンプレートに追加"><i class="fa-solid fa-plus"></i></button>
       </form>
       <p class="hint">現在の目標</p>
       <div class="goal-edit-list" data-category="short"></div>
       <form class="add-goal-form inline-form" data-category="short">
         <input type="text" class="new-goal-text" placeholder="目標を入力" required />
-        <button type="submit" class="btn-primary" aria-label="追加"><i class="fa-solid fa-plus"></i></button>
+        <button type="submit" class="btn-add" aria-label="追加"><i class="fa-solid fa-plus"></i></button>
       </form>
     </div>
     <div class="modal-tab-panel" data-goal-tab-panel="mid" hidden>
@@ -280,13 +280,13 @@
       <div class="goal-template-list" data-category="mid"></div>
       <form class="add-goal-template-form inline-form" data-category="mid">
         <input type="text" class="new-goal-template-text" placeholder="テンプレートを入力" required />
-        <button type="submit" class="btn-primary" aria-label="テンプレートに追加"><i class="fa-solid fa-plus"></i></button>
+        <button type="submit" class="btn-add" aria-label="テンプレートに追加"><i class="fa-solid fa-plus"></i></button>
       </form>
       <p class="hint">現在の目標</p>
       <div class="goal-edit-list" data-category="mid"></div>
       <form class="add-goal-form inline-form" data-category="mid">
         <input type="text" class="new-goal-text" placeholder="目標を入力" required />
-        <button type="submit" class="btn-primary" aria-label="追加"><i class="fa-solid fa-plus"></i></button>
+        <button type="submit" class="btn-add" aria-label="追加"><i class="fa-solid fa-plus"></i></button>
       </form>
     </div>
     <div class="modal-tab-panel" data-goal-tab-panel="long" hidden>
@@ -294,13 +294,13 @@
       <div class="goal-template-list" data-category="long"></div>
       <form class="add-goal-template-form inline-form" data-category="long">
         <input type="text" class="new-goal-template-text" placeholder="テンプレートを入力" required />
-        <button type="submit" class="btn-primary" aria-label="テンプレートに追加"><i class="fa-solid fa-plus"></i></button>
+        <button type="submit" class="btn-add" aria-label="テンプレートに追加"><i class="fa-solid fa-plus"></i></button>
       </form>
       <p class="hint">現在の目標</p>
       <div class="goal-edit-list" data-category="long"></div>
       <form class="add-goal-form inline-form" data-category="long">
         <input type="text" class="new-goal-text" placeholder="目標を入力" required />
-        <button type="submit" class="btn-primary" aria-label="追加"><i class="fa-solid fa-plus"></i></button>
+        <button type="submit" class="btn-add" aria-label="追加"><i class="fa-solid fa-plus"></i></button>
       </form>
     </div>
   </dialog>
@@ -320,7 +320,7 @@
       <p class="hint">国公立(自由入力)</p>
       <form id="add-national-school-form" class="inline-form">
         <input id="new-national-school" type="text" placeholder="例: 東京大学" required />
-        <button type="submit" class="btn-primary" aria-label="追加"><i class="fa-solid fa-plus"></i></button>
+        <button type="submit" class="btn-add" aria-label="追加"><i class="fa-solid fa-plus"></i></button>
       </form>
       <ul id="national-school-list" class="term-items"></ul>
     </div>
@@ -340,6 +340,6 @@
     </div>
   </dialog>
 
-  <script type="module" src="./app.js?v=33"></script>
+  <script type="module" src="./app.js?v=34"></script>
 </body>
 </html>
