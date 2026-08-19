@@ -442,7 +442,17 @@ watchAuth({
     els.actionError.textContent = "";
     try {
       await loadSettings();
+    } catch (err) {
+      showActionError(err);
+    }
+    // カレンダー一覧の取得はGoogle側の一時的な問題(API割り当て超過など)で
+    // 失敗することがあるため、失敗しても他の初期化処理は続行する。
+    try {
       await loadCalendarList();
+    } catch (err) {
+      showActionError(err);
+    }
+    try {
       await loadYears();
       await loadTerms();
       await loadGoalTemplates();
@@ -547,12 +557,27 @@ async function saveSelectedTerms() {
   });
 }
 
+// Google APIのエラーレスポンスから理由(reason/message)を取り出す。
+// 403は原因(スコープ不足・API未有効化・割り当て超過など)が様々なため、
+// 画面にそのまま出して原因特定しやすくする。
+async function extractGoogleErrorDetail(res) {
+  try {
+    const data = await res.json();
+    return data?.error?.message || data?.error?.errors?.[0]?.reason || "";
+  } catch {
+    return "";
+  }
+}
+
 async function loadCalendarList() {
   const token = getGoogleAccessToken();
   const res = await fetch("https://www.googleapis.com/calendar/v3/users/me/calendarList", {
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!res.ok) throw new Error(`カレンダー一覧の取得に失敗しました (${res.status})`);
+  if (!res.ok) {
+    const detail = await extractGoogleErrorDetail(res);
+    throw new Error(`カレンダー一覧の取得に失敗しました (${res.status})${detail ? `: ${detail}` : ""}`);
+  }
   const data = await res.json();
   const calendars = data.items || [];
   calendarColors = new Map(
