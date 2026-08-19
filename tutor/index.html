@@ -10,7 +10,7 @@
       if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
     })();
   </script>
-  <link rel="stylesheet" href="../shared/styles.css?v=32" />
+  <link rel="stylesheet" href="../shared/styles.css?v=33" />
   <link
     rel="stylesheet"
     href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
@@ -50,7 +50,7 @@
       <div class="page-tabs" role="tablist">
         <button type="button" class="page-tab-btn" data-page-tab="record" aria-selected="true"><i class="fa-solid fa-clipboard-list"></i> 授業記録</button>
         <button type="button" class="page-tab-btn" data-page-tab="schedule" aria-selected="false"><i class="fa-solid fa-calendar-days"></i> 授業予定</button>
-        <button type="button" class="page-tab-btn" data-page-tab="curriculum" aria-selected="false"><i class="fa-solid fa-graduation-cap"></i> カリキュラム</button>
+        <button type="button" class="page-tab-btn" data-page-tab="curriculum" aria-selected="false"><i class="fa-solid fa-graduation-cap"></i> 生徒情報</button>
       </div>
 
       <div data-page-tab-panel="record">
@@ -130,50 +130,82 @@
           </div>
           <p id="curriculum-print-header" class="print-only"></p>
 
-          <div class="goals-section">
+          <div class="goals-section collapsible-section">
             <div class="panel-header">
-              <h3><i class="fa-solid fa-bullseye"></i> 目標</h3>
+              <h3 class="section-toggle" data-section-toggle="goals" role="button" tabindex="0" aria-expanded="true">
+                <i class="fa-solid fa-chevron-down section-chevron"></i>
+                <i class="fa-solid fa-bullseye"></i> 目標
+              </h3>
               <button type="button" id="open-goals-modal" aria-label="編集"><i class="fa-solid fa-pen"></i></button>
             </div>
-            <div class="goals-columns">
-              <div class="goals-column">
-                <h4>短期目標</h4>
-                <ul class="goal-list" data-category="short"></ul>
-              </div>
-              <div class="goals-column">
-                <h4>中期目標</h4>
-                <ul class="goal-list" data-category="mid"></ul>
-              </div>
-              <div class="goals-column">
-                <h4>長期目標</h4>
-                <ul class="goal-list" data-category="long"></ul>
+            <div class="accordion-body" data-section-body="goals">
+              <div class="goals-columns">
+                <div class="goals-column">
+                  <h4>短期目標</h4>
+                  <ul class="goal-list" data-category="short"></ul>
+                </div>
+                <div class="goals-column">
+                  <h4>中期目標</h4>
+                  <ul class="goal-list" data-category="mid"></ul>
+                </div>
+                <div class="goals-column">
+                  <h4>長期目標</h4>
+                  <ul class="goal-list" data-category="long"></ul>
+                </div>
               </div>
             </div>
           </div>
 
-          <div class="schools-section">
+          <div class="schools-section collapsible-section">
             <div class="panel-header">
-              <h3><i class="fa-solid fa-school"></i> 受験校・志望校</h3>
+              <h3 class="section-toggle" data-section-toggle="schools" role="button" tabindex="0" aria-expanded="true">
+                <i class="fa-solid fa-chevron-down section-chevron"></i>
+                <i class="fa-solid fa-school"></i> 受験校・志望校
+              </h3>
               <button type="button" id="open-schools-modal" aria-label="設定"><i class="fa-solid fa-gear"></i></button>
             </div>
-            <p id="schools-summary" class="hint">名前を入力して「表示」を押すと設定できます。</p>
+            <div class="accordion-body" data-section-body="schools">
+              <p id="schools-summary" class="hint">名前を入力して「表示」を押すと設定できます。</p>
+            </div>
           </div>
 
-          <div class="table-scroll">
-            <table id="curriculum-table" class="curriculum-table">
-              <thead>
-                <tr>
-                  <th>完了</th>
-                  <th>回数</th>
-                  <th>日付</th>
-                  <th>授業予定</th>
-                  <th>確認テスト</th>
-                  <th>宿題</th>
-                  <th>授業メモ</th>
-                </tr>
-              </thead>
-              <tbody id="curriculum-tbody"></tbody>
-            </table>
+          <div class="progress-section collapsible-section">
+            <div class="panel-header">
+              <h3 class="section-toggle" data-section-toggle="progress" role="button" tabindex="0" aria-expanded="true">
+                <i class="fa-solid fa-chevron-down section-chevron"></i>
+                <i class="fa-solid fa-list-check"></i> 授業進行
+              </h3>
+            </div>
+            <div class="accordion-body" data-section-body="progress">
+              <div class="table-scroll">
+                <table id="curriculum-table" class="curriculum-table">
+                  <thead>
+                    <tr>
+                      <th>完了</th>
+                      <th>回数</th>
+                      <th>日付</th>
+                      <th>授業予定</th>
+                      <th>確認テスト</th>
+                      <th>宿題</th>
+                      <th>授業メモ</th>
+                    </tr>
+                  </thead>
+                  <tbody id="curriculum-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="materials-section collapsible-section">
+            <div class="panel-header">
+              <h3 class="section-toggle" data-section-toggle="materials" role="button" tabindex="0" aria-expanded="true">
+                <i class="fa-solid fa-chevron-down section-chevron"></i>
+                <i class="fa-solid fa-box-archive"></i> 教材・提出物進捗
+              </h3>
+            </div>
+            <div class="accordion-body" data-section-body="materials">
+              <p class="hint">準備中です。</p>
+            </div>
           </div>
         </div>
       </div>
@@ -340,6 +372,6 @@
     </div>
   </dialog>
 
-  <script type="module" src="./app.js?v=36"></script>
+  <script type="module" src="./app.js?v=37"></script>
 </body>
 </html>

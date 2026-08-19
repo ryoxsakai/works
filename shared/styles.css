@@ -802,17 +802,40 @@ dialog.app-modal::backdrop {
   max-width: 260px;
 }
 
-.goals-section,
-.schools-section {
+.collapsible-section {
   margin-top: 1.25rem;
   padding-top: 1rem;
   border-top: 1px solid var(--border);
 }
 
-.goals-section h3,
-.schools-section h3 {
-  margin: 0 0 0.5rem;
+.collapsible-section h3 {
+  margin: 0;
   font-size: 0.95rem;
+}
+
+.collapsible-section .panel-header {
+  margin-bottom: 0;
+}
+
+.collapsible-section .accordion-body {
+  margin-top: 0.5rem;
+}
+
+.section-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+}
+
+.section-chevron {
+  font-size: 0.75rem;
+  color: var(--muted);
+  transition: transform 0.15s ease;
+}
+
+.section-toggle[aria-expanded="false"] .section-chevron {
+  transform: rotate(-90deg);
 }
 
 .goals-columns {
@@ -918,14 +941,19 @@ dialog.app-modal::backdrop {
   .name-token-filter,
   .curriculum-search-bar,
   .curriculum-print-name-row,
-  .goals-section .panel-header button,
-  .schools-section .panel-header button,
+  .collapsible-section .panel-header button,
+  .section-chevron,
   dialog {
     display: none !important;
   }
 
   .print-only {
     display: block;
+  }
+
+  /* アコーディオンの折りたたみ状態に関わらず、印刷時は全セクションを表示する */
+  .accordion-body[hidden] {
+    display: block !important;
   }
 
   main {

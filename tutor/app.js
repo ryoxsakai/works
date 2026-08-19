@@ -19,6 +19,7 @@ const PASTEL_FALLBACK_COLORS = [
 const API_BASE = "/api";
 const EVENT_VIEW_KEY = "works_event_view";
 const CURRICULUM_STATE_KEY = "works_curriculum_state";
+const COLLAPSED_SECTIONS_KEY = "works_collapsed_sections";
 const WEEKDAY_LABELS = ["日", "月", "火", "水", "木", "金", "土"];
 const TOKEN_DELIMITER_RE = /([\s　()()【】\[\]・/,、:：\-])/;
 
@@ -183,6 +184,52 @@ function showActionError(err) {
 function startOfMonth(d) {
   return new Date(d.getFullYear(), d.getMonth(), 1);
 }
+
+// --- セクションの折りたたみ(アコーディオン) ---
+// 印刷時は@media printで.accordion-body[hidden]を強制表示するため、
+// ここでは画面表示用のhidden切り替えとlocalStorageへの保存のみ行う。
+
+function loadCollapsedSections() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(COLLAPSED_SECTIONS_KEY) || "[]");
+    return new Set(Array.isArray(saved) ? saved : []);
+  } catch {
+    return new Set();
+  }
+}
+
+const collapsedSections = loadCollapsedSections();
+
+function applySectionState(id) {
+  const toggle = document.querySelector(`[data-section-toggle="${id}"]`);
+  const body = document.querySelector(`[data-section-body="${id}"]`);
+  if (!toggle || !body) return;
+  const collapsed = collapsedSections.has(id);
+  toggle.setAttribute("aria-expanded", String(!collapsed));
+  body.hidden = collapsed;
+}
+
+function toggleSection(id) {
+  if (collapsedSections.has(id)) {
+    collapsedSections.delete(id);
+  } else {
+    collapsedSections.add(id);
+  }
+  localStorage.setItem(COLLAPSED_SECTIONS_KEY, JSON.stringify([...collapsedSections]));
+  applySectionState(id);
+}
+
+document.querySelectorAll("[data-section-toggle]").forEach((toggle) => {
+  const id = toggle.dataset.sectionToggle;
+  applySectionState(id);
+  toggle.addEventListener("click", () => toggleSection(id));
+  toggle.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      toggleSection(id);
+    }
+  });
+});
 
 // --- 設定モーダル ---
 
