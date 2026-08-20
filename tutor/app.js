@@ -20,6 +20,8 @@ const API_BASE = "/api";
 const EVENT_VIEW_KEY = "works_event_view";
 const CURRICULUM_STATE_KEY = "works_curriculum_state";
 const COLLAPSED_SECTIONS_KEY = "works_collapsed_sections";
+const PRINT_SECTIONS_KEY = "works_print_sections";
+const DEFAULT_PRINT_SECTIONS = ["goals", "schools", "progress", "materials"];
 const WEEKDAY_LABELS = ["日", "月", "火", "水", "木", "金", "土"];
 const TOKEN_DELIMITER_RE = /([\s　()()【】\[\]・/,、:：\-])/;
 
@@ -248,6 +250,44 @@ document.querySelectorAll("[data-section-toggle]").forEach((toggle) => {
       e.preventDefault();
       toggleSection(id);
     }
+  });
+});
+
+// --- セクションごとの印刷対象チェックボックス ---
+// チェックを外したセクションは.no-printクラスを付け、@media printで非表示にする。
+// 折りたたみ(画面表示)とは独立して、印刷に含めるかどうかだけを制御する。
+
+function loadPrintSections() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(PRINT_SECTIONS_KEY) || "null");
+    return new Set(Array.isArray(saved) ? saved : DEFAULT_PRINT_SECTIONS);
+  } catch {
+    return new Set(DEFAULT_PRINT_SECTIONS);
+  }
+}
+
+const printSections = loadPrintSections();
+
+function applyPrintSectionState(id) {
+  const checkbox = document.querySelector(`[data-section-print="${id}"]`);
+  const section = checkbox?.closest(".collapsible-section");
+  if (!checkbox || !section) return;
+  const included = printSections.has(id);
+  checkbox.checked = included;
+  section.classList.toggle("no-print", !included);
+}
+
+document.querySelectorAll("[data-section-print]").forEach((checkbox) => {
+  const id = checkbox.dataset.sectionPrint;
+  applyPrintSectionState(id);
+  checkbox.addEventListener("change", () => {
+    if (checkbox.checked) {
+      printSections.add(id);
+    } else {
+      printSections.delete(id);
+    }
+    localStorage.setItem(PRINT_SECTIONS_KEY, JSON.stringify([...printSections]));
+    applyPrintSectionState(id);
   });
 });
 
@@ -2434,7 +2474,16 @@ els.rankSelects.forEach((select) => {
 // カリキュラム表のtextareaは行数固定だと複数行の内容が印刷時に見切れるため、
 // 印刷直前に内容の高さへ自動調整する。
 
-els.printScheduleBtn.addEventListener("click", () => window.print());
+// window.print()の直前にDOMを更新している(印刷ヘッダーの文言やtextareaの高さ調整)ため、
+// 更新がまだ画面に反映されない(レイアウト前)状態で印刷が走ることがあるモバイル環境向けに、
+// 描画が一度確定してから呼び出す。
+function triggerPrint() {
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => window.print());
+  });
+}
+
+els.printScheduleBtn.addEventListener("click", () => triggerPrint());
 
 els.printCurriculumBtn.addEventListener("click", () => {
   const name = els.curriculumName.value.trim();
@@ -2442,7 +2491,7 @@ els.printCurriculumBtn.addEventListener("click", () => {
   const yearLabel = els.curriculumYearSelect.selectedOptions[0]?.textContent || "";
   const termLabel = els.curriculumTermSelect.selectedOptions[0]?.textContent || "";
   els.curriculumPrintHeader.textContent = [displayName, yearLabel, termLabel].filter(Boolean).join("　/　");
-  window.print();
+  triggerPrint();
 });
 
 window.addEventListener("beforeprint", () => {

@@ -10,7 +10,7 @@
       if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
     })();
   </script>
-  <link rel="stylesheet" href="../shared/styles.css?v=36" />
+  <link rel="stylesheet" href="../shared/styles.css?v=37" />
   <link
     rel="stylesheet"
     href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
@@ -132,10 +132,13 @@
 
           <div class="memo-section collapsible-section">
             <div class="panel-header">
-              <h3 class="section-toggle" data-section-toggle="memo" role="button" tabindex="0" aria-expanded="true">
-                <i class="fa-solid fa-chevron-down section-chevron"></i>
-                <i class="fa-solid fa-note-sticky"></i> 生徒メモ
-              </h3>
+              <div class="section-header-group">
+                <input type="checkbox" class="section-print-checkbox" data-section-print="memo" aria-label="印刷に含める" />
+                <h3 class="section-toggle" data-section-toggle="memo" role="button" tabindex="0" aria-expanded="true">
+                  <i class="fa-solid fa-chevron-down section-chevron"></i>
+                  <i class="fa-solid fa-note-sticky"></i> 生徒メモ
+                </h3>
+              </div>
             </div>
             <div class="accordion-body" data-section-body="memo">
               <textarea id="student-memo" rows="3" placeholder="この生徒についてのメモ(印刷されません)"></textarea>
@@ -144,10 +147,13 @@
 
           <div class="goals-section collapsible-section">
             <div class="panel-header">
-              <h3 class="section-toggle" data-section-toggle="goals" role="button" tabindex="0" aria-expanded="true">
-                <i class="fa-solid fa-chevron-down section-chevron"></i>
-                <i class="fa-solid fa-bullseye"></i> 目標
-              </h3>
+              <div class="section-header-group">
+                <input type="checkbox" class="section-print-checkbox" data-section-print="goals" checked aria-label="印刷に含める" />
+                <h3 class="section-toggle" data-section-toggle="goals" role="button" tabindex="0" aria-expanded="true">
+                  <i class="fa-solid fa-chevron-down section-chevron"></i>
+                  <i class="fa-solid fa-bullseye"></i> 目標
+                </h3>
+              </div>
               <button type="button" id="open-goals-modal" aria-label="編集"><i class="fa-solid fa-pen"></i></button>
             </div>
             <div class="accordion-body" data-section-body="goals">
@@ -170,10 +176,13 @@
 
           <div class="schools-section collapsible-section">
             <div class="panel-header">
-              <h3 class="section-toggle" data-section-toggle="schools" role="button" tabindex="0" aria-expanded="true">
-                <i class="fa-solid fa-chevron-down section-chevron"></i>
-                <i class="fa-solid fa-school"></i> 受験校・志望校
-              </h3>
+              <div class="section-header-group">
+                <input type="checkbox" class="section-print-checkbox" data-section-print="schools" checked aria-label="印刷に含める" />
+                <h3 class="section-toggle" data-section-toggle="schools" role="button" tabindex="0" aria-expanded="true">
+                  <i class="fa-solid fa-chevron-down section-chevron"></i>
+                  <i class="fa-solid fa-school"></i> 受験校・志望校
+                </h3>
+              </div>
               <button type="button" id="open-schools-modal" aria-label="設定"><i class="fa-solid fa-gear"></i></button>
             </div>
             <div class="accordion-body" data-section-body="schools">
@@ -183,10 +192,13 @@
 
           <div class="progress-section collapsible-section">
             <div class="panel-header">
-              <h3 class="section-toggle" data-section-toggle="progress" role="button" tabindex="0" aria-expanded="true">
-                <i class="fa-solid fa-chevron-down section-chevron"></i>
-                <i class="fa-solid fa-list-check"></i> 授業進行
-              </h3>
+              <div class="section-header-group">
+                <input type="checkbox" class="section-print-checkbox" data-section-print="progress" checked aria-label="印刷に含める" />
+                <h3 class="section-toggle" data-section-toggle="progress" role="button" tabindex="0" aria-expanded="true">
+                  <i class="fa-solid fa-chevron-down section-chevron"></i>
+                  <i class="fa-solid fa-list-check"></i> 授業進行
+                </h3>
+              </div>
             </div>
             <div class="accordion-body" data-section-body="progress">
               <div class="table-scroll">
@@ -210,10 +222,13 @@
 
           <div class="materials-section collapsible-section">
             <div class="panel-header">
-              <h3 class="section-toggle" data-section-toggle="materials" role="button" tabindex="0" aria-expanded="true">
-                <i class="fa-solid fa-chevron-down section-chevron"></i>
-                <i class="fa-solid fa-box-archive"></i> 教材・提出物進捗
-              </h3>
+              <div class="section-header-group">
+                <input type="checkbox" class="section-print-checkbox" data-section-print="materials" checked aria-label="印刷に含める" />
+                <h3 class="section-toggle" data-section-toggle="materials" role="button" tabindex="0" aria-expanded="true">
+                  <i class="fa-solid fa-chevron-down section-chevron"></i>
+                  <i class="fa-solid fa-box-archive"></i> 教材・提出物進捗
+                </h3>
+              </div>
             </div>
             <div class="accordion-body" data-section-body="materials">
               <div class="materials-add-row">
@@ -413,6 +428,6 @@
     </div>
   </dialog>
 
-  <script type="module" src="./app.js?v=40"></script>
+  <script type="module" src="./app.js?v=41"></script>
 </body>
 </html>

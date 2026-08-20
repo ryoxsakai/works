@@ -854,6 +854,19 @@ dialog.app-modal::backdrop {
   margin-top: 0.5rem;
 }
 
+.section-header-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.section-print-checkbox {
+  flex-shrink: 0;
+  padding: 0;
+}
+
 .section-toggle {
   display: flex;
   align-items: center;
@@ -1084,11 +1097,16 @@ dialog.app-modal::backdrop {
   .curriculum-print-name-row,
   .collapsible-section .panel-header button,
   .section-chevron,
+  .section-print-checkbox,
   .materials-add-row,
   .material-drag-handle,
   .material-block-remove,
-  .memo-section,
   dialog {
+    display: none !important;
+  }
+
+  /* セクション左のチェックボックスでチェックを外したセクションは印刷しない */
+  .collapsible-section.no-print {
     display: none !important;
   }
 
