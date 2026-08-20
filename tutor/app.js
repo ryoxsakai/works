@@ -1189,7 +1189,7 @@ function renderStudentMaterials() {
       (sm) => `<div class="material-block" draggable="true" data-student-material-id="${sm.id}">
         <div class="material-block-header">
           <i class="fa-solid fa-grip-lines material-drag-handle" aria-hidden="true"></i>
-          <h4>${escapeHtml(sm.material_name)}</h4>
+          <h4><i class="fa-solid fa-chevron-down material-chevron"></i> ${escapeHtml(sm.material_name)}</h4>
           <button type="button" class="material-block-remove" aria-label="この教材を外す"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <ul class="chapter-progress-list">
@@ -1227,14 +1227,21 @@ els.addStudentMaterialBtn.addEventListener("click", async () => {
 
 els.studentMaterialsGrid.addEventListener("click", async (e) => {
   const removeBtn = e.target.closest(".material-block-remove");
-  if (!removeBtn) return;
-  if (!confirm("この教材を生徒から外しますか?(進捗の記録は保持されます)")) return;
-  const id = Number(removeBtn.closest(".material-block").dataset.studentMaterialId);
-  try {
-    await apiFetch(`/student-materials/${id}`, { method: "DELETE" });
-    await loadStudentMaterials();
-  } catch (err) {
-    showActionError(err);
+  if (removeBtn) {
+    if (!confirm("この教材を生徒から外しますか?(進捗の記録は保持されます)")) return;
+    const id = Number(removeBtn.closest(".material-block").dataset.studentMaterialId);
+    try {
+      await apiFetch(`/student-materials/${id}`, { method: "DELETE" });
+      await loadStudentMaterials();
+    } catch (err) {
+      showActionError(err);
+    }
+    return;
+  }
+
+  // 教材名(サブヘッダー)をタップすると、チャプター一覧の折りたたみを切り替える。
+  if (e.target.closest(".material-block-header")) {
+    e.target.closest(".material-block")?.classList.toggle("collapsed");
   }
 });
 

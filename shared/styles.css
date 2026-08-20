@@ -387,9 +387,12 @@ button:disabled {
   gap: 1.25rem;
   margin-bottom: 1rem;
   border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .page-tab-btn {
+  flex-shrink: 0;
   min-width: 0;
   min-height: 0;
   border-bottom: 2px solid transparent;
@@ -397,6 +400,7 @@ button:disabled {
   color: var(--muted);
   padding: 0.6rem 0.1rem;
   font-size: 0.9rem;
+  white-space: nowrap;
 }
 
 .page-tab-btn:hover {
@@ -566,9 +570,11 @@ dialog.app-modal::backdrop {
   padding: 0 1rem;
   border-bottom: 1px solid var(--border);
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .tab-btn {
+  flex-shrink: 0;
   min-width: 0;
   min-height: 0;
   border-bottom: 2px solid transparent;
@@ -867,15 +873,26 @@ dialog.app-modal::backdrop {
 
 .goals-columns {
   display: flex;
+  flex-direction: column;
   gap: 0.75rem;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  padding-bottom: 0.25rem;
 }
 
 .goals-column {
-  flex: 1 0 200px;
-  min-width: 200px;
+  min-width: 0;
+}
+
+@media (min-width: 641px) {
+  .goals-columns {
+    flex-direction: row;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 0.25rem;
+  }
+
+  .goals-column {
+    flex: 1 0 200px;
+    min-width: 200px;
+  }
 }
 
 .goals-column h4 {
@@ -974,13 +991,6 @@ dialog.app-modal::backdrop {
   }
 }
 
-.material-block {
-  border: 1px solid var(--border);
-  border-radius: 0.9rem;
-  background: var(--bg-elevated);
-  padding: 0.6rem 0.7rem;
-}
-
 .material-block.dragging {
   opacity: 0.5;
 }
@@ -990,7 +1000,6 @@ dialog.app-modal::backdrop {
   align-items: center;
   gap: 0.4rem;
   margin-bottom: 0.4rem;
-  cursor: grab;
   touch-action: none;
 }
 
@@ -998,11 +1007,28 @@ dialog.app-modal::backdrop {
   flex: 1;
   margin: 0;
   font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.material-chevron {
+  font-size: 0.7rem;
+  color: var(--muted);
+  transition: transform 0.15s ease;
+}
+
+.material-block.collapsed .material-chevron {
+  transform: rotate(-90deg);
+}
+
+.material-block.collapsed .chapter-progress-list {
+  display: none;
 }
 
 .material-drag-handle {
   color: var(--muted);
   font-size: 0.8rem;
+  cursor: grab;
 }
 
 .material-block-remove {
