@@ -1,12 +1,14 @@
 :root {
   color-scheme: light dark;
   --bg: #ffffff;
-  --bg-elevated: #f6f6f7;
+  --bg-elevated: #ffffff;
   --bg-hover: #ebecee;
   --fg: #1f2328;
   --muted: #8a8f98;
   --border: #e9eaec;
   --accent: #2563eb;
+  --bg-gradient: linear-gradient(135deg, #dbeafe 0%, #ede9fe 100%);
+  --card-shadow: 0 1px 3px rgba(30, 41, 59, 0.08), 0 1px 2px rgba(30, 41, 59, 0.05);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -17,17 +19,21 @@
     --fg: #e7e9ec;
     --muted: #9199a3;
     --border: #2a2d33;
+    --bg-gradient: linear-gradient(135deg, #1e293b 0%, #2e1065 100%);
+    --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.25);
   }
 }
 
 /* 明示的なテーマ選択(設定モーダル)はOSの設定より優先する */
 :root[data-theme="light"] {
   --bg: #ffffff;
-  --bg-elevated: #f6f6f7;
+  --bg-elevated: #ffffff;
   --bg-hover: #ebecee;
   --fg: #1f2328;
   --muted: #8a8f98;
   --border: #e9eaec;
+  --bg-gradient: linear-gradient(135deg, #dbeafe 0%, #ede9fe 100%);
+  --card-shadow: 0 1px 3px rgba(30, 41, 59, 0.08), 0 1px 2px rgba(30, 41, 59, 0.05);
 }
 
 :root[data-theme="dark"] {
@@ -37,6 +43,8 @@
   --fg: #e7e9ec;
   --muted: #9199a3;
   --border: #2a2d33;
+  --bg-gradient: linear-gradient(135deg, #1e293b 0%, #2e1065 100%);
+  --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.25);
 }
 
 * {
@@ -56,7 +64,8 @@ input[type="radio"] {
 body {
   margin: 0;
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-  background: var(--bg);
+  background: var(--bg-gradient);
+  background-attachment: fixed;
   color: var(--fg);
 }
 
@@ -65,8 +74,19 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  padding: 0.6rem 1rem;
-  border-bottom: 1px solid var(--border);
+  margin: 1rem 1.5rem 0;
+  padding: 0.7rem 1rem;
+  background: var(--bg-elevated);
+  border-radius: 1.1rem;
+  box-shadow: var(--card-shadow);
+}
+
+@media (min-width: 900px) {
+  .page-header {
+    margin-left: auto;
+    margin-right: auto;
+    max-width: min(1600px, 95vw);
+  }
 }
 
 .page-header h1 {
@@ -90,12 +110,12 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.9rem;
-  height: 1.9rem;
-  border-radius: 0.6rem;
-  background: var(--bg-elevated);
-  color: var(--fg);
-  font-size: 0.9rem;
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 0.7rem;
+  background: var(--accent);
+  color: #ffffff;
+  font-size: 1rem;
 }
 
 main {
@@ -120,8 +140,9 @@ main {
 .module-card {
   display: block;
   padding: 1.25rem;
-  border: 1px solid var(--border);
-  border-radius: 0.5rem;
+  background: var(--bg-elevated);
+  border-radius: 1rem;
+  box-shadow: var(--card-shadow);
   text-decoration: none;
   color: inherit;
 }
@@ -287,11 +308,13 @@ button:disabled {
 }
 
 .event-item {
-  padding: 0.6rem 0.7rem;
+  --item-accent: var(--border);
+  padding: 0.65rem 0.8rem;
   background: var(--bg-elevated);
   color: var(--fg);
-  border: 1px solid var(--border);
   border-radius: 0.9rem;
+  border-left: 4px solid var(--item-accent);
+  box-shadow: var(--card-shadow);
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
@@ -345,11 +368,23 @@ button:disabled {
   justify-content: flex-start;
   padding: 0.1rem 0.3rem;
   font-size: 0.85rem;
+  font-weight: 600;
   background: transparent;
   color: var(--fg);
-  text-decoration: underline dotted;
-  text-underline-offset: 2px;
   white-space: nowrap;
+}
+
+.record-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--bg-hover);
+  color: var(--muted);
+  font-size: 0.75rem;
 }
 
 .record-student-link:hover {
@@ -388,33 +423,37 @@ button:disabled {
 
 .page-tabs {
   display: flex;
-  gap: 1.25rem;
+  gap: 0.25rem;
   margin-bottom: 1rem;
-  border-bottom: 1px solid var(--border);
+  padding: 0.4rem;
+  background: var(--bg-elevated);
+  border-radius: 1.1rem;
+  box-shadow: var(--card-shadow);
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
 }
 
 .page-tab-btn {
+  flex: 1 0 auto;
   flex-shrink: 0;
   min-width: 0;
   min-height: 0;
-  border-bottom: 2px solid transparent;
-  border-radius: 0;
+  border-radius: 0.8rem;
   color: var(--muted);
-  padding: 0.6rem 0.1rem;
-  font-size: 0.9rem;
+  padding: 0.55rem 0.9rem;
+  font-size: 0.85rem;
   white-space: nowrap;
 }
 
 .page-tab-btn:hover {
-  background: transparent;
+  background: var(--bg-hover);
   color: var(--fg);
 }
 
 .page-tab-btn[aria-selected="true"] {
-  color: var(--fg);
-  border-bottom-color: var(--accent);
+  color: var(--accent);
+  background: var(--bg-hover);
+  font-weight: 600;
 }
 
 .panel-header {
@@ -516,6 +555,7 @@ button:disabled {
 }
 
 .cal-event {
+  --item-accent: var(--border);
   display: block;
   width: 100%;
   text-align: left;
@@ -525,8 +565,8 @@ button:disabled {
   overflow: hidden;
   text-overflow: ellipsis;
   background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-radius: 0.4rem;
+  border-left: 3px solid var(--item-accent);
+  border-radius: 0.3rem;
   color: var(--fg);
 }
 
@@ -538,10 +578,11 @@ button:disabled {
 dialog.app-modal {
   width: min(480px, 92vw);
   padding: 0;
-  border: 1px solid var(--border);
+  border: none;
   border-radius: 1.25rem;
-  background: var(--bg);
+  background: var(--bg-elevated);
   color: var(--fg);
+  box-shadow: 0 10px 30px rgba(30, 41, 59, 0.2);
   overflow: hidden;
 }
 
@@ -767,6 +808,10 @@ dialog.app-modal::backdrop {
 .table-scroll {
   overflow-x: auto;
   margin-top: 1rem;
+  padding: 0.4rem 0.6rem;
+  background: var(--bg-elevated);
+  border-radius: 1rem;
+  box-shadow: var(--card-shadow);
   -webkit-overflow-scrolling: touch;
 }
 
@@ -779,14 +824,19 @@ dialog.app-modal::backdrop {
 
 .curriculum-table th,
 .curriculum-table td {
-  border: 1px solid var(--border);
-  padding: 0.4rem 0.5rem;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  padding: 0.5rem 0.6rem;
   vertical-align: top;
   text-align: left;
 }
 
+.curriculum-table tr:last-child td {
+  border-bottom: none;
+}
+
 .curriculum-table th {
-  background: var(--bg);
+  background: var(--bg-elevated);
   color: var(--muted);
   font-weight: 600;
   white-space: nowrap;

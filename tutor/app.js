@@ -444,7 +444,7 @@ function renderRecordTable(rows) {
     .map(
       (r) => `<tr data-event-id="${escapeHtml(r.eventId)}" data-completed="${r.completed ? 1 : 0}">
         <td>
-          <button type="button" class="record-student-link" data-name="${escapeHtml(r.label)}" data-term-id="${r.termId}"><i class="fa-solid fa-book-open"${r.iconColor ? ` style="color:${escapeHtml(r.iconColor)}"` : ""}></i> ${escapeHtml(r.label)}</button>
+          <button type="button" class="record-student-link" data-name="${escapeHtml(r.label)}" data-term-id="${r.termId}"><span class="record-avatar"${r.iconColor ? ` style="background-color:${escapeHtml(lightenHexColor(r.iconColor, 0.75))};color:${escapeHtml(r.iconColor)}"` : ""}><i class="fa-solid fa-book-open"></i></span> ${escapeHtml(r.label)}</button>
           ${
             r.prevHomework || r.prevLessonMemo
               ? `<div class="record-prev-info">
@@ -2619,7 +2619,7 @@ function renderCurrentView() {
 function eventColorStyle(ev) {
   const color = calendarColors.get(ev._calendarId);
   if (!color) return "";
-  return ` style="background-color:${escapeHtml(color.bg)};color:${escapeHtml(color.fg)};border-color:${escapeHtml(color.raw)}"`;
+  return ` style="--item-accent:${escapeHtml(color.raw)}"`;
 }
 
 // トークンのテキスト部分をクリックするとカリキュラムでその名前を検索し、
