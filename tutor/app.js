@@ -201,6 +201,7 @@ let editingTemplateId = null;
 
 function showActionError(err) {
   els.actionError.textContent = err instanceof Error ? err.message : String(err);
+  els.actionError.classList.remove("info");
 }
 
 function startOfMonth(d) {
@@ -2478,6 +2479,11 @@ els.rankSelects.forEach((select) => {
 // window.print()が無反応になることがあるため、必ずクリックハンドラ内で
 // 同期的に呼び出す(requestAnimationFrame等での遅延は行わない)。
 function triggerPrint() {
+  // 一部のモバイル環境ではwindow.print()が無反応(エラーも出さず何も起きない)
+  // ことがあるため、まずボタンのクリック自体は届いていることを画面上で確認できる
+  // ようにする。
+  els.actionError.textContent = "印刷を呼び出しました…反応がない場合はブラウザの共有/印刷メニューをお試しください";
+  els.actionError.classList.add("info");
   if (typeof window.print !== "function") {
     showActionError(new Error("この環境では印刷機能(window.print)がサポートされていません"));
     return;
@@ -2511,6 +2517,8 @@ window.addEventListener("afterprint", () => {
   els.curriculumTbody.querySelectorAll("textarea").forEach((t) => {
     t.style.height = "";
   });
+  els.actionError.textContent = "";
+  els.actionError.classList.remove("info");
 });
 
 // --- 授業予定の取得・絞り込み・表示 ---

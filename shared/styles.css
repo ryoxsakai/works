@@ -382,6 +382,10 @@ button:disabled {
   color: #dc2626;
 }
 
+.error.info {
+  color: var(--muted);
+}
+
 .page-tabs {
   display: flex;
   gap: 1.25rem;
