@@ -195,7 +195,7 @@ let rawEvents = [];
 let eventDetails = new Map();
 let nameFilter = null;
 // 授業予定は日付一覧から選ぶ詳細リストを標準表示にする。
-let eventViewMode = "list";
+let eventViewMode = localStorage.getItem(EVENT_VIEW_KEY) === "calendar" ? "calendar" : "list";
 let calendarCursor = startOfMonth(new Date());
 let listWeekCursor = startOfWeek(new Date());
 let selectedScheduleDate = formatDateOnly(new Date());
@@ -2731,7 +2731,7 @@ function renderListView(events) {
     const homework = detail.homework || "未入力";
     const memo = detail.lesson_memo || "未入力";
     return `<li class="event-item"${eventColorStyle(ev)}>
-      <div class="event-time"><span>${formatEventTime(ev)}</span><small>${ev.start?.dateTime ? "時刻" : "終日"}</small></div>
+      <div class="event-time"><span>${formatEventTime(ev)}</span><small>${escapeHtml(findPeriodLabel(ev.start?.dateTime) || "")}</small></div>
       <div class="event-main">
         <button type="button" class="event-student-name name-token-text" data-token="${escapeHtml(summary)}">${escapeHtml(summary)}</button>
         <dl class="event-details">
@@ -2783,8 +2783,10 @@ function renderCalendarView(events) {
       const overflow = dayEvents.length - visible.length;
       const eventsHtml = visible
         .map((ev) => {
-          const summaryRaw = ev.summary || "(無題)";
-          return `<span class="cal-event"${eventColorStyle(ev)}>${renderTokenizedSummary(summaryRaw)}</span>`;
+          const summary = (ev.summary || "(無題)").trim();
+          return `<button type="button" class="cal-event name-token-text"${eventColorStyle(ev)} data-token="${escapeHtml(summary)}" aria-label="${escapeHtml(summary)}の生徒情報を開く">
+            <span class="cal-event-time">${formatEventTime(ev)}</span><span>${escapeHtml(summary)}</span>
+          </button>`;
         })
         .join("");
       const overflowHtml = overflow > 0 ? `<div class="cal-more">+${overflow}件</div>` : "";
