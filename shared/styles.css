@@ -1292,3 +1292,46 @@ dialog.app-modal::backdrop {
     word-break: break-word;
   }
 }
+
+
+/* 授業予定: 日付選択と予定詳細を主役にする専用レイアウト */
+.schedule-panel { max-width: 880px; margin-inline: auto; }
+.schedule-heading { margin-bottom: 1.15rem; }
+.schedule-heading h2 { font-size: 1.35rem; letter-spacing: .02em; }
+.eyebrow { margin: 0 0 .25rem; color: var(--accent); font-size: .68rem; font-weight: 800; letter-spacing: .12em; }
+.schedule-header-actions { display: flex; gap: .4rem; }
+.schedule-week-nav { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: .35rem; margin: 0 -0.15rem 1rem; }
+.schedule-week-nav > button { min-width: 2.35rem; min-height: 2.35rem; padding: .35rem; border: 1px solid var(--border); background: var(--bg-elevated); box-shadow: var(--card-shadow); }
+.schedule-week-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: .28rem; padding: .28rem; background: color-mix(in srgb, var(--bg-elevated) 92%, var(--accent) 8%); border: 1px solid var(--border); border-radius: 1rem; }
+.schedule-day-btn { min-width: 0; min-height: 3.6rem; padding: .35rem .1rem; border-radius: .75rem; color: var(--muted); display: grid; gap: .1rem; background: transparent; }
+.schedule-day-btn:hover { background: var(--bg-hover); }
+.schedule-day-btn span { font-size: .68rem; font-weight: 600; }
+.schedule-day-btn strong { font-size: 1.05rem; line-height: 1.1; }
+.schedule-day-btn[aria-pressed="true"] { background: var(--accent); color: #fff; box-shadow: 0 5px 14px color-mix(in srgb, var(--accent) 28%, transparent); }
+#event-list { gap: .7rem; }
+.event-item { min-height: 7.25rem; padding: 0; overflow: hidden; border: 1px solid var(--border); border-left: 5px solid var(--item-accent); border-radius: 1.05rem; display: grid; grid-template-columns: 5.5rem minmax(0, 1fr) 2.7rem; align-items: stretch; gap: 0; }
+.event-time { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: .15rem; padding: .75rem .45rem; border-right: 1px solid var(--border); color: var(--item-accent); font-variant-numeric: tabular-nums; }
+.event-time span { font-size: 1.12rem; font-weight: 750; }
+.event-time small { color: var(--muted); font-size: .67rem; }
+.event-main { min-width: 0; padding: .8rem .9rem; }
+.event-student-name { min-width: 0; min-height: 0; padding: 0; color: var(--fg); font-size: 1rem; font-weight: 750; justify-content: flex-start; text-align: left; }
+.event-student-name:hover { background: transparent; color: var(--accent); }
+.event-details { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .4rem .8rem; margin: .52rem 0 0; }
+.event-details div { min-width: 0; }
+.event-details dt { margin: 0 0 .12rem; color: var(--muted); font-size: .65rem; font-weight: 700; }
+.event-details dd { margin: 0; color: var(--fg); font-size: .78rem; line-height: 1.35; overflow-wrap: anywhere; white-space: pre-wrap; }
+.event-filter-menu { align-self: center; min-width: 2.25rem; min-height: 2.25rem; margin-right: .4rem; padding: .3rem; color: var(--muted); }
+.event-filter-menu:hover { color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, transparent); }
+.schedule-empty { padding: 1.25rem; color: var(--muted); text-align: center; background: var(--bg-elevated); border: 1px dashed var(--border); border-radius: 1rem; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; }
+@media (max-width: 560px) {
+  main { padding: 1rem; }
+  .event-item { grid-template-columns: 4.5rem minmax(0, 1fr) 2.35rem; }
+  .event-details { grid-template-columns: 1fr; gap: .28rem; }
+  .event-main { padding: .68rem .65rem; }
+  .event-time span { font-size: .98rem; }
+}
+@media print {
+  .schedule-week-nav, .event-filter-menu { display: none !important; }
+  .event-item { grid-template-columns: 5.5rem 1fr; box-shadow: none !important; }
+}
