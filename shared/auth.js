@@ -135,7 +135,20 @@ export async function watchAuth({ onSignedIn, onSignedOut }) {
   }
 }
 
+// iOSでホーム画面に追加したアイコンから起動した状態(navigator.standalone)だと、
+// Googleへのリダイレクトが埋め込みブラウザ扱いされ、ログインがブロックされることがある
+// (Googleのポリシーによるもので、こちら側では回避できない)。
+// その場合はSafariで直接開いてログインしてもらうよう案内する。
+export function isStandaloneHomeScreenApp() {
+  return Boolean(window.navigator.standalone);
+}
+
 export function signIn() {
+  if (isStandaloneHomeScreenApp()) {
+    throw new Error(
+      "ホーム画面に追加したアイコンからはGoogleログインができません。Safariでこのページを直接開いてログインしてください(ログイン後はホーム画面アイコンからも使えます)。"
+    );
+  }
   const params = new URLSearchParams({
     client_id: GOOGLE_CLIENT_ID,
     redirect_uri: redirectUri(),

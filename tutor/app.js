@@ -4,7 +4,8 @@ import {
   signOutUser,
   getGoogleAccessToken,
   getSessionToken,
-} from "../shared/auth.js?v=9";
+  isStandaloneHomeScreenApp,
+} from "../shared/auth.js?v=10";
 import { getTheme, setTheme } from "../shared/theme.js?v=5";
 
 const PASTEL_FALLBACK_COLORS = [
@@ -543,7 +544,11 @@ els.clearNameFilterBtn.addEventListener("click", () => {
 
 els.signInBtn.addEventListener("click", () => {
   els.authError.textContent = "";
-  signIn();
+  try {
+    signIn();
+  } catch (err) {
+    els.authError.textContent = err.message;
+  }
 });
 
 els.signOutBtn.addEventListener("click", async () => {
@@ -608,7 +613,11 @@ watchAuth({
     els.signedOut.hidden = false;
     els.signedIn.hidden = true;
     els.userBar.hidden = true;
-    els.authError.textContent = message || "";
+    els.authError.textContent =
+      message ||
+      (isStandaloneHomeScreenApp()
+        ? "ホーム画面に追加したアイコンからはGoogleログインができません。Safariでこのページを直接開いてログインしてください(ログイン後はホーム画面アイコンからも使えます)。"
+        : "");
   },
 });
 
