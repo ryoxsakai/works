@@ -1657,3 +1657,74 @@ button:has(> i:only-child) {
   border: 1px solid currentColor;
   font-size: .62rem;
 }
+
+
+/* 授業予定の一覧・カレンダー切替 */
+.schedule-view-toggle {
+  display: inline-flex;
+  width: auto;
+  margin: -.25rem 0 .85rem;
+  padding: .22rem;
+  border: 1px solid var(--border);
+  border-radius: .9rem;
+  background: var(--bg-elevated);
+  box-shadow: var(--card-shadow);
+}
+
+.schedule-view-toggle .view-toggle-btn {
+  min-height: 2.15rem;
+  padding: .38rem .7rem;
+  border: 0;
+  border-radius: .68rem;
+  background: transparent;
+  color: var(--muted);
+  font-size: .78rem;
+}
+
+.schedule-view-toggle .view-toggle-btn[aria-pressed="true"] {
+  background: var(--accent);
+  color: #fff;
+}
+
+.event-time small:empty {
+  display: none;
+}
+
+.cal-event {
+  min-width: 0;
+  min-height: 0;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: .16rem;
+  padding: .28rem .34rem;
+  border: 0;
+  border-left: 3px solid var(--item-accent);
+  border-radius: .45rem;
+  background: color-mix(in srgb, var(--bg-elevated) 90%, var(--item-accent) 10%);
+  color: var(--fg);
+  font-size: .66rem;
+  line-height: 1.25;
+  text-align: left;
+  white-space: normal;
+}
+
+.cal-event:hover {
+  background: color-mix(in srgb, var(--item-accent) 18%, var(--bg-elevated));
+  color: var(--accent);
+}
+
+.cal-event-time {
+  color: var(--muted);
+  font-size: .58rem;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 560px) {
+  .schedule-view-toggle {
+    width: 100%;
+  }
+
+  .schedule-view-toggle .view-toggle-btn {
+    flex: 1;
+  }
+}
