@@ -1783,3 +1783,74 @@ button:has(> i:only-child) {
 .schedule-heading h2 i {
   color: var(--accent);
 }
+
+
+/* 表示切替は授業予定の見出し直下に置く */
+.schedule-heading + .schedule-view-toggle {
+  margin-top: -.15rem;
+}
+
+/* 月間カレンダーは独立した白いカードとして見せる */
+#calendar-view {
+  padding: .75rem;
+  border: 1px solid var(--border);
+  border-radius: .6rem;
+  background: #ffffff;
+  box-shadow: var(--card-shadow);
+}
+
+#calendar-view .calendar-nav {
+  margin-bottom: .7rem;
+}
+
+#calendar-view .cal-cell {
+  border-radius: .35rem;
+  background: #ffffff;
+}
+
+#calendar-view .cal-cell-empty {
+  background: transparent;
+}
+
+/* 角丸を全体で控えめに統一。円形で意味を持つ要素は維持する */
+button {
+  border-radius: .7rem;
+}
+
+input,
+select,
+textarea {
+  border-radius: .35rem;
+}
+
+.page-tabs,
+.schedule-week-days,
+.view-toggle,
+.schedule-view-toggle,
+.table-scroll,
+.curriculum-panel .collapsible-section,
+.curriculum-panel .curriculum-search-bar,
+.curriculum-panel .curriculum-print-name-row,
+#calendar-view,
+.event-item,
+.schedule-empty,
+.module-card {
+  border-radius: .55rem;
+}
+
+.page-tab-btn,
+.schedule-day-btn,
+.record-panel .record-day-btn,
+.schedule-view-toggle .view-toggle-btn {
+  border-radius: .38rem;
+}
+
+dialog.app-modal {
+  border-radius: .65rem;
+}
+
+.record-avatar,
+.calendar-color-dot,
+#user-avatar {
+  border-radius: 50%;
+}
