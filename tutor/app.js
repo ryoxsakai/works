@@ -657,7 +657,7 @@ async function apiFetch(path, options = {}) {
 
 // 選択中の全カレンダーから指定期間の予定を横断取得する共通ヘルパー。
 // withCalendarId=trueのときは各予定に_calendarId(色分け用)を付与する。
-async function fetchCalendarEvents(timeMin, timeMax, { withCalendarId = false } = {}) {
+async function fetchCalendarEvents(timeMin, timeMax, { withCalendarId = false, includeExcluded = false } = {}) {
   const token = await getGoogleAccessToken();
   const params = new URLSearchParams({
     timeMin,
@@ -678,7 +678,13 @@ async function fetchCalendarEvents(timeMin, timeMax, { withCalendarId = false } 
       return withCalendarId ? items.map((ev) => ({ ...ev, _calendarId: calendarId })) : items;
     })
   );
-  return results.flat().filter((ev) => !excludedTitles.has((ev.summary || "").trim()));
+  return results
+    .flat()
+    .filter((ev) => includeExcluded || !isExcludedScheduleEvent(ev));
+}
+
+function isExcludedScheduleEvent(ev) {
+  return excludedTitles.has((ev.summary || "").trim());
 }
 
 function formatDateOnly(d) {
@@ -2578,7 +2584,8 @@ async function loadCalendarEvents() {
     timeMin = new Date(Date.now() - 90 * 86400000).toISOString();
     timeMax = new Date(Date.now() + 90 * 86400000).toISOString();
   }
-  const events = await fetchCalendarEvents(timeMin, timeMax, { withCalendarId: true });
+  // 授業予定だけは、設定で除外している「空き」枠も細いカードとして表示する。
+  const events = await fetchCalendarEvents(timeMin, timeMax, { withCalendarId: true, includeExcluded: true });
 
   rawEvents = events.sort((a, b) => {
     const aStart = a.start?.dateTime || a.start?.date || "";
@@ -2725,13 +2732,20 @@ function renderListView(events) {
   }
 
   els.eventList.innerHTML = dayEvents.map((ev) => {
+    const period = escapeHtml(findPeriodLabel(ev.start?.dateTime) || "");
+    if (isExcludedScheduleEvent(ev)) {
+      return `<li class="event-item event-empty-slot"${eventColorStyle(ev)}>
+        <div class="event-time"><span>${formatEventTime(ev)}</span><small>${period}</small></div>
+        <div class="event-empty-label">空き</div>
+      </li>`;
+    }
     const detail = eventDetails.get(ev.id) || {};
     const summary = (ev.summary || "(無題)").trim();
     const plan = detail.lesson_plan || "未入力";
     const homework = detail.homework || "未入力";
     const memo = detail.lesson_memo || "未入力";
     return `<li class="event-item"${eventColorStyle(ev)}>
-      <div class="event-time"><span>${formatEventTime(ev)}</span><small>${escapeHtml(findPeriodLabel(ev.start?.dateTime) || "")}</small></div>
+      <div class="event-time"><span>${formatEventTime(ev)}</span><small>${period}</small></div>
       <div class="event-main">
         <button type="button" class="event-student-name name-token-text" data-token="${escapeHtml(summary)}">${escapeHtml(summary)}</button>
         <dl class="event-details">
@@ -2746,6 +2760,8 @@ function renderListView(events) {
 }
 
 function renderCalendarView(events) {
+  // 空き枠は一覧専用。月間カレンダーには通常の授業だけを表示する。
+  events = events.filter((ev) => !isExcludedScheduleEvent(ev));
   els.eventList.hidden = true;
   els.listWeekNav.hidden = true;
   els.calendarView.hidden = false;
