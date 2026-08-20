@@ -2474,13 +2474,19 @@ els.rankSelects.forEach((select) => {
 // カリキュラム表のtextareaは行数固定だと複数行の内容が印刷時に見切れるため、
 // 印刷直前に内容の高さへ自動調整する。
 
-// window.print()の直前にDOMを更新している(印刷ヘッダーの文言やtextareaの高さ調整)ため、
-// 更新がまだ画面に反映されない(レイアウト前)状態で印刷が走ることがあるモバイル環境向けに、
-// 描画が一度確定してから呼び出す。
+// iOS Safari等では、ユーザー操作(クリック)から非同期に切り離すと
+// window.print()が無反応になることがあるため、必ずクリックハンドラ内で
+// 同期的に呼び出す(requestAnimationFrame等での遅延は行わない)。
 function triggerPrint() {
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => window.print());
-  });
+  if (typeof window.print !== "function") {
+    showActionError(new Error("この環境では印刷機能(window.print)がサポートされていません"));
+    return;
+  }
+  try {
+    window.print();
+  } catch (err) {
+    showActionError(err);
+  }
 }
 
 els.printScheduleBtn.addEventListener("click", () => triggerPrint());
