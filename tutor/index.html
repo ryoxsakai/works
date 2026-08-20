@@ -10,7 +10,7 @@
       if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
     })();
   </script>
-  <link rel="stylesheet" href="../shared/styles.css?v=34" />
+  <link rel="stylesheet" href="../shared/styles.css?v=35" />
   <link
     rel="stylesheet"
     href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
@@ -129,6 +129,18 @@
             <input id="curriculum-print-name" type="text" placeholder="未設定の場合は検索名をそのまま使用" />
           </div>
           <p id="curriculum-print-header" class="print-only"></p>
+
+          <div class="memo-section collapsible-section">
+            <div class="panel-header">
+              <h3 class="section-toggle" data-section-toggle="memo" role="button" tabindex="0" aria-expanded="true">
+                <i class="fa-solid fa-chevron-down section-chevron"></i>
+                <i class="fa-solid fa-note-sticky"></i> 生徒メモ
+              </h3>
+            </div>
+            <div class="accordion-body" data-section-body="memo">
+              <textarea id="student-memo" rows="3" placeholder="この生徒についてのメモ(印刷されません)"></textarea>
+            </div>
+          </div>
 
           <div class="goals-section collapsible-section">
             <div class="panel-header">
@@ -401,6 +413,6 @@
     </div>
   </dialog>
 
-  <script type="module" src="./app.js?v=38"></script>
+  <script type="module" src="./app.js?v=39"></script>
 </body>
 </html>

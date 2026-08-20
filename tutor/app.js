@@ -135,6 +135,7 @@ const els = {
   curriculumSearchModalCloseBtn: document.querySelector("#curriculum-search-modal-close"),
   curriculumSearchSummary: document.querySelector("#curriculum-search-summary"),
   curriculumPrintNameInput: document.querySelector("#curriculum-print-name"),
+  studentMemoInput: document.querySelector("#student-memo"),
   goalLists: document.querySelectorAll(".goal-list"),
   openGoalsModalBtn: document.querySelector("#open-goals-modal"),
   goalModal: document.querySelector("#goal-modal"),
@@ -372,6 +373,8 @@ async function loadRecordTable() {
     const n = sameLabelEvents.findIndex((e) => e.id === ev.id) + 1;
     const m = sameLabelEvents.length;
     const saved = entryMap.get(ev.id) || {};
+    const prevEvent = n > 1 ? sameLabelEvents[n - 2] : null;
+    const prevSaved = prevEvent ? entryMap.get(prevEvent.id) || {} : {};
     return {
       eventId: ev.id,
       label,
@@ -385,6 +388,8 @@ async function loadRecordTable() {
       confirmationTest: saved.confirmation_test || "",
       homework: saved.homework || "",
       lessonMemo: saved.lesson_memo || "",
+      prevHomework: prevSaved.homework || "",
+      prevLessonMemo: prevSaved.lesson_memo || "",
     };
   });
 
@@ -395,7 +400,17 @@ function renderRecordTable(rows) {
   els.recordTbody.innerHTML = rows
     .map(
       (r) => `<tr data-event-id="${escapeHtml(r.eventId)}" data-completed="${r.completed ? 1 : 0}">
-        <td><button type="button" class="record-student-link" data-name="${escapeHtml(r.label)}" data-term-id="${r.termId}"><i class="fa-solid fa-book-open"${r.iconColor ? ` style="color:${escapeHtml(r.iconColor)}"` : ""}></i> ${escapeHtml(r.label)}</button></td>
+        <td>
+          <button type="button" class="record-student-link" data-name="${escapeHtml(r.label)}" data-term-id="${r.termId}"><i class="fa-solid fa-book-open"${r.iconColor ? ` style="color:${escapeHtml(r.iconColor)}"` : ""}></i> ${escapeHtml(r.label)}</button>
+          ${
+            r.prevHomework || r.prevLessonMemo
+              ? `<div class="record-prev-info">
+                  ${r.prevHomework ? `<p><i class="fa-solid fa-pencil"></i> ${escapeHtml(r.prevHomework)}</p>` : ""}
+                  ${r.prevLessonMemo ? `<p><i class="fa-solid fa-note-sticky"></i> ${escapeHtml(r.prevLessonMemo)}</p>` : ""}
+                </div>`
+              : ""
+          }
+        </td>
         <td>${r.n}/${r.m}回</td>
         <td>${formatTimeOrPeriod(r.start)}</td>
         <td><textarea class="record-plan" rows="2">${escapeHtml(r.lessonPlan)}</textarea></td>
@@ -1682,10 +1697,12 @@ async function loadStudentPref() {
   const name = els.curriculumName.value.trim();
   if (!name) {
     els.curriculumPrintNameInput.value = "";
+    els.studentMemoInput.value = "";
     return;
   }
   const pref = await apiFetch(`/student-prefs?name=${encodeURIComponent(name)}`);
   els.curriculumPrintNameInput.value = pref?.print_name || "";
+  els.studentMemoInput.value = pref?.memo || "";
 }
 
 els.curriculumPrintNameInput.addEventListener("change", async () => {
@@ -1698,6 +1715,22 @@ els.curriculumPrintNameInput.addEventListener("change", async () => {
     await apiFetch("/student-prefs", {
       method: "PUT",
       body: JSON.stringify({ name, print_name: els.curriculumPrintNameInput.value.trim() || null }),
+    });
+  } catch (err) {
+    showActionError(err);
+  }
+});
+
+els.studentMemoInput.addEventListener("change", async () => {
+  const name = els.curriculumName.value.trim();
+  if (!name) {
+    showActionError(new Error("先に名前を検索してください"));
+    return;
+  }
+  try {
+    await apiFetch("/student-prefs", {
+      method: "PUT",
+      body: JSON.stringify({ name, memo: els.studentMemoInput.value.trim() || null }),
     });
   } catch (err) {
     showActionError(err);

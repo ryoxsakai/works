@@ -75,6 +75,7 @@ CREATE TABLE IF NOT EXISTS goal_templates (
 CREATE TABLE IF NOT EXISTS student_prefs (
   name TEXT PRIMARY KEY,
   print_name TEXT,
+  memo TEXT,
   updated_at TEXT DEFAULT (datetime('now'))
 );
 

@@ -531,13 +531,17 @@ async function readStudentPref(env, name) {
 }
 
 async function upsertStudentPref(env, name, body) {
-  const printName = body.print_name === undefined ? null : body.print_name;
+  const existing = await env.DB.prepare("SELECT * FROM student_prefs WHERE name = ?")
+    .bind(name)
+    .first();
+  const printName = body.print_name !== undefined ? body.print_name : existing?.print_name ?? null;
+  const memo = body.memo !== undefined ? body.memo : existing?.memo ?? null;
   await env.DB.prepare(
-    `INSERT INTO student_prefs (name, print_name, updated_at)
-     VALUES (?, ?, datetime('now'))
-     ON CONFLICT(name) DO UPDATE SET print_name = excluded.print_name, updated_at = excluded.updated_at`
+    `INSERT INTO student_prefs (name, print_name, memo, updated_at)
+     VALUES (?, ?, ?, datetime('now'))
+     ON CONFLICT(name) DO UPDATE SET print_name = excluded.print_name, memo = excluded.memo, updated_at = excluded.updated_at`
   )
-    .bind(name, printName)
+    .bind(name, printName, memo)
     .run();
   return env.DB.prepare("SELECT * FROM student_prefs WHERE name = ?").bind(name).first();
 }
@@ -822,7 +826,7 @@ export default {
         const name = url.searchParams.get("name");
         if (!name) return json({ error: "name is required" }, headers, 400);
         const pref = await readStudentPref(env, name);
-        return json(pref || { name, honorific: null }, headers);
+        return json(pref || { name, print_name: null, memo: null }, headers);
       }
 
       if (url.pathname === "/api/student-prefs" && request.method === "PUT") {
