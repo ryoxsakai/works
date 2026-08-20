@@ -101,6 +101,10 @@
               <button type="button" id="print-schedule" class="print-btn" aria-label="印刷"><i class="fa-solid fa-print"></i></button>
             </div>
           </div>
+          <div class="view-toggle schedule-view-toggle" role="group" aria-label="表示切り替え">
+            <button type="button" class="view-toggle-btn" data-view="list" aria-label="一覧表示"><i class="fa-solid fa-list"></i><span>一覧</span></button>
+            <button type="button" class="view-toggle-btn" data-view="calendar" aria-label="カレンダー表示"><i class="fa-solid fa-calendar-days"></i><span>カレンダー</span></button>
+          </div>
           <p id="name-filter-bar" hidden>
             <i class="fa-solid fa-filter"></i> 絞り込み: <strong id="name-filter-label"></strong>
             <button type="button" id="clear-name-filter" aria-label="絞り込みを解除"><i class="fa-solid fa-xmark"></i></button>
@@ -112,10 +116,7 @@
             <span id="list-week-label" class="sr-only"></span>
           </div>
           <ul id="event-list" aria-live="polite"></ul>
-          <div class="view-toggle schedule-view-toggle" role="group" aria-label="表示切り替え">
-            <button type="button" class="view-toggle-btn" data-view="list" aria-label="一覧表示"><i class="fa-solid fa-list"></i><span>一覧</span></button>
-            <button type="button" class="view-toggle-btn" data-view="calendar" aria-label="カレンダー表示"><i class="fa-solid fa-calendar-days"></i><span>カレンダー</span></button>
-          </div>
+
           <div id="calendar-view" hidden>
             <div class="calendar-nav">
               <button type="button" id="cal-prev" aria-label="前月"><i class="fa-solid fa-chevron-left"></i></button>
