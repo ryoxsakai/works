@@ -1137,6 +1137,23 @@ dialog.app-modal::backdrop {
 }
 
 @media print {
+  /* 印刷はいつも白紙に黒文字が基本。画面用のグラデーション背景・ダーク
+     テーマの配色を持ち込まず、常に明るい配色に固定する。 */
+  :root {
+    --bg: #ffffff !important;
+    --bg-elevated: #ffffff !important;
+    --bg-hover: #f2f2f3 !important;
+    --fg: #1a1a1a !important;
+    --muted: #555555 !important;
+    --border: #cccccc !important;
+    --bg-gradient: #ffffff !important;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+  }
+
   .page-header,
   .user-bar,
   #action-error,
@@ -1160,6 +1177,29 @@ dialog.app-modal::backdrop {
   .curriculum-table input[type="checkbox"],
   dialog {
     display: none !important;
+  }
+
+  /* 画面用の影は紙面では汚れて見えるだけなので消し、代わりに
+     細い罫線で境界をはっきりさせる。色分けの左バーはそのまま活かす。 */
+  .event-item,
+  .cal-event,
+  .table-scroll,
+  .module-card {
+    box-shadow: none !important;
+  }
+
+  .event-item {
+    border: 1px solid var(--border);
+    border-left-width: 4px;
+  }
+
+  .cal-event {
+    border: 1px solid var(--border);
+    border-left-width: 3px;
+  }
+
+  .table-scroll {
+    border: 1px solid var(--border);
   }
 
   /* セクション左のチェックボックスでチェックを外したセクションは印刷しない */
