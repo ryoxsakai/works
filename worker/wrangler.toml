@@ -12,6 +12,11 @@ GOOGLE_CLIENT_ID = "196806466819-2bcole85u4k53h1iqk6jr69ppans7egf.apps.googleuse
 ALLOWED_EMAIL = "ryoxsakai@gmail.com"
 ALLOWED_ORIGIN = "https://works.lrnr.jp"
 
+# 以下はここに書かず、Cloudflareダッシュボード(Workers & Pages → works →
+# 設定 → 変数とシークレット)でSecretとして追加すること:
+#   GOOGLE_CLIENT_SECRET … Google Cloud Consoleの同じOAuthクライアントのクライアントシークレット
+#   SESSION_SECRET        … このWorkerが発行するセッショントークン署名用のランダムな文字列
+
 [[d1_databases]]
 binding = "DB"
 database_name = "tutor-db"

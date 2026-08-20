@@ -13,26 +13,136 @@ function json(data, headers, status = 200) {
   });
 }
 
-// クライアントはFirebase Authを介さず直接Googleのアクセストークンを渡してくるので、
-// Googleのtokeninfoエンドポイントに問い合わせてトークンの正当性とemailを確認する。
-async function verifyGoogleToken(request, env) {
+// --- 認証: Googleの認可コードをリフレッシュトークンに交換してDBに保存し、
+// このWorker自身が発行する署名付きセッショントークンでAPIアクセスを認可する。
+// ブラウザはGoogleの生アクセストークンを長期間保持しないため、タブの
+// バックグラウンド挙動やサードパーティCookie制限に影響されずログイン状態を保てる。
+
+function toBase64Url(bytes) {
+  let str = "";
+  for (const b of bytes) str += String.fromCharCode(b);
+  return btoa(str).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function fromBase64Url(b64url) {
+  const b64 = b64url.replace(/-/g, "+").replace(/_/g, "/");
+  return atob(b64);
+}
+
+async function hmacSign(env, data) {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(env.SESSION_SECRET),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(data));
+  return toBase64Url(new Uint8Array(sig));
+}
+
+const SESSION_MAX_AGE_MS = 90 * 24 * 60 * 60 * 1000;
+
+async function createSessionToken(env, email) {
+  const payload = JSON.stringify({ email, exp: Date.now() + SESSION_MAX_AGE_MS });
+  const payloadB64 = toBase64Url(new TextEncoder().encode(payload));
+  const sig = await hmacSign(env, payloadB64);
+  return `${payloadB64}.${sig}`;
+}
+
+async function verifySession(request, env) {
   const authHeader = request.headers.get("Authorization") || "";
   const match = authHeader.match(/^Bearer (.+)$/);
   if (!match) throw new Error("missing bearer token");
 
-  const res = await fetch(
-    `https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=${encodeURIComponent(match[1])}`
-  );
-  if (!res.ok) throw new Error("not authorized");
-  const info = await res.json();
+  const [payloadB64, sig] = match[1].split(".");
+  if (!payloadB64 || !sig) throw new Error("invalid session");
+  const expectedSig = await hmacSign(env, payloadB64);
+  if (sig !== expectedSig) throw new Error("invalid session");
 
-  const audienceOk = [info.aud, info.azp].includes(env.GOOGLE_CLIENT_ID);
-  const emailOk = info.email?.toLowerCase() === env.ALLOWED_EMAIL.toLowerCase();
-  if (!audienceOk || !emailOk || String(info.email_verified) !== "true") {
+  let payload;
+  try {
+    payload = JSON.parse(fromBase64Url(payloadB64));
+  } catch {
+    throw new Error("invalid session");
+  }
+  if (!payload.email || !payload.exp || payload.exp < Date.now()) {
+    throw new Error("session expired");
+  }
+  if (payload.email.toLowerCase() !== env.ALLOWED_EMAIL.toLowerCase()) {
     throw new Error("not authorized");
   }
+  return payload;
+}
 
-  return info;
+async function exchangeAuthCode(env, code, redirectUri) {
+  const res = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      code,
+      client_id: env.GOOGLE_CLIENT_ID,
+      client_secret: env.GOOGLE_CLIENT_SECRET,
+      redirect_uri: redirectUri,
+      grant_type: "authorization_code",
+    }),
+  });
+  if (!res.ok) throw new Error(`Googleとのトークン交換に失敗しました: ${await res.text()}`);
+  return res.json();
+}
+
+function decodeIdToken(idToken) {
+  const payloadB64 = idToken.split(".")[1];
+  return JSON.parse(fromBase64Url(payloadB64));
+}
+
+async function saveRefreshToken(env, refreshToken) {
+  await env.DB.prepare(
+    `INSERT INTO google_auth (id, refresh_token, updated_at) VALUES (1, ?, datetime('now'))
+     ON CONFLICT(id) DO UPDATE SET refresh_token = excluded.refresh_token, updated_at = excluded.updated_at`
+  )
+    .bind(refreshToken)
+    .run();
+}
+
+async function loadRefreshToken(env) {
+  const row = await env.DB.prepare("SELECT refresh_token FROM google_auth WHERE id = 1").first();
+  return row?.refresh_token || null;
+}
+
+async function clearRefreshToken(env) {
+  const refreshToken = await loadRefreshToken(env);
+  if (refreshToken) {
+    try {
+      await fetch(`https://oauth2.googleapis.com/revoke?token=${encodeURIComponent(refreshToken)}`, {
+        method: "POST",
+      });
+    } catch {
+      // revoke失敗はログアウト自体を妨げない(サーバー側の保存分は次で消す)
+    }
+  }
+  await env.DB.prepare("DELETE FROM google_auth WHERE id = 1").run();
+}
+
+// 保存済みのリフレッシュトークンから、Googleカレンダー呼び出し用の新しい
+// アクセストークンをその都度発行する(ブラウザはこれをキャッシュして使う)。
+async function mintGoogleAccessToken(env) {
+  const refreshToken = await loadRefreshToken(env);
+  if (!refreshToken) {
+    throw new Error("Googleカレンダーへの認可がありません。再度ログインしてください。");
+  }
+  const res = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      refresh_token: refreshToken,
+      client_id: env.GOOGLE_CLIENT_ID,
+      client_secret: env.GOOGLE_CLIENT_SECRET,
+      grant_type: "refresh_token",
+    }),
+  });
+  if (!res.ok) throw new Error(`アクセストークンの更新に失敗しました: ${await res.text()}`);
+  return res.json();
 }
 
 async function readStudents(env) {
@@ -592,7 +702,47 @@ export default {
     const url = new URL(request.url);
 
     try {
-      await verifyGoogleToken(request, env);
+      // 認可コードの交換はまだセッションが無い状態で呼ばれるため、
+      // セッション検証より前に処理する。
+      if (url.pathname === "/api/auth/callback" && request.method === "POST") {
+        const body = await request.json();
+        if (!body.code || !body.redirect_uri) {
+          return json({ error: "code, redirect_uri are required" }, headers, 400);
+        }
+        const tokens = await exchangeAuthCode(env, body.code, body.redirect_uri);
+        const idPayload = decodeIdToken(tokens.id_token);
+        if (
+          idPayload.email?.toLowerCase() !== env.ALLOWED_EMAIL.toLowerCase() ||
+          String(idPayload.email_verified) !== "true"
+        ) {
+          return json({ error: `許可されていないアカウントです: ${idPayload.email}` }, headers, 403);
+        }
+        if (!tokens.refresh_token) {
+          return json(
+            {
+              error:
+                "リフレッシュトークンを取得できませんでした。Googleアカウントの「連携済みのアプリ」からこのアプリの連携を一度解除してから、再度ログインしてください。",
+            },
+            headers,
+            400
+          );
+        }
+        await saveRefreshToken(env, tokens.refresh_token);
+        const sessionToken = await createSessionToken(env, idPayload.email);
+        return json({ session_token: sessionToken }, headers);
+      }
+
+      await verifySession(request, env);
+
+      if (url.pathname === "/api/auth/logout" && request.method === "POST") {
+        await clearRefreshToken(env);
+        return json({ ok: true }, headers);
+      }
+
+      if (url.pathname === "/api/google-token" && request.method === "GET") {
+        const tokens = await mintGoogleAccessToken(env);
+        return json({ access_token: tokens.access_token, expires_in: tokens.expires_in }, headers);
+      }
 
       if (url.pathname === "/api/students" && request.method === "GET") {
         return json(await readStudents(env), headers);
@@ -860,8 +1010,13 @@ export default {
 
       return json({ error: "not found" }, headers, 404);
     } catch (err) {
-      const status =
-        err.message === "not authorized" || err.message === "missing bearer token" ? 401 : 400;
+      const authErrors = [
+        "not authorized",
+        "missing bearer token",
+        "invalid session",
+        "session expired",
+      ];
+      const status = authErrors.includes(err.message) ? 401 : 400;
       return json({ error: err.message }, headers, status);
     }
   },

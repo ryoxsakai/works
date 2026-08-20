@@ -3,7 +3,8 @@ import {
   signIn,
   signOutUser,
   getGoogleAccessToken,
-} from "../shared/auth.js?v=8";
+  getSessionToken,
+} from "../shared/auth.js?v=9";
 import { getTheme, setTheme } from "../shared/theme.js?v=5";
 
 const PASTEL_FALLBACK_COLORS = [
@@ -354,7 +355,7 @@ function renderRecordDateLabel() {
 
 async function loadRecordTable() {
   renderRecordDateLabel();
-  const token = getGoogleAccessToken();
+  const token = getSessionToken();
   if (!token) {
     els.recordTbody.innerHTML = `<tr><td colspan="7">カレンダーへのアクセス許可を確認しています…</td></tr>`;
     return;
@@ -545,7 +546,10 @@ els.signInBtn.addEventListener("click", () => {
   signIn();
 });
 
-els.signOutBtn.addEventListener("click", () => signOutUser());
+els.signOutBtn.addEventListener("click", async () => {
+  await signOutUser();
+  window.location.reload();
+});
 
 watchAuth({
   onSignedIn: async (user) => {
@@ -609,7 +613,7 @@ watchAuth({
 });
 
 async function apiFetch(path, options = {}) {
-  const token = getGoogleAccessToken();
+  const token = getSessionToken();
   if (!token) throw new Error("not signed in");
   const res = await fetch(API_BASE + path, {
     ...options,
@@ -619,6 +623,12 @@ async function apiFetch(path, options = {}) {
       ...(options.headers || {}),
     },
   });
+  if (res.status === 401) {
+    // セッションが失効している場合は静かにログアウトさせ、サインイン画面に戻す。
+    await signOutUser();
+    window.location.reload();
+    throw new Error("セッションが切れました。再度ログインしてください。");
+  }
   if (!res.ok) {
     throw new Error(`API error ${res.status}: ${await res.text()}`);
   }
@@ -628,7 +638,7 @@ async function apiFetch(path, options = {}) {
 // 選択中の全カレンダーから指定期間の予定を横断取得する共通ヘルパー。
 // withCalendarId=trueのときは各予定に_calendarId(色分け用)を付与する。
 async function fetchCalendarEvents(timeMin, timeMax, { withCalendarId = false } = {}) {
-  const token = getGoogleAccessToken();
+  const token = await getGoogleAccessToken();
   const params = new URLSearchParams({
     timeMin,
     timeMax,
@@ -694,7 +704,7 @@ async function extractGoogleErrorDetail(res) {
 }
 
 async function loadCalendarList() {
-  const token = getGoogleAccessToken();
+  const token = await getGoogleAccessToken();
   const res = await fetch("https://www.googleapis.com/calendar/v3/users/me/calendarList", {
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -1835,7 +1845,7 @@ els.curriculumFilterForm.addEventListener("submit", async (e) => {
 });
 
 async function loadCurriculumEvents() {
-  const token = getGoogleAccessToken();
+  const token = getSessionToken();
   const name = els.curriculumName.value.trim();
   const term = terms.find((t) => t.id === Number(els.curriculumTermSelect.value));
   if (!token || !name || !term || selectedCalendarIds.size === 0) {
@@ -2525,7 +2535,7 @@ window.addEventListener("afterprint", () => {
 // --- 授業予定の取得・絞り込み・表示 ---
 
 async function loadCalendarEvents() {
-  const token = getGoogleAccessToken();
+  const token = getSessionToken();
   if (!token) {
     showEventPlaceholder("カレンダーへのアクセス許可を確認しています…");
     return;

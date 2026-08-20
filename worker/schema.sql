@@ -117,3 +117,12 @@ CREATE TABLE IF NOT EXISTS chapter_progress (
   updated_at TEXT DEFAULT (datetime('now')),
   PRIMARY KEY (name, chapter_id)
 );
+
+-- Googleのリフレッシュトークンを保存する単一行テーブル(単一ユーザー運用のためid=1固定)。
+-- サーバー(Worker)側でこれを使ってアクセストークンを都度発行するため、
+-- ブラウザ側のタブ状態やサードパーティCookie制限に左右されずログイン状態を維持できる。
+CREATE TABLE IF NOT EXISTS google_auth (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  refresh_token TEXT NOT NULL,
+  updated_at TEXT DEFAULT (datetime('now'))
+);
