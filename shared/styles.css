@@ -1335,3 +1335,249 @@ dialog.app-modal::backdrop {
   .schedule-week-nav, .event-filter-menu { display: none !important; }
   .event-item { grid-template-columns: 5.5rem 1fr; box-shadow: none !important; }
 }
+
+
+/* 授業記録・カリキュラム: 授業予定と共通の余白、カード、淡いアクセントで統一 */
+.record-panel,
+.curriculum-panel {
+  max-width: 1120px;
+  margin-inline: auto;
+}
+
+.record-panel > .panel-header,
+.curriculum-panel > .panel-header:first-child {
+  margin-bottom: 1rem;
+  padding: .15rem 0;
+}
+
+.record-panel .panel-header h2,
+.curriculum-panel > .panel-header:first-child h2 {
+  font-size: 1.35rem;
+  letter-spacing: .02em;
+}
+
+.record-panel .panel-header h2 i,
+.curriculum-panel > .panel-header:first-child h2 i {
+  color: var(--accent);
+}
+
+.record-panel .hint {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.4rem;
+  margin: .1rem 0 .65rem;
+  padding: .45rem .75rem;
+  background: color-mix(in srgb, var(--bg-elevated) 88%, var(--accent) 12%);
+  border: 1px solid var(--border);
+  border-radius: .8rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.record-panel .view-toggle {
+  padding: .22rem;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: .95rem;
+  box-shadow: var(--card-shadow);
+}
+
+.record-panel .record-day-btn {
+  min-height: 2.2rem;
+  border: none;
+  border-radius: .72rem;
+  background: transparent;
+}
+
+.record-panel .record-day-btn[aria-pressed="true"] {
+  background: var(--accent);
+  color: #fff;
+}
+
+.record-panel .table-scroll,
+.curriculum-panel .table-scroll {
+  margin-top: .3rem;
+  padding: .35rem .55rem;
+  border: 1px solid var(--border);
+  border-radius: 1.15rem;
+  background: var(--bg-elevated);
+  box-shadow: var(--card-shadow);
+}
+
+.record-panel .curriculum-table,
+.curriculum-panel .curriculum-table {
+  font-size: .84rem;
+}
+
+.record-panel .curriculum-table th,
+.curriculum-panel .curriculum-table th {
+  padding: .8rem .65rem;
+  background: color-mix(in srgb, var(--bg-elevated) 92%, var(--accent) 8%);
+  color: var(--muted);
+  font-size: .72rem;
+  letter-spacing: .03em;
+}
+
+.record-panel .curriculum-table td,
+.curriculum-panel .curriculum-table td {
+  padding: .72rem .65rem;
+}
+
+.record-panel .curriculum-table tbody tr,
+.curriculum-panel .curriculum-table tbody tr {
+  transition: background-color .15s ease;
+}
+
+.record-panel .curriculum-table tbody tr:hover,
+.curriculum-panel .curriculum-table tbody tr:hover {
+  background: color-mix(in srgb, var(--bg-hover) 72%, transparent);
+}
+
+.record-panel .record-student-link {
+  padding: .2rem 0;
+  color: var(--fg);
+  font-weight: 750;
+}
+
+.record-panel .record-avatar {
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: .65rem;
+  background: color-mix(in srgb, var(--accent) 12%, var(--bg-elevated));
+  color: var(--accent);
+}
+
+.record-panel .curriculum-table textarea,
+.curriculum-panel .curriculum-table textarea {
+  min-height: 3.25rem;
+  border-radius: .7rem;
+  border-color: transparent;
+  background: color-mix(in srgb, var(--bg-elevated) 88%, var(--accent) 12%);
+  font-size: .78rem;
+  line-height: 1.45;
+}
+
+.record-panel .curriculum-table textarea:focus,
+.curriculum-panel .curriculum-table textarea:focus {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  background: var(--bg-elevated);
+}
+
+/* 生徒情報（カリキュラム）を、情報のまとまりごとのカードとして扱う */
+.curriculum-panel .curriculum-search-bar {
+  padding: .75rem .9rem;
+  margin: 0 0 .75rem;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background: var(--bg-elevated);
+  box-shadow: var(--card-shadow);
+}
+
+.curriculum-panel .curriculum-search-bar .hint {
+  margin: 0;
+  font-size: .88rem;
+}
+
+.curriculum-panel .curriculum-search-bar button {
+  color: var(--accent);
+}
+
+.curriculum-panel .curriculum-print-name-row {
+  margin: 0 0 .9rem;
+  padding: .7rem .85rem;
+  border: 1px solid var(--border);
+  border-radius: .95rem;
+  background: color-mix(in srgb, var(--bg-elevated) 90%, var(--accent) 10%);
+}
+
+.curriculum-panel .curriculum-print-name-row label {
+  color: var(--muted);
+  font-size: .78rem;
+  font-weight: 700;
+}
+
+.curriculum-panel .collapsible-section {
+  margin-top: .8rem;
+  padding: .95rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 1.1rem;
+  background: var(--bg-elevated);
+  box-shadow: var(--card-shadow);
+}
+
+.curriculum-panel .collapsible-section .panel-header {
+  margin-bottom: 0;
+}
+
+.curriculum-panel .collapsible-section h3 {
+  font-size: 1rem;
+  letter-spacing: .01em;
+}
+
+.curriculum-panel .section-print-checkbox {
+  width: 1.12rem;
+  height: 1.12rem;
+}
+
+.curriculum-panel .accordion-body {
+  padding-top: .35rem;
+}
+
+.curriculum-panel .goals-columns {
+  gap: .65rem;
+}
+
+.curriculum-panel .goals-column {
+  padding: .7rem;
+  border-radius: .85rem;
+  background: color-mix(in srgb, var(--bg-elevated) 90%, var(--accent) 10%);
+}
+
+.curriculum-panel .goals-column h4 {
+  color: var(--accent);
+  font-size: .76rem;
+  letter-spacing: .03em;
+}
+
+.curriculum-panel #student-memo {
+  min-height: 6rem;
+  border-radius: .8rem;
+  background: color-mix(in srgb, var(--bg-elevated) 90%, var(--accent) 10%);
+}
+
+.curriculum-panel .materials-add-row select {
+  background: color-mix(in srgb, var(--bg-elevated) 88%, var(--accent) 12%);
+}
+
+.curriculum-panel .btn-add {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 6px 15px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+
+.curriculum-panel .materials-grid {
+  gap: .6rem;
+}
+
+.curriculum-panel .material-block {
+  padding: .7rem;
+  border: 1px solid var(--border);
+  border-radius: .85rem;
+  background: color-mix(in srgb, var(--bg-elevated) 94%, var(--accent) 6%);
+}
+
+@media (max-width: 640px) {
+  .record-panel .panel-header,
+  .curriculum-panel > .panel-header:first-child {
+    align-items: flex-start;
+  }
+
+  .record-panel .view-toggle {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  .curriculum-panel .collapsible-section {
+    padding: .85rem .8rem;
+  }
+}
