@@ -144,11 +144,6 @@ export function isStandaloneHomeScreenApp() {
 }
 
 export function signIn() {
-  if (isStandaloneHomeScreenApp()) {
-    throw new Error(
-      "ホーム画面に追加したアイコンからはGoogleログインができません。Safariでこのページを直接開いてログインしてください(ログイン後はホーム画面アイコンからも使えます)。"
-    );
-  }
   const params = new URLSearchParams({
     client_id: GOOGLE_CLIENT_ID,
     redirect_uri: redirectUri(),
@@ -159,7 +154,19 @@ export function signIn() {
     prompt: "consent",
     login_hint: ALLOWED_EMAIL,
   });
-  window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
+  const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
+
+  if (isStandaloneHomeScreenApp()) {
+    // ホーム画面のアイコン(Web Clip)は複数ウィンドウを持てないため、
+    // window.openで新規ウィンドウ扱いにするとiOSがSafari本体へ処理を渡すことが多い。
+    // これによりGoogle側の埋め込みブラウザ判定(ログインブロック)を回避しやすくなる。
+    // ログイン完了後はセッションがlocalStorageに保存され、同一オリジンなので
+    // 元のホーム画面アイコンからも引き続き使える。
+    window.open(authUrl, "_blank");
+    return;
+  }
+
+  window.location.href = authUrl;
 }
 
 export async function signOutUser() {

@@ -5,7 +5,7 @@ import {
   getGoogleAccessToken,
   getSessionToken,
   isStandaloneHomeScreenApp,
-} from "../shared/auth.js?v=10";
+} from "../shared/auth.js?v=11";
 import { getTheme, setTheme } from "../shared/theme.js?v=5";
 
 const PASTEL_FALLBACK_COLORS = [
@@ -616,7 +616,7 @@ watchAuth({
     els.authError.textContent =
       message ||
       (isStandaloneHomeScreenApp()
-        ? "ホーム画面に追加したアイコンからはGoogleログインができません。Safariでこのページを直接開いてログインしてください(ログイン後はホーム画面アイコンからも使えます)。"
+        ? "ホーム画面のアイコンから起動しています。ログインボタンを押すとSafariが開きます。ログイン後、このアイコンに戻ってきてください。"
         : "");
   },
 });
