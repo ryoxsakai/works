@@ -1760,3 +1760,26 @@ button:has(> i:only-child) {
     grid-template-columns: 4.5rem minmax(0, 1fr);
   }
 }
+
+
+/* 授業記録は生徒名と前回情報を優先して読める列幅にする */
+#record-table th:first-child,
+#record-table td:first-child {
+  width: 30%;
+  min-width: 13rem;
+}
+
+.record-panel .record-student-link {
+  gap: .2rem;
+  padding: 0;
+}
+
+.record-panel .record-avatar {
+  width: 1.38rem;
+  height: 1.38rem;
+  font-size: .54rem;
+}
+
+.schedule-heading h2 i {
+  color: var(--accent);
+}
