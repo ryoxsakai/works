@@ -1854,3 +1854,14 @@ dialog.app-modal {
 #user-avatar {
   border-radius: 50%;
 }
+
+
+/* 表示書体はNoto Sans JP ExtraLightを基本とする */
+body {
+  font-family: "Noto Sans JP", system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-weight: 200;
+}
+
+.record-panel .record-prev-info {
+  margin-left: .35rem;
+}
