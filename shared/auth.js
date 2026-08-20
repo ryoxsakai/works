@@ -148,6 +148,18 @@ export async function watchAuth({ onSignedIn, onSignedOut }) {
   tokenClient.requestAccessToken({ prompt: "none" });
 }
 
+// モバイルではタブがバックグラウンドの間setTimeoutが間引かれ/止まり、
+// scheduleRefresh()で予約した更新が実行されないままトークンが失効することがある。
+// タブが再び前面に来た瞬間に失効(または失効間近)をチェックし、その場で
+// 静かに再取得することで、開き直したときにログアウトさせられる事態を減らす。
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState !== "visible" || !tokenClient) return;
+  if (!loadStoredToken()) {
+    isBackgroundRefresh = true;
+    tokenClient.requestAccessToken({ prompt: "none" });
+  }
+});
+
 export function signIn() {
   isInteractiveAttempt = true;
   tokenClient?.requestAccessToken();
