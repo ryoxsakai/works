@@ -455,12 +455,12 @@ function renderRecordTable(rows) {
     .map(
       (r) => `<tr data-event-id="${escapeHtml(r.eventId)}" data-completed="${r.completed ? 1 : 0}">
         <td>
-          <button type="button" class="record-student-link" data-name="${escapeHtml(r.label)}" data-term-id="${r.termId}"><span class="record-avatar"${r.iconColor ? ` style="background-color:${escapeHtml(lightenHexColor(r.iconColor, 0.75))};color:${escapeHtml(r.iconColor)}"` : ""}><i class="fa-solid fa-book-open"></i></span> ${escapeHtml(r.label)}</button>
+          <button type="button" class="record-student-link" data-name="${escapeHtml(r.label)}" data-term-id="${r.termId}"><span class="record-avatar"${r.iconColor ? ` style="background-color:${escapeHtml(lightenHexColor(r.iconColor, 0.75))};color:${escapeHtml(r.iconColor)}"` : ""}><i class="bx bx-book-open"></i></span> ${escapeHtml(r.label)}</button>
           ${
             r.prevHomework || r.prevLessonMemo
               ? `<div class="record-prev-info">
-                  ${r.prevHomework ? `<p><i class="fa-solid fa-pencil"></i> ${escapeHtml(r.prevHomework)}</p>` : ""}
-                  ${r.prevLessonMemo ? `<p><i class="fa-solid fa-note-sticky"></i> ${escapeHtml(r.prevLessonMemo)}</p>` : ""}
+                  ${r.prevHomework ? `<p><i class="bx bx-pencil"></i> ${escapeHtml(r.prevHomework)}</p>` : ""}
+                  ${r.prevLessonMemo ? `<p><i class="bx bx-note"></i> ${escapeHtml(r.prevLessonMemo)}</p>` : ""}
                 </div>`
               : ""
           }
@@ -806,7 +806,7 @@ function renderExcludedTitleList() {
         .map(
           (title) => `<li class="term-item" data-title="${escapeHtml(title)}">
             <span class="term-item-label">${escapeHtml(title)}</span>
-            <button type="button" class="excluded-title-delete" aria-label="削除"><i class="fa-solid fa-trash"></i></button>
+            <button type="button" class="excluded-title-delete" aria-label="削除"><i class="bx bx-trash"></i></button>
           </li>`
         )
         .join("")
@@ -872,18 +872,18 @@ function renderPeriodList() {
           <input type="text" class="edit-period-label" value="${escapeHtml(p.label)}" required />
           <input type="time" class="edit-period-start" value="${p.start_time}" required />
           <div class="edit-actions">
-            <button type="submit" class="btn-primary" aria-label="保存"><i class="fa-solid fa-check"></i></button>
-            <button type="button" class="cancel-edit-period" aria-label="キャンセル"><i class="fa-solid fa-xmark"></i></button>
+            <button type="submit" class="btn-primary" aria-label="保存"><i class="bx bx-check"></i></button>
+            <button type="button" class="cancel-edit-period" aria-label="キャンセル"><i class="bx bx-x"></i></button>
           </div>
         </form>`;
       }
       return `<div class="term-item" data-period-id="${p.id}">
         <span class="term-item-label">${escapeHtml(p.label)}</span>
         <span class="term-item-dates">${p.start_time} 〜</span>
-        <button type="button" class="period-move-up" ${i === 0 ? "disabled" : ""} aria-label="上へ"><i class="fa-solid fa-chevron-up"></i></button>
-        <button type="button" class="period-move-down" ${i === periods.length - 1 ? "disabled" : ""} aria-label="下へ"><i class="fa-solid fa-chevron-down"></i></button>
-        <button type="button" class="period-edit" aria-label="編集"><i class="fa-solid fa-pen"></i></button>
-        <button type="button" class="period-delete" aria-label="削除"><i class="fa-solid fa-trash"></i></button>
+        <button type="button" class="period-move-up" ${i === 0 ? "disabled" : ""} aria-label="上へ"><i class="bx bx-chevron-up"></i></button>
+        <button type="button" class="period-move-down" ${i === periods.length - 1 ? "disabled" : ""} aria-label="下へ"><i class="bx bx-chevron-down"></i></button>
+        <button type="button" class="period-edit" aria-label="編集"><i class="bx bx-pencil"></i></button>
+        <button type="button" class="period-delete" aria-label="削除"><i class="bx bx-trash"></i></button>
       </div>`;
     })
     .join("");
@@ -998,18 +998,18 @@ function renderMaterialList() {
         return `<form class="material-edit-form" data-material-id="${m.id}">
           <input type="text" class="edit-material-name" value="${escapeHtml(m.name)}" required />
           <div class="edit-actions">
-            <button type="submit" class="btn-primary" aria-label="保存"><i class="fa-solid fa-check"></i></button>
-            <button type="button" class="cancel-edit-material" aria-label="キャンセル"><i class="fa-solid fa-xmark"></i></button>
+            <button type="submit" class="btn-primary" aria-label="保存"><i class="bx bx-check"></i></button>
+            <button type="button" class="cancel-edit-material" aria-label="キャンセル"><i class="bx bx-x"></i></button>
           </div>
         </form>`;
       }
       return `<div class="term-item" data-material-id="${m.id}">
         <span class="term-item-label">${escapeHtml(m.name)}</span>
-        <button type="button" class="material-move-up" ${i === 0 ? "disabled" : ""} aria-label="上へ"><i class="fa-solid fa-chevron-up"></i></button>
-        <button type="button" class="material-move-down" ${i === materials.length - 1 ? "disabled" : ""} aria-label="下へ"><i class="fa-solid fa-chevron-down"></i></button>
-        <button type="button" class="material-detail" aria-label="詳細"><i class="fa-solid fa-list-ol"></i></button>
-        <button type="button" class="material-edit" aria-label="編集"><i class="fa-solid fa-pen"></i></button>
-        <button type="button" class="material-delete" aria-label="削除"><i class="fa-solid fa-trash"></i></button>
+        <button type="button" class="material-move-up" ${i === 0 ? "disabled" : ""} aria-label="上へ"><i class="bx bx-chevron-up"></i></button>
+        <button type="button" class="material-move-down" ${i === materials.length - 1 ? "disabled" : ""} aria-label="下へ"><i class="bx bx-chevron-down"></i></button>
+        <button type="button" class="material-detail" aria-label="詳細"><i class="bx bx-list-ol"></i></button>
+        <button type="button" class="material-edit" aria-label="編集"><i class="bx bx-pencil"></i></button>
+        <button type="button" class="material-delete" aria-label="削除"><i class="bx bx-trash"></i></button>
       </div>`;
     })
     .join("");
@@ -1132,17 +1132,17 @@ function renderMaterialChapterList() {
         return `<form class="chapter-edit-form" data-chapter-id="${c.id}">
           <input type="text" class="edit-chapter-name" value="${escapeHtml(c.name)}" required />
           <div class="edit-actions">
-            <button type="submit" class="btn-primary" aria-label="保存"><i class="fa-solid fa-check"></i></button>
-            <button type="button" class="cancel-edit-chapter" aria-label="キャンセル"><i class="fa-solid fa-xmark"></i></button>
+            <button type="submit" class="btn-primary" aria-label="保存"><i class="bx bx-check"></i></button>
+            <button type="button" class="cancel-edit-chapter" aria-label="キャンセル"><i class="bx bx-x"></i></button>
           </div>
         </form>`;
       }
       return `<div class="term-item" data-chapter-id="${c.id}">
         <span class="term-item-label">${escapeHtml(c.name)}</span>
-        <button type="button" class="chapter-move-up" ${i === 0 ? "disabled" : ""} aria-label="上へ"><i class="fa-solid fa-chevron-up"></i></button>
-        <button type="button" class="chapter-move-down" ${i === materialChapters.length - 1 ? "disabled" : ""} aria-label="下へ"><i class="fa-solid fa-chevron-down"></i></button>
-        <button type="button" class="chapter-edit" aria-label="編集"><i class="fa-solid fa-pen"></i></button>
-        <button type="button" class="chapter-delete" aria-label="削除"><i class="fa-solid fa-trash"></i></button>
+        <button type="button" class="chapter-move-up" ${i === 0 ? "disabled" : ""} aria-label="上へ"><i class="bx bx-chevron-up"></i></button>
+        <button type="button" class="chapter-move-down" ${i === materialChapters.length - 1 ? "disabled" : ""} aria-label="下へ"><i class="bx bx-chevron-down"></i></button>
+        <button type="button" class="chapter-edit" aria-label="編集"><i class="bx bx-pencil"></i></button>
+        <button type="button" class="chapter-delete" aria-label="削除"><i class="bx bx-trash"></i></button>
       </div>`;
     })
     .join("");
@@ -1265,9 +1265,9 @@ function renderStudentMaterials() {
     .map(
       (sm) => `<div class="material-block" draggable="true" data-student-material-id="${sm.id}">
         <div class="material-block-header">
-          <i class="fa-solid fa-grip-lines material-drag-handle" aria-hidden="true"></i>
-          <h4><i class="fa-solid fa-chevron-down material-chevron"></i> ${escapeHtml(sm.material_name)}</h4>
-          <button type="button" class="material-block-remove" aria-label="この教材を外す"><i class="fa-solid fa-xmark"></i></button>
+          <i class="bx bx-menu-alt-left material-drag-handle" aria-hidden="true"></i>
+          <h4><i class="bx bx-chevron-down material-chevron"></i> ${escapeHtml(sm.material_name)}</h4>
+          <button type="button" class="material-block-remove" aria-label="この教材を外す"><i class="bx bx-x"></i></button>
         </div>
         <ul class="chapter-progress-list">
           ${sm.chapters
@@ -1515,15 +1515,15 @@ function renderYearGroups() {
           ? `<form class="year-edit-form" data-year-id="${y.id}">
               <input type="text" class="edit-year-label" value="${escapeHtml(y.label)}" required />
               <div class="edit-actions">
-                <button type="submit" class="btn-primary" aria-label="保存"><i class="fa-solid fa-check"></i></button>
-                <button type="button" class="cancel-edit-year" aria-label="キャンセル"><i class="fa-solid fa-xmark"></i></button>
+                <button type="submit" class="btn-primary" aria-label="保存"><i class="bx bx-check"></i></button>
+                <button type="button" class="cancel-edit-year" aria-label="キャンセル"><i class="bx bx-x"></i></button>
               </div>
             </form>`
           : `<div class="year-group-header">
               <h3>${escapeHtml(y.label)}</h3>
               <div class="year-actions">
-                <button type="button" class="year-edit" data-id="${y.id}" aria-label="編集"><i class="fa-solid fa-pen"></i></button>
-                <button type="button" class="year-delete" data-id="${y.id}" aria-label="削除"><i class="fa-solid fa-trash"></i></button>
+                <button type="button" class="year-edit" data-id="${y.id}" aria-label="編集"><i class="bx bx-pencil"></i></button>
+                <button type="button" class="year-delete" data-id="${y.id}" aria-label="削除"><i class="bx bx-trash"></i></button>
               </div>
             </div>`;
       return `<div class="year-group">
@@ -1536,7 +1536,7 @@ function renderYearGroups() {
             <span>〜</span>
             <input type="date" class="new-term-end" required />
           </div>
-          <button type="submit" class="btn-add" aria-label="学期を追加"><i class="fa-solid fa-plus"></i></button>
+          <button type="submit" class="btn-add" aria-label="学期を追加"><i class="bx bx-plus"></i></button>
         </form>
       </div>`;
     })
@@ -1554,8 +1554,8 @@ function renderTermRow(t) {
         <input type="date" class="edit-term-end" value="${t.end_date}" required />
       </div>
       <div class="edit-actions">
-        <button type="submit" class="btn-primary" aria-label="保存"><i class="fa-solid fa-check"></i></button>
-        <button type="button" class="cancel-edit-term" aria-label="キャンセル"><i class="fa-solid fa-xmark"></i></button>
+        <button type="submit" class="btn-primary" aria-label="保存"><i class="bx bx-check"></i></button>
+        <button type="button" class="cancel-edit-term" aria-label="キャンセル"><i class="bx bx-x"></i></button>
       </div>
     </form>`;
   }
@@ -1563,8 +1563,8 @@ function renderTermRow(t) {
     <input type="checkbox" class="term-checkbox" value="${t.id}" ${checked} />
     <span class="term-item-label">${escapeHtml(t.label)}</span>
     <span class="term-item-dates">${t.start_date} 〜 ${t.end_date}</span>
-    <button type="button" class="term-edit" data-id="${t.id}" aria-label="編集"><i class="fa-solid fa-pen"></i></button>
-    <button type="button" class="term-delete" data-id="${t.id}" aria-label="削除"><i class="fa-solid fa-trash"></i></button>
+    <button type="button" class="term-edit" data-id="${t.id}" aria-label="編集"><i class="bx bx-pencil"></i></button>
+    <button type="button" class="term-delete" data-id="${t.id}" aria-label="削除"><i class="bx bx-trash"></i></button>
   </div>`;
 }
 
@@ -1990,17 +1990,17 @@ function renderGoalEditLists() {
           return `<form class="goal-edit-form" data-goal-id="${g.id}">
             <input type="text" class="edit-goal-text" value="${escapeHtml(g.text)}" required />
             <div class="edit-actions">
-              <button type="submit" class="btn-primary" aria-label="保存"><i class="fa-solid fa-check"></i></button>
-              <button type="button" class="cancel-edit-goal" aria-label="キャンセル"><i class="fa-solid fa-xmark"></i></button>
+              <button type="submit" class="btn-primary" aria-label="保存"><i class="bx bx-check"></i></button>
+              <button type="button" class="cancel-edit-goal" aria-label="キャンセル"><i class="bx bx-x"></i></button>
             </div>
           </form>`;
         }
         return `<div class="term-item" data-goal-id="${g.id}">
           <span class="term-item-label">${escapeHtml(g.text)}</span>
-          <button type="button" class="goal-move-up" ${i === 0 ? "disabled" : ""} aria-label="上へ"><i class="fa-solid fa-chevron-up"></i></button>
-          <button type="button" class="goal-move-down" ${i === items.length - 1 ? "disabled" : ""} aria-label="下へ"><i class="fa-solid fa-chevron-down"></i></button>
-          <button type="button" class="goal-edit" aria-label="編集"><i class="fa-solid fa-pen"></i></button>
-          <button type="button" class="goal-delete" aria-label="削除"><i class="fa-solid fa-trash"></i></button>
+          <button type="button" class="goal-move-up" ${i === 0 ? "disabled" : ""} aria-label="上へ"><i class="bx bx-chevron-up"></i></button>
+          <button type="button" class="goal-move-down" ${i === items.length - 1 ? "disabled" : ""} aria-label="下へ"><i class="bx bx-chevron-down"></i></button>
+          <button type="button" class="goal-edit" aria-label="編集"><i class="bx bx-pencil"></i></button>
+          <button type="button" class="goal-delete" aria-label="削除"><i class="bx bx-trash"></i></button>
         </div>`;
       })
       .join("");
@@ -2185,18 +2185,18 @@ function renderGoalTemplateLists() {
           return `<form class="template-edit-form" data-template-id="${t.id}">
             <input type="text" class="edit-template-text" value="${escapeHtml(t.text)}" required />
             <div class="edit-actions">
-              <button type="submit" class="btn-primary" aria-label="保存"><i class="fa-solid fa-check"></i></button>
-              <button type="button" class="cancel-edit-template" aria-label="キャンセル"><i class="fa-solid fa-xmark"></i></button>
+              <button type="submit" class="btn-primary" aria-label="保存"><i class="bx bx-check"></i></button>
+              <button type="button" class="cancel-edit-template" aria-label="キャンセル"><i class="bx bx-x"></i></button>
             </div>
           </form>`;
         }
         return `<div class="term-item" data-template-id="${t.id}">
           <span class="term-item-label">${escapeHtml(t.text)}</span>
-          <button type="button" class="template-move-up" ${i === 0 ? "disabled" : ""} aria-label="上へ"><i class="fa-solid fa-chevron-up"></i></button>
-          <button type="button" class="template-move-down" ${i === items.length - 1 ? "disabled" : ""} aria-label="下へ"><i class="fa-solid fa-chevron-down"></i></button>
-          <button type="button" class="template-use" aria-label="目標として追加"><i class="fa-solid fa-plus"></i></button>
-          <button type="button" class="template-edit" aria-label="編集"><i class="fa-solid fa-pen"></i></button>
-          <button type="button" class="template-delete" aria-label="削除"><i class="fa-solid fa-trash"></i></button>
+          <button type="button" class="template-move-up" ${i === 0 ? "disabled" : ""} aria-label="上へ"><i class="bx bx-chevron-up"></i></button>
+          <button type="button" class="template-move-down" ${i === items.length - 1 ? "disabled" : ""} aria-label="下へ"><i class="bx bx-chevron-down"></i></button>
+          <button type="button" class="template-use" aria-label="目標として追加"><i class="bx bx-plus"></i></button>
+          <button type="button" class="template-edit" aria-label="編集"><i class="bx bx-pencil"></i></button>
+          <button type="button" class="template-delete" aria-label="削除"><i class="bx bx-trash"></i></button>
         </div>`;
       })
       .join("");
@@ -2388,7 +2388,7 @@ function renderSchoolsModal() {
         .map(
           (s) => `<li class="term-item" data-school-id="${s.id}">
             <span class="term-item-label">${escapeHtml(s.school_name)}</span>
-            <button type="button" class="national-school-delete" data-id="${s.id}" aria-label="削除"><i class="fa-solid fa-trash"></i></button>
+            <button type="button" class="national-school-delete" data-id="${s.id}" aria-label="削除"><i class="bx bx-trash"></i></button>
           </li>`
         )
         .join("")
@@ -2658,7 +2658,7 @@ function renderTokenizedSummary(summary) {
       return `<span class="name-token-text" data-token="${escapeHtml(part)}">${escapeHtml(part)}</span>`;
     })
     .join("");
-  return `${tokensHtml}<button type="button" class="name-token-filter" data-token="${escapeHtml(fullText)}" aria-label="「${escapeHtml(fullText)}」で絞り込み"><i class="fa-solid fa-filter"></i></button>`;
+  return `${tokensHtml}<button type="button" class="name-token-filter" data-token="${escapeHtml(fullText)}" aria-label="「${escapeHtml(fullText)}」で絞り込み"><i class="bx bx-filter"></i></button>`;
 }
 
 function handleTokenClick(e) {
@@ -2754,7 +2754,7 @@ function renderListView(events) {
           <div><dt>授業メモ</dt><dd>${escapeHtml(memo)}</dd></div>
         </dl>
       </div>
-      <button type="button" class="event-filter-menu" data-token="${escapeHtml(summary)}" aria-label="${escapeHtml(summary)}で絞り込む"><i class="fa-solid fa-filter"></i></button>
+      <button type="button" class="event-filter-menu" data-token="${escapeHtml(summary)}" aria-label="${escapeHtml(summary)}で絞り込む"><i class="bx bx-filter"></i></button>
     </li>`;
   }).join("");
 }
