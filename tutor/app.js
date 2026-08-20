@@ -1872,7 +1872,7 @@ async function renderCurriculumTable(events) {
       const saved = entryMap.get(ev.id) || {};
       const start = ev.start?.dateTime || ev.start?.date || "";
       const checked = saved.completed ? "checked" : "";
-      return `<tr data-event-id="${escapeHtml(ev.id)}">
+      return `<tr data-event-id="${escapeHtml(ev.id)}" data-completed="${saved.completed ? 1 : 0}">
         <td><input type="checkbox" class="curriculum-completed" ${checked} /></td>
         <td>第${i + 1}回</td>
         <td>${formatCurriculumDate(start)}</td>
@@ -1890,6 +1890,7 @@ els.curriculumTbody.addEventListener("change", async (e) => {
   if (!row) return;
   const eventId = row.dataset.eventId;
   const completed = row.querySelector(".curriculum-completed").checked;
+  row.dataset.completed = completed ? "1" : "0";
   const lessonPlan = row.querySelector(".curriculum-plan").value;
   const confirmationTest = row.querySelector(".curriculum-test").value;
   const homework = row.querySelector(".curriculum-homework").value;

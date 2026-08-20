@@ -1105,6 +1105,9 @@ dialog.app-modal::backdrop {
   .materials-add-row,
   .material-drag-handle,
   .material-block-remove,
+  .goal-item input[type="checkbox"],
+  .chapter-progress-list input[type="checkbox"],
+  .curriculum-table input[type="checkbox"],
   dialog {
     display: none !important;
   }
@@ -1112,6 +1115,13 @@ dialog.app-modal::backdrop {
   /* セクション左のチェックボックスでチェックを外したセクションは印刷しない */
   .collapsible-section.no-print {
     display: none !important;
+  }
+
+  /* ネイティブのチェックボックスは印刷時の見た目が環境によって崩れるため、
+     チェック状態は目標・チャプターは取り消し線、授業進行はチェックマークで表す。 */
+  .curriculum-table tr[data-completed="1"] td:first-child::after {
+    content: "✓";
+    font-weight: bold;
   }
 
   .print-only {
