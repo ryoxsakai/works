@@ -20,6 +20,7 @@ const PASTEL_FALLBACK_COLORS = [
 
 const API_BASE = "/api";
 const EVENT_VIEW_KEY = "works_event_view";
+const ACTIVE_PAGE_TAB_KEY = "works_active_page_tab";
 const CURRICULUM_STATE_KEY = "works_curriculum_state";
 const COLLAPSED_SECTIONS_KEY = "works_collapsed_sections";
 const PRINT_SECTIONS_KEY = "works_print_sections";
@@ -122,6 +123,7 @@ const els = {
   listWeekPrevBtn: document.querySelector("#list-week-prev"),
   listWeekNextBtn: document.querySelector("#list-week-next"),
   listWeekLabel: document.querySelector("#list-week-label"),
+  scheduleWeekDays: document.querySelector("#schedule-week-days"),
   authError: document.querySelector("#auth-error"),
   pageTabBtns: document.querySelectorAll(".page-tab-btn"),
   pageTabPanels: document.querySelectorAll("[data-page-tab-panel]"),
@@ -190,10 +192,13 @@ let touchDragState = null;
 let editingYearId = null;
 let editingTermId = null;
 let rawEvents = [];
+let eventDetails = new Map();
 let nameFilter = null;
-let eventViewMode = localStorage.getItem(EVENT_VIEW_KEY) === "calendar" ? "calendar" : "list";
+// 授業予定は日付一覧から選ぶ詳細リストを標準表示にする。
+let eventViewMode = "list";
 let calendarCursor = startOfMonth(new Date());
 let listWeekCursor = startOfWeek(new Date());
+let selectedScheduleDate = formatDateOnly(new Date());
 let recordDayOffset = 0; // -1:前日 0:当日 1:翌日
 let goals = [];
 let candidateSchools = [];
@@ -323,13 +328,19 @@ els.themeRadios.forEach((radio) => {
 
 // --- ページ上部のタブ(授業記録 / 授業予定 / カリキュラム) ---
 
-els.pageTabBtns.forEach((btn) => {
-  btn.addEventListener("click", () => {
-    els.pageTabBtns.forEach((b) => b.setAttribute("aria-selected", String(b === btn)));
-    els.pageTabPanels.forEach((panel) => {
-      panel.hidden = panel.dataset.pageTabPanel !== btn.dataset.pageTab;
-    });
+function setActivePageTab(tab) {
+  const target = [...els.pageTabBtns].some((btn) => btn.dataset.pageTab === tab) ? tab : "record";
+  els.pageTabBtns.forEach((btn) => btn.setAttribute("aria-selected", String(btn.dataset.pageTab === target)));
+  els.pageTabPanels.forEach((panel) => {
+    panel.hidden = panel.dataset.pageTabPanel !== target;
   });
+  localStorage.setItem(ACTIVE_PAGE_TAB_KEY, target);
+}
+
+setActivePageTab(localStorage.getItem(ACTIVE_PAGE_TAB_KEY) || "record");
+
+els.pageTabBtns.forEach((btn) => {
+  btn.addEventListener("click", () => setActivePageTab(btn.dataset.pageTab));
 });
 
 // --- 授業記録。前日・当日・翌日にカレンダー上で見つかった予定を、
@@ -2574,6 +2585,9 @@ async function loadCalendarEvents() {
     const bStart = b.start?.dateTime || b.start?.date || "";
     return aStart.localeCompare(bStart);
   });
+  // カードに授業予定・宿題・授業メモを表示するため、既存の進行記録を対応付ける。
+  const curriculumEntries = await apiFetch("/curriculum");
+  eventDetails = new Map(curriculumEntries.map((entry) => [entry.calendar_event_id, entry]));
 
   renderCurriculumNameSuggestions();
   renderCurrentView();
@@ -2641,7 +2655,7 @@ function renderTokenizedSummary(summary) {
 }
 
 function handleTokenClick(e) {
-  const filterBtn = e.target.closest(".name-token-filter");
+  const filterBtn = e.target.closest(".name-token-filter, .event-filter-menu");
   if (filterBtn) {
     applyNameFilter(filterBtn.dataset.token);
     return;
@@ -2672,53 +2686,63 @@ function formatEventTime(ev) {
   });
 }
 
+function renderScheduleWeekDays(weekStart) {
+  const weekEnd = new Date(weekStart.getTime() + 6 * 86400000);
+  els.listWeekLabel.textContent = `${formatWeekLabel(weekStart)} 〜 ${formatWeekLabel(weekEnd)}`;
+  if (!selectedScheduleDate || selectedScheduleDate < formatDateOnly(weekStart) || selectedScheduleDate > formatDateOnly(weekEnd)) {
+    const today = formatDateOnly(new Date());
+    selectedScheduleDate = today >= formatDateOnly(weekStart) && today <= formatDateOnly(weekEnd)
+      ? today
+      : formatDateOnly(weekStart);
+  }
+  els.scheduleWeekDays.innerHTML = Array.from({ length: 7 }, (_, i) => {
+    const date = new Date(weekStart.getTime() + i * 86400000);
+    const value = formatDateOnly(date);
+    const selected = value === selectedScheduleDate;
+    return `<button type="button" class="schedule-day-btn" aria-pressed="${selected}" data-date="${value}" aria-label="${formatWeekLabel(date)}">
+      <span>${WEEKDAY_LABELS[date.getDay()]}</span><strong>${date.getDate()}</strong>
+    </button>`;
+  }).join("");
+}
+
 function renderListView(events) {
   els.calendarView.hidden = true;
   els.eventList.hidden = false;
   els.listWeekNav.hidden = false;
 
   const weekStart = listWeekCursor;
-  const weekEnd = new Date(weekStart.getTime() + 6 * 86400000);
-  els.listWeekLabel.textContent = `${formatWeekLabel(weekStart)} 〜 ${formatWeekLabel(weekEnd)}`;
+  renderScheduleWeekDays(weekStart);
+  const dayEvents = events
+    .filter((ev) => {
+      const start = ev.start?.dateTime || ev.start?.date || "";
+      return start.slice(0, 10) === selectedScheduleDate;
+    })
+    .sort((a, b) => (a.start?.dateTime || a.start?.date || "").localeCompare(b.start?.dateTime || b.start?.date || ""));
 
-  const eventsByDay = {};
-  let weekEventCount = 0;
-  events.forEach((ev) => {
-    const startStr = ev.start?.dateTime || ev.start?.date;
-    if (!startStr) return;
-    const d = new Date(startStr);
-    const dayOnly = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-    if (dayOnly < weekStart || dayOnly > weekEnd) return;
-    const key = formatDateOnly(dayOnly);
-    (eventsByDay[key] ||= []).push(ev);
-    weekEventCount++;
-  });
-
-  if (weekEventCount === 0) {
-    els.eventList.innerHTML = "<li>該当する授業予定がありません</li>";
+  if (dayEvents.length === 0) {
+    els.eventList.innerHTML = `<li class="schedule-empty">${formatWeekLabel(new Date(`${selectedScheduleDate}T00:00:00`))}の授業予定はありません</li>`;
     return;
   }
 
-  let html = "";
-  for (let i = 0; i < 7; i++) {
-    const day = new Date(weekStart.getTime() + i * 86400000);
-    const dayEvents = (eventsByDay[formatDateOnly(day)] || []).sort((a, b) => {
-      const aStart = a.start?.dateTime || a.start?.date || "";
-      const bStart = b.start?.dateTime || b.start?.date || "";
-      return aStart.localeCompare(bStart);
-    });
-    html += `<li class="event-date-header">${formatWeekLabel(day)}</li>`;
-    html += dayEvents
-      .map((ev) => {
-        const summaryRaw = ev.summary || "(無題)";
-        return `<li class="event-item"${eventColorStyle(ev)}>
-          <span class="event-date">${formatEventTime(ev)}</span>
-          <span class="event-summary">${renderTokenizedSummary(summaryRaw)}</span>
-        </li>`;
-      })
-      .join("");
-  }
-  els.eventList.innerHTML = html;
+  els.eventList.innerHTML = dayEvents.map((ev) => {
+    const detail = eventDetails.get(ev.id) || {};
+    const summary = (ev.summary || "(無題)").trim();
+    const plan = detail.lesson_plan || "未入力";
+    const homework = detail.homework || "未入力";
+    const memo = detail.lesson_memo || "未入力";
+    return `<li class="event-item"${eventColorStyle(ev)}>
+      <div class="event-time"><span>${formatEventTime(ev)}</span><small>${ev.start?.dateTime ? "時刻" : "終日"}</small></div>
+      <div class="event-main">
+        <button type="button" class="event-student-name name-token-text" data-token="${escapeHtml(summary)}">${escapeHtml(summary)}</button>
+        <dl class="event-details">
+          <div><dt>授業予定</dt><dd>${escapeHtml(plan)}</dd></div>
+          <div><dt>宿題</dt><dd>${escapeHtml(homework)}</dd></div>
+          <div><dt>授業メモ</dt><dd>${escapeHtml(memo)}</dd></div>
+        </dl>
+      </div>
+      <button type="button" class="event-filter-menu" data-token="${escapeHtml(summary)}" aria-label="${escapeHtml(summary)}で絞り込む"><i class="fa-solid fa-filter"></i></button>
+    </li>`;
+  }).join("");
 }
 
 function renderCalendarView(events) {
@@ -2812,11 +2836,20 @@ els.calendarGrid.addEventListener("click", handleTokenClick);
 
 els.listWeekPrevBtn.addEventListener("click", () => {
   listWeekCursor = new Date(listWeekCursor.getTime() - 7 * 86400000);
+  selectedScheduleDate = formatDateOnly(listWeekCursor);
   renderCurrentView();
 });
 
 els.listWeekNextBtn.addEventListener("click", () => {
   listWeekCursor = new Date(listWeekCursor.getTime() + 7 * 86400000);
+  selectedScheduleDate = formatDateOnly(listWeekCursor);
+  renderCurrentView();
+});
+
+els.scheduleWeekDays.addEventListener("click", (e) => {
+  const btn = e.target.closest(".schedule-day-btn");
+  if (!btn) return;
+  selectedScheduleDate = btn.dataset.date;
   renderCurrentView();
 });
 
