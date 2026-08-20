@@ -1728,3 +1728,35 @@ button:has(> i:only-child) {
     flex: 1;
   }
 }
+
+
+/* 設定で除外した空き枠は、授業予定の一覧だけで控えめに表示する */
+.event-item.event-empty-slot {
+  min-height: 3.7rem;
+  grid-template-columns: 5.5rem minmax(0, 1fr);
+  background: color-mix(in srgb, var(--bg-elevated) 94%, var(--item-accent) 6%);
+}
+
+.event-empty-slot .event-time {
+  padding: .45rem;
+}
+
+.event-empty-slot .event-time span {
+  font-size: .98rem;
+}
+
+.event-empty-label {
+  display: flex;
+  align-items: center;
+  padding: .55rem .85rem;
+  color: var(--muted);
+  font-size: .82rem;
+  font-weight: 700;
+  letter-spacing: .05em;
+}
+
+@media (max-width: 560px) {
+  .event-item.event-empty-slot {
+    grid-template-columns: 4.5rem minmax(0, 1fr);
+  }
+}
