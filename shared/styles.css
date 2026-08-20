@@ -1581,3 +1581,35 @@ dialog.app-modal::backdrop {
     padding: .85rem .8rem;
   }
 }
+
+
+/* 3つの主画面ヘッダーを同じリズムにそろえる */
+.record-heading,
+.curriculum-heading {
+  align-items: flex-start;
+}
+
+.record-heading .eyebrow,
+.curriculum-heading .eyebrow {
+  margin-bottom: .25rem;
+}
+
+.record-heading h2 i,
+.curriculum-heading h2 i {
+  color: var(--accent);
+}
+
+/* 文字のない操作は、本文ボタンより一段控えめなサイズに統一 */
+button:has(> i:only-child) {
+  min-width: 2.1rem;
+  min-height: 2.1rem;
+  padding: .35rem;
+  font-size: .85rem;
+}
+
+@media (max-width: 640px) {
+  .record-heading,
+  .curriculum-heading {
+    align-items: flex-start;
+  }
+}
