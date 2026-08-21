@@ -2834,9 +2834,7 @@ function renderCalendarView(events) {
       const isToday =
         year === today.getFullYear() && month === today.getMonth() && day === today.getDate();
       const dayEvents = eventsByDay[`${year}-${month}-${day}`] || [];
-      const visible = dayEvents.slice(0, 3);
-      const overflow = dayEvents.length - visible.length;
-      const eventsHtml = visible
+      const eventsHtml = dayEvents
         .map((ev) => {
           const summary = (ev.summary || "(無題)").trim();
           return `<button type="button" class="cal-event name-token-text"${eventColorStyle(ev)} data-token="${escapeHtml(summary)}" aria-label="${escapeHtml(summary)}の生徒情報を開く">
@@ -2844,11 +2842,9 @@ function renderCalendarView(events) {
           </button>`;
         })
         .join("");
-      const overflowHtml = overflow > 0 ? `<div class="cal-more">+${overflow}件</div>` : "";
       return `<div class="cal-cell${isToday ? " cal-cell-today" : ""}">
         <div class="cal-day-num">${day}</div>
         ${eventsHtml}
-        ${overflowHtml}
       </div>`;
     })
     .join("");
