@@ -1865,3 +1865,62 @@ body {
 .record-panel .record-prev-info {
   margin-left: .35rem;
 }
+
+
+/* 上部ヘッダーは画面上部に留め、本文の読み進め中も操作の起点を維持する */
+.page-header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  padding-top: .6rem;
+  padding-bottom: .55rem;
+}
+
+/* 月間カレンダーは中身まで白で統一した、一枚のカードとして表示する */
+#calendar-view {
+  padding: .9rem;
+  background: #ffffff;
+  color: #1f2328;
+  border: 1px solid #e9eaec;
+  border-radius: .55rem;
+  box-shadow: var(--card-shadow);
+  overflow: hidden;
+}
+
+#calendar-view .calendar-nav,
+#calendar-view .calendar-grid {
+  background: #ffffff;
+}
+
+#calendar-view .calendar-grid {
+  padding: .35rem;
+  border: 1px solid #eef0f3;
+  border-radius: .4rem;
+  gap: .25rem;
+}
+
+#calendar-view .cal-weekday {
+  color: #6b7280;
+}
+
+#calendar-view .cal-cell {
+  background: #ffffff;
+  border-color: #e9eaec;
+}
+
+#calendar-view .cal-cell-empty {
+  background: #ffffff;
+  border-color: transparent;
+}
+
+#calendar-view .cal-day-num {
+  color: #1f2328;
+}
+
+#calendar-view .cal-event {
+  color: #1f2328;
+}
+
+#calendar-view .cal-more {
+  color: #6b7280;
+}
