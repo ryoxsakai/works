@@ -2238,11 +2238,7 @@ textarea,
 }
 
 
-/* 授業進行は、セクション外枠と表の外枠を個別指定で確実に上書きする */
-.curriculum-panel .progress-section.collapsible-section {
-  border-radius: .4rem;
-}
-
+/* 授業進行はセクション全体の角丸を他とそろえ、表外枠だけを控えめにする */
 .curriculum-panel .progress-section .table-scroll {
   border-radius: .3rem;
 }
