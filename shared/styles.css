@@ -2236,3 +2236,13 @@ textarea,
 .curriculum-panel .progress-section .table-scroll {
   border-radius: .42rem;
 }
+
+
+/* 授業進行は、セクション外枠と表の外枠を個別指定で確実に上書きする */
+.curriculum-panel .progress-section.collapsible-section {
+  border-radius: .4rem;
+}
+
+.curriculum-panel .progress-section .table-scroll {
+  border-radius: .3rem;
+}
