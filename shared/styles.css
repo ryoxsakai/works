@@ -2122,3 +2122,14 @@ textarea:focus {
 .event-item.event-empty-slot {
   border-radius: .24rem;
 }
+
+
+/* カリキュラムの授業進行表は、授業記録表と同じフラットな表面にそろえる */
+.curriculum-panel .progress-section .table-scroll {
+  padding: 0;
+  background: #ffffff;
+}
+
+.curriculum-panel .progress-section .curriculum-table th {
+  background: #ffffff;
+}
