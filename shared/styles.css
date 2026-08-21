@@ -2224,3 +2224,9 @@ textarea,
 .record-panel .table-scroll {
   border-radius: .42rem;
 }
+
+
+/* 生徒メモは補足情報として、本文入力欄より一段小さくする */
+.curriculum-panel #student-memo {
+  font-size: .8rem;
+}
