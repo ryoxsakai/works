@@ -471,6 +471,7 @@ async function loadRecordTable() {
       confirmationTest: saved.confirmation_test || "",
       homework: saved.homework || "",
       lessonMemo: saved.lesson_memo || "",
+      prevLessonPlan: prevSaved.lesson_plan || "",
       prevHomework: prevSaved.homework || "",
       prevLessonMemo: prevSaved.lesson_memo || "",
     };
@@ -494,8 +495,9 @@ function renderRecordTable(rows) {
         <td>
           <button type="button" class="record-student-link" data-name="${escapeHtml(r.label)}" data-term-id="${r.termId}"><span class="record-avatar"${r.iconColor ? ` style="background-color:${escapeHtml(lightenHexColor(r.iconColor, 0.75))};color:${escapeHtml(r.iconColor)}"` : ""}><i class="bx bx-book-open"></i></span> ${escapeHtml(r.label)}</button>
           ${
-            r.prevHomework || r.prevLessonMemo
+            r.prevLessonPlan || r.prevHomework || r.prevLessonMemo
               ? `<div class="record-prev-info">
+                  ${r.prevLessonPlan ? `<p><i class="bx bx-book-content"></i> ${escapeHtml(r.prevLessonPlan)}</p>` : ""}
                   ${r.prevHomework ? `<p><i class="bx bx-pencil"></i> ${escapeHtml(r.prevHomework)}</p>` : ""}
                   ${r.prevLessonMemo ? `<p><i class="bx bx-note"></i> ${escapeHtml(r.prevLessonMemo)}</p>` : ""}
                 </div>`
