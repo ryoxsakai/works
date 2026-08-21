@@ -1924,3 +1924,30 @@ body {
 #calendar-view .cal-more {
   color: #6b7280;
 }
+
+
+/* 基本文字は300のまま、視線を置く要素だけ実フォントの太さで明確にする */
+.page-header h1,
+.panel-header h2,
+.schedule-heading h2,
+.record-heading h2,
+.curriculum-heading h2 {
+  font-weight: 700;
+}
+
+.page-tab-btn[aria-selected="true"],
+.schedule-day-btn span,
+.event-time span {
+  font-weight: 500;
+}
+
+.event-student-name,
+.record-panel .record-student-link {
+  font-weight: 700;
+}
+
+.event-details dt,
+.record-panel .record-student-link,
+.record-panel .record-student-link .record-avatar {
+  font-weight: 700;
+}
