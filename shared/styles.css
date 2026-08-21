@@ -1856,10 +1856,10 @@ dialog.app-modal {
 }
 
 
-/* 表示書体はM PLUS 1pの300を基本とする */
+/* 表示書体はM PLUS 1pの400を基本とする */
 body {
   font-family: "M PLUS 1p", system-ui, -apple-system, "Segoe UI", sans-serif;
-  font-weight: 300;
+  font-weight: 400;
 }
 
 .record-panel .record-prev-info {
@@ -1926,7 +1926,7 @@ body {
 }
 
 
-/* 基本文字は300のまま、視線を置く要素だけ実フォントの太さで明確にする */
+/* 基本文字は400のまま、視線を置く要素だけ実フォントの太さで明確にする */
 .page-header h1,
 .panel-header h2,
 .schedule-heading h2,
