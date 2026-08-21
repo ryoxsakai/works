@@ -1951,3 +1951,79 @@ body {
 .record-panel .record-student-link .record-avatar {
   font-weight: 700;
 }
+
+
+/* 設定は項目を一度に見渡せる2段グリッドにし、操作対象を明確にする */
+#settings-modal {
+  width: min(680px, 94vw);
+  max-height: 82dvh;
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+#settings-modal[open] {
+  display: grid;
+}
+
+#settings-modal .modal-header {
+  padding: .8rem 1rem;
+  background: color-mix(in srgb, var(--bg-elevated) 92%, var(--accent) 8%);
+}
+
+#settings-modal .modal-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .35rem;
+  padding: .65rem .8rem;
+  border-bottom: 1px solid var(--border);
+  overflow: visible;
+}
+
+#settings-modal .tab-btn {
+  min-width: 0;
+  min-height: 2.45rem;
+  justify-content: center;
+  gap: .3rem;
+  padding: .45rem .3rem;
+  border: 1px solid var(--border);
+  border-radius: .4rem;
+  background: var(--bg-elevated);
+  color: var(--muted);
+  font-size: .76rem;
+  font-weight: 500;
+}
+
+#settings-modal .tab-btn:hover {
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+
+#settings-modal .tab-btn[aria-selected="true"] {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--bg-elevated));
+  color: var(--accent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 20%, transparent);
+  font-weight: 700;
+}
+
+#settings-modal .modal-tab-panel {
+  min-height: 0;
+  max-height: none;
+  padding: 1rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+#settings-modal .modal-tab-panel > .hint:first-child {
+  margin-bottom: .9rem;
+  line-height: 1.6;
+}
+
+@media (min-width: 641px) {
+  #settings-modal .modal-tabs {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  #settings-modal .tab-btn {
+    font-size: .74rem;
+  }
+}
