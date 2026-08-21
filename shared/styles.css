@@ -2027,3 +2027,83 @@ body {
     font-size: .74rem;
   }
 }
+
+
+/* 直線的で落ち着いたUIに寄せる。円形に意味のある要素だけは別途維持する */
+button {
+  border-radius: .38rem;
+}
+
+.btn-add {
+  border-radius: 50%;
+}
+
+.page-tabs,
+.schedule-week-days,
+.view-toggle,
+.schedule-view-toggle,
+.table-scroll,
+.module-card,
+.event-item,
+.schedule-empty,
+#calendar-view,
+.curriculum-panel .curriculum-search-bar,
+.curriculum-panel .curriculum-print-name-row,
+.curriculum-panel .collapsible-section {
+  border-radius: .42rem;
+}
+
+.page-tab-btn,
+.schedule-day-btn,
+.record-panel .record-day-btn,
+.schedule-view-toggle .view-toggle-btn,
+.term-item,
+.school-checklist,
+.curriculum-panel .goals-column,
+.curriculum-panel .material-block {
+  border-radius: .3rem;
+}
+
+.cal-cell,
+.cal-event {
+  border-radius: .22rem;
+}
+
+dialog.app-modal {
+  border-radius: .45rem;
+}
+
+/* 入力欄はごく薄い枠と白に近いグレーのグラデーションで、入力可能な面を明確にする */
+input:not([type="checkbox"]):not([type="radio"]),
+select,
+textarea {
+  border: 1px solid #e1e4e8;
+  border-radius: .28rem;
+  background: linear-gradient(135deg, #ffffff 0%, #f5f6f8 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9);
+}
+
+input:not([type="checkbox"]):not([type="radio"]):focus,
+select:focus,
+textarea:focus {
+  border-color: color-mix(in srgb, var(--accent) 55%, #d7dbe1);
+  background: linear-gradient(135deg, #ffffff 0%, #f8f9fb 100%);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+/* 表内や生徒情報の入力欄にも同じ入力面を適用する */
+.record-panel .curriculum-table textarea,
+.curriculum-panel .curriculum-table textarea,
+.curriculum-panel #student-memo,
+.curriculum-panel .materials-add-row select {
+  border-color: #e1e4e8;
+  border-radius: .28rem;
+  background: linear-gradient(135deg, #ffffff 0%, #f5f6f8 100%);
+}
+
+.record-panel .curriculum-table textarea:focus,
+.curriculum-panel .curriculum-table textarea:focus,
+.curriculum-panel #student-memo:focus,
+.curriculum-panel .materials-add-row select:focus {
+  background: linear-gradient(135deg, #ffffff 0%, #f8f9fb 100%);
+}
