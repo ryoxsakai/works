@@ -2148,3 +2148,79 @@ textarea:focus {
 .record-panel .table-scroll {
   border-radius: .3rem;
 }
+
+
+/* 直線的な基調を保ちながら、触れる面だけ角をわずかにやわらげる */
+button {
+  border-radius: .46rem;
+}
+
+.page-tabs,
+.schedule-week-days,
+.view-toggle,
+.schedule-view-toggle,
+.table-scroll,
+.module-card,
+.event-item,
+.schedule-empty,
+#calendar-view,
+.curriculum-panel .curriculum-search-bar,
+.curriculum-panel .curriculum-print-name-row,
+.curriculum-panel .collapsible-section {
+  border-radius: .52rem;
+}
+
+.page-tab-btn,
+.schedule-day-btn,
+.record-panel .record-day-btn,
+.schedule-view-toggle .view-toggle-btn,
+.term-item,
+.school-checklist,
+.curriculum-panel .goals-column,
+.curriculum-panel .material-block {
+  border-radius: .38rem;
+}
+
+.cal-cell,
+.cal-event {
+  border-radius: .28rem;
+}
+
+dialog.app-modal {
+  border-radius: .55rem;
+}
+
+input:not([type="checkbox"]):not([type="radio"]),
+select,
+textarea,
+.record-panel .curriculum-table textarea,
+.curriculum-panel .curriculum-table textarea,
+.curriculum-panel #student-memo,
+.curriculum-panel .materials-add-row select {
+  border-radius: .35rem;
+}
+
+.schedule-view-toggle {
+  border-radius: .32rem;
+}
+
+.schedule-view-toggle .view-toggle-btn {
+  border-radius: .25rem;
+}
+
+.event-item,
+.event-item.event-empty-slot {
+  border-radius: .34rem;
+}
+
+.record-panel .view-toggle {
+  border-radius: .32rem;
+}
+
+.record-panel .record-day-btn {
+  border-radius: .25rem;
+}
+
+.record-panel .table-scroll {
+  border-radius: .42rem;
+}
