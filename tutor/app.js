@@ -37,6 +37,23 @@ function tokenizeText(text) {
     .filter((part) => part !== "" && !(part.length === 1 && TOKEN_DELIMITER_RE.test(part)));
 }
 
+// 複数語の集団授業名は、区切りをまたいだフレーズとして照合する。
+// 1語の名前は従来どおりトークン完全一致にし、似た名前の生徒を誤って拾わない。
+function normalizeCurriculumText(text) {
+  return String(text || "")
+    .normalize("NFKC")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function eventMatchesCurriculumName(event, name) {
+  const query = normalizeCurriculumText(name);
+  const source = `${event.summary || ""} ${event.description || ""}`;
+  if (!query) return false;
+  if (query.includes(" ")) return normalizeCurriculumText(source).includes(query);
+  return tokenizeText(source).some((token) => normalizeCurriculumText(token) === query);
+}
+
 // あいうえお順(私立医学部31校)。分類に迷う大学(自治医科大学・産業医科大学など)も含めているため、
 // 必要に応じて調整してください。
 const PRIVATE_MED_SCHOOLS = [
@@ -1845,6 +1862,8 @@ els.curriculumSearchModalCloseBtn.addEventListener("click", () => els.curriculum
 function renderCurriculumNameSuggestions() {
   const tokens = new Set();
   rawEvents.forEach((ev) => {
+    const summary = (ev.summary || "").trim();
+    if (summary) tokens.add(summary);
     tokenizeText(`${ev.summary || ""} ${ev.description || ""}`).forEach((t) => tokens.add(t));
   });
   els.curriculumNameList.innerHTML = [...tokens]
@@ -1884,7 +1903,7 @@ async function loadCurriculumEvents() {
   const events = await fetchCalendarEvents(timeMin, timeMax);
 
   const matched = events
-    .filter((ev) => tokenizeText(`${ev.summary || ""} ${ev.description || ""}`).includes(name))
+    .filter((ev) => eventMatchesCurriculumName(ev, name))
     .sort((a, b) => {
       const aStart = a.start?.dateTime || a.start?.date || "";
       const bStart = b.start?.dateTime || b.start?.date || "";
