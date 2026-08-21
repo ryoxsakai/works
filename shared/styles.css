@@ -2230,3 +2230,9 @@ textarea,
 .curriculum-panel #student-memo {
   font-size: .8rem;
 }
+
+
+/* 授業進行表だけは、カリキュラム内でもやや直線的な外枠にする */
+.curriculum-panel .progress-section .table-scroll {
+  border-radius: .42rem;
+}
