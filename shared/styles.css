@@ -2107,3 +2107,18 @@ textarea:focus {
 .curriculum-panel .materials-add-row select:focus {
   background: linear-gradient(135deg, #ffffff 0%, #f8f9fb 100%);
 }
+
+
+/* 授業予定の表示切替と生徒予定カードは、より直線的な輪郭にする */
+.schedule-view-toggle {
+  border-radius: .22rem;
+}
+
+.schedule-view-toggle .view-toggle-btn {
+  border-radius: .16rem;
+}
+
+.event-item,
+.event-item.event-empty-slot {
+  border-radius: .24rem;
+}
