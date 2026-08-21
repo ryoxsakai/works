@@ -2133,3 +2133,17 @@ textarea:focus {
 .curriculum-panel .progress-section .curriculum-table th {
   background: #ffffff;
 }
+
+
+/* 授業記録の個別指定が汎用ルールより優先されるため、同じ詳細度で上書きする */
+.record-panel .view-toggle {
+  border-radius: .22rem;
+}
+
+.record-panel .record-day-btn {
+  border-radius: .16rem;
+}
+
+.record-panel .table-scroll {
+  border-radius: .3rem;
+}
