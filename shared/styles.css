@@ -2242,3 +2242,46 @@ textarea,
 .curriculum-panel .progress-section .table-scroll {
   border-radius: .3rem;
 }
+
+
+/* 授業記録の空き枠は、カレンダー色を左端に残した低い行として扱う */
+.record-panel #record-table .record-empty-slot {
+  --record-calendar-accent: var(--border);
+}
+
+.record-panel #record-table .record-empty-slot td {
+  padding: .34rem .65rem;
+  background: color-mix(in srgb, #ffffff 94%, var(--record-calendar-accent) 6%);
+  vertical-align: middle;
+}
+
+.record-panel #record-table .record-empty-slot td:first-child {
+  border-left: 4px solid var(--record-calendar-accent);
+}
+
+.record-empty-label {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  color: var(--muted);
+  font-size: .78rem;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.record-empty-label i {
+  color: var(--record-calendar-accent);
+  font-size: .9rem;
+}
+
+.record-empty-label small {
+  color: var(--muted);
+  font-size: .68rem;
+}
+
+.record-empty-time {
+  color: var(--record-calendar-accent);
+  font-size: .78rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
