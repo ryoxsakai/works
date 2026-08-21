@@ -400,7 +400,7 @@ async function loadRecordTable() {
     await fetchCalendarEvents(
       new Date(`${dayStr}T00:00:00`).toISOString(),
       new Date(`${dayStr}T23:59:59`).toISOString(),
-      { withCalendarId: true }
+      { withCalendarId: true, includeExcluded: true }
     )
   ).sort((a, b) => {
     const aStart = a.start?.dateTime || a.start?.date || "";
@@ -434,6 +434,18 @@ async function loadRecordTable() {
 
   const rows = dayEvents.map((ev) => {
     const label = (ev.summary || "(無題)").trim();
+    const start = ev.start?.dateTime || ev.start?.date || "";
+    const calendar = calendarColors.get(ev._calendarId);
+    if (isExcludedScheduleEvent(ev)) {
+      return {
+        eventId: ev.id,
+        emptySlot: true,
+        start,
+        iconColor: calendar?.raw || "",
+        calendarName: calendar?.name || "カレンダー",
+      };
+    }
+
     const sameLabelEvents = rangeEvents
       .filter((e) => (e.summary || "").trim() === label)
       .sort((a, b) => {
@@ -452,8 +464,8 @@ async function loadRecordTable() {
       termId: coveringTerm ? coveringTerm.id : "",
       n: n || 1,
       m: m || 1,
-      start: ev.start?.dateTime || ev.start?.date || "",
-      iconColor: calendarColors.get(ev._calendarId)?.raw || "",
+      start,
+      iconColor: calendar?.raw || "",
       completed: !!saved.completed,
       lessonPlan: saved.lesson_plan || "",
       confirmationTest: saved.confirmation_test || "",
@@ -469,8 +481,16 @@ async function loadRecordTable() {
 
 function renderRecordTable(rows) {
   els.recordTbody.innerHTML = rows
-    .map(
-      (r) => `<tr data-event-id="${escapeHtml(r.eventId)}" data-completed="${r.completed ? 1 : 0}">
+    .map((r) => {
+      if (r.emptySlot) {
+        const accent = r.iconColor ? ` style="--record-calendar-accent:${escapeHtml(r.iconColor)}"` : "";
+        return `<tr class="record-empty-slot"${accent}>
+          <td colspan="2"><span class="record-empty-label"><i class="bx bx-calendar"></i> 空き <small>${escapeHtml(r.calendarName)}</small></span></td>
+          <td class="record-empty-time">${formatTimeOrPeriod(r.start)}</td>
+          <td colspan="4"></td>
+        </tr>`;
+      }
+      return `<tr data-event-id="${escapeHtml(r.eventId)}" data-completed="${r.completed ? 1 : 0}">
         <td>
           <button type="button" class="record-student-link" data-name="${escapeHtml(r.label)}" data-term-id="${r.termId}"><span class="record-avatar"${r.iconColor ? ` style="background-color:${escapeHtml(lightenHexColor(r.iconColor, 0.75))};color:${escapeHtml(r.iconColor)}"` : ""}><i class="bx bx-book-open"></i></span> ${escapeHtml(r.label)}</button>
           ${
@@ -488,8 +508,8 @@ function renderRecordTable(rows) {
         <td><textarea class="record-test" rows="2">${escapeHtml(r.confirmationTest)}</textarea></td>
         <td><textarea class="record-homework" rows="2">${escapeHtml(r.homework)}</textarea></td>
         <td><textarea class="record-memo" rows="2">${escapeHtml(r.lessonMemo)}</textarea></td>
-      </tr>`
-    )
+      </tr>`;
+    })
     .join("");
 }
 
@@ -762,7 +782,7 @@ async function loadCalendarList() {
       const fallback = PASTEL_FALLBACK_COLORS[i % PASTEL_FALLBACK_COLORS.length];
       const raw = c.backgroundColor || fallback;
       const bg = c.backgroundColor ? lightenHexColor(c.backgroundColor, 0.72) : fallback;
-      return [c.id, { raw, bg, fg: "#1f2937" }];
+      return [c.id, { raw, bg, fg: "#1f2937", name: c.summary || c.id }];
     })
   );
   renderCalendarChecklist(calendars);
