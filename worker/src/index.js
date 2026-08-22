@@ -707,29 +707,36 @@ function getMaterialBucket(env) {
 async function ensureMaterialSchema(env) {
   if (!materialSchemaReady) {
     const db = getMaterialDb(env);
-    materialSchemaReady = db
-      .batch([
+    materialSchemaReady = (async () => {
+      await db.batch([
         db.prepare(
           "CREATE TABLE IF NOT EXISTS material_folders (" +
-            "id TEXT PRIMARY KEY, name TEXT NOT NULL, parent_id TEXT, " +
+            "id TEXT PRIMARY KEY, name TEXT NOT NULL, parent_id TEXT, sort_order INTEGER NOT NULL DEFAULT 0, " +
             "created_at TEXT NOT NULL DEFAULT (datetime('now')))"
         ),
         db.prepare(
           "CREATE TABLE IF NOT EXISTS material_files (" +
             "id TEXT PRIMARY KEY, folder_id TEXT, name TEXT NOT NULL, object_key TEXT NOT NULL UNIQUE, " +
-            "mime_type TEXT, size INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT (datetime('now')))"
+            "mime_type TEXT, size INTEGER NOT NULL DEFAULT 0, sort_order INTEGER NOT NULL DEFAULT 0, " +
+            "created_at TEXT NOT NULL DEFAULT (datetime('now')))"
         ),
-        db.prepare(
-          "CREATE INDEX IF NOT EXISTS idx_material_folders_parent ON material_folders(parent_id)"
-        ),
-        db.prepare(
-          "CREATE INDEX IF NOT EXISTS idx_material_files_folder ON material_files(folder_id)"
-        ),
-      ])
-      .catch((err) => {
-        materialSchemaReady = null;
-        throw err;
-      });
+        db.prepare("CREATE INDEX IF NOT EXISTS idx_material_folders_parent ON material_folders(parent_id)"),
+        db.prepare("CREATE INDEX IF NOT EXISTS idx_material_files_folder ON material_files(folder_id)"),
+      ]);
+      const [folderInfo, fileInfo] = await Promise.all([
+        db.prepare("PRAGMA table_info(material_folders)").all(),
+        db.prepare("PRAGMA table_info(material_files)").all(),
+      ]);
+      if (!folderInfo.results.some((column) => column.name === "sort_order")) {
+        await db.prepare("ALTER TABLE material_folders ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0").run();
+      }
+      if (!fileInfo.results.some((column) => column.name === "sort_order")) {
+        await db.prepare("ALTER TABLE material_files ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0").run();
+      }
+    })().catch((err) => {
+      materialSchemaReady = null;
+      throw err;
+    });
   }
   await materialSchemaReady;
 }
@@ -741,7 +748,7 @@ async function readMaterialFolders(env) {
       "SELECT f.*, " +
         "(SELECT COUNT(*) FROM material_folders c WHERE c.parent_id = f.id) AS folder_count, " +
         "(SELECT COUNT(*) FROM material_files m WHERE m.folder_id = f.id) AS file_count " +
-        "FROM material_folders f ORDER BY f.name COLLATE NOCASE"
+        "FROM material_folders f ORDER BY COALESCE(f.parent_id, ''), f.sort_order, f.name COLLATE NOCASE"
     )
     .all();
   return results;
@@ -759,23 +766,18 @@ async function createMaterialFolder(env, body) {
     const parent = await db.prepare("SELECT id FROM material_folders WHERE id = ?").bind(parentId).first();
     if (!parent) throw new Error("保存先フォルダが見つかりません");
   }
-
   const duplicate = await db
-    .prepare(
-      "SELECT id FROM material_folders WHERE name = ? AND " +
-        "((parent_id = ?) OR (parent_id IS NULL AND ? IS NULL))"
-    )
-    .bind(name, parentId, parentId)
-    .first();
+    .prepare("SELECT id FROM material_folders WHERE name = ? AND ((parent_id = ?) OR (parent_id IS NULL AND ? IS NULL))")
+    .bind(name, parentId, parentId).first();
   if (duplicate) throw new Error("同じ場所に同名のフォルダがあります");
 
+  const next = await db
+    .prepare("SELECT COALESCE(MAX(sort_order), -1) + 1 AS value FROM material_folders WHERE ((parent_id = ?) OR (parent_id IS NULL AND ? IS NULL))")
+    .bind(parentId, parentId).first();
   const id = crypto.randomUUID();
-  return db
-    .prepare(
-      "INSERT INTO material_folders (id, name, parent_id) VALUES (?, ?, ?) RETURNING *"
-    )
-    .bind(id, name, parentId)
-    .first();
+  return db.prepare(
+    "INSERT INTO material_folders (id, name, parent_id, sort_order) VALUES (?, ?, ?, ?) RETURNING *"
+  ).bind(id, name, parentId, Number(next.value || 0)).first();
 }
 
 async function updateMaterialFolder(env, id, body) {
@@ -784,23 +786,58 @@ async function updateMaterialFolder(env, id, body) {
   const current = await db.prepare("SELECT * FROM material_folders WHERE id = ?").bind(id).first();
   if (!current) throw new Error("フォルダが見つかりません");
 
-  const name = String(body.name || "").trim();
+  const name = body.name === undefined ? current.name : String(body.name || "").trim();
+  const parentId = body.parent_id === undefined ? (current.parent_id || null) : (body.parent_id || null);
   if (!name) throw new Error("フォルダ名を入力してください");
   if (name.length > 120) throw new Error("フォルダ名は120文字以内にしてください");
+  if (parentId === id) throw new Error("フォルダ自身の中には移動できません");
 
-  const duplicate = await db
-    .prepare(
-      "SELECT id FROM material_folders WHERE id != ? AND name = ? AND " +
-        "((parent_id = ?) OR (parent_id IS NULL AND ? IS NULL))"
-    )
-    .bind(id, name, current.parent_id, current.parent_id)
-    .first();
+  if (parentId) {
+    let cursor = await db.prepare("SELECT id, parent_id FROM material_folders WHERE id = ?").bind(parentId).first();
+    if (!cursor) throw new Error("移動先フォルダが見つかりません");
+    while (cursor) {
+      if (cursor.id === id) throw new Error("子フォルダの中には移動できません");
+      cursor = cursor.parent_id
+        ? await db.prepare("SELECT id, parent_id FROM material_folders WHERE id = ?").bind(cursor.parent_id).first()
+        : null;
+    }
+  }
+
+  const duplicate = await db.prepare(
+    "SELECT id FROM material_folders WHERE id != ? AND name = ? AND ((parent_id = ?) OR (parent_id IS NULL AND ? IS NULL))"
+  ).bind(id, name, parentId, parentId).first();
   if (duplicate) throw new Error("同じ場所に同名のフォルダがあります");
 
-  return db
-    .prepare("UPDATE material_folders SET name = ? WHERE id = ? RETURNING *")
-    .bind(name, id)
-    .first();
+  let sortOrder = current.sort_order;
+  if ((current.parent_id || null) !== parentId) {
+    const next = await db.prepare(
+      "SELECT COALESCE(MAX(sort_order), -1) + 1 AS value FROM material_folders WHERE ((parent_id = ?) OR (parent_id IS NULL AND ? IS NULL))"
+    ).bind(parentId, parentId).first();
+    sortOrder = Number(next.value || 0);
+  }
+  return db.prepare(
+    "UPDATE material_folders SET name = ?, parent_id = ?, sort_order = ? WHERE id = ? RETURNING *"
+  ).bind(name, parentId, sortOrder, id).first();
+}
+
+async function reorderMaterialFolders(env, body) {
+  await ensureMaterialSchema(env);
+  const db = getMaterialDb(env);
+  const parentId = body.parent_id || null;
+  const order = Array.isArray(body.order) ? body.order.map(String) : [];
+  const { results } = await db.prepare(
+    "SELECT id FROM material_folders WHERE ((parent_id = ?) OR (parent_id IS NULL AND ? IS NULL))"
+  ).bind(parentId, parentId).all();
+  const existing = new Set(results.map((row) => row.id));
+  if (order.length !== existing.size || order.some((id) => !existing.has(id)) || new Set(order).size !== order.length) {
+    throw new Error("フォルダの並び順が正しくありません");
+  }
+  if (order.length) {
+    await db.batch(order.map((id, index) =>
+      db.prepare("UPDATE material_folders SET sort_order = ? WHERE id = ?").bind(index, id)
+    ));
+  }
+  return { ok: true };
 }
 
 async function deleteMaterialFolder(env, id) {
@@ -820,7 +857,7 @@ async function readMaterialFiles(env, folderId) {
     .prepare(
       "SELECT * FROM material_files WHERE " +
         "((folder_id = ?) OR (folder_id IS NULL AND ? IS NULL)) " +
-        "ORDER BY name COLLATE NOCASE"
+        "ORDER BY sort_order, name COLLATE NOCASE"
     )
     .bind(folderId, folderId)
     .all();
@@ -843,6 +880,9 @@ async function uploadMaterialFile(request, env, url) {
     if (!folder) throw new Error("保存先フォルダが見つかりません");
   }
 
+  const next = await db.prepare(
+    "SELECT COALESCE(MAX(sort_order), -1) + 1 AS value FROM material_files WHERE ((folder_id = ?) OR (folder_id IS NULL AND ? IS NULL))"
+  ).bind(folderId, folderId).first();
   const id = crypto.randomUUID();
   const objectKey = "materials/" + id;
   await bucket.put(objectKey, request.body || new Uint8Array(), {
@@ -853,10 +893,10 @@ async function uploadMaterialFile(request, env, url) {
   try {
     return await db
       .prepare(
-        "INSERT INTO material_files (id, folder_id, name, object_key, mime_type, size) " +
-          "VALUES (?, ?, ?, ?, ?, ?) RETURNING *"
+        "INSERT INTO material_files (id, folder_id, name, object_key, mime_type, size, sort_order) " +
+          "VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *"
       )
-      .bind(id, folderId, name, objectKey, mimeType, Number.isFinite(size) ? size : 0)
+      .bind(id, folderId, name, objectKey, mimeType, Number.isFinite(size) ? size : 0, Number(next.value || 0))
       .first();
   } catch (err) {
     await bucket.delete(objectKey);
@@ -894,7 +934,6 @@ async function updateMaterialFile(env, id, body) {
 
   const fields = [];
   const values = [];
-
   if (body.name !== undefined) {
     const name = String(body.name || "").trim();
     if (!name) throw new Error("ファイル名を入力してください");
@@ -902,26 +941,47 @@ async function updateMaterialFile(env, id, body) {
     fields.push("name = ?");
     values.push(name);
   }
-
   if (body.folder_id !== undefined) {
     const folderId = body.folder_id || null;
     if (folderId) {
-      const folder = await db
-        .prepare("SELECT id FROM material_folders WHERE id = ?")
-        .bind(folderId)
-        .first();
+      const folder = await db.prepare("SELECT id FROM material_folders WHERE id = ?").bind(folderId).first();
       if (!folder) throw new Error("移動先フォルダが見つかりません");
     }
     fields.push("folder_id = ?");
     values.push(folderId);
+    if ((current.folder_id || null) !== folderId) {
+      const next = await db.prepare(
+        "SELECT COALESCE(MAX(sort_order), -1) + 1 AS value FROM material_files WHERE ((folder_id = ?) OR (folder_id IS NULL AND ? IS NULL))"
+      ).bind(folderId, folderId).first();
+      fields.push("sort_order = ?");
+      values.push(Number(next.value || 0));
+    }
   }
-
   if (!fields.length) throw new Error("変更内容がありません");
   values.push(id);
-  return db
-    .prepare("UPDATE material_files SET " + fields.join(", ") + " WHERE id = ? RETURNING *")
-    .bind(...values)
-    .first();
+  return db.prepare(
+    "UPDATE material_files SET " + fields.join(", ") + " WHERE id = ? RETURNING *"
+  ).bind(...values).first();
+}
+
+async function reorderMaterialFiles(env, body) {
+  await ensureMaterialSchema(env);
+  const db = getMaterialDb(env);
+  const folderId = body.folder_id || null;
+  const order = Array.isArray(body.order) ? body.order.map(String) : [];
+  const { results } = await db.prepare(
+    "SELECT id FROM material_files WHERE ((folder_id = ?) OR (folder_id IS NULL AND ? IS NULL))"
+  ).bind(folderId, folderId).all();
+  const existing = new Set(results.map((row) => row.id));
+  if (order.length !== existing.size || order.some((id) => !existing.has(id)) || new Set(order).size !== order.length) {
+    throw new Error("ファイルの並び順が正しくありません");
+  }
+  if (order.length) {
+    await db.batch(order.map((id, index) =>
+      db.prepare("UPDATE material_files SET sort_order = ? WHERE id = ?").bind(index, id)
+    ));
+  }
+  return { ok: true };
 }
 
 async function deleteMaterialFile(env, id) {
@@ -1261,6 +1321,10 @@ export default {
         return json(await createMaterialFolder(env, body), headers, 201);
       }
 
+      if (url.pathname === "/api/material-library/folder-order" && request.method === "PUT") {
+        return json(await reorderMaterialFolders(env, await request.json()), headers);
+      }
+
       const materialFolderMatch = url.pathname.match(/^\/api\/material-library\/folders\/([^/]+)$/);
       if (materialFolderMatch && request.method === "PUT") {
         const body = await request.json();
@@ -1281,6 +1345,10 @@ export default {
 
       if (url.pathname === "/api/material-library/files" && request.method === "POST") {
         return json(await uploadMaterialFile(request, env, url), headers, 201);
+      }
+
+      if (url.pathname === "/api/material-library/file-order" && request.method === "PUT") {
+        return json(await reorderMaterialFiles(env, await request.json()), headers);
       }
 
       const materialDownloadMatch = url.pathname.match(

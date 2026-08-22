@@ -17,7 +17,7 @@
     })();
   </script>
   <link rel="apple-touch-icon" href="/shared/logo.png" />
-  <link rel="stylesheet" href="../shared/styles.css?v=47" />
+  <link rel="stylesheet" href="../shared/styles.css?v=48" />
   <link rel="stylesheet" href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" />
 </head>
 <body>
@@ -157,7 +157,7 @@
         <span>新しい名前</span>
         <input id="rename-material-name" type="text" maxlength="255" required />
       </label>
-      <div class="edit-actions">
+      <div class="edit-actions material-dialog-actions">
         <button type="submit" class="btn-primary"><i class="bx bx-check"></i> 保存</button>
       </div>
     </form>
@@ -165,7 +165,7 @@
 
   <dialog id="material-preview-modal" class="app-modal material-preview-modal">
     <div class="modal-header">
-      <h2><i class="bx bx-show"></i> <span id="material-preview-title">教材を閲覧</span></h2>
+      <h2><i class="bx bx-file-find"></i> <span id="material-preview-title">教材を閲覧</span></h2>
       <div class="material-preview-actions">
         <button type="button" id="material-preview-download" aria-label="ダウンロード">
           <i class="bx bx-download"></i>
@@ -178,6 +178,6 @@
     <div id="material-preview-body" class="material-preview-body"></div>
   </dialog>
 
-  <script type="module" src="./app.js?v=2"></script>
+  <script type="module" src="./app.js?v=3"></script>
 </body>
 </html>

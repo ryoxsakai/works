@@ -2887,3 +2887,90 @@ textarea,
     height: 74vh;
   }
 }
+
+
+/* 教材管理: ドラッグ移動・並べ替え */
+.material-dialog-actions {
+  justify-content: flex-end;
+}
+
+.material-folder-card,
+.material-file-item {
+  position: relative;
+}
+
+.material-folder-card[draggable="true"],
+.material-file-item[draggable="true"] {
+  cursor: grab;
+}
+
+.material-folder-card.is-dragging,
+.material-file-item.is-dragging {
+  opacity: .45;
+  cursor: grabbing;
+}
+
+.material-drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  min-width: 1.35rem;
+  color: var(--muted);
+  font-size: .88rem;
+  cursor: grab;
+  touch-action: none;
+}
+
+.material-folder-card > .material-drag-handle {
+  margin-left: .28rem;
+}
+
+.material-file-item > .material-drag-handle {
+  margin-right: -.16rem;
+}
+
+.material-folder-card.is-drop-inside,
+.material-breadcrumb-btn.is-drop-target {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg-elevated));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.material-folder-card.is-drop-before::before,
+.material-file-item.is-drop-before::before,
+.material-folder-card.is-drop-after::after,
+.material-file-item.is-drop-after::after {
+  position: absolute;
+  right: .25rem;
+  left: .25rem;
+  z-index: 3;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+  content: "";
+  pointer-events: none;
+}
+
+.material-folder-card.is-drop-before::before,
+.material-file-item.is-drop-before::before {
+  top: -2px;
+}
+
+.material-folder-card.is-drop-after::after,
+.material-file-item.is-drop-after::after {
+  bottom: -2px;
+}
+
+.material-folder-card.is-drop-before::before,
+.material-folder-card.is-drop-after::after {
+  right: 0;
+  left: 0;
+}
+
+@media (max-width: 640px) {
+  .material-drag-handle {
+    width: 1.15rem;
+    min-width: 1.15rem;
+  }
+}
