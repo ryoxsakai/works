@@ -864,6 +864,14 @@ async function readMaterialFiles(env, folderId) {
   return results;
 }
 
+async function readAllMaterialFiles(env) {
+  await ensureMaterialSchema(env);
+  const { results } = await getMaterialDb(env)
+    .prepare("SELECT * FROM material_files ORDER BY COALESCE(folder_id, ''), sort_order, name COLLATE NOCASE")
+    .all();
+  return results;
+}
+
 async function uploadMaterialFile(request, env, url) {
   await ensureMaterialSchema(env);
   const db = getMaterialDb(env);
@@ -1340,7 +1348,12 @@ export default {
       }
 
       if (url.pathname === "/api/material-library/files" && request.method === "GET") {
-        return json(await readMaterialFiles(env, url.searchParams.get("folder_id") || null), headers);
+        return json(
+          url.searchParams.get("all") === "1"
+            ? await readAllMaterialFiles(env)
+            : await readMaterialFiles(env, url.searchParams.get("folder_id") || null),
+          headers
+        );
       }
 
       if (url.pathname === "/api/material-library/files" && request.method === "POST") {
