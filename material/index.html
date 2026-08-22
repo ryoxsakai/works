@@ -17,7 +17,7 @@
     })();
   </script>
   <link rel="apple-touch-icon" href="/shared/logo.png" />
-  <link rel="stylesheet" href="../shared/styles.css?v=46" />
+  <link rel="stylesheet" href="../shared/styles.css?v=47" />
   <link rel="stylesheet" href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" />
 </head>
 <body>
@@ -145,6 +145,39 @@
     </form>
   </dialog>
 
-  <script type="module" src="./app.js?v=1"></script>
+  <dialog id="rename-material-modal" class="app-modal">
+    <div class="modal-header">
+      <h2><i class="bx bx-pencil"></i> <span id="rename-material-title">名前を変更</span></h2>
+      <button type="button" id="rename-material-close" class="modal-close" aria-label="閉じる">
+        <i class="bx bx-x"></i>
+      </button>
+    </div>
+    <form id="rename-material-form" class="modal-tab-panel">
+      <label class="material-dialog-field">
+        <span>新しい名前</span>
+        <input id="rename-material-name" type="text" maxlength="255" required />
+      </label>
+      <div class="edit-actions">
+        <button type="submit" class="btn-primary"><i class="bx bx-check"></i> 保存</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="material-preview-modal" class="app-modal material-preview-modal">
+    <div class="modal-header">
+      <h2><i class="bx bx-show"></i> <span id="material-preview-title">教材を閲覧</span></h2>
+      <div class="material-preview-actions">
+        <button type="button" id="material-preview-download" aria-label="ダウンロード">
+          <i class="bx bx-download"></i>
+        </button>
+        <button type="button" id="material-preview-close" class="modal-close" aria-label="閉じる">
+          <i class="bx bx-x"></i>
+        </button>
+      </div>
+    </div>
+    <div id="material-preview-body" class="material-preview-body"></div>
+  </dialog>
+
+  <script type="module" src="./app.js?v=2"></script>
 </body>
 </html>
