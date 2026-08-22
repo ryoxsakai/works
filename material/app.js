@@ -52,7 +52,7 @@ let folders = [];
 let files = [];
 let currentFolderId = null;
 let uploadItems = [];
-let draggedFileId = null;
+let draggedItem = null;
 let renameTarget = null;
 let previewFile = null;
 let previewObjectUrl = null;
@@ -163,43 +163,155 @@ function filePresentation(file) {
 async function moveFileTo(fileId, folderId) {
   const file = files.find((item) => item.id === fileId);
   if (!file || (file.folder_id || null) === (folderId || null)) return;
+  await api("/files/" + encodeURIComponent(fileId), {
+    method: "PUT",
+    body: JSON.stringify({ folder_id: folderId || null }),
+  });
+}
+
+async function moveFolderTo(folderId, parentId) {
+  const folder = folderById(folderId);
+  if (!folder || (folder.parent_id || null) === (parentId || null)) return;
+  await api("/folders/" + encodeURIComponent(folderId), {
+    method: "PUT",
+    body: JSON.stringify({ parent_id: parentId || null }),
+  });
+}
+
+async function reorderFolders(movedId, target, position) {
+  const parentId = target.parent_id || null;
+  await moveFolderTo(movedId, parentId);
+  folders = await api("/folders");
+  const order = folders
+    .filter((folder) => (folder.parent_id || null) === parentId && folder.id !== movedId)
+    .map((folder) => folder.id);
+  const targetIndex = order.indexOf(target.id);
+  order.splice(targetIndex + (position === "after" ? 1 : 0), 0, movedId);
+  await api("/folder-order", {
+    method: "PUT",
+    body: JSON.stringify({ parent_id: parentId, order }),
+  });
+}
+
+async function reorderFiles(movedId, targetId, position) {
+  if (movedId === targetId) return;
+  const order = files.filter((file) => file.id !== movedId).map((file) => file.id);
+  const targetIndex = order.indexOf(targetId);
+  order.splice(targetIndex + (position === "after" ? 1 : 0), 0, movedId);
+  await api("/file-order", {
+    method: "PUT",
+    body: JSON.stringify({ folder_id: currentFolderId, order }),
+  });
+}
+
+async function finishDrag(action) {
   try {
     setError();
-    await api("/files/" + encodeURIComponent(fileId), {
-      method: "PUT",
-      body: JSON.stringify({ folder_id: folderId || null }),
-    });
+    await action();
     folders = await api("/folders");
     await loadFiles();
   } catch (err) {
     setError(err.message);
+  } finally {
+    draggedItem = null;
+    clearDropTargets();
   }
 }
 
 function clearDropTargets() {
-  document.querySelectorAll(".is-drop-target").forEach((element) => {
-    element.classList.remove("is-drop-target");
-  });
+  document.querySelectorAll(".is-drop-target, .is-drop-before, .is-drop-inside, .is-drop-after")
+    .forEach((element) => {
+      element.classList.remove("is-drop-target", "is-drop-before", "is-drop-inside", "is-drop-after");
+    });
 }
 
-function makeFolderDropTarget(element, folderId) {
+function dragPosition(element, event) {
+  const rect = element.getBoundingClientRect();
+  const ratio = (event.clientY - rect.top) / Math.max(rect.height, 1);
+  if (ratio < 0.25) return "before";
+  if (ratio > 0.75) return "after";
+  return "inside";
+}
+
+function makeContainerDropTarget(element, folderId) {
   element.addEventListener("dragover", (event) => {
-    if (!draggedFileId) return;
+    if (!draggedItem) return;
     event.preventDefault();
     event.dataTransfer.dropEffect = "move";
     clearDropTargets();
     element.classList.add("is-drop-target");
   });
   element.addEventListener("dragleave", (event) => {
-    if (!element.contains(event.relatedTarget)) element.classList.remove("is-drop-target");
+    if (!element.contains(event.relatedTarget)) clearDropTargets();
   });
-  element.addEventListener("drop", async (event) => {
+  element.addEventListener("drop", (event) => {
     event.preventDefault();
-    const fileId = draggedFileId || event.dataTransfer.getData("text/plain");
-    clearDropTargets();
-    draggedFileId = null;
-    if (fileId) await moveFileTo(fileId, folderId);
+    event.stopPropagation();
+    const item = draggedItem;
+    if (!item) return;
+    finishDrag(() =>
+      item.type === "file" ? moveFileTo(item.id, folderId) : moveFolderTo(item.id, folderId)
+    );
   });
+}
+
+function makeFolderDropTarget(element, folder) {
+  element.addEventListener("dragover", (event) => {
+    if (!draggedItem || (draggedItem.type === "folder" && draggedItem.id === folder.id)) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    clearDropTargets();
+    const position = draggedItem.type === "folder" ? dragPosition(element, event) : "inside";
+    element.classList.add("is-drop-" + position);
+  });
+  element.addEventListener("dragleave", (event) => {
+    if (!element.contains(event.relatedTarget)) clearDropTargets();
+  });
+  element.addEventListener("drop", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const item = draggedItem;
+    if (!item || (item.type === "folder" && item.id === folder.id)) return;
+    const position = item.type === "folder" ? dragPosition(element, event) : "inside";
+    if (item.type === "file") {
+      finishDrag(() => moveFileTo(item.id, folder.id));
+    } else if (position === "inside") {
+      finishDrag(() => moveFolderTo(item.id, folder.id));
+    } else {
+      finishDrag(() => reorderFolders(item.id, folder, position));
+    }
+  });
+}
+
+function makeFileDropTarget(element, file) {
+  element.addEventListener("dragover", (event) => {
+    if (!draggedItem || draggedItem.type !== "file" || draggedItem.id === file.id) return;
+    event.preventDefault();
+    clearDropTargets();
+    element.classList.add(event.clientY < element.getBoundingClientRect().top + element.offsetHeight / 2
+      ? "is-drop-before" : "is-drop-after");
+  });
+  element.addEventListener("drop", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!draggedItem || draggedItem.type !== "file" || draggedItem.id === file.id) return;
+    const position = event.clientY < element.getBoundingClientRect().top + element.offsetHeight / 2
+      ? "before" : "after";
+    finishDrag(() => reorderFiles(draggedItem.id, file.id, position));
+  });
+}
+
+function startDragging(element, type, id, event) {
+  draggedItem = { type, id };
+  event.dataTransfer.effectAllowed = "move";
+  event.dataTransfer.setData("text/plain", type + ":" + id);
+  element.classList.add("is-dragging");
+}
+
+function stopDragging(element) {
+  draggedItem = null;
+  element.classList.remove("is-dragging");
+  clearDropTargets();
 }
 
 function renderBreadcrumb() {
@@ -209,7 +321,7 @@ function renderBreadcrumb() {
   root.className = "material-breadcrumb-btn";
   root.innerHTML = '<i class="bx bx-home"></i><span>すべての教材</span>';
   root.addEventListener("click", () => openFolder(null));
-  makeFolderDropTarget(root, null);
+  makeContainerDropTarget(root, null);
   els.breadcrumb.append(root);
 
   for (const folder of folderAncestors(currentFolderId)) {
@@ -220,7 +332,7 @@ function renderBreadcrumb() {
     button.className = "material-breadcrumb-btn";
     button.textContent = folder.name;
     button.addEventListener("click", () => openFolder(folder.id));
-    makeFolderDropTarget(button, folder.id);
+    makeContainerDropTarget(button, folder.id);
     els.breadcrumb.append(separator, button);
   }
 }
@@ -236,7 +348,16 @@ function renderFolders() {
   for (const folder of children) {
     const article = document.createElement("article");
     article.className = "material-folder-card";
-    makeFolderDropTarget(article, folder.id);
+    article.draggable = true;
+    article.dataset.folderId = folder.id;
+    article.addEventListener("dragstart", (event) => startDragging(article, "folder", folder.id, event));
+    article.addEventListener("dragend", () => stopDragging(article));
+    makeFolderDropTarget(article, folder);
+
+    const handle = document.createElement("span");
+    handle.className = "material-drag-handle";
+    handle.setAttribute("aria-hidden", "true");
+    handle.innerHTML = '<i class="bx bx-move"></i>';
 
     const open = document.createElement("button");
     open.type = "button";
@@ -275,7 +396,7 @@ function renderFolders() {
       }
     });
 
-    article.append(open, rename, remove);
+    article.append(handle, open, rename, remove);
     els.folderGrid.append(article);
   }
 }
@@ -294,17 +415,14 @@ function renderFiles() {
     item.className = "material-file-item";
     item.draggable = true;
     item.dataset.fileId = file.id;
-    item.addEventListener("dragstart", (event) => {
-      draggedFileId = file.id;
-      event.dataTransfer.effectAllowed = "move";
-      event.dataTransfer.setData("text/plain", file.id);
-      item.classList.add("is-dragging");
-    });
-    item.addEventListener("dragend", () => {
-      draggedFileId = null;
-      item.classList.remove("is-dragging");
-      clearDropTargets();
-    });
+    item.addEventListener("dragstart", (event) => startDragging(item, "file", file.id, event));
+    item.addEventListener("dragend", () => stopDragging(item));
+    makeFileDropTarget(item, file);
+
+    const handle = document.createElement("span");
+    handle.className = "material-drag-handle";
+    handle.setAttribute("aria-hidden", "true");
+    handle.innerHTML = '<i class="bx bx-move"></i>';
 
     const presentation = filePresentation(file);
     const info = document.createElement("div");
@@ -316,7 +434,7 @@ function renderFiles() {
       '<span class="material-file-copy"><strong></strong><small></small></span>';
     info.querySelector("strong").textContent = escapeText(file.name);
     info.querySelector("small").textContent =
-      formatSize(file.size) + "・" + String(file.created_at || "").slice(0, 10);
+      presentation.label + "・" + formatSize(file.size) + "・" + String(file.created_at || "").slice(0, 10);
 
     const actions = document.createElement("div");
     actions.className = "material-file-actions";
@@ -325,7 +443,7 @@ function renderFiles() {
     view.type = "button";
     view.className = "material-icon-btn";
     view.setAttribute("aria-label", file.name + "を閲覧");
-    view.innerHTML = '<i class="bx bx-show"></i>';
+    view.innerHTML = '<i class="bx bx-file-find"></i>';
     view.addEventListener("click", () => viewFile(file));
 
     const rename = document.createElement("button");
@@ -350,7 +468,7 @@ function renderFiles() {
     remove.addEventListener("click", () => removeFile(file));
 
     actions.append(view, rename, download, remove);
-    item.append(info, actions);
+    item.append(handle, info, actions);
     els.fileList.append(item);
   }
 }
