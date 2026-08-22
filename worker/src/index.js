@@ -778,6 +778,31 @@ async function createMaterialFolder(env, body) {
     .first();
 }
 
+async function updateMaterialFolder(env, id, body) {
+  await ensureMaterialSchema(env);
+  const db = getMaterialDb(env);
+  const current = await db.prepare("SELECT * FROM material_folders WHERE id = ?").bind(id).first();
+  if (!current) throw new Error("フォルダが見つかりません");
+
+  const name = String(body.name || "").trim();
+  if (!name) throw new Error("フォルダ名を入力してください");
+  if (name.length > 120) throw new Error("フォルダ名は120文字以内にしてください");
+
+  const duplicate = await db
+    .prepare(
+      "SELECT id FROM material_folders WHERE id != ? AND name = ? AND " +
+        "((parent_id = ?) OR (parent_id IS NULL AND ? IS NULL))"
+    )
+    .bind(id, name, current.parent_id, current.parent_id)
+    .first();
+  if (duplicate) throw new Error("同じ場所に同名のフォルダがあります");
+
+  return db
+    .prepare("UPDATE material_folders SET name = ? WHERE id = ? RETURNING *")
+    .bind(name, id)
+    .first();
+}
+
 async function deleteMaterialFolder(env, id) {
   await ensureMaterialSchema(env);
   const db = getMaterialDb(env);
@@ -839,7 +864,7 @@ async function uploadMaterialFile(request, env, url) {
   }
 }
 
-async function downloadMaterialFile(env, id) {
+async function downloadMaterialFile(env, id, disposition = "attachment") {
   await ensureMaterialSchema(env);
   const row = await getMaterialDb(env)
     .prepare("SELECT * FROM material_files WHERE id = ?")
@@ -855,10 +880,48 @@ async function downloadMaterialFile(env, id) {
   headers.set("ETag", object.httpEtag);
   headers.set(
     "Content-Disposition",
-    "attachment; filename*=UTF-8''" + encodeURIComponent(row.name)
+    disposition + "; filename*=UTF-8''" + encodeURIComponent(row.name)
   );
   headers.set("Cache-Control", "private, no-store");
   return new Response(object.body, { headers });
+}
+
+async function updateMaterialFile(env, id, body) {
+  await ensureMaterialSchema(env);
+  const db = getMaterialDb(env);
+  const current = await db.prepare("SELECT * FROM material_files WHERE id = ?").bind(id).first();
+  if (!current) throw new Error("ファイルが見つかりません");
+
+  const fields = [];
+  const values = [];
+
+  if (body.name !== undefined) {
+    const name = String(body.name || "").trim();
+    if (!name) throw new Error("ファイル名を入力してください");
+    if (name.length > 255) throw new Error("ファイル名は255文字以内にしてください");
+    fields.push("name = ?");
+    values.push(name);
+  }
+
+  if (body.folder_id !== undefined) {
+    const folderId = body.folder_id || null;
+    if (folderId) {
+      const folder = await db
+        .prepare("SELECT id FROM material_folders WHERE id = ?")
+        .bind(folderId)
+        .first();
+      if (!folder) throw new Error("移動先フォルダが見つかりません");
+    }
+    fields.push("folder_id = ?");
+    values.push(folderId);
+  }
+
+  if (!fields.length) throw new Error("変更内容がありません");
+  values.push(id);
+  return db
+    .prepare("UPDATE material_files SET " + fields.join(", ") + " WHERE id = ? RETURNING *")
+    .bind(...values)
+    .first();
 }
 
 async function deleteMaterialFile(env, id) {
@@ -1199,6 +1262,14 @@ export default {
       }
 
       const materialFolderMatch = url.pathname.match(/^\/api\/material-library\/folders\/([^/]+)$/);
+      if (materialFolderMatch && request.method === "PUT") {
+        const body = await request.json();
+        return json(
+          await updateMaterialFolder(env, decodeURIComponent(materialFolderMatch[1]), body),
+          headers
+        );
+      }
+
       if (materialFolderMatch && request.method === "DELETE") {
         await deleteMaterialFolder(env, decodeURIComponent(materialFolderMatch[1]));
         return json({ ok: true }, headers);
@@ -1225,7 +1296,29 @@ export default {
         return response;
       }
 
+      const materialViewMatch = url.pathname.match(
+        /^\/api\/material-library\/files\/([^/]+)\/view$/
+      );
+      if (materialViewMatch && request.method === "GET") {
+        const response = await downloadMaterialFile(
+          env,
+          decodeURIComponent(materialViewMatch[1]),
+          "inline"
+        );
+        if (!response) return json({ error: "ファイルが見つかりません" }, headers, 404);
+        response.headers.set("Access-Control-Allow-Origin", origin);
+        return response;
+      }
+
       const materialFileMatch = url.pathname.match(/^\/api\/material-library\/files\/([^/]+)$/);
+      if (materialFileMatch && request.method === "PUT") {
+        const body = await request.json();
+        return json(
+          await updateMaterialFile(env, decodeURIComponent(materialFileMatch[1]), body),
+          headers
+        );
+      }
+
       if (materialFileMatch && request.method === "DELETE") {
         await deleteMaterialFile(env, decodeURIComponent(materialFileMatch[1]));
         return json({ ok: true }, headers);
