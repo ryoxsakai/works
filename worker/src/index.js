@@ -690,6 +690,186 @@ async function deleteCandidateSchool(env, id) {
   await env.DB.prepare("DELETE FROM candidate_schools WHERE id = ?").bind(id).run();
 }
 
+
+/* --- 教材ライブラリ: D1にフォルダ/ファイル情報、R2にファイル本体を保存する。 --- */
+let materialSchemaReady = null;
+
+function getMaterialDb(env) {
+  if (!env.MATERIALS_DB) throw new Error("MATERIALS_DB binding is not configured");
+  return env.MATERIALS_DB;
+}
+
+function getMaterialBucket(env) {
+  if (!env.MATERIALS_BUCKET) throw new Error("MATERIALS_BUCKET binding is not configured");
+  return env.MATERIALS_BUCKET;
+}
+
+async function ensureMaterialSchema(env) {
+  if (!materialSchemaReady) {
+    const db = getMaterialDb(env);
+    materialSchemaReady = db
+      .batch([
+        db.prepare(
+          "CREATE TABLE IF NOT EXISTS material_folders (" +
+            "id TEXT PRIMARY KEY, name TEXT NOT NULL, parent_id TEXT, " +
+            "created_at TEXT NOT NULL DEFAULT (datetime('now')))"
+        ),
+        db.prepare(
+          "CREATE TABLE IF NOT EXISTS material_files (" +
+            "id TEXT PRIMARY KEY, folder_id TEXT, name TEXT NOT NULL, object_key TEXT NOT NULL UNIQUE, " +
+            "mime_type TEXT, size INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT (datetime('now')))"
+        ),
+        db.prepare(
+          "CREATE INDEX IF NOT EXISTS idx_material_folders_parent ON material_folders(parent_id)"
+        ),
+        db.prepare(
+          "CREATE INDEX IF NOT EXISTS idx_material_files_folder ON material_files(folder_id)"
+        ),
+      ])
+      .catch((err) => {
+        materialSchemaReady = null;
+        throw err;
+      });
+  }
+  await materialSchemaReady;
+}
+
+async function readMaterialFolders(env) {
+  await ensureMaterialSchema(env);
+  const { results } = await getMaterialDb(env)
+    .prepare(
+      "SELECT f.*, " +
+        "(SELECT COUNT(*) FROM material_folders c WHERE c.parent_id = f.id) AS folder_count, " +
+        "(SELECT COUNT(*) FROM material_files m WHERE m.folder_id = f.id) AS file_count " +
+        "FROM material_folders f ORDER BY f.name COLLATE NOCASE"
+    )
+    .all();
+  return results;
+}
+
+async function createMaterialFolder(env, body) {
+  await ensureMaterialSchema(env);
+  const db = getMaterialDb(env);
+  const name = String(body.name || "").trim();
+  const parentId = body.parent_id || null;
+  if (!name) throw new Error("フォルダ名を入力してください");
+  if (name.length > 120) throw new Error("フォルダ名は120文字以内にしてください");
+
+  if (parentId) {
+    const parent = await db.prepare("SELECT id FROM material_folders WHERE id = ?").bind(parentId).first();
+    if (!parent) throw new Error("保存先フォルダが見つかりません");
+  }
+
+  const duplicate = await db
+    .prepare(
+      "SELECT id FROM material_folders WHERE name = ? AND " +
+        "((parent_id = ?) OR (parent_id IS NULL AND ? IS NULL))"
+    )
+    .bind(name, parentId, parentId)
+    .first();
+  if (duplicate) throw new Error("同じ場所に同名のフォルダがあります");
+
+  const id = crypto.randomUUID();
+  return db
+    .prepare(
+      "INSERT INTO material_folders (id, name, parent_id) VALUES (?, ?, ?) RETURNING *"
+    )
+    .bind(id, name, parentId)
+    .first();
+}
+
+async function deleteMaterialFolder(env, id) {
+  await ensureMaterialSchema(env);
+  const db = getMaterialDb(env);
+  const [child, file] = await Promise.all([
+    db.prepare("SELECT id FROM material_folders WHERE parent_id = ? LIMIT 1").bind(id).first(),
+    db.prepare("SELECT id FROM material_files WHERE folder_id = ? LIMIT 1").bind(id).first(),
+  ]);
+  if (child || file) throw new Error("中身のあるフォルダは削除できません");
+  await db.prepare("DELETE FROM material_folders WHERE id = ?").bind(id).run();
+}
+
+async function readMaterialFiles(env, folderId) {
+  await ensureMaterialSchema(env);
+  const { results } = await getMaterialDb(env)
+    .prepare(
+      "SELECT * FROM material_files WHERE " +
+        "((folder_id = ?) OR (folder_id IS NULL AND ? IS NULL)) " +
+        "ORDER BY name COLLATE NOCASE"
+    )
+    .bind(folderId, folderId)
+    .all();
+  return results;
+}
+
+async function uploadMaterialFile(request, env, url) {
+  await ensureMaterialSchema(env);
+  const db = getMaterialDb(env);
+  const bucket = getMaterialBucket(env);
+  const name = String(url.searchParams.get("name") || "").trim();
+  const folderId = url.searchParams.get("folder_id") || null;
+  const size = Number(url.searchParams.get("size") || 0);
+  const mimeType = request.headers.get("Content-Type") || "application/octet-stream";
+
+  if (!name) throw new Error("ファイル名がありません");
+  if (!request.body && size > 0) throw new Error("ファイル本体がありません");
+  if (folderId) {
+    const folder = await db.prepare("SELECT id FROM material_folders WHERE id = ?").bind(folderId).first();
+    if (!folder) throw new Error("保存先フォルダが見つかりません");
+  }
+
+  const id = crypto.randomUUID();
+  const objectKey = "materials/" + id;
+  await bucket.put(objectKey, request.body || new Uint8Array(), {
+    httpMetadata: { contentType: mimeType },
+    customMetadata: { originalName: name },
+  });
+
+  try {
+    return await db
+      .prepare(
+        "INSERT INTO material_files (id, folder_id, name, object_key, mime_type, size) " +
+          "VALUES (?, ?, ?, ?, ?, ?) RETURNING *"
+      )
+      .bind(id, folderId, name, objectKey, mimeType, Number.isFinite(size) ? size : 0)
+      .first();
+  } catch (err) {
+    await bucket.delete(objectKey);
+    throw err;
+  }
+}
+
+async function downloadMaterialFile(env, id) {
+  await ensureMaterialSchema(env);
+  const row = await getMaterialDb(env)
+    .prepare("SELECT * FROM material_files WHERE id = ?")
+    .bind(id)
+    .first();
+  if (!row) return null;
+
+  const object = await getMaterialBucket(env).get(row.object_key);
+  if (!object) return null;
+
+  const headers = new Headers();
+  object.writeHttpMetadata(headers);
+  headers.set("ETag", object.httpEtag);
+  headers.set(
+    "Content-Disposition",
+    "attachment; filename*=UTF-8''" + encodeURIComponent(row.name)
+  );
+  headers.set("Cache-Control", "private, no-store");
+  return new Response(object.body, { headers });
+}
+
+async function deleteMaterialFile(env, id) {
+  await ensureMaterialSchema(env);
+  const db = getMaterialDb(env);
+  const row = await db.prepare("SELECT object_key FROM material_files WHERE id = ?").bind(id).first();
+  if (!row) return;
+  await getMaterialBucket(env).delete(row.object_key);
+  await db.prepare("DELETE FROM material_files WHERE id = ?").bind(id).run();
+}
+
 export default {
   async fetch(request, env) {
     const origin = env.ALLOWED_ORIGIN;
@@ -1005,6 +1185,49 @@ export default {
 
       if (schoolMatch && request.method === "DELETE") {
         await deleteCandidateSchool(env, schoolMatch[1]);
+        return json({ ok: true }, headers);
+      }
+
+
+      if (url.pathname === "/api/material-library/folders" && request.method === "GET") {
+        return json(await readMaterialFolders(env), headers);
+      }
+
+      if (url.pathname === "/api/material-library/folders" && request.method === "POST") {
+        const body = await request.json();
+        return json(await createMaterialFolder(env, body), headers, 201);
+      }
+
+      const materialFolderMatch = url.pathname.match(/^\/api\/material-library\/folders\/([^/]+)$/);
+      if (materialFolderMatch && request.method === "DELETE") {
+        await deleteMaterialFolder(env, decodeURIComponent(materialFolderMatch[1]));
+        return json({ ok: true }, headers);
+      }
+
+      if (url.pathname === "/api/material-library/files" && request.method === "GET") {
+        return json(await readMaterialFiles(env, url.searchParams.get("folder_id") || null), headers);
+      }
+
+      if (url.pathname === "/api/material-library/files" && request.method === "POST") {
+        return json(await uploadMaterialFile(request, env, url), headers, 201);
+      }
+
+      const materialDownloadMatch = url.pathname.match(
+        /^\/api\/material-library\/files\/([^/]+)\/download$/
+      );
+      if (materialDownloadMatch && request.method === "GET") {
+        const response = await downloadMaterialFile(
+          env,
+          decodeURIComponent(materialDownloadMatch[1])
+        );
+        if (!response) return json({ error: "ファイルが見つかりません" }, headers, 404);
+        response.headers.set("Access-Control-Allow-Origin", origin);
+        return response;
+      }
+
+      const materialFileMatch = url.pathname.match(/^\/api\/material-library\/files\/([^/]+)$/);
+      if (materialFileMatch && request.method === "DELETE") {
+        await deleteMaterialFile(env, decodeURIComponent(materialFileMatch[1]));
         return json({ ok: true }, headers);
       }
 
