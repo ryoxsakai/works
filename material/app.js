@@ -90,7 +90,7 @@ function switchTab(name) {
   els.tabPanels.forEach((panel) => {
     panel.hidden = panel.dataset.materialTabPanel !== next;
   });
-  if (next === "tree") loadTreeFiles();
+  if (next === "tree" && getSessionToken()) loadTreeFiles();
 }
 
 function folderById(id) {
@@ -984,6 +984,7 @@ watchAuth({
       els.userAvatarFallback.hidden = true;
     }
     await loadLibrary();
+    if (!els.tabPanels[1].hidden) await loadTreeFiles();
   },
   onSignedOut: (message) => {
     els.signedOut.hidden = false;
