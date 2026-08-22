@@ -31,11 +31,14 @@ const els = {
   newFolderClose: document.querySelector("#new-folder-close"),
   newFolderForm: document.querySelector("#new-folder-form"),
   newFolderName: document.querySelector("#new-folder-name"),
-  uploadFolder: document.querySelector("#upload-folder-select"),
   dropzone: document.querySelector("#material-dropzone"),
   fileInput: document.querySelector("#material-file-input"),
   uploadQueue: document.querySelector("#material-upload-queue"),
   uploadStart: document.querySelector("#material-upload-start"),
+  uploadDestination: document.querySelector("#material-upload-destination"),
+  treeSearch: document.querySelector("#material-tree-search-input"),
+  tree: document.querySelector("#material-tree"),
+  treeEmpty: document.querySelector("#material-tree-empty"),
   renameModal: document.querySelector("#rename-material-modal"),
   renameTitle: document.querySelector("#rename-material-title"),
   renameClose: document.querySelector("#rename-material-close"),
@@ -52,6 +55,7 @@ let folders = [];
 let files = [];
 let currentFolderId = null;
 let uploadItems = [];
+let treeFiles = [];
 let draggedItem = null;
 let renameTarget = null;
 let previewFile = null;
@@ -78,7 +82,7 @@ async function api(path, options = {}) {
 }
 
 function switchTab(name) {
-  const next = name === "upload" ? "upload" : "library";
+  const next = name === "tree" ? "tree" : "library";
   localStorage.setItem(ACTIVE_TAB_KEY, next);
   els.tabButtons.forEach((button) => {
     button.setAttribute("aria-selected", String(button.dataset.materialTab === next));
@@ -86,9 +90,7 @@ function switchTab(name) {
   els.tabPanels.forEach((panel) => {
     panel.hidden = panel.dataset.materialTabPanel !== next;
   });
-  if (next === "upload") {
-    els.uploadFolder.value = currentFolderId || "";
-  }
+  if (next === "tree") loadTreeFiles();
 }
 
 function folderById(id) {
@@ -473,23 +475,121 @@ function renderFiles() {
   }
 }
 
-function renderFolderSelect() {
-  const selected = els.uploadFolder.value || currentFolderId || "";
-  els.uploadFolder.replaceChildren(new Option("すべての教材", ""));
-  const sorted = [...folders].sort((a, b) =>
-    folderPath(a.id).localeCompare(folderPath(b.id), "ja")
+function filesInFolder(folderId) {
+  return treeFiles.filter((file) => (file.folder_id || null) === (folderId || null));
+}
+
+function treeNodeMatches(folder, query) {
+  if (!query) return true;
+  if (folder.name.toLocaleLowerCase("ja").includes(query)) return true;
+  if (filesInFolder(folder.id).some((file) => file.name.toLocaleLowerCase("ja").includes(query))) return true;
+  return folders
+    .filter((child) => (child.parent_id || null) === folder.id)
+    .some((child) => treeNodeMatches(child, query));
+}
+
+function makeTreeFile(file) {
+  const presentation = filePresentation(file);
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "material-tree-file";
+  button.innerHTML =
+    '<span class="material-file-icon ' + presentation.tone + '"><i class="bx ' +
+    presentation.icon + '"></i></span>' +
+    '<span class="material-tree-file-copy"><strong></strong><small></small></span>' +
+    '<i class="bx bx-file-find"></i>';
+  button.querySelector("strong").textContent = file.name;
+  button.querySelector("small").textContent = presentation.label + "・" + formatSize(file.size);
+  button.addEventListener("click", () => viewFile(file));
+  return button;
+}
+
+function makeTreeFolder(folder, query, depth = 0) {
+  const details = document.createElement("details");
+  details.className = "material-tree-folder";
+  details.open = Boolean(query) || depth === 0;
+
+  const summary = document.createElement("summary");
+  summary.innerHTML =
+    '<span class="material-tree-chevron"><i class="bx bx-chevron-right"></i></span>' +
+    '<span class="material-folder-icon"><i class="bx bxs-folder"></i></span>' +
+    '<span class="material-tree-folder-copy"><strong></strong><small></small></span>' +
+    '<button type="button" class="material-icon-btn" aria-label="このフォルダを開く"><i class="bx bx-folder-open"></i></button>';
+  summary.querySelector("strong").textContent = folder.name;
+  summary.querySelector("small").textContent =
+    Number(folder.folder_count || 0) + "フォルダ・" + Number(folder.file_count || 0) + "ファイル";
+  summary.querySelector("button").addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    switchTab("library");
+    openFolder(folder.id);
+  });
+
+  const children = document.createElement("div");
+  children.className = "material-tree-children";
+  const childFolders = folders.filter(
+    (child) => (child.parent_id || null) === folder.id && treeNodeMatches(child, query)
   );
-  for (const folder of sorted) {
-    els.uploadFolder.add(new Option(folderPath(folder.id), folder.id));
+  const childFiles = filesInFolder(folder.id).filter(
+    (file) => !query || file.name.toLocaleLowerCase("ja").includes(query) ||
+      folder.name.toLocaleLowerCase("ja").includes(query)
+  );
+  childFolders.forEach((child) => children.append(makeTreeFolder(child, query, depth + 1)));
+  childFiles.forEach((file) => children.append(makeTreeFile(file)));
+  if (!childFolders.length && !childFiles.length) {
+    const empty = document.createElement("span");
+    empty.className = "material-tree-branch-empty";
+    empty.textContent = "空のフォルダ";
+    children.append(empty);
   }
-  els.uploadFolder.value = sorted.some((folder) => folder.id === selected) ? selected : "";
+  details.append(summary, children);
+  return details;
+}
+
+function renderTree() {
+  if (!els.tree) return;
+  const query = els.treeSearch.value.trim().toLocaleLowerCase("ja");
+  els.tree.replaceChildren();
+  const root = document.createElement("div");
+  root.className = "material-tree-root";
+  const rootHeading = document.createElement("div");
+  rootHeading.className = "material-tree-root-heading";
+  rootHeading.innerHTML = '<i class="bx bx-home"></i><strong>すべての教材</strong>';
+  root.append(rootHeading);
+
+  const rootChildren = document.createElement("div");
+  rootChildren.className = "material-tree-children";
+  const topFolders = folders.filter(
+    (folder) => !folder.parent_id && treeNodeMatches(folder, query)
+  );
+  const rootFiles = filesInFolder(null).filter(
+    (file) => !query || file.name.toLocaleLowerCase("ja").includes(query)
+  );
+  topFolders.forEach((folder) => rootChildren.append(makeTreeFolder(folder, query)));
+  rootFiles.forEach((file) => rootChildren.append(makeTreeFile(file)));
+  root.append(rootChildren);
+  els.tree.append(root);
+  els.treeEmpty.hidden = topFolders.length > 0 || rootFiles.length > 0;
+}
+
+async function loadTreeFiles() {
+  try {
+    setError();
+    treeFiles = await api("/files?all=1");
+    renderTree();
+  } catch (err) {
+    setError(err.message);
+  }
 }
 
 function renderLibrary() {
   renderBreadcrumb();
   renderFolders();
   renderFiles();
-  renderFolderSelect();
+  if (els.uploadDestination) {
+    els.uploadDestination.textContent = currentFolderId ? folderPath(currentFolderId) : "すべての教材";
+  }
+  if (!els.tabPanels[1].hidden) renderTree();
 }
 
 async function loadFolders() {
@@ -758,7 +858,7 @@ function uploadOne(item, folderId) {
 }
 
 async function uploadAll() {
-  const folderId = els.uploadFolder.value || null;
+  const folderId = currentFolderId || null;
   els.uploadStart.disabled = true;
   setError();
   let completed = 0;
@@ -782,8 +882,10 @@ async function uploadAll() {
   }
 
   if (completed > 0) {
-    currentFolderId = folderId;
+    uploadItems = uploadItems.filter((item) => item.status !== "done");
+    renderUploadQueue();
     await loadLibrary();
+    if (!els.tabPanels[1].hidden) await loadTreeFiles();
   }
 }
 
@@ -791,6 +893,7 @@ els.tabButtons.forEach((button) => {
   button.addEventListener("click", () => switchTab(button.dataset.materialTab));
 });
 els.search.addEventListener("input", renderLibrary);
+els.treeSearch.addEventListener("input", renderTree);
 els.newFolder.addEventListener("click", () => {
   els.newFolderName.value = "";
   els.newFolderModal.showModal();
