@@ -17,7 +17,7 @@
     })();
   </script>
   <link rel="apple-touch-icon" href="/shared/logo.png" />
-  <link rel="stylesheet" href="../shared/styles.css?v=48" />
+  <link rel="stylesheet" href="../shared/styles.css?v=49" />
   <link rel="stylesheet" href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" />
 </head>
 <body>
@@ -53,8 +53,8 @@
         <button type="button" class="page-tab-btn" data-material-tab="library" aria-selected="true">
           <i class="bx bx-folder-open"></i> 教材一覧
         </button>
-        <button type="button" class="page-tab-btn" data-material-tab="upload" aria-selected="false">
-          <i class="bx bx-cloud-upload"></i> アップロード
+        <button type="button" class="page-tab-btn" data-material-tab="tree" aria-selected="false">
+          <i class="bx bx-git-branch"></i> ツリー検索
         </button>
       </div>
 
@@ -75,9 +75,23 @@
           <div class="material-toolbar">
             <label class="material-search">
               <i class="bx bx-search"></i>
-              <input id="material-search-input" type="search" placeholder="教材を検索" />
+              <input id="material-search-input" type="search" placeholder="このフォルダ内を検索" />
             </label>
           </div>
+
+          <label id="material-dropzone" class="material-dropzone material-inline-dropzone" for="material-file-input">
+            <input id="material-file-input" type="file" multiple hidden />
+            <span class="material-dropzone-icon"><i class="bx bx-cloud-upload"></i></span>
+            <span class="material-inline-upload-copy">
+              <strong>このフォルダへアップロード</strong>
+              <small id="material-upload-destination">すべての教材</small>
+            </span>
+            <span class="material-inline-upload-action">ファイルを選択</span>
+          </label>
+          <ul id="material-upload-queue" class="material-upload-queue material-inline-upload-queue"></ul>
+          <button type="button" id="material-upload-start" class="btn-primary material-upload-start material-inline-upload-start" disabled>
+            <i class="bx bx-upload"></i> アップロードする
+          </button>
 
           <div id="material-folder-grid" class="material-folder-grid"></div>
 
@@ -95,33 +109,24 @@
         </section>
       </div>
 
-      <div data-material-tab-panel="upload" hidden>
-        <section class="panel material-panel" aria-labelledby="material-upload-title">
+      <div data-material-tab-panel="tree" hidden>
+        <section class="panel material-panel material-tree-panel" aria-labelledby="material-tree-title">
           <div class="panel-header material-heading">
             <div>
-              <p class="eyebrow">MATERIAL UPLOAD</p>
-              <h2 id="material-upload-title"><i class="bx bx-cloud-upload"></i> アップロード</h2>
+              <p class="eyebrow">TREE SEARCH</p>
+              <h2 id="material-tree-title"><i class="bx bx-git-branch"></i> ツリー検索</h2>
             </div>
           </div>
-
-          <label class="material-upload-folder">
-            <span>保存先フォルダ</span>
-            <select id="upload-folder-select">
-              <option value="">すべての教材</option>
-            </select>
+          <label class="material-search material-tree-search">
+            <i class="bx bx-search"></i>
+            <input id="material-tree-search-input" type="search" placeholder="フォルダ名・教材名を検索" />
           </label>
-
-          <label id="material-dropzone" class="material-dropzone" for="material-file-input">
-            <input id="material-file-input" type="file" multiple hidden />
-            <span class="material-dropzone-icon"><i class="bx bx-cloud-upload"></i></span>
-            <strong>ここに教材をドラッグ＆ドロップ</strong>
-            <span>またはクリックしてファイルを選択</span>
-          </label>
-
-          <ul id="material-upload-queue" class="material-upload-queue"></ul>
-          <button type="button" id="material-upload-start" class="btn-primary material-upload-start" disabled>
-            <i class="bx bx-upload"></i> アップロードする
-          </button>
+          <p class="material-tree-help">フォルダを展開して階層を確認できます。教材名を押すと内容を閲覧します。</p>
+          <div id="material-tree" class="material-tree" role="tree"></div>
+          <div id="material-tree-empty" class="material-empty" hidden>
+            <i class="bx bx-search-alt"></i>
+            <p>一致するフォルダや教材がありません。</p>
+          </div>
         </section>
       </div>
     </section>
@@ -178,6 +183,6 @@
     <div id="material-preview-body" class="material-preview-body"></div>
   </dialog>
 
-  <script type="module" src="./app.js?v=3"></script>
+  <script type="module" src="./app.js?v=4"></script>
 </body>
 </html>
