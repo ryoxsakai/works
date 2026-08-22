@@ -2,6 +2,7 @@ CREATE TABLE IF NOT EXISTS material_folders (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   parent_id TEXT,
+  sort_order INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -12,6 +13,7 @@ CREATE TABLE IF NOT EXISTS material_files (
   object_key TEXT NOT NULL UNIQUE,
   mime_type TEXT,
   size INTEGER NOT NULL DEFAULT 0,
+  sort_order INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
