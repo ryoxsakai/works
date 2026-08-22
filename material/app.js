@@ -128,38 +128,50 @@ function formatSize(bytes) {
 function filePresentation(file) {
   const type = String(file.mime_type || "").toLowerCase();
   const name = String(file.name || "").toLowerCase();
-  if (type.includes("pdf") || name.endsWith(".pdf")) {
-    return { icon: "bx-file-pdf", tone: "is-pdf", label: "PDF" };
+  const extension = ((name.match(/\.([a-z0-9]{1,5})$/) || [])[1] || "").toUpperCase();
+
+  if (type.includes("pdf") || extension === "PDF") {
+    return { mark: "PDF", tone: "is-pdf", label: "PDF" };
   }
-  if (type.includes("word") || /\.(doc|docx)$/.test(name)) {
-    return { icon: "bx-file", tone: "is-word", label: "Word" };
+  if (type.includes("word") || ["DOC", "DOCX"].includes(extension)) {
+    return { mark: extension || "DOC", tone: "is-word", label: "Word" };
   }
-  if (type.includes("sheet") || /\.(xls|xlsx|csv)$/.test(name)) {
-    return { icon: "bx-spreadsheet", tone: "is-sheet", label: "表計算" };
+  if (type.includes("sheet") || ["XLS", "XLSX", "CSV"].includes(extension)) {
+    return { mark: extension || "XLS", tone: "is-sheet", label: "表計算" };
   }
-  if (type.includes("presentation") || /\.(ppt|pptx)$/.test(name)) {
-    return { icon: "bx-slideshow", tone: "is-slide", label: "スライド" };
+  if (type.includes("presentation") || ["PPT", "PPTX"].includes(extension)) {
+    return { mark: extension || "PPT", tone: "is-slide", label: "スライド" };
   }
-  if (type.startsWith("image/") || /\.(png|jpe?g|gif|webp|svg)$/.test(name)) {
-    return { icon: "bx-image", tone: "is-image", label: "画像" };
+  if (type.startsWith("image/") || ["PNG", "JPG", "JPEG", "GIF", "WEBP", "SVG", "TIFF", "BMP"].includes(extension)) {
+    return { mark: extension === "JPEG" ? "JPG" : (extension || "IMG"), tone: "is-image", label: "画像" };
   }
-  if (type.startsWith("video/") || /\.(mp4|mov|webm|m4v)$/.test(name)) {
-    return { icon: "bx-video", tone: "is-video", label: "動画" };
+  if (type.startsWith("video/") || ["MP4", "MOV", "WEBM", "M4V", "AVI", "MPEG"].includes(extension)) {
+    return { mark: extension || "VID", tone: "is-video", label: "動画" };
   }
-  if (type.startsWith("audio/") || /\.(mp3|m4a|wav|aac|ogg)$/.test(name)) {
-    return { icon: "bx-music", tone: "is-audio", label: "音声" };
+  if (type.startsWith("audio/") || ["MP3", "M4A", "WAV", "AAC", "OGG"].includes(extension)) {
+    return { mark: extension || "AUD", tone: "is-audio", label: "音声" };
   }
-  if (/\.(zip|rar|7z|tar|gz)$/.test(name)) {
-    return { icon: "bx-archive", tone: "is-archive", label: "圧縮" };
+  if (["ZIP", "RAR", "7Z", "TAR", "GZ"].includes(extension)) {
+    return { mark: extension, tone: "is-archive", label: "圧縮" };
   }
   if (
     type.startsWith("text/") ||
     type.includes("json") ||
-    /\.(txt|md|json|xml|html|css|js)$/.test(name)
+    ["TXT", "MD", "JSON", "XML", "HTML", "CSS", "JS"].includes(extension)
   ) {
-    return { icon: "bx-file-blank", tone: "is-text", label: "テキスト" };
+    return { mark: extension || "TXT", tone: "is-text", label: "テキスト" };
   }
-  return { icon: "bx-file-blank", tone: "is-generic", label: "ファイル" };
+  return {
+    mark: extension && extension.length <= 4 ? extension : "FILE",
+    tone: "is-generic",
+    label: extension || "ファイル",
+  };
+}
+
+function fileTypeIconMarkup(file) {
+  const presentation = filePresentation(file);
+  return '<span class="material-file-icon ' + presentation.tone +
+    '" aria-hidden="true"><span class="material-file-mark">' + presentation.mark + "</span></span>";
 }
 
 async function moveFileTo(fileId, folderId) {
@@ -430,9 +442,7 @@ function renderFiles() {
     const info = document.createElement("div");
     info.className = "material-file-info";
     info.innerHTML =
-      '<span class="material-file-icon ' + presentation.tone + '"><i class="bx ' +
-      presentation.icon +
-      '"></i></span>' +
+      fileTypeIconMarkup(file) +
       '<span class="material-file-copy"><strong></strong><small></small></span>';
     info.querySelector("strong").textContent = escapeText(file.name);
     info.querySelector("small").textContent =
@@ -494,8 +504,7 @@ function makeTreeFile(file) {
   button.type = "button";
   button.className = "material-tree-file";
   button.innerHTML =
-    '<span class="material-file-icon ' + presentation.tone + '"><i class="bx ' +
-    presentation.icon + '"></i></span>' +
+    fileTypeIconMarkup(file) +
     '<span class="material-tree-file-copy"><strong></strong><small></small></span>' +
     '<i class="bx bx-file-find"></i>';
   button.querySelector("strong").textContent = file.name;
@@ -790,11 +799,7 @@ function renderUploadQueue() {
     li.className = "material-upload-item";
     li.innerHTML =
       '<div class="material-upload-item-row">' +
-      '<span class="material-file-icon ' +
-      filePresentation(item.file).tone +
-      '"><i class="bx ' +
-      filePresentation(item.file).icon +
-      '"></i></span>' +
+      fileTypeIconMarkup(item.file) +
       '<span class="material-upload-copy"><strong></strong><small></small></span>' +
       '<button type="button" class="material-icon-btn" aria-label="選択から外す"><i class="bx bx-x"></i></button>' +
       "</div>" +

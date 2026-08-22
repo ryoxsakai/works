@@ -3183,3 +3183,99 @@ textarea,
     padding-left: .45rem;
   }
 }
+
+
+/* 教材管理: CDNに依存しない種類別ファイルアイコン */
+.material-file-icon {
+  --file-color: #64748b;
+  position: relative;
+  width: 1.65rem;
+  height: 2rem;
+  overflow: hidden;
+  border: 0;
+  border-radius: .2rem;
+  background: var(--file-color);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--file-color) 78%, #000);
+  color: #fff;
+  clip-path: polygon(0 0, 70% 0, 100% 25%, 100% 100%, 0 100%);
+}
+
+.material-file-icon::after {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 30%;
+  height: 25%;
+  background: color-mix(in srgb, var(--file-color) 72%, #fff);
+  clip-path: polygon(0 0, 0 100%, 100% 100%);
+  content: "";
+}
+
+.material-file-mark {
+  position: relative;
+  z-index: 1;
+  max-width: 100%;
+  padding-top: .38rem;
+  color: #fff;
+  font-size: .43rem;
+  font-weight: 700;
+  letter-spacing: -.025em;
+  line-height: 1;
+  text-align: center;
+}
+
+.material-file-icon.is-pdf {
+  --file-color: #dc3f47;
+}
+
+.material-file-icon.is-word {
+  --file-color: #3178c6;
+}
+
+.material-file-icon.is-sheet {
+  --file-color: #26966a;
+}
+
+.material-file-icon.is-slide {
+  --file-color: #e87936;
+}
+
+.material-file-icon.is-image {
+  --file-color: #8b5cc7;
+}
+
+.material-file-icon.is-video {
+  --file-color: #d84f8c;
+}
+
+.material-file-icon.is-audio {
+  --file-color: #6d5bd0;
+}
+
+.material-file-icon.is-archive {
+  --file-color: #b8842f;
+}
+
+.material-file-icon.is-text {
+  --file-color: #687487;
+}
+
+.material-file-icon.is-generic {
+  --file-color: #87909d;
+}
+
+.material-tree-file .material-file-icon {
+  width: 1.5rem;
+  height: 1.82rem;
+  border-radius: .18rem;
+  font-size: inherit;
+}
+
+.material-tree-file .material-file-mark {
+  font-size: .39rem;
+}
+
+.material-upload-item .material-file-icon {
+  width: 1.55rem;
+  height: 1.88rem;
+}
