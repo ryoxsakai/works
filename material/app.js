@@ -36,12 +36,26 @@ const els = {
   fileInput: document.querySelector("#material-file-input"),
   uploadQueue: document.querySelector("#material-upload-queue"),
   uploadStart: document.querySelector("#material-upload-start"),
+  renameModal: document.querySelector("#rename-material-modal"),
+  renameTitle: document.querySelector("#rename-material-title"),
+  renameClose: document.querySelector("#rename-material-close"),
+  renameForm: document.querySelector("#rename-material-form"),
+  renameName: document.querySelector("#rename-material-name"),
+  previewModal: document.querySelector("#material-preview-modal"),
+  previewTitle: document.querySelector("#material-preview-title"),
+  previewBody: document.querySelector("#material-preview-body"),
+  previewClose: document.querySelector("#material-preview-close"),
+  previewDownload: document.querySelector("#material-preview-download"),
 };
 
 let folders = [];
 let files = [];
 let currentFolderId = null;
 let uploadItems = [];
+let draggedFileId = null;
+let renameTarget = null;
+let previewFile = null;
+let previewObjectUrl = null;
 
 function setError(message = "") {
   els.error.textContent = message;
@@ -109,15 +123,83 @@ function formatSize(bytes) {
   return (value / 1024 / 1024 / 1024).toFixed(1) + " GB";
 }
 
-function fileIcon(file) {
+function filePresentation(file) {
   const type = String(file.mime_type || "").toLowerCase();
   const name = String(file.name || "").toLowerCase();
-  if (type.includes("pdf") || name.endsWith(".pdf")) return "bx-file-pdf";
-  if (type.includes("word") || /\.(doc|docx)$/.test(name)) return "bx-file";
-  if (type.includes("sheet") || /\.(xls|xlsx|csv)$/.test(name)) return "bx-spreadsheet";
-  if (type.startsWith("image/")) return "bx-image";
-  if (type.includes("presentation") || /\.(ppt|pptx)$/.test(name)) return "bx-slideshow";
-  return "bx-file-blank";
+  if (type.includes("pdf") || name.endsWith(".pdf")) {
+    return { icon: "bx-file-pdf", tone: "is-pdf", label: "PDF" };
+  }
+  if (type.includes("word") || /\.(doc|docx)$/.test(name)) {
+    return { icon: "bx-file", tone: "is-word", label: "Word" };
+  }
+  if (type.includes("sheet") || /\.(xls|xlsx|csv)$/.test(name)) {
+    return { icon: "bx-spreadsheet", tone: "is-sheet", label: "表計算" };
+  }
+  if (type.includes("presentation") || /\.(ppt|pptx)$/.test(name)) {
+    return { icon: "bx-slideshow", tone: "is-slide", label: "スライド" };
+  }
+  if (type.startsWith("image/") || /\.(png|jpe?g|gif|webp|svg)$/.test(name)) {
+    return { icon: "bx-image", tone: "is-image", label: "画像" };
+  }
+  if (type.startsWith("video/") || /\.(mp4|mov|webm|m4v)$/.test(name)) {
+    return { icon: "bx-video", tone: "is-video", label: "動画" };
+  }
+  if (type.startsWith("audio/") || /\.(mp3|m4a|wav|aac|ogg)$/.test(name)) {
+    return { icon: "bx-music", tone: "is-audio", label: "音声" };
+  }
+  if (/\.(zip|rar|7z|tar|gz)$/.test(name)) {
+    return { icon: "bx-archive", tone: "is-archive", label: "圧縮" };
+  }
+  if (
+    type.startsWith("text/") ||
+    type.includes("json") ||
+    /\.(txt|md|json|xml|html|css|js)$/.test(name)
+  ) {
+    return { icon: "bx-file-blank", tone: "is-text", label: "テキスト" };
+  }
+  return { icon: "bx-file-blank", tone: "is-generic", label: "ファイル" };
+}
+
+async function moveFileTo(fileId, folderId) {
+  const file = files.find((item) => item.id === fileId);
+  if (!file || (file.folder_id || null) === (folderId || null)) return;
+  try {
+    setError();
+    await api("/files/" + encodeURIComponent(fileId), {
+      method: "PUT",
+      body: JSON.stringify({ folder_id: folderId || null }),
+    });
+    folders = await api("/folders");
+    await loadFiles();
+  } catch (err) {
+    setError(err.message);
+  }
+}
+
+function clearDropTargets() {
+  document.querySelectorAll(".is-drop-target").forEach((element) => {
+    element.classList.remove("is-drop-target");
+  });
+}
+
+function makeFolderDropTarget(element, folderId) {
+  element.addEventListener("dragover", (event) => {
+    if (!draggedFileId) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    clearDropTargets();
+    element.classList.add("is-drop-target");
+  });
+  element.addEventListener("dragleave", (event) => {
+    if (!element.contains(event.relatedTarget)) element.classList.remove("is-drop-target");
+  });
+  element.addEventListener("drop", async (event) => {
+    event.preventDefault();
+    const fileId = draggedFileId || event.dataTransfer.getData("text/plain");
+    clearDropTargets();
+    draggedFileId = null;
+    if (fileId) await moveFileTo(fileId, folderId);
+  });
 }
 
 function renderBreadcrumb() {
@@ -127,6 +209,7 @@ function renderBreadcrumb() {
   root.className = "material-breadcrumb-btn";
   root.innerHTML = '<i class="bx bx-home"></i><span>すべての教材</span>';
   root.addEventListener("click", () => openFolder(null));
+  makeFolderDropTarget(root, null);
   els.breadcrumb.append(root);
 
   for (const folder of folderAncestors(currentFolderId)) {
@@ -137,6 +220,7 @@ function renderBreadcrumb() {
     button.className = "material-breadcrumb-btn";
     button.textContent = folder.name;
     button.addEventListener("click", () => openFolder(folder.id));
+    makeFolderDropTarget(button, folder.id);
     els.breadcrumb.append(separator, button);
   }
 }
@@ -152,6 +236,7 @@ function renderFolders() {
   for (const folder of children) {
     const article = document.createElement("article");
     article.className = "material-folder-card";
+    makeFolderDropTarget(article, folder.id);
 
     const open = document.createElement("button");
     open.type = "button";
@@ -166,6 +251,13 @@ function renderFolders() {
     counts.push((Number(folder.file_count) || 0) + "ファイル");
     open.querySelector("small").textContent = counts.join("・");
     open.addEventListener("click", () => openFolder(folder.id));
+
+    const rename = document.createElement("button");
+    rename.type = "button";
+    rename.className = "material-icon-btn";
+    rename.setAttribute("aria-label", folder.name + "の名前を変更");
+    rename.innerHTML = '<i class="bx bx-pencil"></i>';
+    rename.addEventListener("click", () => openRename("folder", folder));
 
     const remove = document.createElement("button");
     remove.type = "button";
@@ -183,7 +275,7 @@ function renderFolders() {
       }
     });
 
-    article.append(open, remove);
+    article.append(open, rename, remove);
     els.folderGrid.append(article);
   }
 }
@@ -200,11 +292,27 @@ function renderFiles() {
   for (const file of visible) {
     const item = document.createElement("li");
     item.className = "material-file-item";
+    item.draggable = true;
+    item.dataset.fileId = file.id;
+    item.addEventListener("dragstart", (event) => {
+      draggedFileId = file.id;
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", file.id);
+      item.classList.add("is-dragging");
+    });
+    item.addEventListener("dragend", () => {
+      draggedFileId = null;
+      item.classList.remove("is-dragging");
+      clearDropTargets();
+    });
 
+    const presentation = filePresentation(file);
     const info = document.createElement("div");
     info.className = "material-file-info";
     info.innerHTML =
-      '<span class="material-file-icon"><i class="bx ' + fileIcon(file) + '"></i></span>' +
+      '<span class="material-file-icon ' + presentation.tone + '"><i class="bx ' +
+      presentation.icon +
+      '"></i></span>' +
       '<span class="material-file-copy"><strong></strong><small></small></span>';
     info.querySelector("strong").textContent = escapeText(file.name);
     info.querySelector("small").textContent =
@@ -212,6 +320,20 @@ function renderFiles() {
 
     const actions = document.createElement("div");
     actions.className = "material-file-actions";
+
+    const view = document.createElement("button");
+    view.type = "button";
+    view.className = "material-icon-btn";
+    view.setAttribute("aria-label", file.name + "を閲覧");
+    view.innerHTML = '<i class="bx bx-show"></i>';
+    view.addEventListener("click", () => viewFile(file));
+
+    const rename = document.createElement("button");
+    rename.type = "button";
+    rename.className = "material-icon-btn";
+    rename.setAttribute("aria-label", file.name + "の名前を変更");
+    rename.innerHTML = '<i class="bx bx-pencil"></i>';
+    rename.addEventListener("click", () => openRename("file", file));
 
     const download = document.createElement("button");
     download.type = "button";
@@ -227,7 +349,7 @@ function renderFiles() {
     remove.innerHTML = '<i class="bx bx-trash"></i>';
     remove.addEventListener("click", () => removeFile(file));
 
-    actions.append(download, remove);
+    actions.append(view, rename, download, remove);
     item.append(info, actions);
     els.fileList.append(item);
   }
@@ -278,6 +400,120 @@ async function openFolder(id) {
   currentFolderId = id || null;
   els.search.value = "";
   await loadFiles();
+}
+
+function openRename(type, item) {
+  renameTarget = { type, id: item.id };
+  els.renameTitle.textContent = type === "folder" ? "フォルダ名を変更" : "ファイル名を変更";
+  els.renameName.maxLength = type === "folder" ? 120 : 255;
+  els.renameName.value = item.name;
+  els.renameModal.showModal();
+  requestAnimationFrame(() => {
+    els.renameName.focus();
+    els.renameName.select();
+  });
+}
+
+function cleanupPreview() {
+  if (previewObjectUrl) URL.revokeObjectURL(previewObjectUrl);
+  previewObjectUrl = null;
+  previewFile = null;
+  els.previewBody.replaceChildren();
+}
+
+function isTextPreview(file) {
+  const type = String(file.mime_type || "").toLowerCase();
+  const name = String(file.name || "").toLowerCase();
+  return (
+    type.startsWith("text/") ||
+    type.includes("json") ||
+    type.includes("xml") ||
+    /\.(txt|md|csv|json|xml|html|css|js)$/.test(name)
+  );
+}
+
+async function fetchFileResponse(file, action) {
+  const res = await fetch(
+    API_BASE + "/files/" + encodeURIComponent(file.id) + "/" + action,
+    { headers: { Authorization: "Bearer " + getSessionToken() } }
+  );
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || "ファイルの取得に失敗しました");
+  }
+  return res;
+}
+
+async function viewFile(file) {
+  try {
+    setError();
+    cleanupPreview();
+    previewFile = file;
+    els.previewTitle.textContent = file.name;
+    els.previewBody.innerHTML =
+      '<div class="material-preview-loading"><i class="bx bx-loader-alt bx-spin"></i> 読み込み中</div>';
+    els.previewModal.showModal();
+
+    const res = await fetchFileResponse(file, "view");
+    const blob = await res.blob();
+    const type = String(file.mime_type || blob.type || "").toLowerCase();
+    els.previewBody.replaceChildren();
+
+    if (isTextPreview(file)) {
+      const pre = document.createElement("pre");
+      pre.className = "material-text-preview";
+      pre.textContent = await blob.text();
+      els.previewBody.append(pre);
+      return;
+    }
+
+    previewObjectUrl = URL.createObjectURL(blob);
+    if (type.startsWith("image/")) {
+      const image = document.createElement("img");
+      image.className = "material-image-preview";
+      image.src = previewObjectUrl;
+      image.alt = file.name;
+      els.previewBody.append(image);
+      return;
+    }
+    if (type.startsWith("video/")) {
+      const video = document.createElement("video");
+      video.className = "material-media-preview";
+      video.src = previewObjectUrl;
+      video.controls = true;
+      els.previewBody.append(video);
+      return;
+    }
+    if (type.startsWith("audio/")) {
+      const audio = document.createElement("audio");
+      audio.className = "material-audio-preview";
+      audio.src = previewObjectUrl;
+      audio.controls = true;
+      els.previewBody.append(audio);
+      return;
+    }
+    if (type.includes("pdf") || file.name.toLowerCase().endsWith(".pdf")) {
+      const frame = document.createElement("iframe");
+      frame.className = "material-pdf-preview";
+      frame.src = previewObjectUrl;
+      frame.title = file.name;
+      els.previewBody.append(frame);
+      return;
+    }
+
+    URL.revokeObjectURL(previewObjectUrl);
+    previewObjectUrl = null;
+    const unsupported = document.createElement("div");
+    unsupported.className = "material-preview-unsupported";
+    unsupported.innerHTML =
+      '<i class="bx bx-file-blank"></i><p>この形式はブラウザ内で表示できません。</p>' +
+      "<small>ダウンロードして内容を確認してください。</small>";
+    els.previewBody.append(unsupported);
+  } catch (err) {
+    els.previewBody.replaceChildren();
+    setError(err.message);
+    if (els.previewModal.open) els.previewModal.close();
+  }
 }
 
 async function downloadFile(file) {
@@ -336,7 +572,11 @@ function renderUploadQueue() {
     li.className = "material-upload-item";
     li.innerHTML =
       '<div class="material-upload-item-row">' +
-      '<span class="material-file-icon"><i class="bx bx-file-blank"></i></span>' +
+      '<span class="material-file-icon ' +
+      filePresentation(item.file).tone +
+      '"><i class="bx ' +
+      filePresentation(item.file).icon +
+      '"></i></span>' +
       '<span class="material-upload-copy"><strong></strong><small></small></span>' +
       '<button type="button" class="material-icon-btn" aria-label="選択から外す"><i class="bx bx-x"></i></button>' +
       "</div>" +
@@ -439,6 +679,33 @@ els.newFolder.addEventListener("click", () => {
   requestAnimationFrame(() => els.newFolderName.focus());
 });
 els.newFolderClose.addEventListener("click", () => els.newFolderModal.close());
+els.renameClose.addEventListener("click", () => els.renameModal.close());
+els.renameForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!renameTarget) return;
+  try {
+    setError();
+    const path =
+      renameTarget.type === "folder"
+        ? "/folders/" + encodeURIComponent(renameTarget.id)
+        : "/files/" + encodeURIComponent(renameTarget.id);
+    await api(path, {
+      method: "PUT",
+      body: JSON.stringify({ name: els.renameName.value }),
+    });
+    els.renameModal.close();
+    renameTarget = null;
+    folders = await api("/folders");
+    await loadFiles();
+  } catch (err) {
+    setError(err.message);
+  }
+});
+els.previewClose.addEventListener("click", () => els.previewModal.close());
+els.previewModal.addEventListener("close", cleanupPreview);
+els.previewDownload.addEventListener("click", () => {
+  if (previewFile) downloadFile(previewFile);
+});
 els.newFolderForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   try {
