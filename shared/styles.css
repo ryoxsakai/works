@@ -3279,3 +3279,18 @@ textarea,
   width: 1.55rem;
   height: 1.88rem;
 }
+
+
+/* 教材検索欄は外側のコンテナだけに罫線を表示する */
+.material-search input[type="search"],
+.material-search input[type="search"]:hover,
+.material-search input[type="search"]:focus,
+.material-search input[type="search"]:focus-visible {
+  border: 0 !important;
+  border-radius: 0 !important;
+  outline: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  appearance: none;
+  -webkit-appearance: none;
+}
