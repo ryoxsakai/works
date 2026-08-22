@@ -21,3 +21,15 @@ ALLOWED_ORIGIN = "https://works.lrnr.jp"
 binding = "DB"
 database_name = "tutor-db"
 database_id = "941460fb-c46e-4158-b4a7-5bb468b542ca"
+
+
+# 教材管理: フォルダ/ファイル情報
+[[d1_databases]]
+binding = "MATERIALS_DB"
+database_name = "works-materials-db"
+database_id = "2d4fa45f-4d4d-437d-8cc2-7a8531b27e18"
+
+# 教材管理: PDF・Word・画像などのファイル本体
+[[r2_buckets]]
+binding = "MATERIALS_BUCKET"
+bucket_name = "works-materials-files"
