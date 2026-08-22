@@ -2697,3 +2697,193 @@ textarea,
 :root[data-theme="dark"] .material-dialog-field input {
   background: color-mix(in srgb, var(--bg-elevated) 94%, #ffffff 6%);
 }
+
+
+/* 教材管理: 移動・閲覧・リネームとファイル種別表示 */
+.material-file-item {
+  cursor: grab;
+}
+
+.material-file-item:active {
+  cursor: grabbing;
+}
+
+.material-file-item.is-dragging {
+  opacity: .42;
+}
+
+.material-folder-card.is-drop-target,
+.material-breadcrumb-btn.is-drop-target {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--bg-elevated));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.material-file-icon.is-pdf {
+  border-color: color-mix(in srgb, #dc2626 45%, var(--border));
+  color: #dc2626;
+}
+
+.material-file-icon.is-word {
+  border-color: color-mix(in srgb, #2563eb 45%, var(--border));
+  color: #2563eb;
+}
+
+.material-file-icon.is-sheet {
+  border-color: color-mix(in srgb, #15803d 45%, var(--border));
+  color: #15803d;
+}
+
+.material-file-icon.is-slide {
+  border-color: color-mix(in srgb, #ea580c 45%, var(--border));
+  color: #ea580c;
+}
+
+.material-file-icon.is-image {
+  border-color: color-mix(in srgb, #9333ea 45%, var(--border));
+  color: #9333ea;
+}
+
+.material-file-icon.is-video {
+  border-color: color-mix(in srgb, #db2777 45%, var(--border));
+  color: #db2777;
+}
+
+.material-file-icon.is-audio {
+  border-color: color-mix(in srgb, #7c3aed 45%, var(--border));
+  color: #7c3aed;
+}
+
+.material-file-icon.is-archive {
+  border-color: color-mix(in srgb, #a16207 45%, var(--border));
+  color: #a16207;
+}
+
+.material-file-icon.is-text {
+  border-color: color-mix(in srgb, #475569 45%, var(--border));
+  color: #475569;
+}
+
+.material-preview-modal {
+  width: min(960px, 96vw) !important;
+  max-width: 96vw;
+}
+
+.material-preview-actions {
+  display: flex;
+  align-items: center;
+  gap: .15rem;
+}
+
+.material-preview-actions button {
+  min-width: 1.9rem;
+  min-height: 1.9rem;
+  padding: .25rem;
+  border-radius: .34rem;
+}
+
+.material-preview-body {
+  display: grid;
+  place-items: center;
+  min-height: min(68vh, 680px);
+  max-height: 78vh;
+  overflow: auto;
+  background: #f7f8fa;
+}
+
+.material-pdf-preview {
+  width: 100%;
+  height: min(72vh, 760px);
+  border: 0;
+  background: #ffffff;
+}
+
+.material-image-preview {
+  display: block;
+  max-width: 100%;
+  max-height: 72vh;
+  object-fit: contain;
+}
+
+.material-media-preview {
+  width: 100%;
+  max-height: 72vh;
+  background: #111827;
+}
+
+.material-audio-preview {
+  width: min(560px, 90%);
+}
+
+.material-text-preview {
+  width: 100%;
+  min-height: min(68vh, 680px);
+  margin: 0;
+  padding: 1rem;
+  overflow: auto;
+  color: #1f2328;
+  background: #ffffff;
+  font: 400 .78rem/1.65 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.material-preview-loading,
+.material-preview-unsupported {
+  display: grid;
+  justify-items: center;
+  gap: .45rem;
+  padding: 2rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+.material-preview-loading i,
+.material-preview-unsupported i {
+  font-size: 2rem;
+}
+
+.material-preview-unsupported p,
+.material-preview-unsupported small {
+  margin: 0;
+}
+
+.material-preview-unsupported p {
+  color: var(--fg);
+  font-size: .86rem;
+  font-weight: 600;
+}
+
+.material-preview-unsupported small {
+  font-size: .72rem;
+}
+
+@media (max-width: 640px) {
+  .material-file-item {
+    align-items: flex-start;
+  }
+
+  .material-file-actions {
+    display: grid;
+    grid-template-columns: repeat(2, 1.75rem);
+  }
+
+  .material-file-actions .material-icon-btn {
+    min-width: 1.75rem;
+    min-height: 1.75rem;
+  }
+
+  .material-preview-modal {
+    width: 98vw !important;
+    max-width: 98vw;
+  }
+
+  .material-preview-body {
+    min-height: 72vh;
+    max-height: 78vh;
+  }
+
+  .material-pdf-preview {
+    height: 74vh;
+  }
+}
