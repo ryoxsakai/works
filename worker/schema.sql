@@ -126,3 +126,21 @@ CREATE TABLE IF NOT EXISTS google_auth (
   refresh_token TEXT NOT NULL,
   updated_at TEXT DEFAULT (datetime('now'))
 );
+
+
+-- 入試管理: 大学・方式・試験段階ごとの日程。複数日程は1日ごとに1行で保存する。
+CREATE TABLE IF NOT EXISTS admission_events (
+  id TEXT PRIMARY KEY,
+  university TEXT NOT NULL,
+  selection_type TEXT NOT NULL DEFAULT 'general',
+  stage TEXT NOT NULL,
+  schedule_date TEXT NOT NULL,
+  end_date TEXT,
+  notes TEXT,
+  source_url TEXT,
+  color TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_admission_events_date ON admission_events(schedule_date);
+CREATE INDEX IF NOT EXISTS idx_admission_events_stage ON admission_events(stage);

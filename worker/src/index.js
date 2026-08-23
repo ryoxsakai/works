@@ -691,6 +691,100 @@ async function deleteCandidateSchool(env, id) {
 }
 
 
+// 入試管理: 入試日程はD1に保存し、一覧・表・カレンダー・ガントで共通利用する。
+let admissionSchemaReady = null;
+
+async function ensureAdmissionSchema(env) {
+  if (!admissionSchemaReady) {
+    admissionSchemaReady = (async () => {
+      await env.DB.batch([
+        env.DB.prepare(
+          "CREATE TABLE IF NOT EXISTS admission_events (" +
+            "id TEXT PRIMARY KEY, university TEXT NOT NULL, selection_type TEXT NOT NULL DEFAULT 'general', " +
+            "stage TEXT NOT NULL, schedule_date TEXT NOT NULL, end_date TEXT, notes TEXT, source_url TEXT, " +
+            "color TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')))"
+        ),
+        env.DB.prepare(
+          "CREATE INDEX IF NOT EXISTS idx_admission_events_date ON admission_events(schedule_date)"
+        ),
+        env.DB.prepare(
+          "CREATE INDEX IF NOT EXISTS idx_admission_events_stage ON admission_events(stage)"
+        ),
+      ]);
+    })().catch((err) => {
+      admissionSchemaReady = null;
+      throw err;
+    });
+  }
+  await admissionSchemaReady;
+}
+
+async function readAdmissionEvents(env, year) {
+  await ensureAdmissionSchema(env);
+  const query = year
+    ? env.DB.prepare("SELECT * FROM admission_events WHERE schedule_date LIKE ? ORDER BY schedule_date, university, stage").bind(String(year) + "-%")
+    : env.DB.prepare("SELECT * FROM admission_events ORDER BY schedule_date, university, stage");
+  const { results } = await query.all();
+  return results;
+}
+
+async function createAdmissionEvent(env, body) {
+  await ensureAdmissionSchema(env);
+  const university = String(body.university || "").trim();
+  const selectionType = String(body.selection_type || "general").trim();
+  const stage = String(body.stage || "").trim();
+  const scheduleDate = String(body.schedule_date || "").trim();
+  const endDate = body.end_date ? String(body.end_date).trim() : null;
+  if (!university || !stage || !/^\d{4}-\d{2}-\d{2}$/.test(scheduleDate)) {
+    throw new Error("university, stage, schedule_date are required");
+  }
+  if (endDate && !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+    throw new Error("end_date must be YYYY-MM-DD");
+  }
+  const id = crypto.randomUUID();
+  return env.DB.prepare(
+    "INSERT INTO admission_events (id, university, selection_type, stage, schedule_date, end_date, notes, source_url, color) " +
+      "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *"
+  ).bind(
+    id, university, selectionType, stage, scheduleDate, endDate,
+    body.notes ? String(body.notes).trim() : null,
+    body.source_url ? String(body.source_url).trim() : null,
+    body.color ? String(body.color).trim() : null
+  ).first();
+}
+
+async function updateAdmissionEvent(env, id, body) {
+  await ensureAdmissionSchema(env);
+  const current = await env.DB.prepare("SELECT * FROM admission_events WHERE id = ?").bind(id).first();
+  if (!current) throw new Error("入試日程が見つかりません");
+  const university = body.university === undefined ? current.university : String(body.university || "").trim();
+  const selectionType = body.selection_type === undefined ? current.selection_type : String(body.selection_type || "").trim();
+  const stage = body.stage === undefined ? current.stage : String(body.stage || "").trim();
+  const scheduleDate = body.schedule_date === undefined ? current.schedule_date : String(body.schedule_date || "").trim();
+  const endDate = body.end_date === undefined ? current.end_date : (body.end_date ? String(body.end_date).trim() : null);
+  if (!university || !stage || !/^\d{4}-\d{2}-\d{2}$/.test(scheduleDate)) {
+    throw new Error("university, stage, schedule_date are required");
+  }
+  if (endDate && !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+    throw new Error("end_date must be YYYY-MM-DD");
+  }
+  return env.DB.prepare(
+    "UPDATE admission_events SET university = ?, selection_type = ?, stage = ?, schedule_date = ?, end_date = ?, notes = ?, source_url = ?, color = ?, updated_at = datetime('now') WHERE id = ? RETURNING *"
+  ).bind(
+    university, selectionType, stage, scheduleDate, endDate,
+    body.notes === undefined ? current.notes : (body.notes ? String(body.notes).trim() : null),
+    body.source_url === undefined ? current.source_url : (body.source_url ? String(body.source_url).trim() : null),
+    body.color === undefined ? current.color : (body.color ? String(body.color).trim() : null),
+    id
+  ).first();
+}
+
+async function deleteAdmissionEvent(env, id) {
+  await ensureAdmissionSchema(env);
+  await env.DB.prepare("DELETE FROM admission_events WHERE id = ?").bind(id).run();
+}
+
+
 /* --- 教材ライブラリ: D1にフォルダ/ファイル情報、R2にファイル本体を保存する。 --- */
 let materialSchemaReady = null;
 
@@ -1319,6 +1413,27 @@ export default {
         return json({ ok: true }, headers);
       }
 
+
+      if (url.pathname === "/api/admissions" && request.method === "GET") {
+        return json(await readAdmissionEvents(env, url.searchParams.get("year")), headers);
+      }
+
+      if (url.pathname === "/api/admissions" && request.method === "POST") {
+        return json(await createAdmissionEvent(env, await request.json()), headers, 201);
+      }
+
+      const admissionMatch = url.pathname.match(/^\/api\/admissions\/([^/]+)$/);
+      if (admissionMatch && request.method === "PUT") {
+        return json(
+          await updateAdmissionEvent(env, decodeURIComponent(admissionMatch[1]), await request.json()),
+          headers
+        );
+      }
+
+      if (admissionMatch && request.method === "DELETE") {
+        await deleteAdmissionEvent(env, decodeURIComponent(admissionMatch[1]));
+        return json({ ok: true }, headers);
+      }
 
       if (url.pathname === "/api/material-library/folders" && request.method === "GET") {
         return json(await readMaterialFolders(env), headers);
