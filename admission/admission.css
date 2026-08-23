@@ -705,3 +705,229 @@
     font-size: .85rem;
   }
 }
+
+
+/* 入試管理: 複数選択フィルターモーダル */
+.admission-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: .55rem;
+  margin: .85rem 0;
+  min-width: 0;
+}
+
+.admission-filter-open {
+  display: inline-flex;
+  min-height: 2.15rem;
+  align-items: center;
+  gap: .32rem;
+  padding: .34rem .58rem;
+  border-radius: .38rem;
+  color: var(--accent);
+  font-size: .74rem;
+  white-space: nowrap;
+}
+
+.admission-filter-count {
+  display: inline-grid;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  padding: 0 .25rem;
+  place-items: center;
+  border-radius: .58rem;
+  background: var(--accent);
+  color: #fff;
+  font-size: .58rem;
+  font-weight: 700;
+}
+
+.admission-filter-summary {
+  min-width: 0;
+  flex: 1;
+  margin: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: .7rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admission-filter-reset {
+  display: grid;
+  width: 2rem;
+  min-width: 2rem;
+  height: 2rem;
+  padding: 0;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: .34rem;
+  color: var(--muted);
+  font-size: .9rem;
+}
+
+.admission-filter-modal {
+  width: min(35rem, 94vw) !important;
+  max-height: min(42rem, 88vh);
+  padding: 0;
+  overflow: hidden;
+}
+
+.admission-filter-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.admission-filter-tabs button {
+  min-width: 0;
+  padding-right: .35rem;
+  padding-left: .35rem;
+  font-size: .72rem;
+  white-space: nowrap;
+}
+
+.admission-filter-form {
+  display: grid;
+  grid-template-rows: minmax(15rem, 1fr) auto;
+  min-height: 22rem;
+}
+
+.admission-filter-panel {
+  max-height: 50vh;
+  padding: .85rem 1rem;
+  overflow: auto;
+}
+
+.admission-filter-help {
+  margin: 0 0 .62rem;
+  color: var(--muted);
+  font-size: .67rem;
+}
+
+.admission-filter-modal-search {
+  display: flex;
+  min-height: 2.2rem;
+  align-items: center;
+  gap: .4rem;
+  margin-bottom: .55rem;
+  padding: 0 .52rem;
+  border: 1px solid var(--border);
+  border-radius: .36rem;
+  background: #fbfbfc;
+}
+
+.admission-filter-modal-search i {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: .95rem;
+}
+
+.admission-filter-modal-search input {
+  width: 100%;
+  min-width: 0;
+  min-height: 2.05rem;
+  padding: .25rem 0;
+  border: 0 !important;
+  outline: 0;
+  background: transparent !important;
+  box-shadow: none !important;
+  font-size: .76rem;
+}
+
+.admission-filter-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .35rem;
+}
+
+.admission-filter-option {
+  display: flex;
+  min-width: 0;
+  min-height: 2.2rem;
+  align-items: center;
+  gap: .48rem;
+  padding: .42rem .5rem;
+  border: 1px solid var(--border);
+  border-radius: .34rem;
+  background: color-mix(in srgb, var(--bg-elevated) 96%, var(--bg-hover));
+  color: var(--fg);
+  cursor: pointer;
+  font-size: .72rem;
+}
+
+.admission-filter-option:hover {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  background: color-mix(in srgb, var(--accent) 4%, var(--bg-elevated));
+}
+
+.admission-filter-option input {
+  width: .95rem;
+  height: .95rem;
+  flex: 0 0 .95rem;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.admission-filter-option span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admission-filter-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .6rem;
+  padding: .7rem 1rem;
+  border-top: 1px solid var(--border);
+  background: var(--bg-elevated);
+}
+
+.admission-filter-actions button {
+  min-height: 2.15rem;
+  padding: .34rem .62rem;
+  border-radius: .36rem;
+  font-size: .72rem;
+}
+
+.admission-filter-actions button:first-child {
+  color: var(--muted);
+}
+
+:root[data-theme="dark"] .admission-filter-modal-search {
+  background: color-mix(in srgb, var(--bg-elevated) 94%, #fff 6%);
+}
+
+@media (max-width: 640px) {
+  .admission-filter-bar {
+    gap: .4rem;
+  }
+
+  .admission-filter-summary {
+    font-size: .64rem;
+  }
+
+  .admission-filter-modal {
+    width: calc(100vw - 1rem) !important;
+  }
+
+  .admission-filter-panel {
+    padding: .75rem;
+  }
+
+  .admission-filter-options {
+    grid-template-columns: 1fr;
+  }
+
+  .admission-filter-month-options {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admission-filter-tabs button {
+    font-size: .66rem;
+  }
+
+  .admission-filter-tabs button i {
+    font-size: .84rem;
+  }
+}
