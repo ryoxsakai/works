@@ -54,6 +54,8 @@ const els = {
 let events = [];
 let calendarCursor = null;
 let filters = loadFilters();
+let activeView = "list";
+let eventsLoaded = false;
 
 function asStringList(value) {
   return Array.isArray(value) ? [...new Set(value.map(String).filter(Boolean))] : [];
@@ -124,6 +126,7 @@ async function api(path, options = {}) {
 
 function activateView(name) {
   const active = els.tabs.some((tab) => tab.dataset.admissionViewTab === name) ? name : "list";
+  activeView = active;
   els.tabs.forEach((tab) => {
     const selected = tab.dataset.admissionViewTab === active;
     tab.setAttribute("aria-selected", String(selected));
@@ -131,6 +134,7 @@ function activateView(name) {
   });
   els.views.forEach((view) => { view.hidden = view.dataset.admissionView !== active; });
   localStorage.setItem(VIEW_KEY, active);
+  if (eventsLoaded) render();
 }
 
 function activateFilterTab(name) {
@@ -292,7 +296,12 @@ function stageClass(stage) {
 }
 
 function renderCalendar(viewEvents) {
-  if (!calendarCursor) return;
+  if (!calendarCursor) {
+    els.calendarLabel.textContent = "";
+    els.calendarGrid.replaceChildren();
+    els.calendarEmpty.hidden = false;
+    return;
+  }
   const year = calendarCursor.getFullYear();
   const month = calendarCursor.getMonth();
   els.calendarLabel.textContent = year + "年" + (month + 1) + "月";
@@ -364,22 +373,47 @@ function renderGantt(viewEvents) {
   els.gantt.innerHTML = `<div class="admission-gantt-axis"><span>大学・方式</span><div style="width:${trackWidth}px">${dayHeaders}</div></div><div class="admission-gantt-rows">${rows}</div>`;
   els.ganttEmpty.hidden = true;
 }
+function clearInactiveViews() {
+  if (activeView !== "list") els.list.replaceChildren();
+  if (activeView !== "table") els.table.replaceChildren();
+  if (activeView !== "calendar") {
+    els.calendarGrid.replaceChildren();
+    els.calendarEmpty.hidden = true;
+  }
+  if (activeView !== "gantt") {
+    els.gantt.replaceChildren();
+    els.ganttEmpty.hidden = true;
+  }
+}
+
 function render() {
   const viewEvents = filteredEvents();
   renderFilterSummary();
-  renderList(viewEvents);
-  renderTable(viewEvents);
-  if (!calendarCursor && viewEvents.length) {
-    const first = eventDate(viewEvents[0]);
-    calendarCursor = new Date(first.getFullYear(), first.getMonth(), 1);
+  clearInactiveViews();
+
+  if (activeView === "list") {
+    renderList(viewEvents);
+    return;
   }
-  renderCalendar(viewEvents);
+  if (activeView === "table") {
+    renderTable(viewEvents);
+    return;
+  }
+  if (activeView === "calendar") {
+    if (!calendarCursor && viewEvents.length) {
+      const first = eventDate(viewEvents[0]);
+      calendarCursor = new Date(first.getFullYear(), first.getMonth(), 1);
+    }
+    renderCalendar(viewEvents);
+    return;
+  }
   renderGantt(viewEvents);
 }
 
 async function loadEvents() {
   showError("");
   events = await api("/admissions");
+  eventsLoaded = true;
   normalizeLegacyUniversityFilters();
   renderUniversityChoices();
   render();
