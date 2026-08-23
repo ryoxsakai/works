@@ -719,8 +719,158 @@ async function ensureAdmissionSchema(env) {
   await admissionSchemaReady;
 }
 
-async function readAdmissionEvents(env, year) {
+
+const ADMISSION_SOURCE_2027 = "https://medika.jp/free/2027medical-exam-schedule-list";
+
+function scheduleSeed(university, selectionType, stage, dates, notes = "") {
+  return dates.map((schedule_date) => ({ university, selectionType, stage, schedule_date, notes }));
+}
+
+const INITIAL_ADMISSION_EVENTS_2027 = [
+  ...scheduleSeed("産業医科大学医学部（A方式）", "ct", "primary", ["2027-01-16", "2027-01-17", "2027-02-14"], "共通テスト＋個別学力検査"),
+  ...scheduleSeed("産業医科大学医学部（A方式）", "ct", "first_result", ["2027-02-26"], "二次受験資格"),
+  ...scheduleSeed("産業医科大学医学部（A方式）", "ct", "secondary", ["2027-03-12"], "小論文・面接"),
+  ...scheduleSeed("産業医科大学医学部（A方式）", "ct", "final_result", ["2027-03-19"]),
+  ...scheduleSeed("産業医科大学医学部（C方式）", "ct", "primary", ["2027-01-16", "2027-01-17"], "共通テスト利用"),
+  ...scheduleSeed("産業医科大学医学部（C方式）", "ct", "first_result", ["2027-03-04"], "二次受験資格"),
+  ...scheduleSeed("産業医科大学医学部（C方式）", "ct", "secondary", ["2027-03-12"], "小論文・面接"),
+  ...scheduleSeed("産業医科大学医学部（C方式）", "ct", "final_result", ["2027-03-19"]),
+  ...scheduleSeed("帝京大学医学部", "general", "primary", ["2027-01-21", "2027-01-22", "2027-01-23"], "一般選抜。一次は3日間から選択"),
+  ...scheduleSeed("帝京大学医学部", "general", "first_result", ["2027-01-28"]),
+  ...scheduleSeed("帝京大学医学部", "general", "secondary", ["2027-02-04", "2027-02-05"], "出願時選択"),
+  ...scheduleSeed("帝京大学医学部", "general", "final_result", ["2027-02-13"]),
+  ...scheduleSeed("国際医療福祉大学医学部", "general", "primary", ["2027-01-25"]),
+  ...scheduleSeed("国際医療福祉大学医学部", "general", "first_result", ["2027-01-29"]),
+  ...scheduleSeed("国際医療福祉大学医学部", "general", "secondary", ["2027-02-01", "2027-02-02", "2027-02-03", "2027-02-04", "2027-02-05", "2027-02-06"], "大学指定"),
+  ...scheduleSeed("国際医療福祉大学医学部", "general", "final_result", ["2027-02-12"]),
+  ...scheduleSeed("自治医科大学医学部", "regional", "primary", ["2027-01-25", "2027-01-26"], "学力試験・面接。出願都道府県で手続"),
+  ...scheduleSeed("自治医科大学医学部", "regional", "first_result", ["2027-01-29"]),
+  ...scheduleSeed("自治医科大学医学部", "regional", "secondary", ["2027-02-03"]),
+  ...scheduleSeed("自治医科大学医学部", "regional", "final_result", ["2027-02-12"]),
+  ...scheduleSeed("近畿大学医学部（前期）", "general", "primary", ["2027-01-31"]),
+  ...scheduleSeed("近畿大学医学部（前期）", "general", "first_result", ["2027-02-10"]),
+  ...scheduleSeed("近畿大学医学部（前期）", "general", "secondary", ["2027-02-14"]),
+  ...scheduleSeed("近畿大学医学部（前期）", "general", "final_result", ["2027-02-23"]),
+  ...scheduleSeed("川崎医科大学医学部", "regional", "primary", ["2027-02-01"], "岡山県地域枠を含む"),
+  ...scheduleSeed("川崎医科大学医学部", "regional", "first_result", ["2027-02-04"]),
+  ...scheduleSeed("川崎医科大学医学部", "regional", "secondary", ["2027-02-10", "2027-02-11"], "大学指定日"),
+  ...scheduleSeed("川崎医科大学医学部", "regional", "final_result", ["2027-02-13"]),
+  ...scheduleSeed("東京女子医科大学医学部", "general", "primary", ["2027-02-01"]),
+  ...scheduleSeed("東京女子医科大学医学部", "general", "first_result", ["2027-02-08"]),
+  ...scheduleSeed("東京女子医科大学医学部", "general", "secondary", ["2027-02-13", "2027-02-14", "2027-02-15"], "希望日を提出"),
+  ...scheduleSeed("東京女子医科大学医学部", "general", "final_result", ["2027-02-19"]),
+  ...scheduleSeed("日本医科大学医学部（前期）", "regional", "primary", ["2027-02-01"], "地域枠前期を含む"),
+  ...scheduleSeed("日本医科大学医学部（前期）", "regional", "first_result", ["2027-02-08"]),
+  ...scheduleSeed("日本医科大学医学部（前期）", "regional", "secondary", ["2027-02-10", "2027-02-12"], "希望日を提出"),
+  ...scheduleSeed("日本医科大学医学部（前期）", "regional", "final_result", ["2027-02-16"]),
+  ...scheduleSeed("杏林大学医学部", "general", "primary", ["2027-02-02"]),
+  ...scheduleSeed("杏林大学医学部", "general", "first_result", ["2027-02-08"]),
+  ...scheduleSeed("杏林大学医学部", "general", "secondary", ["2027-02-11", "2027-02-12"], "大学指定日"),
+  ...scheduleSeed("杏林大学医学部", "general", "final_result", ["2027-02-17"]),
+  ...scheduleSeed("北里大学医学部", "regional", "primary", ["2027-02-02"], "相模原市修学資金枠を含む"),
+  ...scheduleSeed("北里大学医学部", "regional", "first_result", ["2027-02-08"]),
+  ...scheduleSeed("北里大学医学部", "regional", "secondary", ["2027-02-13", "2027-02-14", "2027-02-15"], "相模原市枠は2/13・14から選択"),
+  ...scheduleSeed("北里大学医学部", "regional", "final_result", ["2027-02-17"]),
+  ...scheduleSeed("順天堂大学医学部（A方式）", "general", "primary", ["2027-02-03"]),
+  ...scheduleSeed("順天堂大学医学部（A方式）", "general", "first_result", ["2027-02-10"]),
+  ...scheduleSeed("順天堂大学医学部（A方式）", "general", "secondary", ["2027-02-14", "2027-02-15", "2027-02-16"], "大学指定日"),
+  ...scheduleSeed("順天堂大学医学部（A方式）", "general", "final_result", ["2027-02-20"]),
+  ...scheduleSeed("岩手医科大学医学部", "regional", "primary", ["2027-02-03"], "一般枠・地域枠C・地域枠D"),
+  ...scheduleSeed("岩手医科大学医学部", "regional", "first_result", ["2027-02-09"]),
+  ...scheduleSeed("岩手医科大学医学部", "regional", "secondary", ["2027-02-12", "2027-02-13"], "いずれか1日"),
+  ...scheduleSeed("岩手医科大学医学部", "regional", "final_result", ["2027-02-18"]),
+  ...scheduleSeed("金沢医科大学医学部（前期）", "general", "primary", ["2027-02-03", "2027-02-04"]),
+  ...scheduleSeed("金沢医科大学医学部（前期）", "general", "first_result", ["2027-02-10"]),
+  ...scheduleSeed("金沢医科大学医学部（前期）", "general", "secondary", ["2027-02-17", "2027-02-18"], "希望する1日"),
+  ...scheduleSeed("金沢医科大学医学部（前期）", "general", "final_result", ["2027-02-22"]),
+  ...scheduleSeed("東北医科薬科大学医学部", "general", "primary", ["2027-02-04"]),
+  ...scheduleSeed("東北医科薬科大学医学部", "general", "first_result", ["2027-02-12"]),
+  ...scheduleSeed("東北医科薬科大学医学部", "general", "secondary", ["2027-02-20", "2027-02-21"], "大学指定日"),
+  ...scheduleSeed("東北医科薬科大学医学部", "general", "final_result", ["2027-02-25"]),
+  ...scheduleSeed("藤田医科大学医学部", "general", "primary", ["2027-02-04"]),
+  ...scheduleSeed("藤田医科大学医学部", "general", "first_result", ["2027-02-09"]),
+  ...scheduleSeed("藤田医科大学医学部", "general", "secondary", ["2027-02-14", "2027-02-15"], "いずれか1日"),
+  ...scheduleSeed("藤田医科大学医学部", "general", "final_result", ["2027-02-18"]),
+  ...scheduleSeed("兵庫医科大学医学部（A方式）", "regional", "primary", ["2027-02-04"], "兵庫県推薦入学制度枠を含む"),
+  ...scheduleSeed("兵庫医科大学医学部（A方式）", "regional", "first_result", ["2027-02-15"]),
+  ...scheduleSeed("兵庫医科大学医学部（A方式）", "regional", "secondary", ["2027-02-17", "2027-02-18"], "出願時選択"),
+  ...scheduleSeed("兵庫医科大学医学部（A方式）", "regional", "final_result", ["2027-02-24"]),
+  ...scheduleSeed("東京医科大学医学部", "general", "primary", ["2027-02-06"]),
+  ...scheduleSeed("東京医科大学医学部", "general", "first_result", ["2027-02-11"]),
+  ...scheduleSeed("東京医科大学医学部", "general", "secondary", ["2027-02-13", "2027-02-14"], "出願順に大学指定"),
+  ...scheduleSeed("東京医科大学医学部", "general", "final_result", ["2027-02-18"]),
+  ...scheduleSeed("愛知医科大学医学部", "general", "primary", ["2027-02-09"]),
+  ...scheduleSeed("愛知医科大学医学部", "general", "first_result", ["2027-02-15"]),
+  ...scheduleSeed("愛知医科大学医学部", "general", "secondary", ["2027-02-18", "2027-02-19", "2027-02-20"], "希望日選択"),
+  ...scheduleSeed("愛知医科大学医学部", "general", "final_result", ["2027-02-24"]),
+  ...scheduleSeed("慶應義塾大学医学部", "general", "primary", ["2027-02-09"]),
+  ...scheduleSeed("慶應義塾大学医学部", "general", "first_result", ["2027-02-19"]),
+  ...scheduleSeed("慶應義塾大学医学部", "general", "secondary", ["2027-03-01"]),
+  ...scheduleSeed("慶應義塾大学医学部", "general", "final_result", ["2027-03-05"]),
+  ...scheduleSeed("大阪医科薬科大学医学部（前期）", "regional", "primary", ["2027-02-10"], "大阪府地域枠を含む"),
+  ...scheduleSeed("大阪医科薬科大学医学部（前期）", "regional", "first_result", ["2027-02-17"]),
+  ...scheduleSeed("大阪医科薬科大学医学部（前期）", "regional", "secondary", ["2027-02-19"]),
+  ...scheduleSeed("大阪医科薬科大学医学部（前期）", "regional", "final_result", ["2027-02-20"]),
+  ...scheduleSeed("東京慈恵会医科大学医学部", "general", "primary", ["2027-02-11"]),
+  ...scheduleSeed("東京慈恵会医科大学医学部", "general", "first_result", ["2027-02-17"]),
+  ...scheduleSeed("東京慈恵会医科大学医学部", "general", "secondary", ["2027-02-20", "2027-02-21", "2027-02-22"], "大学指定日"),
+  ...scheduleSeed("東京慈恵会医科大学医学部", "general", "final_result", ["2027-03-01"]),
+  ...scheduleSeed("獨協医科大学医学部（前期）", "regional", "primary", ["2027-02-12", "2027-02-13"], "栃木県・新潟県地域枠を含む"),
+  ...scheduleSeed("獨協医科大学医学部（前期）", "regional", "first_result", ["2027-02-16"]),
+  ...scheduleSeed("獨協医科大学医学部（前期）", "regional", "secondary", ["2027-02-19", "2027-02-20"]),
+  ...scheduleSeed("獨協医科大学医学部（前期）", "regional", "final_result", ["2027-02-26"]),
+  ...scheduleSeed("日本医科大学医学部（後期）", "regional", "primary", ["2027-02-28"], "地域枠後期を含む"),
+  ...scheduleSeed("日本医科大学医学部（後期）", "regional", "first_result", ["2027-03-06"]),
+  ...scheduleSeed("日本医科大学医学部（後期）", "regional", "secondary", ["2027-03-09"]),
+  ...scheduleSeed("日本医科大学医学部（後期）", "regional", "final_result", ["2027-03-15"]),
+  ...scheduleSeed("東京医科大学医学部（推薦・地域枠）", "recommendation", "primary", ["2026-11-28"], "学校推薦型・地域枠・全国ブロック別。小論文・基礎学力検査"),
+  ...scheduleSeed("東京医科大学医学部（推薦・地域枠）", "recommendation", "first_result", ["2026-12-03"], "基礎学力検査合格発表"),
+  ...scheduleSeed("東京医科大学医学部（推薦・地域枠）", "recommendation", "secondary", ["2026-12-12"], "面接（MMI）"),
+  ...scheduleSeed("東京医科大学医学部（推薦・地域枠）", "recommendation", "final_result", ["2026-12-17"]),
+  ...scheduleSeed("東京女子医科大学医学部（総合型）", "comprehensive", "primary", ["2026-10-18"]),
+  ...scheduleSeed("東京女子医科大学医学部（総合型）", "comprehensive", "first_result", ["2026-10-27"]),
+  ...scheduleSeed("東京女子医科大学医学部（総合型）", "comprehensive", "secondary", ["2026-10-31"]),
+  ...scheduleSeed("東京女子医科大学医学部（総合型）", "comprehensive", "final_result", ["2026-11-06"]),
+  ...scheduleSeed("東京女子医科大学医学部（一般推薦）", "recommendation", "primary", ["2026-11-21", "2026-11-22"]),
+  ...scheduleSeed("東京女子医科大学医学部（一般推薦）", "recommendation", "final_result", ["2026-12-04"]),
+  ...scheduleSeed("聖マリアンナ医科大学医学部（推薦・神奈川県地域枠）", "recommendation", "primary", ["2026-11-14"]),
+  ...scheduleSeed("聖マリアンナ医科大学医学部（推薦・神奈川県地域枠）", "recommendation", "final_result", ["2026-12-01"]),
+  ...scheduleSeed("帝京大学医学部（公募推薦）", "recommendation", "primary", ["2026-11-21"]),
+  ...scheduleSeed("帝京大学医学部（公募推薦）", "recommendation", "final_result", ["2026-12-01"]),
+  ...scheduleSeed("東北医科薬科大学医学部（総合型・東北地域定着枠）", "regional", "secondary", ["2026-10-24", "2026-10-25"], "一次は書類選考"),
+  ...scheduleSeed("東北医科薬科大学医学部（総合型・東北地域定着枠）", "regional", "first_result", ["2026-10-16"]),
+  ...scheduleSeed("東北医科薬科大学医学部（総合型・東北地域定着枠）", "regional", "final_result", ["2026-11-02"]),
+  ...scheduleSeed("金沢医科大学医学部（総合型・指定地域）", "regional", "primary", ["2026-11-21"]),
+  ...scheduleSeed("金沢医科大学医学部（総合型・指定地域）", "regional", "first_result", ["2026-11-26"]),
+  ...scheduleSeed("金沢医科大学医学部（総合型・指定地域）", "regional", "secondary", ["2026-12-06"]),
+  ...scheduleSeed("金沢医科大学医学部（総合型・指定地域）", "regional", "final_result", ["2026-12-10"]),
+  ...scheduleSeed("藤田医科大学医学部（ふじた未来入試）", "comprehensive", "primary", ["2026-11-08"]),
+  ...scheduleSeed("藤田医科大学医学部（ふじた未来入試）", "comprehensive", "first_result", ["2026-11-13"]),
+  ...scheduleSeed("藤田医科大学医学部（ふじた未来入試）", "comprehensive", "secondary", ["2026-11-22"]),
+  ...scheduleSeed("藤田医科大学医学部（ふじた未来入試）", "comprehensive", "final_result", ["2026-11-30"]),
+  ...scheduleSeed("愛知医科大学医学部（公募推薦・愛知県地域特別枠）", "regional", "primary", ["2026-11-28"]),
+  ...scheduleSeed("愛知医科大学医学部（公募推薦・愛知県地域特別枠）", "regional", "final_result", ["2026-12-10"]),
+  ...scheduleSeed("産業医科大学医学部（学校推薦）", "recommendation", "primary", ["2026-12-02"]),
+  ...scheduleSeed("産業医科大学医学部（学校推薦）", "recommendation", "final_result", ["2026-12-11"]),
+].flat();
+
+async function ensureInitialAdmissionSchedule(env) {
   await ensureAdmissionSchema(env);
+  const seeded = await env.DB.prepare("SELECT value FROM settings WHERE key = 'admission_seed_2027'").first();
+  if (seeded) return;
+  await env.DB.batch(INITIAL_ADMISSION_EVENTS_2027.map((event) =>
+    env.DB.prepare(
+      "INSERT INTO admission_events (id, university, selection_type, stage, schedule_date, notes, source_url) VALUES (?, ?, ?, ?, ?, ?, ?)"
+    ).bind(
+      crypto.randomUUID(), event.university, event.selectionType, event.stage,
+      event.schedule_date, event.notes || null, ADMISSION_SOURCE_2027
+    )
+  ));
+  await writeSetting(env, "admission_seed_2027", { seeded_at: new Date().toISOString(), count: INITIAL_ADMISSION_EVENTS_2027.length });
+}
+
+async function readAdmissionEvents(env, year) {
+  await ensureInitialAdmissionSchedule(env);
   const query = year
     ? env.DB.prepare("SELECT * FROM admission_events WHERE schedule_date LIKE ? ORDER BY schedule_date, university, stage").bind(String(year) + "-%")
     : env.DB.prepare("SELECT * FROM admission_events ORDER BY schedule_date, university, stage");
