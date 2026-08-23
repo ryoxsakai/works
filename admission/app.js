@@ -16,6 +16,20 @@ const typeLabels = {
   comprehensive: "総合型選抜",
 };
 
+const printTypeLabels = {
+  general: "一般",
+  ct: "共テ",
+  recommendation: "推薦",
+  regional: "地域",
+  comprehensive: "総合",
+};
+const printStageLabels = {
+  primary: "一次",
+  first_result: "一次発",
+  secondary: "二次",
+  final_result: "合格",
+};
+
 const universityReadings = {
   "愛知医科": "あいちいか",
   "岩手医科": "いわていか",
@@ -74,10 +88,8 @@ const els = {
   filterSelectAll: [...document.querySelectorAll("[data-admission-filter-select-all]")],
   filterClearGroups: [...document.querySelectorAll("[data-admission-filter-clear-group]")],
   filterClear: document.querySelector("#admission-filter-clear"),
-  add: document.querySelector("#admission-add"),
-  editor: document.querySelector("#admission-editor"),
-  editorClose: document.querySelector("#admission-editor-close"),
-  form: document.querySelector("#admission-form"),
+  print: document.querySelector("#admission-print"),
+  ganttPrint: document.querySelector("#admission-gantt-print"),
 };
 
 let events = [];
@@ -475,6 +487,80 @@ function renderGantt(viewEvents) {
   els.gantt.innerHTML = `<div class="admission-gantt-axis"><span>大学・方式</span><div style="width:${trackWidth}px">${dayHeaders}</div></div><div class="admission-gantt-rows">${rows}</div>`;
   els.ganttEmpty.hidden = true;
 }
+
+function renderPrintableGantt(viewEvents) {
+  if (!viewEvents.length) {
+    els.ganttPrint.innerHTML = '<p class="admission-view-note">表示できる入試日程はありません。</p>';
+    return;
+  }
+
+  const universities = [...new Set(viewEvents.map((event) => canonicalUniversityName(event.university)))]
+    .sort(sortUniversities);
+  els.ganttPrint.innerHTML = universities.map((university) => {
+    const universityEvents = viewEvents
+      .filter((event) => canonicalUniversityName(event.university) === university)
+      .sort((a, b) => a.schedule_date.localeCompare(b.schedule_date));
+    const dates = universityEvents.map(eventDate);
+    const start = new Date(dates[0].getFullYear(), dates[0].getMonth(), 1);
+    const lastDate = dates.at(-1);
+    const end = new Date(lastDate.getFullYear(), lastDate.getMonth(), 1);
+    const months = [];
+    for (let cursor = new Date(start); cursor <= end; cursor = addMonths(cursor, 1)) {
+      months.push(new Date(cursor));
+    }
+
+    const monthRows = months.map((monthDate) => {
+      const year = monthDate.getFullYear();
+      const month = monthDate.getMonth();
+      const dayCount = new Date(year, month + 1, 0).getDate();
+      const monthEvents = universityEvents.filter((event) => {
+        const date = eventDate(event);
+        return date.getFullYear() === year && date.getMonth() === month;
+      });
+      const byDay = new Map();
+      monthEvents.forEach((event) => {
+        const day = eventDate(event).getDate();
+        const entries = byDay.get(day) || [];
+        entries.push(event);
+        byDay.set(day, entries);
+      });
+      const days = Array.from({ length: dayCount }, (_, index) => {
+        const day = index + 1;
+        const date = new Date(year, month, day);
+        const entries = (byDay.get(day) || []).map((event) => `
+          <span class="admission-gantt-print-event ${stageClass(event.stage)}">
+            <b>${escapeHtml(printTypeLabels[event.selection_type] || event.selection_type)}</b>
+            <small>${escapeHtml(printStageLabels[event.stage] || event.stage)}</small>
+          </span>`).join("");
+        const weekendClass = date.getDay() === 0 ? " is-sunday" : (date.getDay() === 6 ? " is-saturday" : "");
+        return `<div class="admission-gantt-print-day${weekendClass}"><time>${day}</time>${entries}</div>`;
+      }).join("");
+      return `
+        <div class="admission-gantt-print-month">
+          <strong>${year}年${month + 1}月</strong>
+          <div class="admission-gantt-print-days" style="--admission-print-days:${dayCount}">${days}</div>
+        </div>`;
+    }).join("");
+
+    return `
+      <section class="admission-gantt-print-university">
+        <h3>${escapeHtml(university)}</h3>
+        ${monthRows}
+      </section>`;
+  }).join("");
+}
+
+function cleanupPrintView() {
+  delete document.body.dataset.admissionPrintView;
+  els.ganttPrint.replaceChildren();
+}
+
+function printActiveView() {
+  document.body.dataset.admissionPrintView = activeView;
+  if (activeView === "gantt") renderPrintableGantt(filteredEvents());
+  requestAnimationFrame(() => requestAnimationFrame(() => window.print()));
+}
+
 function clearInactiveViews() {
   if (activeView !== "list") els.list.replaceChildren();
   if (activeView !== "table") els.table.replaceChildren();
@@ -521,15 +607,9 @@ async function loadEvents() {
   render();
 }
 
-function openEditor() {
-  els.form.reset();
-  els.form.schedule_date.value = new Date().toISOString().slice(0, 10);
-  els.editor.showModal();
-}
-
 els.signIn.addEventListener("click", signIn);
-els.add.addEventListener("click", openEditor);
-els.editorClose.addEventListener("click", () => els.editor.close());
+els.print.addEventListener("click", printActiveView);
+window.addEventListener("afterprint", cleanupPrintView);
 els.filterOpen.addEventListener("click", openFilterModal);
 els.filterClose.addEventListener("click", () => els.filterModal.close());
 els.filterUniversitySearch.addEventListener("input", filterUniversityOptions);
@@ -601,19 +681,6 @@ els.tabs.forEach((tab) => {
     activateView(els.tabs[next].dataset.admissionViewTab);
   });
 });
-els.form.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const form = new FormData(els.form);
-  const body = Object.fromEntries(form.entries());
-  try {
-    await api("/admissions", { method: "POST", body: JSON.stringify(body) });
-    els.editor.close();
-    await loadEvents();
-  } catch (error) {
-    showError(error);
-  }
-});
-
 activateFilterTab("universities");
 activateView(localStorage.getItem(VIEW_KEY) || "list");
 watchAuth({
