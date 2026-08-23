@@ -16,6 +16,33 @@ const typeLabels = {
   comprehensive: "総合型選抜",
 };
 
+const universityReadings = {
+  "愛知医科": "あいちいか",
+  "岩手医科": "いわていか",
+  "大阪医科薬科": "おおさかいかやっか",
+  "川崎医科": "かわさきいか",
+  "金沢医科": "かなざわいか",
+  "北里": "きたさと",
+  "慶應義塾": "けいおうぎじゅく",
+  "近畿": "きんき",
+  "杏林": "きょうりん",
+  "国際医療福祉": "こくさいいりょうふくし",
+  "産業医科": "さんぎょういか",
+  "自治医科": "じちいか",
+  "順天堂": "じゅんてんどう",
+  "聖マリアンナ医科": "せいまりあんないか",
+  "帝京": "ていきょう",
+  "東京医科": "とうきょういか",
+  "東京慈恵会医科": "とうきょうじけいかいいか",
+  "東京女子医科": "とうきょうじょしいか",
+  "東北医科薬科": "とうほくいかやっか",
+  "獨協医科": "どっきょういか",
+  "日本医科": "にほんいか",
+  "兵庫医科": "ひょうごいか",
+  "藤田医科": "ふじたいか",
+};
+const universityCollator = new Intl.Collator("ja-JP", { sensitivity: "base", numeric: true });
+
 const els = {
   signedOut: document.querySelector("#signed-out"),
   signedIn: document.querySelector("#signed-in"),
@@ -44,6 +71,8 @@ const els = {
   filterPanels: [...document.querySelectorAll("[data-admission-filter-panel]")],
   filterUniversitySearch: document.querySelector("#admission-filter-university-search"),
   filterUniversityList: document.querySelector("#admission-filter-university-list"),
+  filterSelectAll: [...document.querySelectorAll("[data-admission-filter-select-all]")],
+  filterClearGroups: [...document.querySelectorAll("[data-admission-filter-clear-group]")],
   filterClear: document.querySelector("#admission-filter-clear"),
   add: document.querySelector("#admission-add"),
   editor: document.querySelector("#admission-editor"),
@@ -104,6 +133,59 @@ function formatDate(value) {
   });
 }
 
+function canonicalUniversityName(value) {
+  return String(value || "")
+    .replace(/（[^）]*）/g, "")
+    .trim()
+    .replace(/大学医学部$/, "")
+    .replace(/医学部$/, "")
+    .replace(/大学$/, "")
+    .trim();
+}
+
+function sortUniversities(a, b) {
+  const readingA = universityReadings[a] || a;
+  const readingB = universityReadings[b] || b;
+  return universityCollator.compare(readingA, readingB) || universityCollator.compare(a, b);
+}
+
+function uniqueParts(parts) {
+  return [...new Set(parts.map((part) => String(part || "").trim()).filter(Boolean))];
+}
+
+function tableUniversityDetails(event) {
+  const raw = String(event.university || "");
+  const qualifiers = [...raw.matchAll(/（([^）]+)）/g)]
+    .flatMap((match) => match[1].split(/[・／/]/))
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const redundant = {
+    general: ["一般", "一般選抜"],
+    ct: ["共テ", "共テ利用", "共通テスト", "共通テスト利用"],
+    recommendation: ["推薦", "学校推薦"],
+    regional: ["地域枠"],
+    comprehensive: ["総合型", "総合型選抜"],
+  }[event.selection_type] || [];
+
+  const methodParts = [];
+  const noteParts = [];
+  qualifiers.forEach((part) => {
+    if (redundant.includes(part)) return;
+    if (/枠|地域|定着|特別|指定/.test(part)) {
+      noteParts.push(part);
+    } else if (/方式|前期|後期|推薦|総合型|共通テスト|共テ|一般|入試|選抜/.test(part)) {
+      methodParts.push(part);
+    } else {
+      noteParts.push(part);
+    }
+  });
+
+  const type = typeLabels[event.selection_type] || event.selection_type;
+  const method = methodParts.length ? `${type}（${uniqueParts(methodParts).join("・")}）` : type;
+  const notes = uniqueParts([...noteParts, event.notes]).join("／");
+  return { university: canonicalUniversityName(raw), method, notes };
+}
+
 function showError(error) {
   els.error.textContent = error instanceof Error ? error.message : String(error || "");
 }
@@ -150,8 +232,8 @@ function activateFilterTab(name) {
 }
 
 function renderUniversityChoices() {
-  const universities = [...new Set(events.map((event) => event.university).filter(Boolean))]
-    .sort((a, b) => a.localeCompare(b, "ja"));
+  const universities = [...new Set(events.map((event) => canonicalUniversityName(event.university)).filter(Boolean))]
+    .sort(sortUniversities);
   els.filterUniversityList.innerHTML = universities.map((university) => `
     <label class="admission-filter-option">
       <input type="checkbox" name="filter_university" value="${escapeHtml(university)}" />
@@ -180,17 +262,22 @@ function filterUniversityOptions() {
 }
 
 function normalizeLegacyUniversityFilters() {
-  const known = [...new Set(events.map((event) => event.university).filter(Boolean))];
-  let changed = false;
-  const expanded = filters.universities.flatMap((selected) => {
-    if (known.includes(selected)) return [selected];
+  const rawNames = [...new Set(events.map((event) => event.university).filter(Boolean))];
+  const known = [...new Set(rawNames.map(canonicalUniversityName).filter(Boolean))];
+  const normalized = [...new Set(filters.universities.flatMap((selected) => {
+    const direct = canonicalUniversityName(selected);
+    if (known.includes(direct)) return [direct];
     const query = selected.toLocaleLowerCase("ja-JP");
-    const matches = known.filter((university) => university.toLocaleLowerCase("ja-JP").includes(query));
-    if (matches.length) changed = true;
-    return matches.length ? matches : [];
-  });
-  if (changed || expanded.length !== filters.universities.length) {
-    filters.universities = [...new Set(expanded)];
+    return known.filter((university) => {
+      if (university.toLocaleLowerCase("ja-JP").includes(query)) return true;
+      return rawNames.some((raw) =>
+        canonicalUniversityName(raw) === university &&
+        raw.toLocaleLowerCase("ja-JP").includes(query)
+      );
+    });
+  }))];
+  if (JSON.stringify(normalized) !== JSON.stringify(filters.universities)) {
+    filters.universities = normalized;
     saveFilters();
   }
 }
@@ -244,7 +331,7 @@ function primaryMonthByUniversity() {
 function filteredEvents() {
   const primaryDates = primaryMonthByUniversity();
   return events.filter((event) => {
-    if (filters.universities.length && !filters.universities.includes(event.university)) return false;
+    if (filters.universities.length && !filters.universities.includes(canonicalUniversityName(event.university))) return false;
     if (filters.types.length && !filters.types.includes(event.selection_type)) return false;
     if (filters.primaryMonths.length && !filters.primaryMonths.includes(String(primaryDates.get(event.university)?.getMonth() + 1))) return false;
     return true;
@@ -273,14 +360,17 @@ function renderTable(viewEvents) {
     els.table.innerHTML = `<tr class="admission-table-empty"><td colspan="5">入試日程はまだ登録されていません。</td></tr>`;
     return;
   }
-  els.table.innerHTML = viewEvents.map((event) => `
-    <tr>
-      <td><strong>${escapeHtml(event.university)}</strong></td>
-      <td>${escapeHtml(typeLabels[event.selection_type] || event.selection_type)}</td>
-      <td>${escapeHtml(stageLabels[event.stage] || event.stage)}</td>
-      <td>${escapeHtml(formatDate(event.schedule_date))}</td>
-      <td>${escapeHtml(event.notes || "—")}</td>
-    </tr>`).join("");
+  els.table.innerHTML = viewEvents.map((event) => {
+    const details = tableUniversityDetails(event);
+    return `
+      <tr>
+        <td><strong>${escapeHtml(details.university)}</strong></td>
+        <td>${escapeHtml(details.method)}</td>
+        <td>${escapeHtml(stageLabels[event.stage] || event.stage)}</td>
+        <td>${escapeHtml(formatDate(event.schedule_date))}</td>
+        <td>${escapeHtml(details.notes || "—")}</td>
+      </tr>`;
+  }).join("");
 }
 
 function calendarKey(date) {
@@ -442,6 +532,18 @@ els.filterTabs.forEach((tab) => {
       : (index - 1 + els.filterTabs.length) % els.filterTabs.length;
     els.filterTabs[next].focus();
     activateFilterTab(els.filterTabs[next].dataset.admissionFilterTab);
+  });
+});
+els.filterSelectAll.forEach((button) => {
+  button.addEventListener("click", () => {
+    const name = button.dataset.admissionFilterSelectAll;
+    els.filterForm.querySelectorAll(`input[name="${name}"]`).forEach((input) => { input.checked = true; });
+  });
+});
+els.filterClearGroups.forEach((button) => {
+  button.addEventListener("click", () => {
+    const name = button.dataset.admissionFilterClearGroup;
+    els.filterForm.querySelectorAll(`input[name="${name}"]`).forEach((input) => { input.checked = false; });
   });
 });
 els.filterClear.addEventListener("click", () => {
