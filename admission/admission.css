@@ -1202,3 +1202,61 @@
     white-space: nowrap;
   }
 }
+
+
+/* 入試管理: 試験段階・方式の配色 */
+.admission-calendar-event.admission-stage-primary,
+.admission-gantt-marker.admission-stage-primary,
+.admission-gantt-print-event.admission-stage-primary {
+  --admission-color: #2563eb;
+}
+
+.admission-calendar-event.admission-stage-first_result,
+.admission-gantt-marker.admission-stage-first_result,
+.admission-gantt-print-event.admission-stage-first_result {
+  --admission-color: #8b5cf6;
+}
+
+.admission-calendar-event.admission-stage-secondary,
+.admission-gantt-marker.admission-stage-secondary,
+.admission-gantt-print-event.admission-stage-secondary {
+  --admission-color: #d97706;
+}
+
+.admission-calendar-event.admission-stage-final_result,
+.admission-gantt-marker.admission-stage-final_result,
+.admission-gantt-print-event.admission-stage-final_result {
+  --admission-color: #16a34a;
+}
+
+.admission-table tbody tr.admission-type-general {
+  --admission-type-color: #4f7ee8;
+}
+
+.admission-table tbody tr.admission-type-ct {
+  --admission-type-color: #16a3a3;
+}
+
+.admission-table tbody tr.admission-type-recommendation {
+  --admission-type-color: #e879a0;
+}
+
+.admission-table tbody tr.admission-type-regional {
+  --admission-type-color: #59a86b;
+}
+
+.admission-table tbody tr.admission-type-comprehensive {
+  --admission-type-color: #9a6dde;
+}
+
+.admission-table tbody tr[class*="admission-type-"] > td {
+  background: color-mix(in srgb, var(--admission-type-color) 11%, var(--bg-elevated));
+}
+
+.admission-table tbody tr[class*="admission-type-"] > td:first-child {
+  box-shadow: inset 3px 0 0 var(--admission-type-color);
+}
+
+:root[data-theme="dark"] .admission-table tbody tr[class*="admission-type-"] > td {
+  background: color-mix(in srgb, var(--admission-type-color) 16%, var(--bg-elevated));
+}

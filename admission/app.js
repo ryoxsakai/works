@@ -386,8 +386,9 @@ function renderTable(viewEvents) {
   }
   els.table.innerHTML = viewEvents.map((event) => {
     const details = tableUniversityDetails(event);
+    const rowTypeClass = "admission-type-" + String(event.selection_type || "general").replace(/[^a-z_]/g, "");
     return `
-      <tr>
+      <tr class="${rowTypeClass}">
         <td><strong>${escapeHtml(details.university)}</strong></td>
         <td>${escapeHtml(details.method)}</td>
         <td>${escapeHtml(stageLabels[event.stage] || event.stage)}</td>
