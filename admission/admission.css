@@ -237,3 +237,146 @@
     display: none;
   }
 }
+
+
+/* 入試管理: 日程入力・一覧・表 */
+.admission-auth {
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: .52rem;
+  background: var(--bg-elevated);
+  box-shadow: var(--card-shadow);
+}
+
+.admission-auth p {
+  margin: 0 0 .7rem;
+  font-size: .82rem;
+}
+
+.admission-add {
+  min-height: 2.2rem;
+  padding: .35rem .6rem;
+  border-radius: .38rem;
+  color: var(--accent);
+  font-size: .75rem;
+}
+
+.admission-form {
+  display: grid;
+  gap: .7rem;
+}
+
+.admission-form label {
+  display: grid;
+  gap: .28rem;
+  color: var(--muted);
+  font-size: .76rem;
+}
+
+.admission-form input,
+.admission-form select,
+.admission-form textarea {
+  width: 100%;
+  border-radius: .38rem;
+  background: #fbfbfc;
+  font-size: .82rem;
+}
+
+.admission-form textarea {
+  resize: vertical;
+}
+
+.admission-form-actions {
+  justify-content: flex-end;
+}
+
+.admission-list-item {
+  --admission-color: #2563eb;
+  display: flex;
+  align-items: center;
+  gap: .7rem;
+  margin-bottom: .45rem;
+  padding: .7rem .75rem;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--admission-color);
+  border-radius: .42rem;
+  background: var(--bg-elevated);
+  box-shadow: var(--card-shadow);
+}
+
+.admission-list-item time {
+  width: 7.4rem;
+  flex: 0 0 7.4rem;
+  color: var(--muted);
+  font-size: .72rem;
+}
+
+.admission-list-copy {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: .1rem;
+}
+
+.admission-list-copy strong {
+  overflow: hidden;
+  color: var(--fg);
+  font-size: .86rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admission-list-copy span,
+.admission-list-copy small {
+  color: var(--muted);
+  font-size: .68rem;
+}
+
+.admission-list-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admission-stage-badge {
+  flex-shrink: 0;
+  padding: .2rem .38rem;
+  border-radius: .28rem;
+  color: var(--admission-color);
+  background: color-mix(in srgb, var(--admission-color) 9%, var(--bg-elevated));
+  font-size: .64rem;
+  font-weight: 600;
+}
+
+.admission-stage-primary { --admission-color: #2563eb; }
+.admission-stage-first_result { --admission-color: #8b5cf6; }
+.admission-stage-secondary { --admission-color: #d97706; }
+.admission-stage-final_result { --admission-color: #16a34a; }
+
+:root[data-theme="dark"] .admission-form input,
+:root[data-theme="dark"] .admission-form select,
+:root[data-theme="dark"] .admission-form textarea {
+  background: color-mix(in srgb, var(--bg-elevated) 94%, #fff 6%);
+}
+
+@media (max-width: 640px) {
+  .admission-heading {
+    align-items: center;
+  }
+
+  .admission-list-item {
+    align-items: flex-start;
+    gap: .45rem;
+  }
+
+  .admission-list-item time {
+    width: 4.55rem;
+    flex-basis: 4.55rem;
+    line-height: 1.4;
+  }
+
+  .admission-stage-badge {
+    display: none;
+  }
+}
