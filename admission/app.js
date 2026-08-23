@@ -25,6 +25,13 @@ const els = {
   views: [...document.querySelectorAll("[data-admission-view]")],
   list: document.querySelector("#admission-list"),
   table: document.querySelector("#admission-table-body"),
+  calendarGrid: document.querySelector("#admission-calendar-grid"),
+  calendarLabel: document.querySelector("#admission-calendar-label"),
+  calendarPrev: document.querySelector("#admission-calendar-prev"),
+  calendarNext: document.querySelector("#admission-calendar-next"),
+  calendarEmpty: document.querySelector("#admission-calendar-empty"),
+  gantt: document.querySelector("#admission-gantt"),
+  ganttEmpty: document.querySelector("#admission-gantt-empty"),
   add: document.querySelector("#admission-add"),
   editor: document.querySelector("#admission-editor"),
   editorClose: document.querySelector("#admission-editor-close"),
@@ -32,6 +39,7 @@ const els = {
 };
 
 let events = [];
+let calendarCursor = null;
 
 function escapeHtml(value) {
   return String(value || "").replace(/[&<>"']/g, (c) => ({
@@ -110,9 +118,92 @@ function renderTable() {
     </tr>`).join("");
 }
 
+function calendarKey(date) {
+  return date.getFullYear() + "-" + date.getMonth() + "-" + date.getDate();
+}
+
+function eventDate(event) {
+  return new Date(event.schedule_date + "T00:00:00");
+}
+
+function stageClass(stage) {
+  return "admission-stage-" + String(stage || "primary").replace(/[^a-z_]/g, "");
+}
+
+function renderCalendar() {
+  if (!calendarCursor) return;
+  const year = calendarCursor.getFullYear();
+  const month = calendarCursor.getMonth();
+  els.calendarLabel.textContent = year + "年" + (month + 1) + "月";
+
+  const byDay = new Map();
+  events.forEach((event) => {
+    const date = eventDate(event);
+    if (date.getFullYear() !== year || date.getMonth() !== month) return;
+    const key = calendarKey(date);
+    const items = byDay.get(key) || [];
+    items.push(event);
+    byDay.set(key, items);
+  });
+
+  const week = ["日", "月", "火", "水", "木", "金", "土"];
+  const startOffset = new Date(year, month, 1).getDay();
+  const days = new Date(year, month + 1, 0).getDate();
+  let html = week.map((label) => `<div class="admission-calendar-weekday">${label}</div>`).join("");
+  for (let i = 0; i < startOffset; i++) html += '<div class="admission-calendar-cell empty"></div>';
+  for (let day = 1; day <= days; day++) {
+    const date = new Date(year, month, day);
+    const items = byDay.get(calendarKey(date)) || [];
+    const cards = items.map((event) => `<span class="admission-calendar-event ${stageClass(event.stage)}" title="${escapeHtml(event.university)}｜${escapeHtml(stageLabels[event.stage] || event.stage)}"><b>${escapeHtml(event.university)}</b><small>${escapeHtml(stageLabels[event.stage] || event.stage)}</small></span>`).join("");
+    html += `<div class="admission-calendar-cell"><time datetime="${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}">${day}</time>${cards}</div>`;
+  }
+  while ((startOffset + days) % 7) html += '<div class="admission-calendar-cell empty"></div>';
+  els.calendarGrid.innerHTML = html;
+  els.calendarEmpty.hidden = byDay.size > 0;
+}
+
+function addMonths(date, count) {
+  return new Date(date.getFullYear(), date.getMonth() + count, 1);
+}
+
+function renderGantt() {
+  if (!events.length) {
+    els.gantt.innerHTML = "";
+    els.ganttEmpty.hidden = false;
+    return;
+  }
+  const dates = events.map(eventDate).sort((a, b) => a - b);
+  const rangeStart = new Date(dates[0].getFullYear(), dates[0].getMonth(), 1);
+  const rangeEnd = new Date(dates.at(-1).getFullYear(), dates.at(-1).getMonth() + 1, 0);
+  const totalDays = Math.max(1, Math.round((rangeEnd - rangeStart) / 86400000));
+  const months = [];
+  for (let date = new Date(rangeStart); date <= rangeEnd; date = addMonths(date, 1)) {
+    months.push(new Date(date));
+  }
+  const groups = [...new Set(events.map((event) => event.university))];
+  const axis = months.map((month) => `<span>${month.getFullYear()}年${month.getMonth() + 1}月</span>`).join("");
+  const rows = groups.map((university) => {
+    const rowEvents = events.filter((event) => event.university === university);
+    const markers = rowEvents.map((event, index) => {
+      const offset = Math.round(((eventDate(event) - rangeStart) / 86400000) / totalDays * 10000) / 100;
+      const label = stageLabels[event.stage] || event.stage;
+      return `<span class="admission-gantt-marker ${stageClass(event.stage)}" style="left:${offset}%; top:${.35 + (index % 3) * 1.15}rem" title="${escapeHtml(formatDate(event.schedule_date))}｜${escapeHtml(label)}">${escapeHtml(label.replace("試験", "").replace("発表", "発"))}</span>`;
+    }).join("");
+    return `<div class="admission-gantt-row"><strong title="${escapeHtml(university)}">${escapeHtml(university)}</strong><div class="admission-gantt-track">${markers}</div></div>`;
+  }).join("");
+  els.gantt.innerHTML = `<div class="admission-gantt-axis"><span>大学・方式</span><div>${axis}</div></div><div class="admission-gantt-rows">${rows}</div>`;
+  els.ganttEmpty.hidden = true;
+}
+
 function render() {
   renderList();
   renderTable();
+  if (!calendarCursor && events.length) {
+    const first = eventDate(events[0]);
+    calendarCursor = new Date(first.getFullYear(), first.getMonth(), 1);
+  }
+  renderCalendar();
+  renderGantt();
 }
 
 async function loadEvents() {
@@ -130,6 +221,14 @@ function openEditor() {
 els.signIn.addEventListener("click", signIn);
 els.add.addEventListener("click", openEditor);
 els.editorClose.addEventListener("click", () => els.editor.close());
+els.calendarPrev.addEventListener("click", () => {
+  calendarCursor = addMonths(calendarCursor || new Date(), -1);
+  renderCalendar();
+});
+els.calendarNext.addEventListener("click", () => {
+  calendarCursor = addMonths(calendarCursor || new Date(), 1);
+  renderCalendar();
+});
 els.tabs.forEach((tab) => {
   tab.addEventListener("click", () => activateView(tab.dataset.admissionViewTab));
   tab.addEventListener("keydown", (event) => {
