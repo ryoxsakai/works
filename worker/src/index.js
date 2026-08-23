@@ -2,7 +2,7 @@ function corsHeaders(origin) {
   return {
     "Access-Control-Allow-Origin": origin,
     "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type,Authorization",
+    "Access-Control-Allow-Headers": "Content-Type,Authorization,X-API-Key",
   };
 }
 
@@ -11,6 +11,164 @@ function json(data, headers, status = 200) {
     status,
     headers: { ...headers, "Content-Type": "application/json" },
   });
+}
+
+// --- ブラウザを介さない読み取り専用の授業予定API ---
+
+const SCHEDULE_TIME_ZONE = "Asia/Tokyo";
+
+const SCHEDULE_UTC_OFFSET_MS = 9 * 60 * 60 * 1000;
+
+function httpError(status, message) {
+  const err = new Error(message);
+  err.status = status;
+  return err;
+}
+
+async function constantTimeEqual(left, right) {
+  const encoder = new TextEncoder();
+  const [leftHash, rightHash] = await Promise.all([
+    crypto.subtle.digest("SHA-256", encoder.encode(left)),
+    crypto.subtle.digest("SHA-256", encoder.encode(right)),
+  ]);
+  const leftBytes = new Uint8Array(leftHash);
+  const rightBytes = new Uint8Array(rightHash);
+  let difference = 0;
+  for (let i = 0; i < leftBytes.length; i += 1) {
+    difference |= leftBytes[i] ^ rightBytes[i];
+  }
+  return difference === 0;
+}
+
+async function verifyReadApiKey(request, env) {
+  if (!env.WORKS_API_KEY) {
+    throw httpError(503, "WORKS_API_KEY is not configured");
+  }
+  const supplied = request.headers.get("X-API-Key") || "";
+  if (!supplied || !(await constantTimeEqual(supplied, env.WORKS_API_KEY))) {
+    throw httpError(401, "invalid API key");
+  }
+}
+
+function todayInScheduleTimeZone(now = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: SCHEDULE_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(now);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+function scheduleDateRange(date) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    throw httpError(400, "date must be YYYY-MM-DD");
+  }
+  const [year, month, day] = date.split("-").map(Number);
+  const midnightUtc = new Date(Date.UTC(year, month - 1, day));
+  if (
+    midnightUtc.getUTCFullYear() !== year ||
+    midnightUtc.getUTCMonth() !== month - 1 ||
+    midnightUtc.getUTCDate() !== day
+  ) {
+    throw httpError(400, "date is invalid");
+  }
+  const start = new Date(midnightUtc.getTime() - SCHEDULE_UTC_OFFSET_MS);
+  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+  return { timeMin: start.toISOString(), timeMax: end.toISOString() };
+}
+
+async function fetchCalendarEventsForSchedule(accessToken, calendarId, timeMin, timeMax) {
+  const events = [];
+  let pageToken = "";
+  do {
+    const params = new URLSearchParams({
+      timeMin,
+      timeMax,
+      timeZone: SCHEDULE_TIME_ZONE,
+      singleEvents: "true",
+      orderBy: "startTime",
+      maxResults: "2500",
+      showDeleted: "false",
+    });
+    if (pageToken) params.set("pageToken", pageToken);
+    const res = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?${params}`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    if (!res.ok) {
+      throw httpError(502, `Google Calendar API error (${res.status})`);
+    }
+    const data = await res.json();
+    events.push(...(data.items || []).map((event) => ({ ...event, calendar_id: calendarId })));
+    pageToken = data.nextPageToken || "";
+  } while (pageToken);
+  return events;
+}
+
+async function readSchedule(env, searchParams) {
+  const date = (searchParams.get("date") || todayInScheduleTimeZone()).trim();
+  const { timeMin, timeMax } = scheduleDateRange(date);
+  const includeExcluded = ["1", "true"].includes(
+    (searchParams.get("include_excluded") || "").toLowerCase()
+  );
+  const settings = await readSettings(env);
+  const calendarIds = Array.isArray(settings.selected_calendars)
+    ? [...new Set(settings.selected_calendars.map(String).filter(Boolean))]
+    : [];
+  if (calendarIds.length === 0) {
+    throw httpError(409, "selected calendars are not configured");
+  }
+  const token = await mintGoogleAccessToken(env);
+  const eventGroups = await Promise.all(
+    calendarIds.map((calendarId) =>
+      fetchCalendarEventsForSchedule(token.access_token, calendarId, timeMin, timeMax)
+    )
+  );
+  const excludedTitles = new Set(
+    Array.isArray(settings.excluded_titles)
+      ? settings.excluded_titles.map((title) => String(title).trim())
+      : []
+  );
+  const details = new Map(
+    (await readCurriculumEntries(env)).map((entry) => [entry.calendar_event_id, entry])
+  );
+  const events = eventGroups
+    .flat()
+    .filter((event) => event.status !== "cancelled")
+    .filter(
+      (event) =>
+        includeExcluded || !excludedTitles.has(String(event.summary || "").trim())
+    )
+    .sort((left, right) => {
+      const leftStart = left.start?.dateTime || left.start?.date || "";
+      const rightStart = right.start?.dateTime || right.start?.date || "";
+      return leftStart.localeCompare(rightStart);
+    })
+    .map((event) => {
+      const detail = details.get(event.id) || {};
+      return {
+        id: event.id,
+        calendar_id: event.calendar_id,
+        title: String(event.summary || "(無題)").trim(),
+        start: event.start?.dateTime || event.start?.date || null,
+        end: event.end?.dateTime || event.end?.date || null,
+        all_day: Boolean(event.start?.date && !event.start?.dateTime),
+        completed: Boolean(detail.completed),
+        lesson_plan: detail.lesson_plan || null,
+        confirmation_test: detail.confirmation_test || null,
+        homework: detail.homework || null,
+        lesson_memo: detail.lesson_memo || null,
+      };
+    });
+  return {
+    date,
+    time_zone: SCHEDULE_TIME_ZONE,
+    count: events.length,
+    events,
+    generated_at: new Date().toISOString(),
+  };
 }
 
 // --- 認証: Googleの認可コードをリフレッシュトークンに交換してDBに保存し、
@@ -1287,6 +1445,11 @@ export default {
         return json({ session_token: sessionToken }, headers);
       }
 
+      if (url.pathname === "/api/schedule" && request.method === "GET") {
+        await verifyReadApiKey(request, env);
+        return json(await readSchedule(env, url.searchParams), headers);
+      }
+
       await verifySession(request, env);
 
       if (url.pathname === "/api/auth/logout" && request.method === "POST") {
@@ -1678,7 +1841,7 @@ export default {
         "invalid session",
         "session expired",
       ];
-      const status = authErrors.includes(err.message) ? 401 : 400;
+      const status = Number.isInteger(err.status) ? err.status : authErrors.includes(err.message) ? 401 : 400;
       return json({ error: err.message }, headers, status);
     }
   },
