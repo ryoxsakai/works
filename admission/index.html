@@ -19,7 +19,7 @@
   <link rel="apple-touch-icon" href="/shared/logo.png" />
   <link rel="stylesheet" href="/shared/styles.css?v=52" />
   <link rel="stylesheet" href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" />
-  <link rel="stylesheet" href="/admission/admission.css?v=5" />
+  <link rel="stylesheet" href="/admission/admission.css?v=6" />
 </head>
 <body>
   <header class="page-header">
@@ -46,35 +46,16 @@
         <button id="admission-add" type="button" class="btn-primary admission-add"><i class="bx bx-plus"></i> 日程を追加</button>
       </div>
 
-      <div class="admission-filters" aria-label="入試日程の絞り込み">
-        <label class="admission-filter-search">
-          <i class="bx bx-search"></i>
-          <input id="admission-university-filter" type="search" placeholder="大学名を検索" />
-        </label>
-        <label>
-          <span>方式</span>
-          <select id="admission-type-filter">
-            <option value="">すべて</option>
-            <option value="general">一般選抜</option>
-            <option value="ct">共通テスト利用</option>
-            <option value="recommendation">推薦</option>
-            <option value="regional">地域枠</option>
-            <option value="comprehensive">総合型選抜</option>
-          </select>
-        </label>
-        <label>
-          <span>一次実施月</span>
-          <select id="admission-primary-month-filter">
-            <option value="">すべて</option>
-            <option value="10">10月</option>
-            <option value="11">11月</option>
-            <option value="12">12月</option>
-            <option value="1">1月</option>
-            <option value="2">2月</option>
-            <option value="3">3月</option>
-          </select>
-        </label>
-        <button id="admission-filter-reset" type="button" aria-label="絞り込みを解除"><i class="bx bx-reset"></i> 解除</button>
+      <div class="admission-filter-bar" aria-label="入試日程の絞り込み">
+        <button id="admission-filter-open" type="button" class="btn-primary admission-filter-open">
+          <i class="bx bx-filter-alt"></i>
+          絞り込み
+          <span id="admission-filter-count" class="admission-filter-count" hidden>0</span>
+        </button>
+        <p id="admission-filter-summary" class="admission-filter-summary">すべての入試日程</p>
+        <button id="admission-filter-reset" type="button" class="admission-filter-reset" aria-label="絞り込みを解除" hidden>
+          <i class="bx bx-reset"></i>
+        </button>
       </div>
 
       <div class="admission-view-tabs" role="tablist" aria-label="入試日程の表示形式">
@@ -127,6 +108,64 @@
     </section>
   </main>
 
+  <dialog id="admission-filter-modal" class="app-modal admission-filter-modal">
+    <div class="modal-header">
+      <h2><i class="bx bx-filter-alt"></i> 絞り込み設定</h2>
+      <button id="admission-filter-close" type="button" class="modal-close" aria-label="閉じる"><i class="bx bx-x"></i></button>
+    </div>
+
+    <div class="modal-tabs admission-filter-tabs" role="tablist" aria-label="絞り込み項目">
+      <button type="button" role="tab" data-admission-filter-tab="universities" aria-controls="admission-filter-panel-universities">
+        <i class="bx bx-building-house"></i> 大学
+      </button>
+      <button type="button" role="tab" data-admission-filter-tab="types" aria-controls="admission-filter-panel-types">
+        <i class="bx bx-category"></i> 方式
+      </button>
+      <button type="button" role="tab" data-admission-filter-tab="months" aria-controls="admission-filter-panel-months">
+        <i class="bx bx-calendar"></i> 一次実施月
+      </button>
+    </div>
+
+    <form id="admission-filter-form" class="admission-filter-form">
+      <section id="admission-filter-panel-universities" class="admission-filter-panel" role="tabpanel" data-admission-filter-panel="universities">
+        <label class="admission-filter-modal-search">
+          <i class="bx bx-search"></i>
+          <input id="admission-filter-university-search" type="search" placeholder="大学名を検索" autocomplete="off" />
+        </label>
+        <p class="admission-filter-help">対象にしたい大学を複数選択できます。</p>
+        <div id="admission-filter-university-list" class="admission-filter-options admission-filter-university-list"></div>
+      </section>
+
+      <section id="admission-filter-panel-types" class="admission-filter-panel" role="tabpanel" data-admission-filter-panel="types" hidden>
+        <p class="admission-filter-help">対象にしたい方式を複数選択できます。</p>
+        <div class="admission-filter-options">
+          <label class="admission-filter-option"><input type="checkbox" name="filter_type" value="general" /><span>一般選抜</span></label>
+          <label class="admission-filter-option"><input type="checkbox" name="filter_type" value="ct" /><span>共通テスト利用</span></label>
+          <label class="admission-filter-option"><input type="checkbox" name="filter_type" value="recommendation" /><span>推薦</span></label>
+          <label class="admission-filter-option"><input type="checkbox" name="filter_type" value="regional" /><span>地域枠</span></label>
+          <label class="admission-filter-option"><input type="checkbox" name="filter_type" value="comprehensive" /><span>総合型選抜</span></label>
+        </div>
+      </section>
+
+      <section id="admission-filter-panel-months" class="admission-filter-panel" role="tabpanel" data-admission-filter-panel="months" hidden>
+        <p class="admission-filter-help">一次試験が実施される月を複数選択できます。</p>
+        <div class="admission-filter-options admission-filter-month-options">
+          <label class="admission-filter-option"><input type="checkbox" name="filter_month" value="10" /><span>10月</span></label>
+          <label class="admission-filter-option"><input type="checkbox" name="filter_month" value="11" /><span>11月</span></label>
+          <label class="admission-filter-option"><input type="checkbox" name="filter_month" value="12" /><span>12月</span></label>
+          <label class="admission-filter-option"><input type="checkbox" name="filter_month" value="1" /><span>1月</span></label>
+          <label class="admission-filter-option"><input type="checkbox" name="filter_month" value="2" /><span>2月</span></label>
+          <label class="admission-filter-option"><input type="checkbox" name="filter_month" value="3" /><span>3月</span></label>
+        </div>
+      </section>
+
+      <div class="admission-filter-actions">
+        <button id="admission-filter-clear" type="button"><i class="bx bx-reset"></i> すべて解除</button>
+        <button type="submit" class="btn-primary"><i class="bx bx-check"></i> 適用</button>
+      </div>
+    </form>
+  </dialog>
+
   <dialog id="admission-editor" class="app-modal">
     <div class="modal-header">
       <h2><i class="bx bx-calendar-plus"></i> 入試日程を追加</h2>
@@ -143,6 +182,6 @@
     </form>
   </dialog>
 
-  <script type="module" src="/admission/app.js?v=5"></script>
+  <script type="module" src="/admission/app.js?v=6"></script>
 </body>
 </html>
