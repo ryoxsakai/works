@@ -19,6 +19,7 @@
   <link rel="apple-touch-icon" href="/shared/logo.png" />
   <link rel="stylesheet" href="/shared/styles.css?v=52" />
   <link rel="stylesheet" href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" />
+  <link rel="stylesheet" href="/admission/admission.css?v=1" />
 </head>
 <body>
   <header class="page-header">
@@ -27,17 +28,80 @@
 
   <main class="admission-main">
     <a class="admission-back" href="/"><i class="bx bx-chevron-left"></i> Worksトップへ</a>
+
     <section class="admission-panel" aria-labelledby="admission-title">
-      <p class="eyebrow">ADMISSION MANAGEMENT</p>
-      <h2 id="admission-title"><i class="bx bx-calendar-event"></i> 入試カレンダー</h2>
-      <div class="admission-calendar-placeholder">
-        <div>
-          <i class="bx bx-calendar-plus"></i>
-          <p>入試カレンダーを準備中です</p>
-          <small>大学・学部・試験日程をまとめて管理できるようにします。</small>
+      <div class="admission-heading">
+        <div class="admission-heading-copy">
+          <p class="eyebrow">ADMISSION CALENDAR</p>
+          <h2 id="admission-title"><i class="bx bx-calendar-event"></i> 入試日程</h2>
         </div>
       </div>
+
+      <div class="admission-view-tabs" role="tablist" aria-label="入試日程の表示形式">
+        <button class="admission-view-tab" type="button" role="tab" aria-controls="admission-view-list" data-admission-view-tab="list">
+          <i class="bx bx-list-ul"></i> 一覧
+        </button>
+        <button class="admission-view-tab" type="button" role="tab" aria-controls="admission-view-calendar" data-admission-view-tab="calendar">
+          <i class="bx bx-calendar"></i> カレンダー
+        </button>
+        <button class="admission-view-tab" type="button" role="tab" aria-controls="admission-view-gantt" data-admission-view-tab="gantt">
+          <i class="bx bx-bar-chart-alt-2"></i> ガント
+        </button>
+        <button class="admission-view-tab" type="button" role="tab" aria-controls="admission-view-table" data-admission-view-tab="table">
+          <i class="bx bx-table"></i> 表
+        </button>
+      </div>
+
+      <section id="admission-view-list" class="admission-view" role="tabpanel" data-admission-view="list">
+        <div class="admission-empty-state">
+          <div>
+            <i class="bx bx-list-ul"></i>
+            <p>入試日程はまだ登録されていません</p>
+            <small>登録後は、日付順に大学・方式・試験段階を一覧表示します。</small>
+          </div>
+        </div>
+      </section>
+
+      <section id="admission-view-calendar" class="admission-view" role="tabpanel" data-admission-view="calendar" hidden>
+        <div class="admission-calendar-shell" aria-label="月間カレンダーの準備表示">
+          <div class="admission-calendar-grid" aria-hidden="true">
+            <div class="admission-calendar-weekday">日</div><div class="admission-calendar-weekday">月</div><div class="admission-calendar-weekday">火</div><div class="admission-calendar-weekday">水</div><div class="admission-calendar-weekday">木</div><div class="admission-calendar-weekday">金</div><div class="admission-calendar-weekday">土</div>
+            <div class="admission-calendar-cell empty"></div><div class="admission-calendar-cell empty"></div><div class="admission-calendar-cell"></div><div class="admission-calendar-cell"></div><div class="admission-calendar-cell"></div><div class="admission-calendar-cell"></div><div class="admission-calendar-cell"></div>
+            <div class="admission-calendar-cell"></div><div class="admission-calendar-cell"></div><div class="admission-calendar-cell"></div><div class="admission-calendar-cell"></div><div class="admission-calendar-cell"></div><div class="admission-calendar-cell"></div><div class="admission-calendar-cell"></div>
+            <div class="admission-calendar-cell"></div><div class="admission-calendar-cell"></div><div class="admission-calendar-cell"></div><div class="admission-calendar-cell"></div><div class="admission-calendar-cell"></div><div class="admission-calendar-cell"></div><div class="admission-calendar-cell"></div>
+            <div class="admission-calendar-cell"></div><div class="admission-calendar-cell"></div><div class="admission-calendar-cell"></div><div class="admission-calendar-cell"></div><div class="admission-calendar-cell"></div><div class="admission-calendar-cell"></div><div class="admission-calendar-cell"></div>
+            <div class="admission-calendar-cell"></div><div class="admission-calendar-cell"></div><div class="admission-calendar-cell"></div><div class="admission-calendar-cell"></div><div class="admission-calendar-cell empty"></div><div class="admission-calendar-cell empty"></div><div class="admission-calendar-cell empty"></div>
+          </div>
+        </div>
+        <div class="admission-empty-state">
+          <div>
+            <i class="bx bx-calendar"></i>
+            <p>月間カレンダーを準備しています</p>
+            <small>日程データの登録後、試験・発表・面接を月単位で確認できます。</small>
+          </div>
+        </div>
+      </section>
+
+      <section id="admission-view-gantt" class="admission-view" role="tabpanel" data-admission-view="gantt" hidden>
+        <div class="admission-gantt-shell">
+          <div class="admission-gantt-inner">
+            <div class="admission-gantt-axis"><span>大学・方式</span><span>10月</span><span>11月</span><span>12月</span><span>1月</span><span>2月</span><span>3月</span></div>
+            <div class="admission-gantt-empty">日程を登録すると、出願・一次・二次・発表の流れを横断して確認できます。</div>
+          </div>
+        </div>
+      </section>
+
+      <section id="admission-view-table" class="admission-view" role="tabpanel" data-admission-view="table" hidden>
+        <div class="admission-table-shell">
+          <table class="admission-table">
+            <thead><tr><th>大学</th><th>方式</th><th>区分</th><th>日付</th><th>補足</th></tr></thead>
+            <tbody><tr class="admission-table-empty"><td colspan="5">入試日程はまだ登録されていません。</td></tr></tbody>
+          </table>
+        </div>
+      </section>
     </section>
   </main>
+
+  <script src="/admission/admission.js?v=1"></script>
 </body>
 </html>
