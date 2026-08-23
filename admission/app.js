@@ -181,7 +181,19 @@ function tableUniversityDetails(event) {
   });
 
   const type = typeLabels[event.selection_type] || event.selection_type;
-  const method = methodParts.length ? `${type}（${uniqueParts(methodParts).join("・")}）` : type;
+  const normalizedMethods = uniqueParts(methodParts).map((part) => ({
+    "一般": "一般選抜",
+    "共テ": "共通テスト利用",
+    "共テ利用": "共通テスト利用",
+    "共通テスト": "共通テスト利用",
+    "推薦": "推薦",
+    "総合型": "総合型選抜",
+  }[part] || part));
+  const qualifierDefinesMethod = event.selection_type === "regional" &&
+    normalizedMethods.some((part) => /一般|共通テスト|推薦|総合型/.test(part));
+  const method = qualifierDefinesMethod
+    ? normalizedMethods.join("・")
+    : (normalizedMethods.length ? `${type}（${normalizedMethods.join("・")}）` : type);
   const notes = uniqueParts([...noteParts, event.notes]).join("／");
   return { university: canonicalUniversityName(raw), method, notes };
 }
