@@ -3294,3 +3294,82 @@ textarea,
   appearance: none;
   -webkit-appearance: none;
 }
+
+
+/* 入試管理 */
+.admission-main {
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.admission-back {
+  display: inline-flex;
+  align-items: center;
+  gap: .25rem;
+  margin: 0 0 .8rem;
+  padding: .3rem 0;
+  color: var(--muted);
+  font-size: .76rem;
+  text-decoration: none;
+}
+
+.admission-back:hover {
+  color: var(--accent);
+}
+
+.admission-panel {
+  padding: 1.1rem;
+  border: 1px solid var(--border);
+  border-radius: .52rem;
+  background: var(--bg-elevated);
+  box-shadow: var(--card-shadow);
+}
+
+.admission-panel .eyebrow {
+  margin-bottom: .25rem;
+}
+
+.admission-panel h2 {
+  display: flex;
+  align-items: center;
+  gap: .42rem;
+  margin: 0;
+  color: var(--fg);
+  font-size: 1.25rem;
+}
+
+.admission-panel h2 > .bx {
+  color: var(--accent);
+}
+
+.admission-calendar-placeholder {
+  display: grid;
+  min-height: 13rem;
+  place-items: center;
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px dashed color-mix(in srgb, var(--accent) 40%, var(--border));
+  border-radius: .44rem;
+  background: color-mix(in srgb, var(--accent) 3%, var(--bg-elevated));
+  color: var(--muted);
+  text-align: center;
+}
+
+.admission-calendar-placeholder i {
+  margin-bottom: .4rem;
+  color: var(--accent);
+  font-size: 2rem;
+}
+
+.admission-calendar-placeholder p {
+  margin: 0;
+  color: var(--fg);
+  font-size: .85rem;
+  font-weight: 600;
+}
+
+.admission-calendar-placeholder small {
+  display: block;
+  margin-top: .25rem;
+  font-size: .7rem;
+}
