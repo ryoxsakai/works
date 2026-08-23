@@ -563,3 +563,61 @@
     min-height: 5.7rem;
   }
 }
+
+
+/* 入試管理: 日付単位のガント軸 */
+.admission-gantt-inner {
+  min-width: max-content;
+}
+
+.admission-gantt-axis,
+.admission-gantt-row {
+  width: max-content;
+  grid-template-columns: 11rem max-content;
+}
+
+.admission-gantt-axis > div {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 38px;
+  grid-template-columns: none;
+}
+
+.admission-gantt-axis > div span {
+  display: grid;
+  width: 38px;
+  min-height: 2.35rem;
+  padding: .16rem 0;
+  place-items: center;
+  border-left: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+  font-size: .48rem;
+  line-height: 1.1;
+  text-align: center;
+}
+
+.admission-gantt-axis > div span b,
+.admission-gantt-axis > div span small {
+  display: block;
+}
+
+.admission-gantt-axis > div span small {
+  color: var(--muted);
+  font-size: .43rem;
+  font-weight: 400;
+}
+
+.admission-gantt-axis > div span.is-month-start {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+  font-weight: 700;
+}
+
+.admission-gantt-track {
+  background-image: repeating-linear-gradient(
+    to right,
+    transparent 0,
+    transparent 37px,
+    color-mix(in srgb, var(--border) 75%, transparent) 37px,
+    color-mix(in srgb, var(--border) 75%, transparent) 38px
+  );
+}
