@@ -735,10 +735,10 @@ async function createAdmissionEvent(env, body) {
   const stage = String(body.stage || "").trim();
   const scheduleDate = String(body.schedule_date || "").trim();
   const endDate = body.end_date ? String(body.end_date).trim() : null;
-  if (!university || !stage || !/^\\d{4}-\\d{2}-\\d{2}$/.test(scheduleDate)) {
+  if (!university || !stage || !/^\d{4}-\d{2}-\d{2}$/.test(scheduleDate)) {
     throw new Error("university, stage, schedule_date are required");
   }
-  if (endDate && !/^\\d{4}-\\d{2}-\\d{2}$/.test(endDate)) {
+  if (endDate && !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
     throw new Error("end_date must be YYYY-MM-DD");
   }
   const id = crypto.randomUUID();
@@ -762,10 +762,10 @@ async function updateAdmissionEvent(env, id, body) {
   const stage = body.stage === undefined ? current.stage : String(body.stage || "").trim();
   const scheduleDate = body.schedule_date === undefined ? current.schedule_date : String(body.schedule_date || "").trim();
   const endDate = body.end_date === undefined ? current.end_date : (body.end_date ? String(body.end_date).trim() : null);
-  if (!university || !stage || !/^\\d{4}-\\d{2}-\\d{2}$/.test(scheduleDate)) {
+  if (!university || !stage || !/^\d{4}-\d{2}-\d{2}$/.test(scheduleDate)) {
     throw new Error("university, stage, schedule_date are required");
   }
-  if (endDate && !/^\\d{4}-\\d{2}-\\d{2}$/.test(endDate)) {
+  if (endDate && !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
     throw new Error("end_date must be YYYY-MM-DD");
   }
   return env.DB.prepare(
