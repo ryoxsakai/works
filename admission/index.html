@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=M+PLUS+1p:wght@400;500;700&display=swap" rel="stylesheet" />
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <title>入試管理 | Works</title>
+  <script>
+    (function () {
+      var t = localStorage.getItem("works_theme");
+      if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+    })();
+  </script>
+  <link rel="apple-touch-icon" href="/shared/logo.png" />
+  <link rel="stylesheet" href="/shared/styles.css?v=52" />
+  <link rel="stylesheet" href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" />
+</head>
+<body>
+  <header class="page-header">
+    <h1><a href="/">入試管理</a></h1>
+  </header>
+
+  <main class="admission-main">
+    <a class="admission-back" href="/"><i class="bx bx-chevron-left"></i> Worksトップへ</a>
+    <section class="admission-panel" aria-labelledby="admission-title">
+      <p class="eyebrow">ADMISSION MANAGEMENT</p>
+      <h2 id="admission-title"><i class="bx bx-calendar-event"></i> 入試カレンダー</h2>
+      <div class="admission-calendar-placeholder">
+        <div>
+          <i class="bx bx-calendar-plus"></i>
+          <p>入試カレンダーを準備中です</p>
+          <small>大学・学部・試験日程をまとめて管理できるようにします。</small>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
