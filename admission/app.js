@@ -1,6 +1,7 @@
 import { getSessionToken, signIn, watchAuth } from "../shared/auth.js?v=11";
 
 const VIEW_KEY = "works_admission_view";
+const FILTER_KEY = "works_admission_filters";
 const stageLabels = {
   primary: "一次試験",
   first_result: "一次発表",
@@ -32,6 +33,10 @@ const els = {
   calendarEmpty: document.querySelector("#admission-calendar-empty"),
   gantt: document.querySelector("#admission-gantt"),
   ganttEmpty: document.querySelector("#admission-gantt-empty"),
+  universityFilter: document.querySelector("#admission-university-filter"),
+  typeFilter: document.querySelector("#admission-type-filter"),
+  primaryMonthFilter: document.querySelector("#admission-primary-month-filter"),
+  filterReset: document.querySelector("#admission-filter-reset"),
   add: document.querySelector("#admission-add"),
   editor: document.querySelector("#admission-editor"),
   editorClose: document.querySelector("#admission-editor-close"),
@@ -40,6 +45,16 @@ const els = {
 
 let events = [];
 let calendarCursor = null;
+let filters = loadFilters();
+
+function loadFilters() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(FILTER_KEY) || "{}");
+    return { university: String(stored.university || ""), type: String(stored.type || ""), primaryMonth: String(stored.primaryMonth || "") };
+  } catch {
+    return { university: "", type: "", primaryMonth: "" };
+  }
+}
 
 function escapeHtml(value) {
   return String(value || "").replace(/[&<>"']/g, (c) => ({
@@ -86,12 +101,44 @@ function activateView(name) {
   localStorage.setItem(VIEW_KEY, active);
 }
 
-function renderList() {
-  if (!events.length) {
+function syncFilterInputs() {
+  els.universityFilter.value = filters.university;
+  els.typeFilter.value = filters.type;
+  els.primaryMonthFilter.value = filters.primaryMonth;
+}
+
+function primaryMonthByUniversity() {
+  const map = new Map();
+  events.forEach((event) => {
+    const date = eventDate(event);
+    const current = map.get(event.university);
+    if (!current || date < current) map.set(event.university, date);
+  });
+  events.filter((event) => event.stage === "primary").forEach((event) => {
+    const date = eventDate(event);
+    const current = map.get(event.university);
+    if (!current || date < current) map.set(event.university, date);
+  });
+  return map;
+}
+
+function filteredEvents() {
+  const query = filters.university.trim().toLocaleLowerCase("ja-JP");
+  const primaryDates = primaryMonthByUniversity();
+  return events.filter((event) => {
+    if (query && !event.university.toLocaleLowerCase("ja-JP").includes(query)) return false;
+    if (filters.type && event.selection_type !== filters.type) return false;
+    if (filters.primaryMonth && String(primaryDates.get(event.university)?.getMonth() + 1) !== filters.primaryMonth) return false;
+    return true;
+  });
+}
+
+function renderList(viewEvents) {
+  if (!viewEvents.length) {
     els.list.innerHTML = `<div class="admission-empty-state"><div><i class="bx bx-list-ul"></i><p>入試日程はまだ登録されていません</p><small>右上の「日程を追加」から、大学・方式・段階・日付を登録できます。</small></div></div>`;
     return;
   }
-  els.list.innerHTML = events.map((event) => `
+  els.list.innerHTML = viewEvents.map((event) => `
     <article class="admission-list-item admission-stage-${escapeHtml(event.stage)}">
       <time datetime="${escapeHtml(event.schedule_date)}">${escapeHtml(formatDate(event.schedule_date))}</time>
       <div class="admission-list-copy">
@@ -103,12 +150,12 @@ function renderList() {
     </article>`).join("");
 }
 
-function renderTable() {
-  if (!events.length) {
+function renderTable(viewEvents) {
+  if (!viewEvents.length) {
     els.table.innerHTML = `<tr class="admission-table-empty"><td colspan="5">入試日程はまだ登録されていません。</td></tr>`;
     return;
   }
-  els.table.innerHTML = events.map((event) => `
+  els.table.innerHTML = viewEvents.map((event) => `
     <tr>
       <td><strong>${escapeHtml(event.university)}</strong></td>
       <td>${escapeHtml(typeLabels[event.selection_type] || event.selection_type)}</td>
@@ -130,14 +177,14 @@ function stageClass(stage) {
   return "admission-stage-" + String(stage || "primary").replace(/[^a-z_]/g, "");
 }
 
-function renderCalendar() {
+function renderCalendar(viewEvents) {
   if (!calendarCursor) return;
   const year = calendarCursor.getFullYear();
   const month = calendarCursor.getMonth();
   els.calendarLabel.textContent = year + "年" + (month + 1) + "月";
 
   const byDay = new Map();
-  events.forEach((event) => {
+  viewEvents.forEach((event) => {
     const date = eventDate(event);
     if (date.getFullYear() !== year || date.getMonth() !== month) return;
     const key = calendarKey(date);
@@ -166,14 +213,14 @@ function addMonths(date, count) {
   return new Date(date.getFullYear(), date.getMonth() + count, 1);
 }
 
-function renderGantt() {
-  if (!events.length) {
+function renderGantt(viewEvents) {
+  if (!viewEvents.length) {
     els.gantt.innerHTML = "";
     els.ganttEmpty.hidden = false;
     return;
   }
 
-  const dates = events.map(eventDate).sort((a, b) => a - b);
+  const dates = viewEvents.map(eventDate).sort((a, b) => a - b);
   const rangeStart = new Date(dates[0].getFullYear(), dates[0].getMonth(), dates[0].getDate());
   const rangeEnd = new Date(dates.at(-1).getFullYear(), dates.at(-1).getMonth(), dates.at(-1).getDate());
   const dayCount = Math.round((rangeEnd - rangeStart) / 86400000) + 1;
@@ -186,7 +233,7 @@ function renderGantt() {
     return `<span class="${isMonthStart ? "is-month-start" : ""}" title="${formatDate(day.toISOString().slice(0, 10))}"><b>${day.getMonth() + 1}/${day.getDate()}</b><small>${["日", "月", "火", "水", "木", "金", "土"][day.getDay()]}</small></span>`;
   }).join("");
 
-  const groups = [...new Set(events.map((event) => event.university))];
+  const groups = [...new Set(viewEvents.map((event) => event.university))];
   const rows = groups.map((university) => {
     const rowEvents = events
       .filter((event) => event.university === university)
@@ -204,14 +251,16 @@ function renderGantt() {
   els.ganttEmpty.hidden = true;
 }
 function render() {
-  renderList();
-  renderTable();
-  if (!calendarCursor && events.length) {
-    const first = eventDate(events[0]);
+  const viewEvents = filteredEvents();
+  syncFilterInputs();
+  renderList(viewEvents);
+  renderTable(viewEvents);
+  if (!calendarCursor && viewEvents.length) {
+    const first = eventDate(viewEvents[0]);
     calendarCursor = new Date(first.getFullYear(), first.getMonth(), 1);
   }
-  renderCalendar();
-  renderGantt();
+  renderCalendar(viewEvents);
+  renderGantt(viewEvents);
 }
 
 async function loadEvents() {
@@ -229,6 +278,26 @@ function openEditor() {
 els.signIn.addEventListener("click", signIn);
 els.add.addEventListener("click", openEditor);
 els.editorClose.addEventListener("click", () => els.editor.close());
+[els.universityFilter, els.typeFilter, els.primaryMonthFilter].forEach((input) => {
+  input.addEventListener("input", () => {
+    filters = { university: els.universityFilter.value, type: els.typeFilter.value, primaryMonth: els.primaryMonthFilter.value };
+    localStorage.setItem(FILTER_KEY, JSON.stringify(filters));
+    calendarCursor = null;
+    render();
+  });
+  input.addEventListener("change", () => {
+    filters = { university: els.universityFilter.value, type: els.typeFilter.value, primaryMonth: els.primaryMonthFilter.value };
+    localStorage.setItem(FILTER_KEY, JSON.stringify(filters));
+    calendarCursor = null;
+    render();
+  });
+});
+els.filterReset.addEventListener("click", () => {
+  filters = { university: "", type: "", primaryMonth: "" };
+  localStorage.removeItem(FILTER_KEY);
+  calendarCursor = null;
+  render();
+});
 els.calendarPrev.addEventListener("click", () => {
   calendarCursor = addMonths(calendarCursor || new Date(), -1);
   renderCalendar();
