@@ -441,7 +441,10 @@ function renderCalendar(viewEvents) {
     const cards = items.map((event) => `<span class="admission-calendar-event ${stageClass(event.stage)}" title="${escapeHtml(event.university)}｜${escapeHtml(stageLabels[event.stage] || event.stage)}"><b>${escapeHtml(event.university)}</b><small>${escapeHtml(stageLabels[event.stage] || event.stage)}</small></span>`).join("");
     html += `<div class="admission-calendar-cell"><time datetime="${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}">${day}</time>${cards}</div>`;
   }
-  while ((startOffset + days) % 7) html += '<div class="admission-calendar-cell empty"></div>';
+  const trailingCells = (7 - ((startOffset + days) % 7)) % 7;
+  for (let i = 0; i < trailingCells; i++) {
+    html += '<div class="admission-calendar-cell empty"></div>';
+  }
   els.calendarGrid.innerHTML = html;
   els.calendarEmpty.hidden = byDay.size > 0;
 }
