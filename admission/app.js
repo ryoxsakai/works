@@ -33,10 +33,18 @@ const els = {
   calendarEmpty: document.querySelector("#admission-calendar-empty"),
   gantt: document.querySelector("#admission-gantt"),
   ganttEmpty: document.querySelector("#admission-gantt-empty"),
-  universityFilter: document.querySelector("#admission-university-filter"),
-  typeFilter: document.querySelector("#admission-type-filter"),
-  primaryMonthFilter: document.querySelector("#admission-primary-month-filter"),
+  filterOpen: document.querySelector("#admission-filter-open"),
+  filterCount: document.querySelector("#admission-filter-count"),
+  filterSummary: document.querySelector("#admission-filter-summary"),
   filterReset: document.querySelector("#admission-filter-reset"),
+  filterModal: document.querySelector("#admission-filter-modal"),
+  filterClose: document.querySelector("#admission-filter-close"),
+  filterForm: document.querySelector("#admission-filter-form"),
+  filterTabs: [...document.querySelectorAll("[data-admission-filter-tab]")],
+  filterPanels: [...document.querySelectorAll("[data-admission-filter-panel]")],
+  filterUniversitySearch: document.querySelector("#admission-filter-university-search"),
+  filterUniversityList: document.querySelector("#admission-filter-university-list"),
+  filterClear: document.querySelector("#admission-filter-clear"),
   add: document.querySelector("#admission-add"),
   editor: document.querySelector("#admission-editor"),
   editorClose: document.querySelector("#admission-editor-close"),
@@ -47,13 +55,37 @@ let events = [];
 let calendarCursor = null;
 let filters = loadFilters();
 
+function asStringList(value) {
+  return Array.isArray(value) ? [...new Set(value.map(String).filter(Boolean))] : [];
+}
+
+function emptyFilters() {
+  return { universities: [], types: [], primaryMonths: [] };
+}
+
 function loadFilters() {
   try {
     const stored = JSON.parse(localStorage.getItem(FILTER_KEY) || "{}");
-    return { university: String(stored.university || ""), type: String(stored.type || ""), primaryMonth: String(stored.primaryMonth || "") };
+    return {
+      universities: asStringList(stored.universities).length
+        ? asStringList(stored.universities)
+        : (stored.university ? [String(stored.university)] : []),
+      types: asStringList(stored.types).length
+        ? asStringList(stored.types)
+        : (stored.type ? [String(stored.type)] : []),
+      primaryMonths: asStringList(stored.primaryMonths).length
+        ? asStringList(stored.primaryMonths)
+        : (stored.primaryMonth ? [String(stored.primaryMonth)] : []),
+    };
   } catch {
-    return { university: "", type: "", primaryMonth: "" };
+    return emptyFilters();
   }
+}
+
+function saveFilters() {
+  const count = filters.universities.length + filters.types.length + filters.primaryMonths.length;
+  if (count) localStorage.setItem(FILTER_KEY, JSON.stringify(filters));
+  else localStorage.removeItem(FILTER_KEY);
 }
 
 function escapeHtml(value) {
@@ -101,10 +133,92 @@ function activateView(name) {
   localStorage.setItem(VIEW_KEY, active);
 }
 
-function syncFilterInputs() {
-  els.universityFilter.value = filters.university;
-  els.typeFilter.value = filters.type;
-  els.primaryMonthFilter.value = filters.primaryMonth;
+function activateFilterTab(name) {
+  const active = els.filterTabs.some((tab) => tab.dataset.admissionFilterTab === name) ? name : "universities";
+  els.filterTabs.forEach((tab) => {
+    const selected = tab.dataset.admissionFilterTab === active;
+    tab.setAttribute("aria-selected", String(selected));
+    tab.tabIndex = selected ? 0 : -1;
+  });
+  els.filterPanels.forEach((panel) => {
+    panel.hidden = panel.dataset.admissionFilterPanel !== active;
+  });
+}
+
+function renderUniversityChoices() {
+  const universities = [...new Set(events.map((event) => event.university).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b, "ja"));
+  els.filterUniversityList.innerHTML = universities.map((university) => `
+    <label class="admission-filter-option">
+      <input type="checkbox" name="filter_university" value="${escapeHtml(university)}" />
+      <span>${escapeHtml(university)}</span>
+    </label>`).join("");
+}
+
+function syncFilterModal() {
+  const groups = [
+    ["filter_university", filters.universities],
+    ["filter_type", filters.types],
+    ["filter_month", filters.primaryMonths],
+  ];
+  groups.forEach(([name, selected]) => {
+    els.filterForm.querySelectorAll(`input[name="${name}"]`).forEach((input) => {
+      input.checked = selected.includes(input.value);
+    });
+  });
+}
+
+function filterUniversityOptions() {
+  const query = els.filterUniversitySearch.value.trim().toLocaleLowerCase("ja-JP");
+  els.filterUniversityList.querySelectorAll(".admission-filter-option").forEach((option) => {
+    option.hidden = Boolean(query) && !option.textContent.toLocaleLowerCase("ja-JP").includes(query);
+  });
+}
+
+function normalizeLegacyUniversityFilters() {
+  const known = [...new Set(events.map((event) => event.university).filter(Boolean))];
+  let changed = false;
+  const expanded = filters.universities.flatMap((selected) => {
+    if (known.includes(selected)) return [selected];
+    const query = selected.toLocaleLowerCase("ja-JP");
+    const matches = known.filter((university) => university.toLocaleLowerCase("ja-JP").includes(query));
+    if (matches.length) changed = true;
+    return matches.length ? matches : [];
+  });
+  if (changed || expanded.length !== filters.universities.length) {
+    filters.universities = [...new Set(expanded)];
+    saveFilters();
+  }
+}
+
+function renderFilterSummary() {
+  const count = filters.universities.length + filters.types.length + filters.primaryMonths.length;
+  els.filterCount.hidden = count === 0;
+  els.filterCount.textContent = String(count);
+  els.filterReset.hidden = count === 0;
+  if (!count) {
+    els.filterSummary.textContent = "すべての入試日程";
+    return;
+  }
+  const parts = [];
+  if (filters.universities.length) parts.push(`大学 ${filters.universities.length}件`);
+  if (filters.types.length) {
+    const labels = filters.types.map((value) => typeLabels[value] || value);
+    parts.push(`方式 ${labels.length <= 2 ? labels.join("・") : labels.length + "件"}`);
+  }
+  if (filters.primaryMonths.length) {
+    parts.push(`一次月 ${filters.primaryMonths.map((month) => month + "月").join("・")}`);
+  }
+  els.filterSummary.textContent = parts.join(" / ");
+}
+
+function openFilterModal() {
+  renderUniversityChoices();
+  syncFilterModal();
+  els.filterUniversitySearch.value = "";
+  filterUniversityOptions();
+  activateFilterTab("universities");
+  els.filterModal.showModal();
 }
 
 function primaryMonthByUniversity() {
@@ -124,12 +238,11 @@ function primaryMonthByUniversity() {
 }
 
 function filteredEvents() {
-  const query = filters.university.trim().toLocaleLowerCase("ja-JP");
   const primaryDates = primaryMonthByUniversity();
   return events.filter((event) => {
-    if (query && !event.university.toLocaleLowerCase("ja-JP").includes(query)) return false;
-    if (filters.type && event.selection_type !== filters.type) return false;
-    if (filters.primaryMonth && String(primaryDates.get(event.university)?.getMonth() + 1) !== filters.primaryMonth) return false;
+    if (filters.universities.length && !filters.universities.includes(event.university)) return false;
+    if (filters.types.length && !filters.types.includes(event.selection_type)) return false;
+    if (filters.primaryMonths.length && !filters.primaryMonths.includes(String(primaryDates.get(event.university)?.getMonth() + 1))) return false;
     return true;
   });
 }
@@ -253,7 +366,7 @@ function renderGantt(viewEvents) {
 }
 function render() {
   const viewEvents = filteredEvents();
-  syncFilterInputs();
+  renderFilterSummary();
   renderList(viewEvents);
   renderTable(viewEvents);
   if (!calendarCursor && viewEvents.length) {
@@ -267,6 +380,8 @@ function render() {
 async function loadEvents() {
   showError("");
   events = await api("/admissions");
+  normalizeLegacyUniversityFilters();
+  renderUniversityChoices();
   render();
 }
 
@@ -279,33 +394,51 @@ function openEditor() {
 els.signIn.addEventListener("click", signIn);
 els.add.addEventListener("click", openEditor);
 els.editorClose.addEventListener("click", () => els.editor.close());
-[els.universityFilter, els.typeFilter, els.primaryMonthFilter].forEach((input) => {
-  input.addEventListener("input", () => {
-    filters = { university: els.universityFilter.value, type: els.typeFilter.value, primaryMonth: els.primaryMonthFilter.value };
-    localStorage.setItem(FILTER_KEY, JSON.stringify(filters));
-    calendarCursor = null;
-    render();
-  });
-  input.addEventListener("change", () => {
-    filters = { university: els.universityFilter.value, type: els.typeFilter.value, primaryMonth: els.primaryMonthFilter.value };
-    localStorage.setItem(FILTER_KEY, JSON.stringify(filters));
-    calendarCursor = null;
-    render();
+els.filterOpen.addEventListener("click", openFilterModal);
+els.filterClose.addEventListener("click", () => els.filterModal.close());
+els.filterUniversitySearch.addEventListener("input", filterUniversityOptions);
+els.filterTabs.forEach((tab) => {
+  tab.addEventListener("click", () => activateFilterTab(tab.dataset.admissionFilterTab));
+  tab.addEventListener("keydown", (event) => {
+    if (!["ArrowLeft", "ArrowRight"].includes(event.key)) return;
+    event.preventDefault();
+    const index = els.filterTabs.indexOf(tab);
+    const next = event.key === "ArrowRight"
+      ? (index + 1) % els.filterTabs.length
+      : (index - 1 + els.filterTabs.length) % els.filterTabs.length;
+    els.filterTabs[next].focus();
+    activateFilterTab(els.filterTabs[next].dataset.admissionFilterTab);
   });
 });
+els.filterClear.addEventListener("click", () => {
+  els.filterForm.querySelectorAll('input[type="checkbox"]').forEach((input) => { input.checked = false; });
+});
+els.filterForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const form = new FormData(els.filterForm);
+  filters = {
+    universities: form.getAll("filter_university").map(String),
+    types: form.getAll("filter_type").map(String),
+    primaryMonths: form.getAll("filter_month").map(String),
+  };
+  saveFilters();
+  calendarCursor = null;
+  render();
+  els.filterModal.close();
+});
 els.filterReset.addEventListener("click", () => {
-  filters = { university: "", type: "", primaryMonth: "" };
-  localStorage.removeItem(FILTER_KEY);
+  filters = emptyFilters();
+  saveFilters();
   calendarCursor = null;
   render();
 });
 els.calendarPrev.addEventListener("click", () => {
   calendarCursor = addMonths(calendarCursor || new Date(), -1);
-  renderCalendar();
+  renderCalendar(filteredEvents());
 });
 els.calendarNext.addEventListener("click", () => {
   calendarCursor = addMonths(calendarCursor || new Date(), 1);
-  renderCalendar();
+  renderCalendar(filteredEvents());
 });
 els.tabs.forEach((tab) => {
   tab.addEventListener("click", () => activateView(tab.dataset.admissionViewTab));
@@ -333,6 +466,7 @@ els.form.addEventListener("submit", async (event) => {
   }
 });
 
+activateFilterTab("universities");
 activateView(localStorage.getItem(VIEW_KEY) || "list");
 watchAuth({
   onSignedIn: async () => {
