@@ -16,6 +16,7 @@ ALLOWED_ORIGIN = "https://works.lrnr.jp"
 # 設定 → 変数とシークレット)でSecretとして追加すること:
 #   GOOGLE_CLIENT_SECRET … Google Cloud Consoleの同じOAuthクライアントのクライアントシークレット
 #   SESSION_SECRET        … このWorkerが発行するセッショントークン署名用のランダムな文字列
+#   WORKS_API_KEY         … /api/schedule専用の十分に長いランダムなAPIキー
 
 [[d1_databases]]
 binding = "DB"
