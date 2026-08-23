@@ -172,29 +172,37 @@ function renderGantt() {
     els.ganttEmpty.hidden = false;
     return;
   }
+
   const dates = events.map(eventDate).sort((a, b) => a - b);
-  const rangeStart = new Date(dates[0].getFullYear(), dates[0].getMonth(), 1);
-  const rangeEnd = new Date(dates.at(-1).getFullYear(), dates.at(-1).getMonth() + 1, 0);
-  const totalDays = Math.max(1, Math.round((rangeEnd - rangeStart) / 86400000));
-  const months = [];
-  for (let date = new Date(rangeStart); date <= rangeEnd; date = addMonths(date, 1)) {
-    months.push(new Date(date));
-  }
-  const groups = [...new Set(events.map((event) => event.university))];
-  const axis = months.map((month) => `<span>${month.getFullYear()}年${month.getMonth() + 1}月</span>`).join("");
-  const rows = groups.map((university) => {
-    const rowEvents = events.filter((event) => event.university === university);
-    const markers = rowEvents.map((event, index) => {
-      const offset = Math.round(((eventDate(event) - rangeStart) / 86400000) / totalDays * 10000) / 100;
-      const label = stageLabels[event.stage] || event.stage;
-      return `<span class="admission-gantt-marker ${stageClass(event.stage)}" style="left:${offset}%; top:${.35 + (index % 3) * 1.15}rem" title="${escapeHtml(formatDate(event.schedule_date))}｜${escapeHtml(label)}">${escapeHtml(label.replace("試験", "").replace("発表", "発"))}</span>`;
-    }).join("");
-    return `<div class="admission-gantt-row"><strong title="${escapeHtml(university)}">${escapeHtml(university)}</strong><div class="admission-gantt-track">${markers}</div></div>`;
+  const rangeStart = new Date(dates[0].getFullYear(), dates[0].getMonth(), dates[0].getDate());
+  const rangeEnd = new Date(dates.at(-1).getFullYear(), dates.at(-1).getMonth(), dates.at(-1).getDate());
+  const dayCount = Math.round((rangeEnd - rangeStart) / 86400000) + 1;
+  const dayWidth = 38;
+  const trackWidth = dayCount * dayWidth;
+  const dayHeaders = Array.from({ length: dayCount }, (_, index) => {
+    const day = new Date(rangeStart);
+    day.setDate(rangeStart.getDate() + index);
+    const isMonthStart = day.getDate() === 1 || index === 0;
+    return `<span class="${isMonthStart ? "is-month-start" : ""}" title="${formatDate(day.toISOString().slice(0, 10))}"><b>${day.getMonth() + 1}/${day.getDate()}</b><small>${["日", "月", "火", "水", "木", "金", "土"][day.getDay()]}</small></span>`;
   }).join("");
-  els.gantt.innerHTML = `<div class="admission-gantt-axis"><span>大学・方式</span><div>${axis}</div></div><div class="admission-gantt-rows">${rows}</div>`;
+
+  const groups = [...new Set(events.map((event) => event.university))];
+  const rows = groups.map((university) => {
+    const rowEvents = events
+      .filter((event) => event.university === university)
+      .sort((a, b) => a.schedule_date.localeCompare(b.schedule_date));
+    const markers = rowEvents.map((event, index) => {
+      const offsetDays = Math.round((eventDate(event) - rangeStart) / 86400000);
+      const label = stageLabels[event.stage] || event.stage;
+      const lane = index % 3;
+      return `<span class="admission-gantt-marker ${stageClass(event.stage)}" style="left:${offsetDays * dayWidth + 2}px; top:${.3 + lane * 1.12}rem" title="${escapeHtml(formatDate(event.schedule_date))}｜${escapeHtml(university)}｜${escapeHtml(label)}">${escapeHtml(label.replace("試験", "").replace("発表", "発"))}</span>`;
+    }).join("");
+    return `<div class="admission-gantt-row"><strong title="${escapeHtml(university)}">${escapeHtml(university)}</strong><div class="admission-gantt-track" style="width:${trackWidth}px">${markers}</div></div>`;
+  }).join("");
+
+  els.gantt.innerHTML = `<div class="admission-gantt-axis"><span>大学・方式</span><div style="width:${trackWidth}px">${dayHeaders}</div></div><div class="admission-gantt-rows">${rows}</div>`;
   els.ganttEmpty.hidden = true;
 }
-
 function render() {
   renderList();
   renderTable();
