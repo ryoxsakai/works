@@ -380,3 +380,186 @@
     display: none;
   }
 }
+
+
+/* 入試管理: 月間カレンダー・ガントチャート */
+.admission-calendar-nav {
+  display: grid;
+  grid-template-columns: 2.2rem 1fr 2.2rem;
+  align-items: center;
+  max-width: 18rem;
+  margin: 0 auto .65rem;
+  text-align: center;
+}
+
+.admission-calendar-nav button {
+  min-width: 2.1rem;
+  min-height: 2.1rem;
+  padding: .25rem;
+  border: 1px solid var(--border);
+  border-radius: .36rem;
+}
+
+.admission-calendar-nav strong {
+  font-size: .86rem;
+}
+
+.admission-calendar-grid {
+  min-width: 710px;
+  grid-template-rows: 2rem;
+  gap: 0;
+}
+
+.admission-calendar-cell {
+  min-height: 6.25rem;
+  padding: .3rem;
+  overflow: hidden;
+}
+
+.admission-calendar-cell > time {
+  display: block;
+  margin-bottom: .2rem;
+  color: var(--muted);
+  font-size: .64rem;
+  font-weight: 600;
+}
+
+.admission-calendar-event {
+  --admission-color: #2563eb;
+  display: block;
+  margin-top: .16rem;
+  padding: .18rem .22rem .18rem .32rem;
+  overflow: hidden;
+  border-left: 3px solid var(--admission-color);
+  border-radius: .2rem;
+  background: color-mix(in srgb, var(--admission-color) 7%, var(--bg-elevated));
+  color: var(--fg);
+  line-height: 1.2;
+}
+
+.admission-calendar-event b,
+.admission-calendar-event small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admission-calendar-event b {
+  font-size: .57rem;
+  font-weight: 600;
+}
+
+.admission-calendar-event small {
+  margin-top: .05rem;
+  color: var(--admission-color);
+  font-size: .52rem;
+}
+
+.admission-view-note {
+  margin: .55rem 0 0;
+  color: var(--muted);
+  font-size: .74rem;
+  text-align: center;
+}
+
+.admission-gantt-shell {
+  border-radius: .44rem;
+}
+
+.admission-gantt-inner {
+  min-width: 920px;
+  padding: .65rem .75rem .9rem;
+}
+
+.admission-gantt-axis {
+  display: grid;
+  grid-template-columns: 11rem minmax(0, 1fr);
+  gap: .55rem;
+  margin-bottom: .25rem;
+  padding-bottom: .35rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+  font-size: .64rem;
+  font-weight: 600;
+}
+
+.admission-gantt-axis > span {
+  padding-left: .15rem;
+}
+
+.admission-gantt-axis > div {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(5.5rem, 1fr));
+}
+
+.admission-gantt-axis > div span {
+  padding-left: .3rem;
+  border-left: 1px solid var(--border);
+}
+
+.admission-gantt-rows {
+  display: grid;
+}
+
+.admission-gantt-row {
+  display: grid;
+  grid-template-columns: 11rem minmax(0, 1fr);
+  gap: .55rem;
+  min-height: 4rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.admission-gantt-row > strong {
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  padding: .4rem .15rem;
+  color: var(--fg);
+  font-size: .67rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admission-gantt-track {
+  position: relative;
+  min-height: 4rem;
+  background-image: repeating-linear-gradient(
+    to right,
+    transparent 0,
+    transparent calc(16.666% - 1px),
+    color-mix(in srgb, var(--border) 82%, transparent) calc(16.666% - 1px),
+    color-mix(in srgb, var(--border) 82%, transparent) 16.666%
+  );
+}
+
+.admission-gantt-marker {
+  --admission-color: #2563eb;
+  position: absolute;
+  max-width: 5.1rem;
+  padding: .12rem .22rem;
+  transform: translateX(-1px);
+  overflow: hidden;
+  border-left: 3px solid var(--admission-color);
+  border-radius: .18rem;
+  background: color-mix(in srgb, var(--admission-color) 12%, var(--bg-elevated));
+  color: var(--admission-color);
+  font-size: .52rem;
+  font-weight: 600;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .admission-calendar-shell,
+  .admission-gantt-shell {
+    margin-right: -.15rem;
+    margin-left: -.15rem;
+  }
+
+  .admission-calendar-cell {
+    min-height: 5.7rem;
+  }
+}
