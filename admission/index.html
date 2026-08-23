@@ -19,7 +19,7 @@
   <link rel="apple-touch-icon" href="/shared/logo.png" />
   <link rel="stylesheet" href="/shared/styles.css?v=52" />
   <link rel="stylesheet" href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" />
-  <link rel="stylesheet" href="/admission/admission.css?v=6" />
+  <link rel="stylesheet" href="/admission/admission.css?v=7" />
 </head>
 <body>
   <header class="page-header">
@@ -132,12 +132,24 @@
           <i class="bx bx-search"></i>
           <input id="admission-filter-university-search" type="search" placeholder="大学名を検索" autocomplete="off" />
         </label>
-        <p class="admission-filter-help">対象にしたい大学を複数選択できます。</p>
+        <div class="admission-filter-panel-tools">
+          <p class="admission-filter-help">対象にしたい大学を複数選択できます。</p>
+          <div>
+            <button type="button" data-admission-filter-select-all="filter_university">すべて選択</button>
+            <button type="button" data-admission-filter-clear-group="filter_university">すべて解除</button>
+          </div>
+        </div>
         <div id="admission-filter-university-list" class="admission-filter-options admission-filter-university-list"></div>
       </section>
 
       <section id="admission-filter-panel-types" class="admission-filter-panel" role="tabpanel" data-admission-filter-panel="types" hidden>
-        <p class="admission-filter-help">対象にしたい方式を複数選択できます。</p>
+        <div class="admission-filter-panel-tools">
+          <p class="admission-filter-help">対象にしたい方式を複数選択できます。</p>
+          <div>
+            <button type="button" data-admission-filter-select-all="filter_type">すべて選択</button>
+            <button type="button" data-admission-filter-clear-group="filter_type">すべて解除</button>
+          </div>
+        </div>
         <div class="admission-filter-options">
           <label class="admission-filter-option"><input type="checkbox" name="filter_type" value="general" /><span>一般選抜</span></label>
           <label class="admission-filter-option"><input type="checkbox" name="filter_type" value="ct" /><span>共通テスト利用</span></label>
@@ -148,7 +160,13 @@
       </section>
 
       <section id="admission-filter-panel-months" class="admission-filter-panel" role="tabpanel" data-admission-filter-panel="months" hidden>
-        <p class="admission-filter-help">一次試験が実施される月を複数選択できます。</p>
+        <div class="admission-filter-panel-tools">
+          <p class="admission-filter-help">一次試験が実施される月を複数選択できます。</p>
+          <div>
+            <button type="button" data-admission-filter-select-all="filter_month">すべて選択</button>
+            <button type="button" data-admission-filter-clear-group="filter_month">すべて解除</button>
+          </div>
+        </div>
         <div class="admission-filter-options admission-filter-month-options">
           <label class="admission-filter-option"><input type="checkbox" name="filter_month" value="10" /><span>10月</span></label>
           <label class="admission-filter-option"><input type="checkbox" name="filter_month" value="11" /><span>11月</span></label>
@@ -182,6 +200,6 @@
     </form>
   </dialog>
 
-  <script type="module" src="/admission/app.js?v=7"></script>
+  <script type="module" src="/admission/app.js?v=8"></script>
 </body>
 </html>

@@ -931,3 +931,47 @@
     font-size: .84rem;
   }
 }
+
+
+/* 入試管理: フィルタータブ単位の一括選択 */
+.admission-filter-panel-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .65rem;
+  margin-bottom: .62rem;
+}
+
+.admission-filter-panel-tools .admission-filter-help {
+  margin: 0;
+}
+
+.admission-filter-panel-tools > div {
+  display: flex;
+  flex: 0 0 auto;
+  gap: .25rem;
+}
+
+.admission-filter-panel-tools button {
+  min-height: 1.8rem;
+  padding: .22rem .38rem;
+  border: 1px solid var(--border);
+  border-radius: .3rem;
+  color: var(--muted);
+  background: var(--bg-elevated);
+  font-size: .6rem;
+  white-space: nowrap;
+}
+
+.admission-filter-panel-tools button:hover {
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
+  color: var(--accent);
+}
+
+@media (max-width: 640px) {
+  .admission-filter-panel-tools {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: .4rem;
+  }
+}
