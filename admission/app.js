@@ -558,7 +558,7 @@ function cleanupPrintView() {
 function printActiveView() {
   document.body.dataset.admissionPrintView = activeView;
   if (activeView === "gantt") renderPrintableGantt(filteredEvents());
-  requestAnimationFrame(() => requestAnimationFrame(() => window.print()));
+  window.print();
 }
 
 function clearInactiveViews() {
