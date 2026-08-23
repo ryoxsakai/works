@@ -621,3 +621,87 @@
     color-mix(in srgb, var(--border) 75%, transparent) 38px
   );
 }
+
+
+/* 入試管理: 共通フィルター */
+.admission-filters {
+  display: grid;
+  grid-template-columns: minmax(11rem, 1fr) minmax(7rem, .55fr) minmax(7rem, .55fr) auto;
+  gap: .45rem;
+  margin: .85rem 0;
+  padding: .55rem;
+  border: 1px solid var(--border);
+  border-radius: .46rem;
+  background: color-mix(in srgb, var(--bg-elevated) 92%, var(--bg-hover));
+}
+
+.admission-filters label {
+  display: grid;
+  min-width: 0;
+  gap: .15rem;
+  color: var(--muted);
+  font-size: .63rem;
+}
+
+.admission-filters input,
+.admission-filters select {
+  width: 100%;
+  min-height: 2rem;
+  padding: .28rem .45rem;
+  border-radius: .32rem;
+  background: #fbfbfc;
+  font-size: .75rem;
+}
+
+.admission-filter-search {
+  position: relative;
+  display: flex !important;
+  align-items: flex-end;
+}
+
+.admission-filter-search i {
+  position: absolute;
+  bottom: .57rem;
+  left: .52rem;
+  color: var(--muted);
+  font-size: .95rem;
+  pointer-events: none;
+}
+
+.admission-filter-search input {
+  padding-left: 1.75rem;
+}
+
+.admission-filters > button {
+  align-self: end;
+  min-width: auto;
+  min-height: 2rem;
+  padding: .28rem .5rem;
+  border: 1px solid var(--border);
+  border-radius: .32rem;
+  color: var(--muted);
+  font-size: .7rem;
+}
+
+:root[data-theme="dark"] .admission-filters input,
+:root[data-theme="dark"] .admission-filters select {
+  background: color-mix(in srgb, var(--bg-elevated) 94%, #fff 6%);
+}
+
+@media (max-width: 640px) {
+  .admission-filters {
+    grid-template-columns: 1fr 1fr auto;
+  }
+
+  .admission-filter-search {
+    grid-column: 1 / -1;
+  }
+
+  .admission-filters > button {
+    font-size: 0;
+  }
+
+  .admission-filters > button i {
+    font-size: .85rem;
+  }
+}
