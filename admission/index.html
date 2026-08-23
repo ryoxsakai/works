@@ -19,7 +19,7 @@
   <link rel="apple-touch-icon" href="/shared/logo.png" />
   <link rel="stylesheet" href="/shared/styles.css?v=52" />
   <link rel="stylesheet" href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" />
-  <link rel="stylesheet" href="/admission/admission.css?v=7" />
+  <link rel="stylesheet" href="/admission/admission.css?v=8" />
 </head>
 <body>
   <header class="page-header">
@@ -43,7 +43,7 @@
           <p class="eyebrow">ADMISSION CALENDAR</p>
           <h2 id="admission-title"><i class="bx bx-calendar-event"></i> 入試日程</h2>
         </div>
-        <button id="admission-add" type="button" class="btn-primary admission-add"><i class="bx bx-plus"></i> 日程を追加</button>
+        <button id="admission-print" type="button" class="admission-print" aria-label="現在の表示を印刷" title="現在の表示を印刷"><i class="bx bx-printer"></i></button>
       </div>
 
       <div class="admission-filter-bar" aria-label="入試日程の絞り込み">
@@ -93,6 +93,7 @@
         <div class="admission-gantt-shell">
           <div id="admission-gantt" class="admission-gantt-inner"></div>
         </div>
+        <div id="admission-gantt-print" class="admission-gantt-print" aria-hidden="true"></div>
         <p id="admission-gantt-empty" class="admission-view-note" hidden>表示できる入試日程はありません。</p>
       </section>
 
@@ -184,22 +185,6 @@
     </form>
   </dialog>
 
-  <dialog id="admission-editor" class="app-modal">
-    <div class="modal-header">
-      <h2><i class="bx bx-calendar-plus"></i> 入試日程を追加</h2>
-      <button id="admission-editor-close" type="button" class="modal-close" aria-label="閉じる"><i class="bx bx-x"></i></button>
-    </div>
-    <form id="admission-form" class="modal-tab-panel admission-form">
-      <label>大学名<input name="university" type="text" placeholder="例：帝京大学医学部" required /></label>
-      <label>方式<select name="selection_type"><option value="general">一般選抜</option><option value="ct">共通テスト利用</option><option value="recommendation">推薦</option><option value="regional">地域枠</option><option value="comprehensive">総合型選抜</option></select></label>
-      <label>段階<select name="stage"><option value="primary">一次試験</option><option value="first_result">一次発表</option><option value="secondary">二次試験</option><option value="final_result">合格発表</option></select></label>
-      <label>日付<input name="schedule_date" type="date" required /></label>
-      <label>補足<textarea name="notes" rows="3" placeholder="選択日・会場・補足など"></textarea></label>
-      <label>出典URL<input name="source_url" type="url" placeholder="https://..." /></label>
-      <div class="edit-actions admission-form-actions"><button type="submit" class="btn-primary"><i class="bx bx-check"></i> 保存</button></div>
-    </form>
-  </dialog>
-
-  <script type="module" src="/admission/app.js?v=8"></script>
+  <script type="module" src="/admission/app.js?v=9"></script>
 </body>
 </html>
