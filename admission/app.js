@@ -109,12 +109,13 @@ function syncFilterInputs() {
 
 function primaryMonthByUniversity() {
   const map = new Map();
-  events.forEach((event) => {
+  events.filter((event) => event.stage === "primary").forEach((event) => {
     const date = eventDate(event);
     const current = map.get(event.university);
     if (!current || date < current) map.set(event.university, date);
   });
-  events.filter((event) => event.stage === "primary").forEach((event) => {
+  events.forEach((event) => {
+    if (map.has(event.university)) return;
     const date = eventDate(event);
     const current = map.get(event.university);
     if (!current || date < current) map.set(event.university, date);
@@ -235,7 +236,7 @@ function renderGantt(viewEvents) {
 
   const groups = [...new Set(viewEvents.map((event) => event.university))];
   const rows = groups.map((university) => {
-    const rowEvents = events
+    const rowEvents = viewEvents
       .filter((event) => event.university === university)
       .sort((a, b) => a.schedule_date.localeCompare(b.schedule_date));
     const markers = rowEvents.map((event, index) => {
