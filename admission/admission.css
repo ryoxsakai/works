@@ -1,0 +1,239 @@
+/* 入試管理: 表示切替の共通UI */
+.admission-main {
+  max-width: 1120px;
+}
+
+.admission-panel {
+  padding: 1rem;
+}
+
+.admission-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: .75rem;
+}
+
+.admission-heading-copy {
+  min-width: 0;
+}
+
+.admission-heading .eyebrow {
+  margin: 0 0 .2rem;
+}
+
+.admission-heading h2 {
+  margin: 0;
+}
+
+.admission-view-tabs {
+  position: sticky;
+  top: 3.35rem;
+  z-index: 5;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: .25rem;
+  margin: 1rem 0;
+  padding: .3rem;
+  border: 1px solid var(--border);
+  border-radius: .5rem;
+  background: color-mix(in srgb, var(--bg-elevated) 94%, transparent);
+  box-shadow: var(--card-shadow);
+  backdrop-filter: blur(12px);
+}
+
+.admission-view-tab {
+  min-width: 0;
+  min-height: 2.25rem;
+  padding: .4rem .55rem;
+  border-radius: .36rem;
+  color: var(--muted);
+  font-size: .78rem;
+  white-space: nowrap;
+}
+
+.admission-view-tab i {
+  font-size: .98rem;
+}
+
+.admission-view-tab[aria-selected="true"] {
+  background: var(--bg-hover);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.admission-view {
+  min-height: 20rem;
+}
+
+.admission-view[hidden] {
+  display: none !important;
+}
+
+.admission-empty-state {
+  display: grid;
+  min-height: 17rem;
+  place-items: center;
+  padding: 1.25rem;
+  border: 1px dashed color-mix(in srgb, var(--accent) 42%, var(--border));
+  border-radius: .44rem;
+  background: color-mix(in srgb, var(--accent) 3%, var(--bg-elevated));
+  color: var(--muted);
+  text-align: center;
+}
+
+.admission-empty-state > div {
+  max-width: 28rem;
+}
+
+.admission-empty-state i {
+  display: block;
+  margin-bottom: .45rem;
+  color: var(--accent);
+  font-size: 2rem;
+}
+
+.admission-empty-state p {
+  margin: 0;
+  color: var(--fg);
+  font-size: .88rem;
+  font-weight: 600;
+}
+
+.admission-empty-state small {
+  display: block;
+  margin-top: .3rem;
+  font-size: .72rem;
+  line-height: 1.6;
+}
+
+.admission-calendar-shell,
+.admission-gantt-shell,
+.admission-table-shell {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: .44rem;
+  background: var(--bg-elevated);
+  -webkit-overflow-scrolling: touch;
+}
+
+.admission-calendar-grid {
+  display: grid;
+  min-width: 640px;
+  grid-template-columns: repeat(7, minmax(4.8rem, 1fr));
+  grid-template-rows: 2rem repeat(5, 5.6rem);
+}
+
+.admission-calendar-weekday,
+.admission-calendar-cell {
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.admission-calendar-weekday {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-size: .7rem;
+  font-weight: 600;
+}
+
+.admission-calendar-weekday:nth-child(7n),
+.admission-calendar-cell:nth-child(7n) {
+  border-right: 0;
+}
+
+.admission-calendar-cell {
+  padding: .35rem;
+  color: var(--muted);
+  font-size: .68rem;
+}
+
+.admission-calendar-cell.empty {
+  background: color-mix(in srgb, var(--bg-hover) 36%, transparent);
+}
+
+.admission-calendar-cell.current {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.admission-gantt-inner {
+  min-width: 760px;
+  padding: .8rem;
+}
+
+.admission-gantt-axis {
+  display: grid;
+  grid-template-columns: 9rem repeat(6, 1fr);
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+  font-size: .7rem;
+}
+
+.admission-gantt-axis span {
+  padding: .3rem .35rem;
+  text-align: center;
+}
+
+.admission-gantt-axis span:first-child {
+  text-align: left;
+}
+
+.admission-gantt-empty {
+  display: grid;
+  min-height: 13rem;
+  place-items: center;
+  color: var(--muted);
+  font-size: .78rem;
+}
+
+.admission-table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+  font-size: .78rem;
+}
+
+.admission-table th,
+.admission-table td {
+  padding: .65rem .7rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+
+.admission-table th {
+  color: var(--muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.admission-table-empty td {
+  padding: 4rem 1rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  .admission-main {
+    padding: 1rem;
+  }
+
+  .admission-view-tabs {
+    top: 2.9rem;
+    grid-template-columns: repeat(4, minmax(4.2rem, 1fr));
+    margin-right: -.1rem;
+    margin-left: -.1rem;
+    overflow-x: auto;
+  }
+
+  .admission-view-tab {
+    padding-right: .35rem;
+    padding-left: .35rem;
+    font-size: .7rem;
+  }
+
+  .admission-view-tab i {
+    display: none;
+  }
+}
