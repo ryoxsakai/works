@@ -1357,28 +1357,55 @@
   }
 
   .admission-calendar-continuous {
+  min-width: 640px;
+}
+
+.admission-calendar-continuous-grid {
+  grid-template-rows: 2rem;
+  grid-auto-rows: 5.6rem;
+}
+
+.admission-calendar-continuous-grid .admission-calendar-cell.is-month-start {
+  box-shadow: inset 2px 0 var(--accent);
+}
+
+.admission-calendar-continuous-grid .admission-calendar-cell > time {
+  display: flex;
+  align-items: baseline;
+  gap: .2rem;
+}
+
+.admission-calendar-continuous-grid .admission-calendar-cell > time b {
+  font-size: inherit;
+}
+
+.admission-calendar-month-label {
+  color: var(--accent);
+  font-size: .5rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+@media print {
+  .admission-calendar-mode {
+    display: none !important;
+  }
+
+  .admission-calendar-controls {
+    margin-bottom: 3mm;
+  }
+
+  .admission-calendar-continuous {
     min-width: 0;
   }
 
-  .admission-calendar-month {
-    break-inside: avoid;
-  }
-
-  .admission-calendar-month + .admission-calendar-month {
-    margin-top: 4mm;
-  }
-
-  .admission-calendar-month > h3 {
-    padding: 2mm;
-    border: 1px solid #cfd4dc;
-    border-bottom: 0;
-    background: #f4f6f9;
-    color: #111;
-    font-size: 10pt;
-  }
-
-  .admission-calendar-month .admission-calendar-grid {
+  .admission-calendar-continuous-grid {
     grid-template-rows: 2rem;
     grid-auto-rows: 22mm;
+  }
+
+  .admission-calendar-month-label {
+    color: #2563eb;
+    font-size: 5.5pt;
   }
 }
