@@ -416,6 +416,101 @@ const MCP_SCHEDULE_TOOLS = [
     },
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
   },
+
+  {
+    name: "list_curriculum_materials",
+    title: "カリキュラム教材を一覧取得",
+    description: "登録済みの教材と各教材のチャプターを取得します。教材登録・チャプター登録・生徒への紐付け前のID確認に使用します。",
+    inputSchema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "教材名またはチャプター名の部分一致検索語。" },
+        limit: { type: "integer", minimum: 1, maximum: 200, description: "返す教材の最大件数。省略時は100件。" },
+      },
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+  },
+  {
+    name: "create_curriculum_material",
+    title: "カリキュラム教材を登録",
+    description: "生徒のカリキュラムで使用する教材を登録します。同名教材がある場合は既存教材を返します。",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string", description: "教材名。" },
+      },
+      required: ["name"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  {
+    name: "create_material_chapters",
+    title: "教材チャプターを登録",
+    description: "指定教材に1件以上のチャプターをまとめて登録します。同名チャプターがある場合は重複登録しません。",
+    inputSchema: {
+      type: "object",
+      properties: {
+        material_id: { type: "integer", minimum: 1, description: "list_curriculum_materialsまたはcreate_curriculum_materialで取得した教材ID。" },
+        chapter_names: {
+          type: "array",
+          minItems: 1,
+          maxItems: 100,
+          items: { type: "string" },
+          description: "登録するチャプター名の配列。入力順で並びます。",
+        },
+      },
+      required: ["material_id", "chapter_names"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  {
+    name: "get_student_materials",
+    title: "生徒の教材と進捗を取得",
+    description: "生徒に紐付いた教材、チャプター、各チャプターの完了状態を取得します。",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string", description: "生徒名。" },
+      },
+      required: ["name"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+  },
+  {
+    name: "assign_material_to_student",
+    title: "教材を生徒に紐付け",
+    description: "登録済みの教材を生徒に紐付けます。同じ紐付けを再実行しても重複しません。",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string", description: "生徒名。" },
+        material_id: { type: "integer", minimum: 1, description: "list_curriculum_materialsで取得した教材ID。" },
+      },
+      required: ["name", "material_id"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  {
+    name: "set_chapter_completion",
+    title: "チャプター完了状態を更新",
+    description: "生徒に紐付いた教材のチャプターを完了または未完了に更新します。",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string", description: "生徒名。" },
+        chapter_id: { type: "integer", minimum: 1, description: "get_student_materialsで取得したチャプターID。" },
+        completed: { type: "boolean", description: "完了にする場合はtrue、未完了に戻す場合はfalse。" },
+      },
+      required: ["name", "chapter_id", "completed"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
   {
     name: "search_materials",
     title: "教材を検索",
@@ -789,6 +884,185 @@ async function updateSchedulesFromArguments(env, args) {
   return { count: results.length, updates: results };
 }
 
+
+function normalizeCurriculumText(value, field) {
+  const text = String(value || "").trim();
+  if (!text) throw httpError(400, field + " is required");
+  if (text.length > 200) throw httpError(400, field + " is too long");
+  return text;
+}
+
+function positiveInteger(value, field) {
+  const number = Number(value);
+  if (!Number.isInteger(number) || number < 1) {
+    throw httpError(400, field + " must be a positive integer");
+  }
+  return number;
+}
+
+async function listMcpCurriculumMaterials(env, args = {}) {
+  const query = String(args.query || "").trim().toLocaleLowerCase("ja");
+  const limitValue = args.limit === undefined ? 100 : Number(args.limit);
+  if (!Number.isInteger(limitValue) || limitValue < 1 || limitValue > 200) {
+    throw httpError(400, "limit must be an integer between 1 and 200");
+  }
+
+  const materials = await readMaterials(env);
+  const output = [];
+  for (const material of materials) {
+    const chapters = await readChapters(env, material.id);
+    const matches =
+      !query ||
+      String(material.name).toLocaleLowerCase("ja").includes(query) ||
+      chapters.some((chapter) =>
+        String(chapter.name).toLocaleLowerCase("ja").includes(query)
+      );
+    if (!matches) continue;
+    output.push({ ...material, chapters });
+    if (output.length >= limitValue) break;
+  }
+  return { count: output.length, materials: output };
+}
+
+async function createMcpCurriculumMaterial(env, args) {
+  const name = normalizeCurriculumText(args.name, "name");
+  const existing = await env.DB.prepare(
+    "SELECT * FROM materials WHERE name = ? COLLATE NOCASE ORDER BY id LIMIT 1"
+  )
+    .bind(name)
+    .first();
+  if (existing) {
+    return {
+      created: false,
+      material: { ...existing, chapters: await readChapters(env, existing.id) },
+    };
+  }
+  const material = await createMaterial(env, { name });
+  return { created: true, material: { ...material, chapters: [] } };
+}
+
+async function createMcpMaterialChapters(env, args) {
+  const materialId = positiveInteger(args.material_id, "material_id");
+  if (!Array.isArray(args.chapter_names) || args.chapter_names.length < 1 || args.chapter_names.length > 100) {
+    throw httpError(400, "chapter_names must contain between 1 and 100 items");
+  }
+  const material = await env.DB.prepare("SELECT * FROM materials WHERE id = ?")
+    .bind(materialId)
+    .first();
+  if (!material) throw httpError(404, "material not found");
+
+  const names = [];
+  const seen = new Set();
+  for (const value of args.chapter_names) {
+    const name = normalizeCurriculumText(value, "chapter_name");
+    const key = name.toLocaleLowerCase("ja");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    names.push(name);
+  }
+
+  const chapters = [];
+  let createdCount = 0;
+  for (const name of names) {
+    let chapter = await env.DB.prepare(
+      "SELECT * FROM material_chapters WHERE material_id = ? AND name = ? COLLATE NOCASE ORDER BY id LIMIT 1"
+    )
+      .bind(materialId, name)
+      .first();
+    let created = false;
+    if (!chapter) {
+      chapter = await createChapter(env, materialId, { name });
+      created = true;
+      createdCount += 1;
+    }
+    chapters.push({ ...chapter, created });
+  }
+  return {
+    material: { id: material.id, name: material.name },
+    created_count: createdCount,
+    existing_count: chapters.length - createdCount,
+    chapters,
+  };
+}
+
+async function readMcpStudentMaterials(env, args) {
+  const name = normalizeCurriculumText(args.name, "name");
+  const materials = await readStudentMaterials(env, name);
+  let completedChapters = 0;
+  let totalChapters = 0;
+  for (const material of materials) {
+    totalChapters += material.chapters.length;
+    completedChapters += material.chapters.filter((chapter) => Boolean(chapter.completed)).length;
+  }
+  return {
+    name,
+    material_count: materials.length,
+    completed_chapters: completedChapters,
+    total_chapters: totalChapters,
+    materials,
+  };
+}
+
+async function assignMcpMaterialToStudent(env, args) {
+  const name = normalizeCurriculumText(args.name, "name");
+  const materialId = positiveInteger(args.material_id, "material_id");
+  const material = await env.DB.prepare("SELECT * FROM materials WHERE id = ?")
+    .bind(materialId)
+    .first();
+  if (!material) throw httpError(404, "material not found");
+
+  const existing = await env.DB.prepare(
+    "SELECT * FROM student_materials WHERE name = ? AND material_id = ?"
+  )
+    .bind(name, materialId)
+    .first();
+  const link = existing || (await addStudentMaterial(env, { name, material_id: materialId }));
+  const chapters = await readChapters(env, materialId);
+  return {
+    created: !existing,
+    link: {
+      ...link,
+      name,
+      material_id: materialId,
+      material_name: material.name,
+      chapter_count: chapters.length,
+    },
+  };
+}
+
+async function setMcpChapterCompletion(env, args) {
+  const name = normalizeCurriculumText(args.name, "name");
+  const chapterId = positiveInteger(args.chapter_id, "chapter_id");
+  if (typeof args.completed !== "boolean") {
+    throw httpError(400, "completed must be boolean");
+  }
+  const chapter = await env.DB.prepare(
+    "SELECT c.id, c.name, c.material_id, m.name AS material_name FROM material_chapters c JOIN materials m ON m.id = c.material_id WHERE c.id = ?"
+  )
+    .bind(chapterId)
+    .first();
+  if (!chapter) throw httpError(404, "chapter not found");
+
+  const assignment = await env.DB.prepare(
+    "SELECT id FROM student_materials WHERE name = ? AND material_id = ?"
+  )
+    .bind(name, chapter.material_id)
+    .first();
+  if (!assignment) {
+    throw httpError(409, "material is not assigned to this student");
+  }
+
+  await setChapterProgress(env, name, chapterId, args.completed);
+  return {
+    name,
+    chapter_id: chapter.id,
+    chapter_name: chapter.name,
+    material_id: chapter.material_id,
+    material_name: chapter.material_name,
+    completed: args.completed,
+  };
+}
+
 async function handleMcp(request, env, url) {
   if (request.method !== "POST") {
     return new Response("Method Not Allowed", { status: 405 });
@@ -805,9 +1079,9 @@ async function handleMcp(request, env, url) {
     return mcpResponse(id, {
       protocolVersion: params.protocolVersion || "2025-06-18",
       capabilities: { tools: {} },
-      serverInfo: { name: "works-schedule", version: "1.4.0" },
+      serverInfo: { name: "works-schedule", version: "1.5.0" },
       instructions:
-        "Use search_schedules to find exact event_id and calendar_id values before writes. Use briefing and progress tools to prepare and report, history before undoing changes, search_materials before linking a file, and preview_reschedule before apply_reschedule. Dates use Asia/Tokyo. Update tools preserve fields that are not supplied; pass null to clear a text field.",
+        "Use search_schedules to find exact event_id and calendar_id values before schedule writes. Use list_curriculum_materials before creating chapters or assigning curriculum materials, and get_student_materials before updating chapter completion. Use briefing and progress tools to prepare and report, history before undoing changes, search_materials before linking a file, and preview_reschedule before apply_reschedule. Dates use Asia/Tokyo. Update tools preserve fields that are not supplied; pass null to clear a text field.",
     });
   }
   if (method === "notifications/initialized") {
@@ -871,6 +1145,24 @@ async function handleMcp(request, env, url) {
     }
     if (params.name === "undo_schedule_update") {
       return mcpToolResult(id, await undoScheduleUpdate(env, args));
+    }
+    if (params.name === "list_curriculum_materials") {
+      return mcpToolResult(id, await listMcpCurriculumMaterials(env, args));
+    }
+    if (params.name === "create_curriculum_material") {
+      return mcpToolResult(id, await createMcpCurriculumMaterial(env, args));
+    }
+    if (params.name === "create_material_chapters") {
+      return mcpToolResult(id, await createMcpMaterialChapters(env, args));
+    }
+    if (params.name === "get_student_materials") {
+      return mcpToolResult(id, await readMcpStudentMaterials(env, args));
+    }
+    if (params.name === "assign_material_to_student") {
+      return mcpToolResult(id, await assignMcpMaterialToStudent(env, args));
+    }
+    if (params.name === "set_chapter_completion") {
+      return mcpToolResult(id, await setMcpChapterCompletion(env, args));
     }
     if (params.name === "search_materials") {
       return mcpToolResult(id, await searchMcpMaterials(env, args));
