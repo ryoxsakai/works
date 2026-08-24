@@ -500,26 +500,51 @@ function renderContinuousCalendar(viewEvents) {
   }
 
   const dates = viewEvents.map(eventDate).sort((a, b) => a - b);
-  const first = dates[0];
-  const last = dates.at(-1);
-  const months = [];
-  for (
-    let cursor = new Date(first.getFullYear(), first.getMonth(), 1);
-    cursor <= new Date(last.getFullYear(), last.getMonth(), 1);
-    cursor = addMonths(cursor, 1)
-  ) {
-    months.push(new Date(cursor));
+  const rangeStart = new Date(dates[0]);
+  rangeStart.setDate(rangeStart.getDate() - rangeStart.getDay());
+  const rangeEnd = new Date(dates.at(-1));
+  rangeEnd.setDate(rangeEnd.getDate() + (6 - rangeEnd.getDay()));
+
+  const byDay = new Map();
+  viewEvents.forEach((event) => {
+    const date = eventDate(event);
+    const key = calendarKey(date);
+    const items = byDay.get(key) || [];
+    items.push(event);
+    byDay.set(key, items);
+  });
+
+  const week = ["日", "月", "火", "水", "木", "金", "土"];
+  let html = week.map((label) => `<div class="admission-calendar-weekday">${label}</div>`).join("");
+  let index = 0;
+  for (let cursor = new Date(rangeStart); cursor <= rangeEnd; cursor.setDate(cursor.getDate() + 1)) {
+    const date = new Date(cursor);
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const day = date.getDate();
+    const items = byDay.get(calendarKey(date)) || [];
+    const cards = items.map((event) => {
+      const university = canonicalUniversityName(event.university);
+      const type = calendarTypeLabels[event.selection_type] || event.selection_type;
+      const shortLabel = university + "・" + type;
+      const fullTitle = [
+        event.university,
+        typeLabels[event.selection_type] || event.selection_type,
+        stageLabels[event.stage] || event.stage,
+      ].join("｜");
+      return `<span class="admission-calendar-event ${stageClass(event.stage)}" title="${escapeHtml(fullTitle)}"><b>${escapeHtml(shortLabel)}</b><small>${escapeHtml(stageLabels[event.stage] || event.stage)}</small></span>`;
+    }).join("");
+    const beginsMonth = day === 1;
+    const showMonth = index === 0 || beginsMonth;
+    const monthLabel = showMonth
+      ? `<span class="admission-calendar-month-label">${year}年${month + 1}月</span>`
+      : "";
+    const iso = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    html += `<div class="admission-calendar-cell${beginsMonth ? " is-month-start" : ""}"><time datetime="${iso}">${monthLabel}<b>${day}</b></time>${cards}</div>`;
+    index += 1;
   }
 
-  els.calendarContinuous.innerHTML = months.map((monthDate) => {
-    const year = monthDate.getFullYear();
-    const month = monthDate.getMonth();
-    const calendar = calendarMonthMarkup(year, month, viewEvents);
-    return `<section class="admission-calendar-month" aria-label="${year}年${month + 1}月">
-      <h3>${year}年${month + 1}月</h3>
-      <div class="admission-calendar-grid">${calendar.html}</div>
-    </section>`;
-  }).join("");
+  els.calendarContinuous.innerHTML = `<div class="admission-calendar-grid admission-calendar-continuous-grid">${html}</div>`;
   els.calendarEmpty.hidden = true;
 }
 
