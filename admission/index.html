@@ -19,7 +19,7 @@
   <link rel="apple-touch-icon" href="/shared/logo.png" />
   <link rel="stylesheet" href="/shared/styles.css?v=52" />
   <link rel="stylesheet" href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" />
-  <link rel="stylesheet" href="/admission/admission.css?v=10" />
+  <link rel="stylesheet" href="/admission/admission.css?v=11" />
 </head>
 <body>
   <header class="page-header">
@@ -78,15 +78,22 @@
       </section>
 
       <section id="admission-view-calendar" class="admission-view" role="tabpanel" data-admission-view="calendar" hidden>
-        <div class="admission-calendar-nav">
-          <button id="admission-calendar-prev" type="button" aria-label="前の月"><i class="bx bx-chevron-left"></i></button>
-          <strong id="admission-calendar-label"></strong>
-          <button id="admission-calendar-next" type="button" aria-label="次の月"><i class="bx bx-chevron-right"></i></button>
+        <div class="admission-calendar-controls">
+          <div class="admission-calendar-mode" role="group" aria-label="カレンダーの表示方法">
+            <button type="button" data-admission-calendar-mode="month" aria-pressed="true"><i class="bx bx-calendar"></i> 月表示</button>
+            <button type="button" data-admission-calendar-mode="continuous" aria-pressed="false"><i class="bx bx-calendar-week"></i> 連続表示</button>
+          </div>
+          <div id="admission-calendar-nav" class="admission-calendar-nav">
+            <button id="admission-calendar-prev" type="button" aria-label="前の月"><i class="bx bx-chevron-left"></i></button>
+            <strong id="admission-calendar-label"></strong>
+            <button id="admission-calendar-next" type="button" aria-label="次の月"><i class="bx bx-chevron-right"></i></button>
+          </div>
         </div>
         <div class="admission-calendar-shell">
           <div id="admission-calendar-grid" class="admission-calendar-grid"></div>
+          <div id="admission-calendar-continuous" class="admission-calendar-continuous" hidden></div>
         </div>
-        <p id="admission-calendar-empty" class="admission-view-note" hidden>この月の入試日程はありません。</p>
+        <p id="admission-calendar-empty" class="admission-view-note" hidden>表示できる入試日程はありません。</p>
       </section>
 
       <section id="admission-view-gantt" class="admission-view" role="tabpanel" data-admission-view="gantt" hidden>
@@ -185,6 +192,6 @@
     </form>
   </dialog>
 
-  <script type="module" src="/admission/app.js?v=12"></script>
+  <script type="module" src="/admission/app.js?v=13"></script>
 </body>
 </html>
