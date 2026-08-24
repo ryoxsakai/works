@@ -160,11 +160,12 @@ CREATE INDEX IF NOT EXISTS idx_mcp_schedule_changes_event
 
 -- 教材ライブラリのファイルとGoogleカレンダー予定の対応。
 CREATE TABLE IF NOT EXISTS schedule_material_links (
+  calendar_id TEXT NOT NULL,
   event_id TEXT NOT NULL,
   material_file_id TEXT NOT NULL,
   note TEXT,
   created_at TEXT DEFAULT (datetime('now')),
-  PRIMARY KEY (event_id, material_file_id)
+  PRIMARY KEY (calendar_id, event_id, material_file_id)
 );
 
 
