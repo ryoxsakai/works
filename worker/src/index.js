@@ -357,6 +357,65 @@ const MCP_SCHEDULE_TOOLS = [
     },
   },
   {
+    name: "get_student_profile",
+    title: "生徒プロフィールを取得",
+    description: "生徒メモと印刷用氏名を取得します。未登録の場合もnullを含むプロフィールを返します。",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string", description: "生徒名。" },
+      },
+      required: ["name"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+  },
+  {
+    name: "update_student_profile",
+    title: "生徒プロフィールを更新",
+    description: "生徒メモと印刷用氏名を部分更新します。省略した項目は保持し、nullまたは空文字列で消去します。",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string", description: "生徒名。" },
+        memo: { type: ["string", "null"], description: "生徒メモ。nullまたは空文字列で消去します。" },
+        print_name: { type: ["string", "null"], description: "印刷用氏名。nullまたは空文字列で消去します。" },
+      },
+      required: ["name"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  },
+  {
+    name: "get_student_profile_change_history",
+    title: "生徒プロフィールの変更履歴を取得",
+    description: "MCPから行った生徒メモ・印刷用氏名の変更と取り消し履歴を新しい順に取得します。",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string", description: "生徒名。" },
+        limit: { type: "integer", minimum: 1, maximum: 100, description: "最大件数。省略時は20件。" },
+      },
+      required: ["name"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+  },
+  {
+    name: "undo_student_profile_update",
+    title: "生徒プロフィールの変更を取り消す",
+    description: "指定した変更履歴を1件取り消します。変更後に別の編集がある場合は競合として停止します。",
+    inputSchema: {
+      type: "object",
+      properties: {
+        change_id: { type: "string", description: "get_student_profile_change_historyで取得した変更ID。" },
+      },
+      required: ["change_id"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+  },
+  {
     name: "get_student_overview",
     title: "生徒の概要を取得",
     description: "生徒の目標、志望校、教材進捗、メモ、直近・今後の授業をまとめて取得します。予定名は生徒名またはcalendar_tagと完全一致で照合します。",
@@ -738,6 +797,8 @@ async function ensureMcpFeatureSchema(env) {
       await env.DB.batch([
         env.DB.prepare("CREATE TABLE IF NOT EXISTS mcp_schedule_changes (id TEXT PRIMARY KEY, event_id TEXT NOT NULL, action TEXT NOT NULL, changed_fields TEXT NOT NULL, before_json TEXT NOT NULL, after_json TEXT NOT NULL, undone_by TEXT, created_at TEXT DEFAULT (datetime('now')))"),
         env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_mcp_schedule_changes_event ON mcp_schedule_changes(event_id, created_at DESC)"),
+        env.DB.prepare("CREATE TABLE IF NOT EXISTS mcp_student_profile_changes (id TEXT PRIMARY KEY, name TEXT NOT NULL, action TEXT NOT NULL, changed_fields TEXT NOT NULL, before_json TEXT NOT NULL, after_json TEXT NOT NULL, undone_by TEXT, created_at TEXT DEFAULT (datetime('now')))"),
+        env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_mcp_student_profile_changes_name ON mcp_student_profile_changes(name, created_at DESC)"),
         env.DB.prepare("CREATE TABLE IF NOT EXISTS schedule_material_links (calendar_id TEXT NOT NULL, event_id TEXT NOT NULL, material_file_id TEXT NOT NULL, note TEXT, created_at TEXT DEFAULT (datetime('now')), PRIMARY KEY (calendar_id, event_id, material_file_id))"),
       ]);
       const { results: columns } = await env.DB.prepare("PRAGMA table_info(schedule_material_links)").all();
@@ -1063,6 +1124,165 @@ async function setMcpChapterCompletion(env, args) {
   };
 }
 
+function studentProfileSnapshot(row) {
+  return {
+    exists: Boolean(row?.name),
+    print_name: row?.print_name ?? null,
+    memo: row?.memo ?? null,
+    updated_at: row?.updated_at ?? null,
+  };
+}
+
+function equalStudentProfileSnapshots(left, right) {
+  const normalize = (value) =>
+    value && Object.prototype.hasOwnProperty.call(value, "exists")
+      ? {
+          exists: Boolean(value.exists),
+          print_name: value.print_name ?? null,
+          memo: value.memo ?? null,
+          updated_at: value.updated_at ?? null,
+        }
+      : studentProfileSnapshot(value);
+  return JSON.stringify(normalize(left)) === JSON.stringify(normalize(right));
+}
+
+function studentProfileField(args, field, maxLength) {
+  if (!Object.prototype.hasOwnProperty.call(args, field)) {
+    return { provided: false, value: undefined };
+  }
+  const value = args[field];
+  if (value !== null && typeof value !== "string") {
+    throw httpError(400, field + " must be string or null");
+  }
+  if (typeof value === "string" && value.length > maxLength) {
+    throw httpError(400, field + " is too long");
+  }
+  if (value === null || !value.trim()) return { provided: true, value: null };
+  return {
+    provided: true,
+    value: field === "print_name" ? value.trim() : value,
+  };
+}
+
+async function readMcpStudentProfile(env, args = {}) {
+  const name = normalizeCurriculumText(args.name, "name");
+  const profile = await readStudentPref(env, name);
+  return { name, ...studentProfileSnapshot(profile) };
+}
+
+async function updateMcpStudentProfile(env, args = {}) {
+  await ensureMcpFeatureSchema(env);
+  const name = normalizeCurriculumText(args.name, "name");
+  const memo = studentProfileField(args, "memo", 20000);
+  const printName = studentProfileField(args, "print_name", 200);
+  if (!memo.provided && !printName.provided) {
+    throw httpError(400, "memo or print_name is required");
+  }
+
+  const beforeRow = await readStudentPref(env, name);
+  const before = studentProfileSnapshot(beforeRow);
+  const nextPrintName = printName.provided ? printName.value : before.print_name;
+  const nextMemo = memo.provided ? memo.value : before.memo;
+  if (nextPrintName === before.print_name && nextMemo === before.memo) {
+    return { updated: false, change_id: null, profile: { name, ...before } };
+  }
+
+  const updatedAt = new Date().toISOString();
+  const after = {
+    exists: true,
+    print_name: nextPrintName,
+    memo: nextMemo,
+    updated_at: updatedAt,
+  };
+  const changedFields = [
+    ...(nextPrintName !== before.print_name ? ["print_name"] : []),
+    ...(nextMemo !== before.memo ? ["memo"] : []),
+  ];
+  const changeId = crypto.randomUUID();
+  await env.DB.batch([
+    env.DB.prepare(`INSERT INTO student_prefs (name, print_name, memo, updated_at)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(name) DO UPDATE SET print_name = excluded.print_name,
+        memo = excluded.memo, updated_at = excluded.updated_at`)
+      .bind(name, nextPrintName, nextMemo, updatedAt),
+    env.DB.prepare(`INSERT INTO mcp_student_profile_changes
+      (id, name, action, changed_fields, before_json, after_json)
+      VALUES (?, ?, 'update', ?, ?, ?)`)
+      .bind(changeId, name, JSON.stringify(changedFields), JSON.stringify(before), JSON.stringify(after)),
+  ]);
+  return { updated: true, change_id: changeId, changed_fields: changedFields, profile: { name, ...after } };
+}
+
+async function readStudentProfileChangeHistory(env, args = {}) {
+  await ensureMcpFeatureSchema(env);
+  const name = normalizeCurriculumText(args.name, "name");
+  const limit = readBoundedInteger(args.limit, 20, 1, 100, "limit");
+  const { results } = await env.DB.prepare(
+    "SELECT * FROM mcp_student_profile_changes WHERE name = ? ORDER BY created_at DESC, rowid DESC LIMIT ?"
+  )
+    .bind(name, limit)
+    .all();
+  const changes = results.map((row) => ({
+    ...row,
+    changed_fields: parseJsonColumn(row.changed_fields, []),
+    before: parseJsonColumn(row.before_json, null),
+    after: parseJsonColumn(row.after_json, null),
+    before_json: undefined,
+    after_json: undefined,
+  }));
+  return { name, count: changes.length, changes };
+}
+
+async function undoStudentProfileUpdate(env, args = {}) {
+  await ensureMcpFeatureSchema(env);
+  const changeId = String(args.change_id || "").trim();
+  if (!changeId) throw httpError(400, "change_id is required");
+  const change = await env.DB.prepare(
+    "SELECT * FROM mcp_student_profile_changes WHERE id = ?"
+  )
+    .bind(changeId)
+    .first();
+  if (!change) throw httpError(404, "student profile change not found");
+  if (change.action !== "update") throw httpError(409, "only update changes can be undone");
+  if (change.undone_by) throw httpError(409, "student profile change was already undone");
+
+  const before = parseJsonColumn(change.before_json, null);
+  const after = parseJsonColumn(change.after_json, null);
+  const current = studentProfileSnapshot(await readStudentPref(env, change.name));
+  if (!equalStudentProfileSnapshots(current, after)) {
+    throw httpError(409, "student profile changed after this history entry; undo stopped");
+  }
+
+  const restoredAt = new Date().toISOString();
+  const restoredSnapshot = before.exists
+    ? { ...before, updated_at: restoredAt }
+    : studentProfileSnapshot(null);
+  const restoreStatement = before.exists
+    ? env.DB.prepare(`INSERT INTO student_prefs (name, print_name, memo, updated_at)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(name) DO UPDATE SET print_name = excluded.print_name,
+          memo = excluded.memo, updated_at = excluded.updated_at`)
+        .bind(change.name, before.print_name, before.memo, restoredAt)
+    : env.DB.prepare("DELETE FROM student_prefs WHERE name = ?").bind(change.name);
+  const undoId = crypto.randomUUID();
+  await env.DB.batch([
+    restoreStatement,
+    env.DB.prepare(`INSERT INTO mcp_student_profile_changes
+      (id, name, action, changed_fields, before_json, after_json)
+      VALUES (?, ?, 'undo', ?, ?, ?)`)
+      .bind(undoId, change.name, change.changed_fields, JSON.stringify(current), JSON.stringify(restoredSnapshot)),
+    env.DB.prepare("UPDATE mcp_student_profile_changes SET undone_by = ? WHERE id = ?")
+      .bind(undoId, changeId),
+  ]);
+  const restored = studentProfileSnapshot(await readStudentPref(env, change.name));
+  return {
+    name: change.name,
+    undone_change_id: changeId,
+    undo_change_id: undoId,
+    restored: { name: change.name, ...restored },
+  };
+}
+
 async function handleMcp(request, env, url) {
   if (request.method !== "POST") {
     return new Response("Method Not Allowed", { status: 405 });
@@ -1079,9 +1299,9 @@ async function handleMcp(request, env, url) {
     return mcpResponse(id, {
       protocolVersion: params.protocolVersion || "2025-06-18",
       capabilities: { tools: {} },
-      serverInfo: { name: "works-schedule", version: "1.5.0" },
+      serverInfo: { name: "works-schedule", version: "1.6.0" },
       instructions:
-        "Use search_schedules to find exact event_id and calendar_id values before schedule writes. Use list_curriculum_materials before creating chapters or assigning curriculum materials, and get_student_materials before updating chapter completion. Use briefing and progress tools to prepare and report, history before undoing changes, search_materials before linking a file, and preview_reschedule before apply_reschedule. Dates use Asia/Tokyo. Update tools preserve fields that are not supplied; pass null to clear a text field.",
+        "Use search_schedules to find exact event_id and calendar_id values before schedule writes. Use get_student_profile before updating a student memo or print name, and get_student_profile_change_history before undoing a profile update. Use list_curriculum_materials before creating chapters or assigning curriculum materials, and get_student_materials before updating chapter completion. Use briefing and progress tools to prepare and report, history before undoing changes, search_materials before linking a file, and preview_reschedule before apply_reschedule. Dates use Asia/Tokyo. Update tools preserve fields that are not supplied; pass null to clear a text field.",
     });
   }
   if (method === "notifications/initialized") {
@@ -1133,6 +1353,18 @@ async function handleMcp(request, env, url) {
     }
     if (params.name === "update_schedules") {
       return mcpToolResult(id, await updateSchedulesFromArguments(env, args));
+    }
+    if (params.name === "get_student_profile") {
+      return mcpToolResult(id, await readMcpStudentProfile(env, args));
+    }
+    if (params.name === "update_student_profile") {
+      return mcpToolResult(id, await updateMcpStudentProfile(env, args));
+    }
+    if (params.name === "get_student_profile_change_history") {
+      return mcpToolResult(id, await readStudentProfileChangeHistory(env, args));
+    }
+    if (params.name === "undo_student_profile_update") {
+      return mcpToolResult(id, await undoStudentProfileUpdate(env, args));
     }
     if (params.name === "get_student_overview") {
       return mcpToolResult(id, await readStudentOverview(env, args));
