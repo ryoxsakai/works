@@ -1339,7 +1339,8 @@
 }
 
 .admission-calendar-month .admission-calendar-grid {
-  grid-template-rows: 2rem repeat(6, 5.6rem);
+  grid-template-rows: 2rem;
+  grid-auto-rows: 5.6rem;
 }
 
 .admission-calendar-month .admission-calendar-cell:nth-last-child(-n + 7) {
@@ -1377,6 +1378,7 @@
   }
 
   .admission-calendar-month .admission-calendar-grid {
-    grid-template-rows: 2rem repeat(6, 22mm);
+    grid-template-rows: 2rem;
+    grid-auto-rows: 22mm;
   }
 }
