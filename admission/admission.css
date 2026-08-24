@@ -1280,3 +1280,105 @@
     word-break: keep-all;
   }
 }
+
+
+/* 入試管理: 連続カレンダー */
+.admission-calendar-controls {
+  display: grid;
+  gap: .55rem;
+  margin-bottom: .65rem;
+}
+
+.admission-calendar-mode {
+  display: inline-grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: min(100%, 15rem);
+  margin: 0 auto;
+  padding: .2rem;
+  border: 1px solid var(--border);
+  border-radius: .42rem;
+  background: var(--bg-elevated);
+}
+
+.admission-calendar-mode button {
+  min-height: 1.9rem;
+  padding: .28rem .45rem;
+  border: 0;
+  border-radius: .28rem;
+  background: transparent;
+  color: var(--muted);
+  font-size: .68rem;
+  font-weight: 600;
+}
+
+.admission-calendar-mode button i {
+  margin-right: .15rem;
+  font-size: .86rem;
+}
+
+.admission-calendar-mode button[aria-pressed="true"] {
+  background: var(--bg-hover);
+  color: var(--accent);
+}
+
+.admission-calendar-continuous {
+  min-width: 640px;
+}
+
+.admission-calendar-month + .admission-calendar-month {
+  border-top: 1px solid var(--border);
+}
+
+.admission-calendar-month > h3 {
+  margin: 0;
+  padding: .52rem .7rem;
+  background: color-mix(in srgb, var(--bg-hover) 58%, var(--bg-elevated));
+  color: var(--fg);
+  font-size: .78rem;
+  font-weight: 700;
+}
+
+.admission-calendar-month .admission-calendar-grid {
+  grid-template-rows: 2rem;
+  grid-auto-rows: 5.6rem;
+}
+
+.admission-calendar-month .admission-calendar-cell:nth-last-child(-n + 7) {
+  border-bottom: 0;
+}
+
+@media print {
+  .admission-calendar-mode {
+    display: none !important;
+  }
+
+  .admission-calendar-controls {
+    margin-bottom: 3mm;
+  }
+
+  .admission-calendar-continuous {
+    min-width: 0;
+  }
+
+  .admission-calendar-month {
+    break-inside: avoid;
+  }
+
+  .admission-calendar-month + .admission-calendar-month {
+    margin-top: 4mm;
+  }
+
+  .admission-calendar-month > h3 {
+    padding: 2mm;
+    border: 1px solid #cfd4dc;
+    border-bottom: 0;
+    background: #f4f6f9;
+    color: #111;
+    font-size: 10pt;
+  }
+
+  .admission-calendar-month .admission-calendar-grid {
+    grid-template-rows: 2rem;
+    grid-auto-rows: 22mm;
+  }
+}
