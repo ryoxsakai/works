@@ -1078,6 +1078,13 @@
     box-shadow: none;
   }
 
+  .admission-calendar-shell {
+    width: 98.5%;
+    margin-right: auto;
+    margin-left: auto;
+    box-sizing: border-box;
+  }
+
   .admission-calendar-nav button {
     display: none;
   }
