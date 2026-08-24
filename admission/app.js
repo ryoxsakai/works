@@ -2,6 +2,7 @@ import { getSessionToken, signIn, watchAuth } from "../shared/auth.js?v=11";
 
 const VIEW_KEY = "works_admission_view";
 const FILTER_KEY = "works_admission_filters";
+const CALENDAR_MODE_KEY = "works_admission_calendar_mode";
 const stageLabels = {
   primary: "一次試験",
   first_result: "一次発表",
@@ -76,6 +77,9 @@ const els = {
   list: document.querySelector("#admission-list"),
   table: document.querySelector("#admission-table-body"),
   calendarGrid: document.querySelector("#admission-calendar-grid"),
+  calendarContinuous: document.querySelector("#admission-calendar-continuous"),
+  calendarModeButtons: [...document.querySelectorAll("[data-admission-calendar-mode]")],
+  calendarNav: document.querySelector("#admission-calendar-nav"),
   calendarLabel: document.querySelector("#admission-calendar-label"),
   calendarPrev: document.querySelector("#admission-calendar-prev"),
   calendarNext: document.querySelector("#admission-calendar-next"),
@@ -102,12 +106,17 @@ const els = {
 
 let events = [];
 let calendarCursor = null;
+let calendarMode = loadCalendarMode();
 let filters = loadFilters();
 let activeView = "list";
 let eventsLoaded = false;
 
 function asStringList(value) {
   return Array.isArray(value) ? [...new Set(value.map(String).filter(Boolean))] : [];
+}
+
+function loadCalendarMode() {
+  return localStorage.getItem(CALENDAR_MODE_KEY) === "continuous" ? "continuous" : "month";
 }
 
 function emptyFilters() {
@@ -249,6 +258,19 @@ function activateView(name) {
   els.views.forEach((view) => { view.hidden = view.dataset.admissionView !== active; });
   localStorage.setItem(VIEW_KEY, active);
   if (eventsLoaded) render();
+}
+
+function activateCalendarMode(mode) {
+  calendarMode = mode === "continuous" ? "continuous" : "month";
+  localStorage.setItem(CALENDAR_MODE_KEY, calendarMode);
+  els.calendarModeButtons.forEach((button) => {
+    const selected = button.dataset.admissionCalendarMode === calendarMode;
+    button.setAttribute("aria-pressed", String(selected));
+  });
+  els.calendarNav.hidden = calendarMode === "continuous";
+  els.calendarGrid.hidden = calendarMode === "continuous";
+  els.calendarContinuous.hidden = calendarMode !== "continuous";
+  if (eventsLoaded && activeView === "calendar") render();
 }
 
 function activateFilterTab(name) {
@@ -418,17 +440,7 @@ function stageClass(stage) {
   return "admission-stage-" + String(stage || "primary").replace(/[^a-z_]/g, "");
 }
 
-function renderCalendar(viewEvents) {
-  if (!calendarCursor) {
-    els.calendarLabel.textContent = "";
-    els.calendarGrid.replaceChildren();
-    els.calendarEmpty.hidden = false;
-    return;
-  }
-  const year = calendarCursor.getFullYear();
-  const month = calendarCursor.getMonth();
-  els.calendarLabel.textContent = year + "年" + (month + 1) + "月";
-
+function calendarMonthMarkup(year, month, viewEvents) {
   const byDay = new Map();
   viewEvents.forEach((event) => {
     const date = eventDate(event);
@@ -461,11 +473,54 @@ function renderCalendar(viewEvents) {
     html += `<div class="admission-calendar-cell"><time datetime="${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}">${day}</time>${cards}</div>`;
   }
   const trailingCells = (7 - ((startOffset + days) % 7)) % 7;
-  for (let i = 0; i < trailingCells; i++) {
-    html += '<div class="admission-calendar-cell empty"></div>';
+  for (let i = 0; i < trailingCells; i++) html += '<div class="admission-calendar-cell empty"></div>';
+  return { html, hasEvents: byDay.size > 0 };
+}
+
+function renderCalendar(viewEvents) {
+  if (!calendarCursor) {
+    els.calendarLabel.textContent = "";
+    els.calendarGrid.replaceChildren();
+    els.calendarEmpty.hidden = false;
+    return;
   }
-  els.calendarGrid.innerHTML = html;
-  els.calendarEmpty.hidden = byDay.size > 0;
+  const year = calendarCursor.getFullYear();
+  const month = calendarCursor.getMonth();
+  const calendar = calendarMonthMarkup(year, month, viewEvents);
+  els.calendarLabel.textContent = year + "年" + (month + 1) + "月";
+  els.calendarGrid.innerHTML = calendar.html;
+  els.calendarEmpty.hidden = calendar.hasEvents;
+}
+
+function renderContinuousCalendar(viewEvents) {
+  els.calendarContinuous.replaceChildren();
+  if (!viewEvents.length) {
+    els.calendarEmpty.hidden = false;
+    return;
+  }
+
+  const dates = viewEvents.map(eventDate).sort((a, b) => a - b);
+  const first = dates[0];
+  const last = dates.at(-1);
+  const months = [];
+  for (
+    let cursor = new Date(first.getFullYear(), first.getMonth(), 1);
+    cursor <= new Date(last.getFullYear(), last.getMonth(), 1);
+    cursor = addMonths(cursor, 1)
+  ) {
+    months.push(new Date(cursor));
+  }
+
+  els.calendarContinuous.innerHTML = months.map((monthDate) => {
+    const year = monthDate.getFullYear();
+    const month = monthDate.getMonth();
+    const calendar = calendarMonthMarkup(year, month, viewEvents);
+    return `<section class="admission-calendar-month" aria-label="${year}年${month + 1}月">
+      <h3>${year}年${month + 1}月</h3>
+      <div class="admission-calendar-grid">${calendar.html}</div>
+    </section>`;
+  }).join("");
+  els.calendarEmpty.hidden = true;
 }
 
 function addMonths(date, count) {
@@ -588,6 +643,7 @@ function clearInactiveViews() {
   if (activeView !== "table") els.table.replaceChildren();
   if (activeView !== "calendar") {
     els.calendarGrid.replaceChildren();
+    els.calendarContinuous.replaceChildren();
     els.calendarEmpty.hidden = true;
   }
   if (activeView !== "gantt") {
@@ -614,7 +670,8 @@ function render() {
       const first = eventDate(viewEvents[0]);
       calendarCursor = new Date(first.getFullYear(), first.getMonth(), 1);
     }
-    renderCalendar(viewEvents);
+    if (calendarMode === "continuous") renderContinuousCalendar(viewEvents);
+    else renderCalendar(viewEvents);
     return;
   }
   renderGantt(viewEvents);
@@ -682,6 +739,9 @@ els.filterReset.addEventListener("click", () => {
   calendarCursor = null;
   render();
 });
+els.calendarModeButtons.forEach((button) => {
+  button.addEventListener("click", () => activateCalendarMode(button.dataset.admissionCalendarMode));
+});
 els.calendarPrev.addEventListener("click", () => {
   calendarCursor = addMonths(calendarCursor || new Date(), -1);
   renderCalendar(filteredEvents());
@@ -704,6 +764,7 @@ els.tabs.forEach((tab) => {
   });
 });
 activateFilterTab("universities");
+activateCalendarMode(calendarMode);
 activateView(localStorage.getItem(VIEW_KEY) || "list");
 watchAuth({
   onSignedIn: async () => {
