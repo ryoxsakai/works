@@ -5,6 +5,9 @@ compatibility_date = "2026-08-01"
 
 routes = [
   { pattern = "works.lrnr.jp/api/*", zone_name = "lrnr.jp" },
+  { pattern = "works.lrnr.jp/mcp", zone_name = "lrnr.jp" },
+  { pattern = "works.lrnr.jp/oauth/*", zone_name = "lrnr.jp" },
+  { pattern = "works.lrnr.jp/.well-known/*", zone_name = "lrnr.jp" },
 ]
 
 [vars]
