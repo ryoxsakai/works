@@ -13,7 +13,7 @@ function json(data, headers, status = 200) {
   });
 }
 
-// --- ブラウザを介さない読み取り専用の授業予定API ---
+// --- ブラウザを介さない授業予定API ---
 
 const SCHEDULE_TIME_ZONE = "Asia/Tokyo";
 
@@ -54,6 +54,7 @@ async function verifyReadApiKey(request, env) {
 // 授業予定は個人情報を含むため、MCPのtools/callはOAuthで発行した短命の
 // Bearer tokenでのみ実行できるようにする。OAuthの認可画面では既存の
 // WORKS_API_KEYを本人確認用に使い、キー自体はChatGPTへ保存しない。
+// schedule:readはこの個人用MCPへの接続権限を表し、取得・更新の両方に使用する。
 const MCP_SCOPE = "schedule:read";
 const MCP_TOKEN_MAX_AGE_MS = 60 * 60 * 1000;
 const MCP_AUTH_CODE_MAX_AGE_MS = 5 * 60 * 1000;
@@ -94,7 +95,7 @@ function oauthErrorPage(message) {
 }
 function renderMcpAuthorizeForm(params) {
   const fields = ["response_type", "client_id", "redirect_uri", "state", "code_challenge", "code_challenge_method", "scope"].map((name) => `<input type="hidden" name="${name}" value="${escapeHtml(params.get(name) || "")}">`).join("");
-  return html(`<!doctype html><html lang="ja"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>WORKS を接続</title><body style="font-family:-apple-system,BlinkMacSystemFont,'Noto Sans JP',sans-serif;max-width:560px;margin:48px auto;padding:0 20px"><h1>WORKS をChatGPTに接続</h1><p>授業予定・宿題・授業メモの読み取りを許可します。</p><form method="post"><label style="display:block;margin:24px 0 8px">WORKS APIキー</label><input name="api_key" type="password" autocomplete="current-password" required style="box-sizing:border-box;width:100%;padding:12px;font-size:16px">${fields}<button type="submit" style="margin-top:24px;padding:12px 18px;font-size:16px">接続を許可</button></form></body></html>`);
+  return html(`<!doctype html><html lang="ja"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>WORKS を接続</title><body style="font-family:-apple-system,BlinkMacSystemFont,'Noto Sans JP',sans-serif;max-width:560px;margin:48px auto;padding:0 20px"><h1>WORKS をChatGPTに接続</h1><p>授業予定・確認テスト・宿題・授業メモの読み取りと更新を許可します。</p><form method="post"><label style="display:block;margin:24px 0 8px">WORKS APIキー</label><input name="api_key" type="password" autocomplete="current-password" required style="box-sizing:border-box;width:100%;padding:12px;font-size:16px">${fields}<button type="submit" style="margin-top:24px;padding:12px 18px;font-size:16px">接続を許可</button></form></body></html>`);
 }
 async function authorizeMcpClient(request, env, url) {
   const params = request.method === "POST" ? new URLSearchParams(await request.text()) : url.searchParams;
@@ -136,20 +137,332 @@ async function verifyMcpAccessToken(request, env) {
   let payload; try { payload = JSON.parse(fromBase64Url(payloadB64)); } catch { throw httpError(401, "invalid MCP bearer token"); }
   if (payload.aud !== "works-mcp" || payload.exp < Date.now() || payload.email?.toLowerCase() !== env.ALLOWED_EMAIL.toLowerCase() || !String(payload.scope || "").split(" ").includes(MCP_SCOPE)) throw httpError(401, "invalid MCP bearer token");
 }
-function mcpResponse(id, result) { return mcpJson({ jsonrpc: "2.0", id, result }); }
-function mcpError(id, code, message) { return mcpJson({ jsonrpc: "2.0", id: id ?? null, error: { code, message } }); }
+function mcpResponse(id, result) {
+  return mcpJson({ jsonrpc: "2.0", id, result });
+}
+
+function mcpError(id, code, message) {
+  return mcpJson({ jsonrpc: "2.0", id: id ?? null, error: { code, message } });
+}
+
+function mcpToolResult(id, data) {
+  return mcpResponse(id, {
+    content: [{ type: "text", text: JSON.stringify(data) }],
+    structuredContent: data,
+    isError: false,
+  });
+}
+
+function mcpToolFailure(id, err) {
+  return mcpResponse(id, {
+    content: [{ type: "text", text: err?.message || String(err) }],
+    isError: true,
+  });
+}
+
+const SCHEDULE_TEXT_FIELDS = [
+  "lesson_plan",
+  "confirmation_test",
+  "homework",
+  "lesson_memo",
+];
+
+const scheduleUpdateProperties = {
+  event_id: {
+    type: "string",
+    description:
+      "get_scheduleで取得した予定ID。省略する場合はdateとtitleを指定します。",
+  },
+  date: {
+    type: "string",
+    description:
+      "YYYY-MM-DD形式。event_idを省略してtitleで予定を特定するときに必要です。",
+  },
+  title: {
+    type: "string",
+    description:
+      "予定名の完全一致。event_idを省略してdateで予定を特定するときに必要です。",
+  },
+  completed: {
+    type: "boolean",
+    description: "授業を完了扱いにする場合はtrue、未完了に戻す場合はfalse。",
+  },
+  lesson_plan: {
+    type: ["string", "null"],
+    description: "授業予定。nullまたは空文字列で消去します。",
+  },
+  confirmation_test: {
+    type: ["string", "null"],
+    description: "確認テスト。nullまたは空文字列で消去します。",
+  },
+  homework: {
+    type: ["string", "null"],
+    description: "宿題。nullまたは空文字列で消去します。",
+  },
+  lesson_memo: {
+    type: ["string", "null"],
+    description: "授業メモ。nullまたは空文字列で消去します。",
+  },
+};
+
+const MCP_SCHEDULE_TOOLS = [
+  {
+    name: "get_schedule",
+    title: "授業予定を取得",
+    description:
+      "指定日（Asia/Tokyo）のWORKS授業予定、授業計画、確認テスト、宿題、授業メモを取得します。日付を省略すると今日です。",
+    inputSchema: {
+      type: "object",
+      properties: {
+        date: {
+          type: "string",
+          description: "YYYY-MM-DD形式。省略時は今日（Asia/Tokyo）。",
+        },
+        include_excluded: {
+          type: "boolean",
+          description: "除外設定済みの予定も含める場合はtrue。",
+        },
+      },
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      openWorldHint: false,
+    },
+  },
+  {
+    name: "update_schedule",
+    title: "授業予定を更新",
+    description:
+      "1件の授業について、授業予定・確認テスト・宿題・授業メモ・完了状態を部分更新します。event_id、またはdateとtitleの組み合わせで対象を指定します。指定しなかった項目は変更しません。",
+    inputSchema: {
+      type: "object",
+      properties: scheduleUpdateProperties,
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+  },
+  {
+    name: "update_schedules",
+    title: "複数の授業予定を一括更新",
+    description:
+      "複数の授業予定を一度に部分更新します。各項目はevent_id、またはdateとtitleの組み合わせで対象を指定します。予定名が重複する場合はevent_idを使用してください。",
+    inputSchema: {
+      type: "object",
+      properties: {
+        updates: {
+          type: "array",
+          minItems: 1,
+          maxItems: 50,
+          items: {
+            type: "object",
+            properties: scheduleUpdateProperties,
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ["updates"],
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+  },
+];
+
+function schedulePatchFromArguments(args) {
+  const patch = {};
+  if (Object.prototype.hasOwnProperty.call(args, "completed")) {
+    if (typeof args.completed !== "boolean") {
+      throw httpError(400, "completed must be boolean");
+    }
+    patch.completed = args.completed;
+  }
+  for (const field of SCHEDULE_TEXT_FIELDS) {
+    if (!Object.prototype.hasOwnProperty.call(args, field)) continue;
+    const value = args[field];
+    if (value !== null && typeof value !== "string") {
+      throw httpError(400, `${field} must be string or null`);
+    }
+    if (typeof value === "string" && value.length > 5000) {
+      throw httpError(400, `${field} is too long`);
+    }
+    patch[field] = value === null ? null : value.trim() || null;
+  }
+  if (Object.keys(patch).length === 0) {
+    throw httpError(400, "at least one update field is required");
+  }
+  return patch;
+}
+
+async function resolveScheduleUpdateTarget(env, args) {
+  const eventId = String(args.event_id || "").trim();
+  if (eventId) {
+    return {
+      event_id: eventId,
+      date: args.date ? String(args.date).trim() : null,
+      title: args.title ? String(args.title).trim() : null,
+    };
+  }
+
+  const date = String(args.date || "").trim();
+  const title = String(args.title || "").trim();
+  if (!date || !title) {
+    throw httpError(400, "event_id, or both date and title, are required");
+  }
+
+  const searchParams = new URLSearchParams({
+    date,
+    include_excluded: "true",
+  });
+  const schedule = await readSchedule(env, searchParams);
+  const matches = schedule.events.filter((event) => event.title === title);
+  if (matches.length === 0) {
+    throw httpError(404, `schedule not found: ${date} ${title}`);
+  }
+  if (matches.length > 1) {
+    throw httpError(
+      409,
+      `multiple schedules matched: ${date} ${title}; use event_id`
+    );
+  }
+  return {
+    event_id: matches[0].id,
+    date,
+    title: matches[0].title,
+  };
+}
+
+async function updateScheduleFromArguments(env, args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw httpError(400, "arguments must be an object");
+  }
+  const patch = schedulePatchFromArguments(args);
+  const target = await resolveScheduleUpdateTarget(env, args);
+  const entry = await upsertCurriculumEntry(env, target.event_id, patch);
+  return {
+    event_id: target.event_id,
+    date: target.date,
+    title: target.title,
+    updated_fields: Object.keys(patch),
+    entry,
+  };
+}
+
+async function updateSchedulesFromArguments(env, args) {
+  if (!Array.isArray(args?.updates) || args.updates.length === 0) {
+    throw httpError(400, "updates[] is required");
+  }
+  if (args.updates.length > 50) {
+    throw httpError(400, "updates[] must contain at most 50 items");
+  }
+
+  // 対象特定と入力検証をすべて先に終え、明らかな入力エラーで途中更新しない。
+  const prepared = [];
+  for (const update of args.updates) {
+    if (!update || typeof update !== "object" || Array.isArray(update)) {
+      throw httpError(400, "each update must be an object");
+    }
+    prepared.push({
+      target: await resolveScheduleUpdateTarget(env, update),
+      patch: schedulePatchFromArguments(update),
+    });
+  }
+
+  const eventIds = prepared.map(({ target }) => target.event_id);
+  if (new Set(eventIds).size !== eventIds.length) {
+    throw httpError(409, "updates[] contains duplicate schedules");
+  }
+
+  const results = [];
+  for (const { target, patch } of prepared) {
+    const entry = await upsertCurriculumEntry(env, target.event_id, patch);
+    results.push({
+      event_id: target.event_id,
+      date: target.date,
+      title: target.title,
+      updated_fields: Object.keys(patch),
+      entry,
+    });
+  }
+  return { count: results.length, updates: results };
+}
+
 async function handleMcp(request, env, url) {
-  if (request.method !== "POST") return new Response("Method Not Allowed", { status: 405 });
-  let message; try { message = await request.json(); } catch { return mcpError(null, -32700, "Parse error"); }
+  if (request.method !== "POST") {
+    return new Response("Method Not Allowed", { status: 405 });
+  }
+  let message;
+  try {
+    message = await request.json();
+  } catch {
+    return mcpError(null, -32700, "Parse error");
+  }
+
   const { id, method, params = {} } = message;
-  if (method === "initialize") return mcpResponse(id, { protocolVersion: params.protocolVersion || "2025-06-18", capabilities: { tools: {} }, serverInfo: { name: "works-schedule", version: "1.0.0" }, instructions: "Use get_schedule for the user's private WORKS lesson schedule. This tool is read-only and uses Asia/Tokyo dates." });
-  if (method === "notifications/initialized") return new Response(null, { status: 202 });
-  if (method === "tools/list") return mcpResponse(id, { tools: [{ name: "get_schedule", title: "授業予定を取得", description: "指定日（Asia/Tokyo）のWORKS授業予定、授業計画、確認テスト、宿題、授業メモを取得します。日付を省略すると今日です。", inputSchema: { type: "object", properties: { date: { type: "string", description: "YYYY-MM-DD形式。省略時は今日（Asia/Tokyo）。" }, include_excluded: { type: "boolean", description: "除外設定済みの予定も含める場合はtrue。" } }, additionalProperties: false }, annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false } }] });
-  if (method !== "tools/call") return mcpError(id, -32601, "Method not found");
-  try { await verifyMcpAccessToken(request, env); } catch (err) { if (err.status === 401) return mcpJson({ error: "unauthorized" }, 401, { "WWW-Authenticate": `Bearer resource_metadata="${mcpBaseUrl(url)}/.well-known/oauth-protected-resource", scope="${MCP_SCOPE}"` }); throw err; }
-  if (params.name !== "get_schedule") return mcpError(id, -32602, "Unknown tool");
-  const searchParams = new URLSearchParams(); if (params.arguments?.date) searchParams.set("date", String(params.arguments.date)); if (params.arguments?.include_excluded) searchParams.set("include_excluded", "true");
-  try { const schedule = await readSchedule(env, searchParams); return mcpResponse(id, { content: [{ type: "text", text: JSON.stringify(schedule) }], structuredContent: schedule, isError: false }); } catch (err) { return mcpResponse(id, { content: [{ type: "text", text: err.message }], isError: true }); }
+  if (method === "initialize") {
+    return mcpResponse(id, {
+      protocolVersion: params.protocolVersion || "2025-06-18",
+      capabilities: { tools: {} },
+      serverInfo: { name: "works-schedule", version: "1.1.0" },
+      instructions:
+        "Use get_schedule to identify lessons. Use update_schedule for one lesson and update_schedules for multiple lessons. Dates use Asia/Tokyo. Update tools preserve fields that are not supplied; pass null to clear a text field.",
+    });
+  }
+  if (method === "notifications/initialized") {
+    return new Response(null, { status: 202 });
+  }
+  if (method === "tools/list") {
+    return mcpResponse(id, { tools: MCP_SCHEDULE_TOOLS });
+  }
+  if (method !== "tools/call") {
+    return mcpError(id, -32601, "Method not found");
+  }
+
+  try {
+    await verifyMcpAccessToken(request, env);
+  } catch (err) {
+    if (err.status === 401) {
+      return mcpJson(
+        { error: "unauthorized" },
+        401,
+        {
+          "WWW-Authenticate": `Bearer resource_metadata="${mcpBaseUrl(
+            url
+          )}/.well-known/oauth-protected-resource", scope="${MCP_SCOPE}"`,
+        }
+      );
+    }
+    throw err;
+  }
+
+  try {
+    const args = params.arguments || {};
+    if (params.name === "get_schedule") {
+      const searchParams = new URLSearchParams();
+      if (args.date) searchParams.set("date", String(args.date));
+      if (args.include_excluded) searchParams.set("include_excluded", "true");
+      return mcpToolResult(id, await readSchedule(env, searchParams));
+    }
+    if (params.name === "update_schedule") {
+      return mcpToolResult(id, await updateScheduleFromArguments(env, args));
+    }
+    if (params.name === "update_schedules") {
+      return mcpToolResult(id, await updateSchedulesFromArguments(env, args));
+    }
+    return mcpError(id, -32602, "Unknown tool");
+  } catch (err) {
+    return mcpToolFailure(id, err);
+  }
 }
 
 function todayInScheduleTimeZone(now = new Date()) {
@@ -765,6 +1078,27 @@ async function readCurriculumEntries(env) {
 
 async function upsertCurriculumEntry(env, eventId, body) {
   if (!eventId) throw new Error("event id is required");
+  const existing =
+    (await env.DB.prepare(
+      "SELECT * FROM curriculum_entries WHERE calendar_event_id = ?"
+    )
+      .bind(eventId)
+      .first()) || {};
+
+  const completed =
+    body.completed !== undefined
+      ? body.completed
+        ? 1
+        : 0
+      : existing.completed
+        ? 1
+        : 0;
+  const values = {};
+  for (const field of SCHEDULE_TEXT_FIELDS) {
+    values[field] =
+      body[field] !== undefined ? body[field] : existing[field] || null;
+  }
+
   await env.DB.prepare(
     `INSERT INTO curriculum_entries (calendar_event_id, completed, lesson_plan, confirmation_test, homework, lesson_memo, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
@@ -778,14 +1112,16 @@ async function upsertCurriculumEntry(env, eventId, body) {
   )
     .bind(
       eventId,
-      body.completed ? 1 : 0,
-      body.lesson_plan || null,
-      body.confirmation_test || null,
-      body.homework || null,
-      body.lesson_memo || null
+      completed,
+      values.lesson_plan,
+      values.confirmation_test,
+      values.homework,
+      values.lesson_memo
     )
     .run();
-  return env.DB.prepare("SELECT * FROM curriculum_entries WHERE calendar_event_id = ?")
+  return env.DB.prepare(
+    "SELECT * FROM curriculum_entries WHERE calendar_event_id = ?"
+  )
     .bind(eventId)
     .first();
 }
