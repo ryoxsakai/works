@@ -16,6 +16,14 @@ const typeLabels = {
   comprehensive: "総合型選抜",
 };
 
+const calendarTypeLabels = {
+  general: "一般",
+  ct: "共テ",
+  recommendation: "推薦",
+  regional: "地域枠",
+  comprehensive: "総合型",
+};
+
 const printTypeLabels = {
   general: "一般",
   ct: "共テ",
@@ -439,7 +447,17 @@ function renderCalendar(viewEvents) {
   for (let day = 1; day <= days; day++) {
     const date = new Date(year, month, day);
     const items = byDay.get(calendarKey(date)) || [];
-    const cards = items.map((event) => `<span class="admission-calendar-event ${stageClass(event.stage)}" title="${escapeHtml(event.university)}｜${escapeHtml(stageLabels[event.stage] || event.stage)}"><b>${escapeHtml(event.university)}</b><small>${escapeHtml(stageLabels[event.stage] || event.stage)}</small></span>`).join("");
+    const cards = items.map((event) => {
+      const university = canonicalUniversityName(event.university);
+      const type = calendarTypeLabels[event.selection_type] || event.selection_type;
+      const shortLabel = university + "・" + type;
+      const fullTitle = [
+        event.university,
+        typeLabels[event.selection_type] || event.selection_type,
+        stageLabels[event.stage] || event.stage,
+      ].join("｜");
+      return `<span class="admission-calendar-event ${stageClass(event.stage)}" title="${escapeHtml(fullTitle)}"><b>${escapeHtml(shortLabel)}</b><small>${escapeHtml(stageLabels[event.stage] || event.stage)}</small></span>`;
+    }).join("");
     html += `<div class="admission-calendar-cell"><time datetime="${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}">${day}</time>${cards}</div>`;
   }
   const trailingCells = (7 - ((startOffset + days) % 7)) % 7;
