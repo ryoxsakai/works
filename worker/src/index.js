@@ -526,6 +526,88 @@ const MCP_SCHEDULE_TOOLS = [
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   {
+    name: "update_curriculum_material",
+    title: "カリキュラム教材名を変更",
+    description: "登録済み教材の名称を変更します。同名教材がある場合は停止します。",
+    inputSchema: {
+      type: "object",
+      properties: {
+        material_id: { type: "integer", minimum: 1, description: "list_curriculum_materialsで取得した教材ID。" },
+        name: { type: "string", description: "変更後の教材名。" },
+      },
+      required: ["material_id", "name"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  {
+    name: "update_material_chapter",
+    title: "教材チャプター名を変更",
+    description: "指定チャプターの名称を変更します。同じ教材内に同名チャプターがある場合は停止します。",
+    inputSchema: {
+      type: "object",
+      properties: {
+        chapter_id: { type: "integer", minimum: 1, description: "list_curriculum_materialsで取得したチャプターID。" },
+        name: { type: "string", description: "変更後のチャプター名。" },
+      },
+      required: ["chapter_id", "name"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  {
+    name: "reorder_material_chapters",
+    title: "教材チャプターを並べ替え",
+    description: "指定教材の全チャプターIDを希望順に並べ替えます。欠落・重複・別教材のIDがある場合は停止します。",
+    inputSchema: {
+      type: "object",
+      properties: {
+        material_id: { type: "integer", minimum: 1, description: "list_curriculum_materialsで取得した教材ID。" },
+        chapter_ids: {
+          type: "array",
+          minItems: 1,
+          maxItems: 500,
+          items: { type: "integer", minimum: 1 },
+          description: "この教材の全チャプターIDを希望する順番で指定。",
+        },
+      },
+      required: ["material_id", "chapter_ids"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  {
+    name: "merge_material_chapters",
+    title: "重複チャプターを統合",
+    description: "統合元の進捗を統合先へ移し、完了状態を保持してから統合元を削除します。両者が同じ教材に属さない場合は停止します。",
+    inputSchema: {
+      type: "object",
+      properties: {
+        source_chapter_id: { type: "integer", minimum: 1, description: "削除する統合元チャプターID。" },
+        target_chapter_id: { type: "integer", minimum: 1, description: "残す統合先チャプターID。" },
+        expected_source_name: { type: "string", description: "誤削除防止のための統合元チャプター名。現在値と一致しない場合は停止します。" },
+      },
+      required: ["source_chapter_id", "target_chapter_id", "expected_source_name"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+  },
+  {
+    name: "delete_material_chapter",
+    title: "教材チャプターを削除",
+    description: "指定チャプターを削除します。生徒の進捗が存在する場合は削除せず、merge_material_chaptersの使用を求めます。",
+    inputSchema: {
+      type: "object",
+      properties: {
+        chapter_id: { type: "integer", minimum: 1, description: "削除するチャプターID。" },
+        expected_name: { type: "string", description: "誤削除防止のためのチャプター名。現在値と一致しない場合は停止します。" },
+      },
+      required: ["chapter_id", "expected_name"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+  },
+  {
     name: "get_student_materials",
     title: "生徒の教材と進捗を取得",
     description: "生徒に紐付いた教材、チャプター、各チャプターの完了状態を取得します。",
@@ -818,6 +900,108 @@ async function ensureMcpFeatureSchema(env) {
   await mcpFeatureSchemaReady;
 }
 
+let curriculumIntegrityReady = null;
+
+async function runDbStatements(env, statements, chunkSize = 50) {
+  for (let index = 0; index < statements.length; index += chunkSize) {
+    await env.DB.batch(statements.slice(index, index + chunkSize));
+  }
+}
+
+async function resequenceMaterialChapters(env, materialId) {
+  const { results } = await env.DB.prepare(
+    "SELECT id FROM material_chapters WHERE material_id = ? ORDER BY sort_order, id"
+  )
+    .bind(materialId)
+    .all();
+  await runDbStatements(
+    env,
+    results.map((chapter, index) =>
+      env.DB.prepare("UPDATE material_chapters SET sort_order = ? WHERE id = ?")
+        .bind(index, chapter.id)
+    )
+  );
+}
+
+async function ensureCurriculumIntegrity(env) {
+  if (!curriculumIntegrityReady) {
+    curriculumIntegrityReady = (async () => {
+      const { results: duplicateGroups } = await env.DB.prepare(
+        `SELECT material_id, lower(trim(name)) AS normalized_name, MIN(id) AS keep_id, COUNT(*) AS duplicate_count
+         FROM material_chapters
+         GROUP BY material_id, lower(trim(name))
+         HAVING COUNT(*) > 1`
+      ).all();
+      const mergedChapters = [];
+
+      for (const group of duplicateGroups) {
+        const { results: duplicates } = await env.DB.prepare(
+          `SELECT id, name, sort_order
+           FROM material_chapters
+           WHERE material_id = ? AND lower(trim(name)) = ?
+           ORDER BY id`
+        )
+          .bind(group.material_id, group.normalized_name)
+          .all();
+        const target = duplicates.find((chapter) => chapter.id === group.keep_id) || duplicates[0];
+        if (!target) continue;
+
+        for (const source of duplicates.filter((chapter) => chapter.id !== target.id)) {
+          const { results: progressRows } = await env.DB.prepare(
+            "SELECT name, completed, updated_at FROM chapter_progress WHERE chapter_id = ?"
+          )
+            .bind(source.id)
+            .all();
+          const statements = progressRows.map((progress) =>
+            env.DB.prepare(
+              `INSERT INTO chapter_progress (name, chapter_id, completed, updated_at)
+               VALUES (?, ?, ?, ?)
+               ON CONFLICT(name, chapter_id) DO UPDATE SET
+                 completed = CASE
+                   WHEN chapter_progress.completed = 1 OR excluded.completed = 1 THEN 1
+                   ELSE 0
+                 END,
+                 updated_at = CASE
+                   WHEN COALESCE(chapter_progress.updated_at, '') >= COALESCE(excluded.updated_at, '')
+                     THEN chapter_progress.updated_at
+                   ELSE excluded.updated_at
+                 END`
+            ).bind(progress.name, target.id, progress.completed ? 1 : 0, progress.updated_at)
+          );
+          statements.push(
+            env.DB.prepare("DELETE FROM chapter_progress WHERE chapter_id = ?").bind(source.id),
+            env.DB.prepare("DELETE FROM material_chapters WHERE id = ?").bind(source.id)
+          );
+          await runDbStatements(env, statements);
+          mergedChapters.push({
+            material_id: group.material_id,
+            source_chapter_id: source.id,
+            target_chapter_id: target.id,
+            name: target.name,
+            migrated_progress_count: progressRows.length,
+          });
+        }
+      }
+
+      await env.DB.prepare("UPDATE material_chapters SET name = trim(name) WHERE name <> trim(name)").run();
+      const { results: materials } = await env.DB.prepare(
+        "SELECT DISTINCT material_id FROM material_chapters"
+      ).all();
+      for (const material of materials) {
+        await resequenceMaterialChapters(env, material.material_id);
+      }
+      await env.DB.prepare(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_material_chapters_unique_name ON material_chapters(material_id, lower(trim(name)))"
+      ).run();
+      return { merged_chapters: mergedChapters };
+    })().catch((err) => {
+      curriculumIntegrityReady = null;
+      throw err;
+    });
+  }
+  return curriculumIntegrityReady;
+}
+
 function curriculumSnapshot(row) {
   return {
     exists: Boolean(row?.calendar_event_id),
@@ -962,6 +1146,7 @@ function positiveInteger(value, field) {
 }
 
 async function listMcpCurriculumMaterials(env, args = {}) {
+  await ensureCurriculumIntegrity(env);
   const query = String(args.query || "").trim().toLocaleLowerCase("ja");
   const limitValue = args.limit === undefined ? 100 : Number(args.limit);
   if (!Number.isInteger(limitValue) || limitValue < 1 || limitValue > 200) {
@@ -1003,6 +1188,7 @@ async function createMcpCurriculumMaterial(env, args) {
 }
 
 async function createMcpMaterialChapters(env, args) {
+  await ensureCurriculumIntegrity(env);
   const materialId = positiveInteger(args.material_id, "material_id");
   if (!Array.isArray(args.chapter_names) || args.chapter_names.length < 1 || args.chapter_names.length > 100) {
     throw httpError(400, "chapter_names must contain between 1 and 100 items");
@@ -1044,6 +1230,176 @@ async function createMcpMaterialChapters(env, args) {
     existing_count: chapters.length - createdCount,
     chapters,
   };
+}
+
+async function updateMcpCurriculumMaterial(env, args) {
+  const materialId = positiveInteger(args.material_id, "material_id");
+  const name = normalizeCurriculumText(args.name, "name");
+  const before = await env.DB.prepare("SELECT * FROM materials WHERE id = ?")
+    .bind(materialId)
+    .first();
+  if (!before) throw httpError(404, "material not found");
+  const duplicate = await env.DB.prepare(
+    "SELECT id FROM materials WHERE id <> ? AND lower(trim(name)) = lower(trim(?)) ORDER BY id LIMIT 1"
+  )
+    .bind(materialId, name)
+    .first();
+  if (duplicate) throw httpError(409, "another material already uses this name");
+  const material = await updateMaterial(env, materialId, { name });
+  return { before, material };
+}
+
+async function readMcpMaterialChapter(env, chapterId) {
+  return env.DB.prepare(
+    `SELECT c.*, m.name AS material_name
+     FROM material_chapters c
+     JOIN materials m ON m.id = c.material_id
+     WHERE c.id = ?`
+  )
+    .bind(chapterId)
+    .first();
+}
+
+async function updateMcpMaterialChapter(env, args) {
+  await ensureCurriculumIntegrity(env);
+  const chapterId = positiveInteger(args.chapter_id, "chapter_id");
+  const name = normalizeCurriculumText(args.name, "name");
+  const before = await readMcpMaterialChapter(env, chapterId);
+  if (!before) throw httpError(404, "chapter not found");
+  const duplicate = await env.DB.prepare(
+    `SELECT id FROM material_chapters
+     WHERE material_id = ? AND id <> ? AND lower(trim(name)) = lower(trim(?))
+     ORDER BY id LIMIT 1`
+  )
+    .bind(before.material_id, chapterId, name)
+    .first();
+  if (duplicate) throw httpError(409, "another chapter in this material already uses this name");
+  let chapter;
+  try {
+    chapter = await updateChapter(env, chapterId, { name });
+  } catch (err) {
+    if (String(err?.message || "").toLowerCase().includes("unique")) {
+      throw httpError(409, "another chapter in this material already uses this name");
+    }
+    throw err;
+  }
+  return { before, chapter: { ...chapter, material_name: before.material_name } };
+}
+
+async function reorderMcpMaterialChapters(env, args) {
+  await ensureCurriculumIntegrity(env);
+  const materialId = positiveInteger(args.material_id, "material_id");
+  if (!Array.isArray(args.chapter_ids) || args.chapter_ids.length < 1 || args.chapter_ids.length > 500) {
+    throw httpError(400, "chapter_ids must contain between 1 and 500 items");
+  }
+  const requestedIds = args.chapter_ids.map((value) => positiveInteger(value, "chapter_id"));
+  if (new Set(requestedIds).size !== requestedIds.length) {
+    throw httpError(400, "chapter_ids must not contain duplicates");
+  }
+  const material = await env.DB.prepare("SELECT id, name FROM materials WHERE id = ?")
+    .bind(materialId)
+    .first();
+  if (!material) throw httpError(404, "material not found");
+  const { results: current } = await env.DB.prepare(
+    "SELECT id FROM material_chapters WHERE material_id = ? ORDER BY sort_order, id"
+  )
+    .bind(materialId)
+    .all();
+  const currentIds = current.map((chapter) => Number(chapter.id));
+  if (
+    currentIds.length !== requestedIds.length ||
+    currentIds.some((chapterId) => !requestedIds.includes(chapterId))
+  ) {
+    throw httpError(409, "chapter_ids must contain every current chapter in this material exactly once");
+  }
+  await runDbStatements(
+    env,
+    requestedIds.map((chapterId, index) =>
+      env.DB.prepare("UPDATE material_chapters SET sort_order = ? WHERE id = ? AND material_id = ?")
+        .bind(index, chapterId, materialId)
+    )
+  );
+  return { material, chapters: await readChapters(env, materialId) };
+}
+
+function assertExpectedChapterName(chapter, expectedName, fieldName) {
+  const expected = normalizeCurriculumText(expectedName, fieldName);
+  if (String(chapter.name).trim().toLocaleLowerCase("ja") !== expected.toLocaleLowerCase("ja")) {
+    throw httpError(409, `${fieldName} does not match the current chapter name`);
+  }
+}
+
+async function mergeMcpMaterialChapters(env, args) {
+  await ensureCurriculumIntegrity(env);
+  const sourceChapterId = positiveInteger(args.source_chapter_id, "source_chapter_id");
+  const targetChapterId = positiveInteger(args.target_chapter_id, "target_chapter_id");
+  if (sourceChapterId === targetChapterId) {
+    throw httpError(400, "source_chapter_id and target_chapter_id must be different");
+  }
+  const [source, target] = await Promise.all([
+    readMcpMaterialChapter(env, sourceChapterId),
+    readMcpMaterialChapter(env, targetChapterId),
+  ]);
+  if (!source) throw httpError(404, "source chapter not found");
+  if (!target) throw httpError(404, "target chapter not found");
+  assertExpectedChapterName(source, args.expected_source_name, "expected_source_name");
+  if (source.material_id !== target.material_id) {
+    throw httpError(409, "source and target chapters must belong to the same material");
+  }
+
+  const { results: progressRows } = await env.DB.prepare(
+    "SELECT name, completed, updated_at FROM chapter_progress WHERE chapter_id = ?"
+  )
+    .bind(sourceChapterId)
+    .all();
+  const statements = progressRows.map((progress) =>
+    env.DB.prepare(
+      `INSERT INTO chapter_progress (name, chapter_id, completed, updated_at)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(name, chapter_id) DO UPDATE SET
+         completed = CASE
+           WHEN chapter_progress.completed = 1 OR excluded.completed = 1 THEN 1
+           ELSE 0
+         END,
+         updated_at = CASE
+           WHEN COALESCE(chapter_progress.updated_at, '') >= COALESCE(excluded.updated_at, '')
+             THEN chapter_progress.updated_at
+           ELSE excluded.updated_at
+         END`
+    ).bind(progress.name, targetChapterId, progress.completed ? 1 : 0, progress.updated_at)
+  );
+  statements.push(
+    env.DB.prepare("DELETE FROM chapter_progress WHERE chapter_id = ?").bind(sourceChapterId),
+    env.DB.prepare("DELETE FROM material_chapters WHERE id = ?").bind(sourceChapterId)
+  );
+  await runDbStatements(env, statements);
+  await resequenceMaterialChapters(env, source.material_id);
+  return {
+    merged: true,
+    source_chapter: source,
+    target_chapter: await readMcpMaterialChapter(env, targetChapterId),
+    migrated_progress_count: progressRows.length,
+  };
+}
+
+async function deleteMcpMaterialChapter(env, args) {
+  await ensureCurriculumIntegrity(env);
+  const chapterId = positiveInteger(args.chapter_id, "chapter_id");
+  const chapter = await readMcpMaterialChapter(env, chapterId);
+  if (!chapter) throw httpError(404, "chapter not found");
+  assertExpectedChapterName(chapter, args.expected_name, "expected_name");
+  const progress = await env.DB.prepare(
+    "SELECT COUNT(*) AS count FROM chapter_progress WHERE chapter_id = ?"
+  )
+    .bind(chapterId)
+    .first();
+  const progressCount = Number(progress?.count || 0);
+  if (progressCount > 0) {
+    throw httpError(409, "chapter has student progress; merge it into another chapter before deletion");
+  }
+  await env.DB.prepare("DELETE FROM material_chapters WHERE id = ?").bind(chapterId).run();
+  await resequenceMaterialChapters(env, chapter.material_id);
+  return { deleted: true, chapter, deleted_progress_count: 0 };
 }
 
 async function readMcpStudentMaterials(env, args) {
@@ -1305,9 +1661,9 @@ async function handleMcp(request, env, url) {
     return mcpResponse(id, {
       protocolVersion: params.protocolVersion || "2025-06-18",
       capabilities: { tools: {} },
-      serverInfo: { name: "works-schedule", version: "1.6.1" },
+      serverInfo: { name: "works-schedule", version: "1.7.0" },
       instructions:
-        "Use search_schedules to find exact event_id and calendar_id values before schedule writes. Use get_student_profile before updating a student memo or print name, and get_student_profile_change_history before undoing a profile update. Use list_curriculum_materials before creating chapters or assigning curriculum materials, and get_student_materials before updating chapter completion. Use briefing and progress tools to prepare and report, history before undoing changes, search_materials before linking a file, and preview_reschedule before apply_reschedule. Dates use Asia/Tokyo. Update tools preserve fields that are not supplied; pass null to clear a text field.",
+        "Use search_schedules to find exact event_id and calendar_id values before schedule writes. Use get_student_profile before updating a student memo or print name, and get_student_profile_change_history before undoing a profile update. Use list_curriculum_materials before creating, renaming, reordering, merging, or deleting curriculum chapters, and get_student_materials before updating chapter completion. Merge duplicate chapters to preserve student progress; delete_material_chapter refuses to remove a chapter that has progress. Use briefing and progress tools to prepare and report, history before undoing changes, search_materials before linking a file, and preview_reschedule before apply_reschedule. Dates use Asia/Tokyo. Update tools preserve fields that are not supplied; pass null to clear a text field.",
     });
   }
   if (method === "notifications/initialized") {
@@ -1393,6 +1749,21 @@ async function handleMcp(request, env, url) {
     }
     if (toolName === "create_material_chapters") {
       return mcpToolResult(id, await createMcpMaterialChapters(env, args));
+    }
+    if (toolName === "update_curriculum_material") {
+      return mcpToolResult(id, await updateMcpCurriculumMaterial(env, args));
+    }
+    if (toolName === "update_material_chapter") {
+      return mcpToolResult(id, await updateMcpMaterialChapter(env, args));
+    }
+    if (toolName === "reorder_material_chapters") {
+      return mcpToolResult(id, await reorderMcpMaterialChapters(env, args));
+    }
+    if (toolName === "merge_material_chapters") {
+      return mcpToolResult(id, await mergeMcpMaterialChapters(env, args));
+    }
+    if (toolName === "delete_material_chapter") {
+      return mcpToolResult(id, await deleteMcpMaterialChapter(env, args));
     }
     if (toolName === "get_student_materials") {
       return mcpToolResult(id, await readMcpStudentMaterials(env, args));
@@ -2156,15 +2527,47 @@ function duplicateValues(rows, field) {
     .map(([value, items]) => ({ value, records: items }));
 }
 
+function duplicateCurriculumMaterials(rows) {
+  const grouped = new Map();
+  for (const row of rows) {
+    const normalized = String(row.name || "").trim().toLocaleLowerCase("ja");
+    if (!normalized) continue;
+    const group = grouped.get(normalized) || { value: String(row.name).trim(), records: [] };
+    group.records.push(row.id);
+    grouped.set(normalized, group);
+  }
+  return [...grouped.values()].filter((group) => group.records.length > 1);
+}
+
+function duplicateCurriculumChapters(rows) {
+  const grouped = new Map();
+  for (const row of rows) {
+    const normalized = String(row.name || "").trim().toLocaleLowerCase("ja");
+    if (!normalized) continue;
+    const key = `${row.material_id}:${normalized}`;
+    const group = grouped.get(key) || {
+      material_id: row.material_id,
+      material_name: row.material_name,
+      value: String(row.name).trim(),
+      records: [],
+    };
+    group.records.push(row.id);
+    grouped.set(key, group);
+  }
+  return [...grouped.values()].filter((group) => group.records.length > 1);
+}
+
 async function readScheduleDataHealth(env) {
-  await ensureMcpFeatureSchema(env);
-  const [settings, students, links, files, orphanStudentMaterials, orphanChapterProgress] = await Promise.all([
+  await Promise.all([ensureMcpFeatureSchema(env), ensureCurriculumIntegrity(env)]);
+  const [settings, students, links, files, orphanStudentMaterials, orphanChapterProgress, curriculumMaterials, curriculumChapters] = await Promise.all([
     readSettings(env),
     readStudents(env),
     env.DB.prepare("SELECT * FROM schedule_material_links").all(),
     readAllMaterialFiles(env),
     env.DB.prepare("SELECT sm.id, sm.name, sm.material_id FROM student_materials sm LEFT JOIN materials m ON m.id = sm.material_id WHERE m.id IS NULL").all(),
     env.DB.prepare("SELECT p.name, p.chapter_id FROM chapter_progress p LEFT JOIN material_chapters c ON c.id = p.chapter_id WHERE c.id IS NULL").all(),
+    env.DB.prepare("SELECT id, name FROM materials ORDER BY sort_order, id").all(),
+    env.DB.prepare("SELECT c.id, c.material_id, c.name, m.name AS material_name FROM material_chapters c JOIN materials m ON m.id = c.material_id ORDER BY c.material_id, c.sort_order, c.id").all(),
   ]);
   const selectedCalendars = Array.isArray(settings.selected_calendars)
     ? [...new Set(settings.selected_calendars.map(String).filter(Boolean))]
@@ -2203,10 +2606,14 @@ async function readScheduleDataHealth(env) {
   }
   const duplicateStudentNames = duplicateValues(students, "name");
   const duplicateCalendarTags = duplicateValues(students, "calendar_tag");
+  const duplicateMaterials = duplicateCurriculumMaterials(curriculumMaterials.results);
+  const duplicateChapters = duplicateCurriculumChapters(curriculumChapters.results);
   const issues = {
     missing_selected_calendars: selectedCalendars.length === 0,
     duplicate_student_names: duplicateStudentNames,
     duplicate_calendar_tags: duplicateCalendarTags,
+    duplicate_curriculum_materials: duplicateMaterials,
+    duplicate_material_chapters: duplicateChapters,
     legacy_material_links: legacyMaterialLinks,
     missing_material_files: missingMaterialFiles,
     unselected_calendar_links: unselectedCalendarLinks,
@@ -2229,6 +2636,8 @@ async function readScheduleDataHealth(env) {
       students: students.length,
       material_files: files.length,
       material_links: links.results.length,
+      curriculum_materials: curriculumMaterials.results.length,
+      material_chapters: curriculumChapters.results.length,
       calendar_links_checked: calendarValidationChecked,
     },
     calendar_validation_truncated: calendarValidationTruncated,
@@ -2599,6 +3008,7 @@ async function deleteMaterial(env, id) {
 
 // 教材のチャプター(章)。教材(material_id)に紐付き、sort_orderで並べ替える。
 async function readChapters(env, materialId) {
+  await ensureCurriculumIntegrity(env);
   const { results } = await env.DB.prepare(
     "SELECT * FROM material_chapters WHERE material_id = ? ORDER BY sort_order"
   )
@@ -2608,27 +3018,41 @@ async function readChapters(env, materialId) {
 }
 
 async function createChapter(env, materialId, body) {
+  await ensureCurriculumIntegrity(env);
   const name = (body.name || "").trim();
   if (!name) throw new Error("name is required");
+  const existing = await env.DB.prepare(
+    "SELECT * FROM material_chapters WHERE material_id = ? AND lower(trim(name)) = lower(trim(?)) ORDER BY id LIMIT 1"
+  )
+    .bind(materialId, name)
+    .first();
+  if (existing) return existing;
   const { results } = await env.DB.prepare(
     "SELECT COALESCE(MAX(sort_order), -1) AS maxOrder FROM material_chapters WHERE material_id = ?"
   )
     .bind(materialId)
     .all();
   const nextOrder = (results[0]?.maxOrder ?? -1) + 1;
-  return env.DB.prepare(
-    "INSERT INTO material_chapters (material_id, name, sort_order) VALUES (?, ?, ?) RETURNING *"
+  const inserted = await env.DB.prepare(
+    "INSERT OR IGNORE INTO material_chapters (material_id, name, sort_order) VALUES (?, ?, ?) RETURNING *"
   )
     .bind(materialId, name, nextOrder)
+    .first();
+  if (inserted) return inserted;
+  return env.DB.prepare(
+    "SELECT * FROM material_chapters WHERE material_id = ? AND lower(trim(name)) = lower(trim(?)) ORDER BY id LIMIT 1"
+  )
+    .bind(materialId, name)
     .first();
 }
 
 async function updateChapter(env, id, body) {
+  await ensureCurriculumIntegrity(env);
   const fields = [];
   const values = [];
   if (body.name !== undefined) {
     fields.push("name = ?");
-    values.push(body.name);
+    values.push(String(body.name).trim());
   }
   if (body.sort_order !== undefined) {
     fields.push("sort_order = ?");
@@ -2642,6 +3066,7 @@ async function updateChapter(env, id, body) {
 }
 
 async function deleteChapter(env, id) {
+  await ensureCurriculumIntegrity(env);
   await env.DB.prepare("DELETE FROM chapter_progress WHERE chapter_id = ?").bind(id).run();
   await env.DB.prepare("DELETE FROM material_chapters WHERE id = ?").bind(id).run();
 }

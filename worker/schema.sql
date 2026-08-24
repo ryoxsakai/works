@@ -102,6 +102,12 @@ CREATE TABLE IF NOT EXISTS material_chapters (
   created_at TEXT DEFAULT (datetime('now'))
 );
 
+-- 同一教材内のチャプター名は、前後の空白と英字の大小を無視して一意にする。
+-- 既存DBへの適用時はWorkerのensureCurriculumIntegrityが重複を安全に統合してから
+-- 同じインデックスを作成する。
+CREATE UNIQUE INDEX IF NOT EXISTS idx_material_chapters_unique_name
+  ON material_chapters(material_id, lower(trim(name)));
+
 CREATE TABLE IF NOT EXISTS student_materials (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
