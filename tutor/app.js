@@ -114,8 +114,12 @@ const els = {
   addPeriodForm: document.querySelector("#add-period-form"),
   newPeriodLabel: document.querySelector("#new-period-label"),
   newPeriodStart: document.querySelector("#new-period-start"),
+  materialCategoryList: document.querySelector("#material-category-list"),
+  addMaterialCategoryForm: document.querySelector("#add-material-category-form"),
+  newMaterialCategoryName: document.querySelector("#new-material-category-name"),
   materialList: document.querySelector("#material-list"),
   addMaterialForm: document.querySelector("#add-material-form"),
+  newMaterialCategory: document.querySelector("#new-material-category"),
   newMaterialName: document.querySelector("#new-material-name"),
   materialChaptersModal: document.querySelector("#material-chapters-modal"),
   materialChaptersCloseBtn: document.querySelector("#material-chapters-close"),
@@ -199,7 +203,9 @@ let selectedTermIds = new Set();
 let excludedTitles = new Set();
 let periods = [];
 let editingPeriodId = null;
+let materialCategories = [];
 let materials = [];
+let editingMaterialCategoryId = null;
 let editingMaterialId = null;
 let currentMaterialId = null;
 let materialChapters = [];
@@ -1019,51 +1025,223 @@ els.periodList.addEventListener("submit", async (e) => {
   }
 });
 
-// --- 教材(設定タブ)。教材名を登録し、詳細アイコンからチャプター(章)を管理する ---
+// --- 教材(設定タブ)。カテゴリを親にして教材を整理し、教材内のチャプターを管理する ---
 
-async function loadMaterials() {
-  materials = await apiFetch("/materials");
-  renderMaterialList();
+function getMaterialCategoryId(material) {
+  return material.category_id === null || material.category_id === undefined
+    ? null
+    : Number(material.category_id);
 }
 
-function renderMaterialList() {
-  if (materials.length === 0) {
-    els.materialList.innerHTML = `<p class="hint">まだ教材が登録されていません。</p>`;
+function materialCategoryOptions(selectedCategoryId) {
+  const selectedId = selectedCategoryId === null ? null : Number(selectedCategoryId);
+  return [
+    `<option value="" ${selectedId === null ? "selected" : ""}>未分類</option>`,
+    ...materialCategories.map(
+      (category) =>
+        `<option value="${category.id}" ${selectedId === category.id ? "selected" : ""}>${escapeHtml(category.name)}</option>`
+    ),
+  ].join("");
+}
+
+async function loadMaterials() {
+  const pendingCategoryId = els.newMaterialCategory.value
+    ? Number(els.newMaterialCategory.value)
+    : null;
+  [materialCategories, materials] = await Promise.all([
+    apiFetch("/material-categories"),
+    apiFetch("/materials"),
+  ]);
+  renderMaterialCategoryList();
+  renderMaterialList();
+  els.newMaterialCategory.innerHTML = materialCategoryOptions(pendingCategoryId);
+  renderAddStudentMaterialOptions();
+}
+
+function renderMaterialCategoryList() {
+  if (materialCategories.length === 0) {
+    els.materialCategoryList.innerHTML = `<p class="hint">まだ教材カテゴリが登録されていません。</p>`;
     return;
   }
-  els.materialList.innerHTML = materials
-    .map((m, i) => {
-      if (editingMaterialId === m.id) {
-        return `<form class="material-edit-form" data-material-id="${m.id}">
-          <input type="text" class="edit-material-name" value="${escapeHtml(m.name)}" required />
+  els.materialCategoryList.innerHTML = materialCategories
+    .map((category, index) => {
+      if (editingMaterialCategoryId === category.id) {
+        return `<form class="material-category-edit-form" data-material-category-id="${category.id}">
+          <input type="text" class="edit-material-category-name" value="${escapeHtml(category.name)}" required />
           <div class="edit-actions">
-            <button type="submit" class="btn-primary" aria-label="保存"><i class="bx bx-check"></i></button>
-            <button type="button" class="cancel-edit-material" aria-label="キャンセル"><i class="bx bx-x"></i></button>
+            <button type="submit" class="btn-primary" aria-label="カテゴリ名を保存"><i class="bx bx-check"></i></button>
+            <button type="button" class="cancel-edit-material-category" aria-label="キャンセル"><i class="bx bx-x"></i></button>
           </div>
         </form>`;
       }
-      return `<div class="term-item" data-material-id="${m.id}">
-        <span class="term-item-label">${escapeHtml(m.name)}</span>
-        <button type="button" class="material-move-up" ${i === 0 ? "disabled" : ""} aria-label="上へ"><i class="bx bx-chevron-up"></i></button>
-        <button type="button" class="material-move-down" ${i === materials.length - 1 ? "disabled" : ""} aria-label="下へ"><i class="bx bx-chevron-down"></i></button>
-        <button type="button" class="material-detail" aria-label="詳細"><i class="bx bx-list-ol"></i></button>
-        <button type="button" class="material-edit" aria-label="編集"><i class="bx bx-pencil"></i></button>
-        <button type="button" class="material-delete" aria-label="削除"><i class="bx bx-trash"></i></button>
+      return `<div class="term-item material-category-item" data-material-category-id="${category.id}">
+        <span class="term-item-label">${escapeHtml(category.name)}</span>
+        <span class="material-count">${Number(category.material_count || 0)}件</span>
+        <button type="button" class="material-category-move-up" ${index === 0 ? "disabled" : ""} aria-label="カテゴリを上へ"><i class="bx bx-chevron-up"></i></button>
+        <button type="button" class="material-category-move-down" ${index === materialCategories.length - 1 ? "disabled" : ""} aria-label="カテゴリを下へ"><i class="bx bx-chevron-down"></i></button>
+        <button type="button" class="material-category-edit" aria-label="カテゴリ名を編集"><i class="bx bx-pencil"></i></button>
       </div>`;
     })
     .join("");
 }
 
+function renderMaterialList() {
+  const groups = [
+    ...materialCategories.map((category) => ({ id: category.id, name: category.name })),
+    { id: null, name: "未分類" },
+  ];
+  els.materialList.innerHTML = groups
+    .map((group) => {
+      const groupMaterials = materials.filter(
+        (material) => getMaterialCategoryId(material) === group.id
+      );
+      const rows = groupMaterials.length
+        ? groupMaterials
+            .map((material, index) => {
+              if (editingMaterialId === material.id) {
+                return `<form class="material-edit-form" data-material-id="${material.id}">
+                  <input type="text" class="edit-material-name" value="${escapeHtml(material.name)}" required />
+                  <div class="edit-actions">
+                    <button type="submit" class="btn-primary" aria-label="教材名を保存"><i class="bx bx-check"></i></button>
+                    <button type="button" class="cancel-edit-material" aria-label="キャンセル"><i class="bx bx-x"></i></button>
+                  </div>
+                </form>`;
+              }
+              return `<div class="term-item material-item" data-material-id="${material.id}">
+                <span class="term-item-label">${escapeHtml(material.name)}</span>
+                <select class="material-category-select" aria-label="${escapeHtml(material.name)}のカテゴリ">${materialCategoryOptions(group.id)}</select>
+                <div class="material-item-actions">
+                  <button type="button" class="material-move-up" ${index === 0 ? "disabled" : ""} aria-label="教材を上へ"><i class="bx bx-chevron-up"></i></button>
+                  <button type="button" class="material-move-down" ${index === groupMaterials.length - 1 ? "disabled" : ""} aria-label="教材を下へ"><i class="bx bx-chevron-down"></i></button>
+                  <button type="button" class="material-detail" aria-label="チャプターを編集"><i class="bx bx-list-ol"></i></button>
+                  <button type="button" class="material-edit" aria-label="教材名を編集"><i class="bx bx-pencil"></i></button>
+                  <button type="button" class="material-delete" aria-label="教材を削除"><i class="bx bx-trash"></i></button>
+                </div>
+              </div>`;
+            })
+            .join("")
+        : `<p class="hint material-group-empty">教材はありません。</p>`;
+      return `<section class="material-category-group" data-material-category-id="${group.id ?? ""}">
+        <div class="material-category-group-header">
+          <h4>${escapeHtml(group.name)}</h4>
+          <span>${groupMaterials.length}件</span>
+        </div>
+        ${rows}
+      </section>`;
+    })
+    .join("");
+}
+
+els.addMaterialCategoryForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  els.actionError.textContent = "";
+  const name = els.newMaterialCategoryName.value.trim();
+  if (!name) return;
+  try {
+    await apiFetch("/material-categories", {
+      method: "POST",
+      body: JSON.stringify({ name }),
+    });
+    els.newMaterialCategoryName.value = "";
+    await loadMaterials();
+  } catch (err) {
+    showActionError(err);
+  }
+});
+
+els.materialCategoryList.addEventListener("click", async (e) => {
+  const editBtn = e.target.closest(".material-category-edit");
+  if (editBtn) {
+    editingMaterialCategoryId = Number(
+      editBtn.closest("[data-material-category-id]").dataset.materialCategoryId
+    );
+    renderMaterialCategoryList();
+    return;
+  }
+  if (e.target.closest(".cancel-edit-material-category")) {
+    editingMaterialCategoryId = null;
+    renderMaterialCategoryList();
+    return;
+  }
+  const moveUp = e.target.closest(".material-category-move-up");
+  const moveDown = e.target.closest(".material-category-move-down");
+  if (!moveUp && !moveDown) return;
+  const id = Number(
+    (moveUp || moveDown).closest("[data-material-category-id]").dataset.materialCategoryId
+  );
+  const index = materialCategories.findIndex((category) => category.id === id);
+  const destination = moveUp ? index - 1 : index + 1;
+  if (destination < 0 || destination >= materialCategories.length) return;
+  const categoryIds = materialCategories.map((category) => category.id);
+  [categoryIds[index], categoryIds[destination]] = [categoryIds[destination], categoryIds[index]];
+  try {
+    await apiFetch("/material-categories/reorder", {
+      method: "PUT",
+      body: JSON.stringify({ category_ids: categoryIds }),
+    });
+    await loadMaterials();
+  } catch (err) {
+    showActionError(err);
+  }
+});
+
+els.materialCategoryList.addEventListener("submit", async (e) => {
+  const editForm = e.target.closest(".material-category-edit-form");
+  if (!editForm) return;
+  e.preventDefault();
+  els.actionError.textContent = "";
+  const id = Number(editForm.dataset.materialCategoryId);
+  const name = editForm.querySelector(".edit-material-category-name").value.trim();
+  if (!name) return;
+  try {
+    await apiFetch(`/material-categories/${id}`, {
+      method: "PUT",
+      body: JSON.stringify({ name }),
+    });
+    editingMaterialCategoryId = null;
+    await loadMaterials();
+  } catch (err) {
+    showActionError(err);
+  }
+});
+
 els.addMaterialForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   els.actionError.textContent = "";
   const name = els.newMaterialName.value.trim();
+  const categoryId = els.newMaterialCategory.value
+    ? Number(els.newMaterialCategory.value)
+    : null;
   if (!name) return;
   try {
-    await apiFetch("/materials", { method: "POST", body: JSON.stringify({ name }) });
+    await apiFetch("/materials", {
+      method: "POST",
+      body: JSON.stringify({ name, category_id: categoryId }),
+    });
     els.newMaterialName.value = "";
     await loadMaterials();
   } catch (err) {
+    showActionError(err);
+  }
+});
+
+els.materialList.addEventListener("change", async (e) => {
+  const categorySelect = e.target.closest(".material-category-select");
+  if (!categorySelect) return;
+  const id = Number(categorySelect.closest("[data-material-id]").dataset.materialId);
+  const categoryId = categorySelect.value ? Number(categorySelect.value) : null;
+  const material = materials.find((item) => item.id === id);
+  if (!material || getMaterialCategoryId(material) === categoryId) return;
+  categorySelect.disabled = true;
+  els.actionError.textContent = "";
+  try {
+    await apiFetch(`/materials/${id}`, {
+      method: "PUT",
+      body: JSON.stringify({ category_id: categoryId }),
+    });
+    await loadMaterials();
+  } catch (err) {
+    renderMaterialList();
     showActionError(err);
   }
 });
@@ -1107,16 +1285,22 @@ els.materialList.addEventListener("click", async (e) => {
   const moveDown = e.target.closest(".material-move-down");
   if (moveUp || moveDown) {
     const id = Number((moveUp || moveDown).closest("[data-material-id]").dataset.materialId);
-    const idx = materials.findIndex((m) => m.id === id);
-    const swapIdx = moveUp ? idx - 1 : idx + 1;
-    if (swapIdx < 0 || swapIdx >= materials.length) return;
-    const a = materials[idx];
-    const b = materials[swapIdx];
+    const material = materials.find((item) => item.id === id);
+    if (!material) return;
+    const categoryId = getMaterialCategoryId(material);
+    const categoryMaterials = materials.filter(
+      (item) => getMaterialCategoryId(item) === categoryId
+    );
+    const index = categoryMaterials.findIndex((item) => item.id === id);
+    const destination = moveUp ? index - 1 : index + 1;
+    if (destination < 0 || destination >= categoryMaterials.length) return;
+    const materialIds = categoryMaterials.map((item) => item.id);
+    [materialIds[index], materialIds[destination]] = [materialIds[destination], materialIds[index]];
     try {
-      await Promise.all([
-        apiFetch(`/materials/${a.id}`, { method: "PUT", body: JSON.stringify({ sort_order: b.sort_order }) }),
-        apiFetch(`/materials/${b.id}`, { method: "PUT", body: JSON.stringify({ sort_order: a.sort_order }) }),
-      ]);
+      await apiFetch("/materials/reorder", {
+        method: "PUT",
+        body: JSON.stringify({ category_id: categoryId, material_ids: materialIds }),
+      });
       await loadMaterials();
     } catch (err) {
       showActionError(err);
@@ -1288,9 +1472,21 @@ async function loadStudentMaterials() {
 
 function renderAddStudentMaterialOptions() {
   const usedIds = new Set(studentMaterials.map((sm) => sm.material_id));
-  const options = materials
-    .filter((m) => !usedIds.has(m.id))
-    .map((m) => `<option value="${m.id}">${escapeHtml(m.name)}</option>`)
+  const available = materials.filter((material) => !usedIds.has(material.id));
+  const groups = [
+    ...materialCategories.map((category) => ({ id: category.id, name: category.name })),
+    { id: null, name: "未分類" },
+  ];
+  const options = groups
+    .map((group) => {
+      const groupMaterials = available.filter(
+        (material) => getMaterialCategoryId(material) === group.id
+      );
+      if (groupMaterials.length === 0) return "";
+      return `<optgroup label="${escapeHtml(group.name)}">${groupMaterials
+        .map((material) => `<option value="${material.id}">${escapeHtml(material.name)}</option>`)
+        .join("")}</optgroup>`;
+    })
     .join("");
   els.addStudentMaterialSelect.innerHTML = `<option value="">教材を選択...</option>${options}`;
 }

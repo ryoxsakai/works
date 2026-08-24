@@ -87,12 +87,26 @@ CREATE TABLE IF NOT EXISTS periods (
   created_at TEXT DEFAULT (datetime('now'))
 );
 
-CREATE TABLE IF NOT EXISTS materials (
+CREATE TABLE IF NOT EXISTS material_categories (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
   sort_order INTEGER DEFAULT 0,
   created_at TEXT DEFAULT (datetime('now'))
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_material_categories_unique_name
+  ON material_categories(lower(trim(name)));
+
+CREATE TABLE IF NOT EXISTS materials (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  category_id INTEGER REFERENCES material_categories(id),
+  sort_order INTEGER DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_materials_category_order
+  ON materials(category_id, sort_order, id);
 
 CREATE TABLE IF NOT EXISTS material_chapters (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

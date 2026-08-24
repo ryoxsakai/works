@@ -902,6 +902,32 @@ async function ensureMcpFeatureSchema(env) {
 
 let curriculumIntegrityReady = null;
 
+let materialCategorySchemaReady = null;
+
+async function ensureMaterialCategorySchema(env) {
+  if (!materialCategorySchemaReady) {
+    materialCategorySchemaReady = (async () => {
+      await env.DB.prepare(
+        "CREATE TABLE IF NOT EXISTS material_categories (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, sort_order INTEGER DEFAULT 0, created_at TEXT DEFAULT (datetime('now')))"
+      ).run();
+      await env.DB.prepare(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_material_categories_unique_name ON material_categories(lower(trim(name)))"
+      ).run();
+      const { results: columns } = await env.DB.prepare("PRAGMA table_info(materials)").all();
+      if (!columns.some((column) => column.name === "category_id")) {
+        await env.DB.prepare("ALTER TABLE materials ADD COLUMN category_id INTEGER").run();
+      }
+      await env.DB.prepare(
+        "CREATE INDEX IF NOT EXISTS idx_materials_category_order ON materials(category_id, sort_order, id)"
+      ).run();
+    })().catch((err) => {
+      materialCategorySchemaReady = null;
+      throw err;
+    });
+  }
+  return materialCategorySchemaReady;
+}
+
 async function runDbStatements(env, statements, chunkSize = 50) {
   for (let index = 0; index < statements.length; index += chunkSize) {
     await env.DB.batch(statements.slice(index, index + chunkSize));
@@ -2558,14 +2584,19 @@ function duplicateCurriculumChapters(rows) {
 }
 
 async function readScheduleDataHealth(env) {
-  await Promise.all([ensureMcpFeatureSchema(env), ensureCurriculumIntegrity(env)]);
-  const [settings, students, links, files, orphanStudentMaterials, orphanChapterProgress, curriculumMaterials, curriculumChapters] = await Promise.all([
+  await Promise.all([
+    ensureMcpFeatureSchema(env),
+    ensureCurriculumIntegrity(env),
+    ensureMaterialCategorySchema(env),
+  ]);
+  const [settings, students, links, files, orphanStudentMaterials, orphanChapterProgress, materialCategories, curriculumMaterials, curriculumChapters] = await Promise.all([
     readSettings(env),
     readStudents(env),
     env.DB.prepare("SELECT * FROM schedule_material_links").all(),
     readAllMaterialFiles(env),
     env.DB.prepare("SELECT sm.id, sm.name, sm.material_id FROM student_materials sm LEFT JOIN materials m ON m.id = sm.material_id WHERE m.id IS NULL").all(),
     env.DB.prepare("SELECT p.name, p.chapter_id FROM chapter_progress p LEFT JOIN material_chapters c ON c.id = p.chapter_id WHERE c.id IS NULL").all(),
+    readMaterialCategories(env),
     env.DB.prepare("SELECT id, name FROM materials ORDER BY sort_order, id").all(),
     env.DB.prepare("SELECT c.id, c.material_id, c.name, m.name AS material_name FROM material_chapters c JOIN materials m ON m.id = c.material_id ORDER BY c.material_id, c.sort_order, c.id").all(),
   ]);
@@ -2636,6 +2667,7 @@ async function readScheduleDataHealth(env) {
       students: students.length,
       material_files: files.length,
       material_links: links.results.length,
+      material_categories: materialCategories.length,
       curriculum_materials: curriculumMaterials.results.length,
       material_chapters: curriculumChapters.results.length,
       calendar_links_checked: calendarValidationChecked,
@@ -2956,43 +2988,238 @@ async function deletePeriod(env, id) {
   await env.DB.prepare("DELETE FROM periods WHERE id = ?").bind(id).run();
 }
 
-// 教材(materials)。生徒に紐付かないグローバルな一覧。sort_orderで並べ替える。
+// 教材カテゴリ。教材の親として表示順を持ち、教材が0件でも登録できる。
+async function readMaterialCategories(env) {
+  await ensureMaterialCategorySchema(env);
+  const { results } = await env.DB.prepare(
+    `SELECT c.*, COUNT(m.id) AS material_count
+     FROM material_categories c
+     LEFT JOIN materials m ON m.category_id = c.id
+     GROUP BY c.id
+     ORDER BY c.sort_order, c.id`
+  ).all();
+  return results;
+}
+
+async function createMaterialCategory(env, body) {
+  await ensureMaterialCategorySchema(env);
+  const name = normalizeCurriculumText(body.name, "name");
+  const existing = await env.DB.prepare(
+    "SELECT id FROM material_categories WHERE lower(trim(name)) = lower(trim(?)) ORDER BY id LIMIT 1"
+  )
+    .bind(name)
+    .first();
+  if (existing) throw httpError(409, "another material category already uses this name");
+  const order = await env.DB.prepare(
+    "SELECT COALESCE(MAX(sort_order), -1) AS max_order FROM material_categories"
+  ).first();
+  return env.DB.prepare(
+    "INSERT INTO material_categories (name, sort_order) VALUES (?, ?) RETURNING *, 0 AS material_count"
+  )
+    .bind(name, Number(order?.max_order ?? -1) + 1)
+    .first();
+}
+
+async function updateMaterialCategory(env, id, body) {
+  await ensureMaterialCategorySchema(env);
+  const categoryId = positiveInteger(id, "category_id");
+  const before = await env.DB.prepare("SELECT id FROM material_categories WHERE id = ?")
+    .bind(categoryId)
+    .first();
+  if (!before) throw httpError(404, "material category not found");
+  if (body.name === undefined) throw httpError(400, "name is required");
+  const name = normalizeCurriculumText(body.name, "name");
+  const duplicate = await env.DB.prepare(
+    "SELECT id FROM material_categories WHERE id <> ? AND lower(trim(name)) = lower(trim(?)) ORDER BY id LIMIT 1"
+  )
+    .bind(categoryId, name)
+    .first();
+  if (duplicate) throw httpError(409, "another material category already uses this name");
+  await env.DB.prepare("UPDATE material_categories SET name = ? WHERE id = ?")
+    .bind(name, categoryId)
+    .run();
+  return env.DB.prepare(
+    `SELECT c.*, COUNT(m.id) AS material_count
+     FROM material_categories c
+     LEFT JOIN materials m ON m.category_id = c.id
+     WHERE c.id = ?
+     GROUP BY c.id`
+  )
+    .bind(categoryId)
+    .first();
+}
+
+async function reorderMaterialCategories(env, body) {
+  await ensureMaterialCategorySchema(env);
+  const orderedIds = body.category_ids;
+  if (!Array.isArray(orderedIds)) throw httpError(400, "category_ids is required");
+  const categoryIds = orderedIds.map((id) => positiveInteger(id, "category_id"));
+  if (new Set(categoryIds).size !== categoryIds.length) {
+    throw httpError(400, "category_ids must not contain duplicates");
+  }
+  const categories = await readMaterialCategories(env);
+  const currentIds = categories.map((category) => category.id).sort((a, b) => a - b);
+  const requestedIds = [...categoryIds].sort((a, b) => a - b);
+  if (currentIds.length !== requestedIds.length || currentIds.some((id, index) => id !== requestedIds[index])) {
+    throw httpError(409, "category_ids must contain every current category exactly once");
+  }
+  await runDbStatements(
+    env,
+    categoryIds.map((categoryId, index) =>
+      env.DB.prepare("UPDATE material_categories SET sort_order = ? WHERE id = ?")
+        .bind(index, categoryId)
+    )
+  );
+  return readMaterialCategories(env);
+}
+
+function parseMaterialCategoryId(value, field = "category_id") {
+  if (value === null || value === "") return null;
+  return positiveInteger(value, field);
+}
+
+async function assertMaterialCategoryExists(env, categoryId) {
+  if (categoryId === null) return;
+  const category = await env.DB.prepare("SELECT id FROM material_categories WHERE id = ?")
+    .bind(categoryId)
+    .first();
+  if (!category) throw httpError(404, "material category not found");
+}
+
+async function readMaterialIdsInCategory(env, categoryId) {
+  const query = categoryId === null
+    ? "SELECT id FROM materials WHERE category_id IS NULL ORDER BY sort_order, id"
+    : "SELECT id FROM materials WHERE category_id = ? ORDER BY sort_order, id";
+  const statement = env.DB.prepare(query);
+  const { results } = categoryId === null
+    ? await statement.all()
+    : await statement.bind(categoryId).all();
+  return results.map((material) => material.id);
+}
+
+async function resequenceMaterialsInCategory(env, categoryId) {
+  const ids = await readMaterialIdsInCategory(env, categoryId);
+  await runDbStatements(
+    env,
+    ids.map((materialId, index) =>
+      env.DB.prepare("UPDATE materials SET sort_order = ? WHERE id = ?")
+        .bind(index, materialId)
+    )
+  );
+}
+
+// 教材(materials)。カテゴリ順、その中のsort_order順で並べ替える。
 async function readMaterials(env) {
-  const { results } = await env.DB.prepare("SELECT * FROM materials ORDER BY sort_order").all();
+  await ensureMaterialCategorySchema(env);
+  const { results } = await env.DB.prepare(
+    `SELECT m.*, c.name AS category_name
+     FROM materials m
+     LEFT JOIN material_categories c ON c.id = m.category_id
+     ORDER BY CASE WHEN c.id IS NULL THEN 1 ELSE 0 END, c.sort_order, c.id, m.sort_order, m.id`
+  ).all();
   return results;
 }
 
 async function createMaterial(env, body) {
-  const name = (body.name || "").trim();
-  if (!name) throw new Error("name is required");
-  const { results } = await env.DB.prepare(
-    "SELECT COALESCE(MAX(sort_order), -1) AS maxOrder FROM materials"
-  ).all();
-  const nextOrder = (results[0]?.maxOrder ?? -1) + 1;
-  return env.DB.prepare("INSERT INTO materials (name, sort_order) VALUES (?, ?) RETURNING *")
-    .bind(name, nextOrder)
+  await ensureMaterialCategorySchema(env);
+  const name = normalizeCurriculumText(body.name, "name");
+  const categoryId = parseMaterialCategoryId(body.category_id ?? null);
+  await assertMaterialCategoryExists(env, categoryId);
+  const query = categoryId === null
+    ? "SELECT COALESCE(MAX(sort_order), -1) AS max_order FROM materials WHERE category_id IS NULL"
+    : "SELECT COALESCE(MAX(sort_order), -1) AS max_order FROM materials WHERE category_id = ?";
+  const statement = env.DB.prepare(query);
+  const order = categoryId === null
+    ? await statement.first()
+    : await statement.bind(categoryId).first();
+  return env.DB.prepare(
+    "INSERT INTO materials (name, category_id, sort_order) VALUES (?, ?, ?) RETURNING *"
+  )
+    .bind(name, categoryId, Number(order?.max_order ?? -1) + 1)
     .first();
 }
 
 async function updateMaterial(env, id, body) {
+  await ensureMaterialCategorySchema(env);
+  const materialId = positiveInteger(id, "material_id");
+  const before = await env.DB.prepare("SELECT * FROM materials WHERE id = ?")
+    .bind(materialId)
+    .first();
+  if (!before) throw httpError(404, "material not found");
+
   const fields = [];
   const values = [];
+  let movedFromCategory;
   if (body.name !== undefined) {
     fields.push("name = ?");
-    values.push(body.name);
+    values.push(normalizeCurriculumText(body.name, "name"));
   }
-  if (body.sort_order !== undefined) {
+  if (body.category_id !== undefined) {
+    const categoryId = parseMaterialCategoryId(body.category_id);
+    await assertMaterialCategoryExists(env, categoryId);
+    const beforeCategoryId = before.category_id === null ? null : Number(before.category_id);
+    if (categoryId !== beforeCategoryId) {
+      const query = categoryId === null
+        ? "SELECT COALESCE(MAX(sort_order), -1) AS max_order FROM materials WHERE category_id IS NULL"
+        : "SELECT COALESCE(MAX(sort_order), -1) AS max_order FROM materials WHERE category_id = ?";
+      const statement = env.DB.prepare(query);
+      const order = categoryId === null
+        ? await statement.first()
+        : await statement.bind(categoryId).first();
+      fields.push("category_id = ?", "sort_order = ?");
+      values.push(categoryId, Number(order?.max_order ?? -1) + 1);
+      movedFromCategory = beforeCategoryId;
+    }
+  }
+  if (body.sort_order !== undefined && movedFromCategory === undefined) {
+    const sortOrder = Number(body.sort_order);
+    if (!Number.isInteger(sortOrder) || sortOrder < 0) {
+      throw httpError(400, "sort_order must be a non-negative integer");
+    }
     fields.push("sort_order = ?");
-    values.push(body.sort_order);
+    values.push(sortOrder);
   }
-  if (fields.length === 0) throw new Error("nothing to update");
-  values.push(id);
-  return env.DB.prepare(`UPDATE materials SET ${fields.join(", ")} WHERE id = ? RETURNING *`)
+  if (fields.length === 0) throw httpError(400, "nothing to update");
+  values.push(materialId);
+  const material = await env.DB.prepare(
+    `UPDATE materials SET ${fields.join(", ")} WHERE id = ? RETURNING *`
+  )
     .bind(...values)
     .first();
+  if (movedFromCategory !== undefined) await resequenceMaterialsInCategory(env, movedFromCategory);
+  return material;
+}
+
+async function reorderMaterialsInCategory(env, body) {
+  await ensureMaterialCategorySchema(env);
+  const categoryId = parseMaterialCategoryId(body.category_id ?? null);
+  await assertMaterialCategoryExists(env, categoryId);
+  if (!Array.isArray(body.material_ids)) throw httpError(400, "material_ids is required");
+  const materialIds = body.material_ids.map((id) => positiveInteger(id, "material_id"));
+  if (new Set(materialIds).size !== materialIds.length) {
+    throw httpError(400, "material_ids must not contain duplicates");
+  }
+  const currentIds = await readMaterialIdsInCategory(env, categoryId);
+  const sortedCurrent = [...currentIds].sort((a, b) => a - b);
+  const sortedRequested = [...materialIds].sort((a, b) => a - b);
+  if (sortedCurrent.length !== sortedRequested.length || sortedCurrent.some((id, index) => id !== sortedRequested[index])) {
+    throw httpError(409, "material_ids must contain every current material in this category exactly once");
+  }
+  await runDbStatements(
+    env,
+    materialIds.map((materialId, index) =>
+      env.DB.prepare("UPDATE materials SET sort_order = ? WHERE id = ?")
+        .bind(index, materialId)
+    )
+  );
+  return readMaterials(env);
 }
 
 async function deleteMaterial(env, id) {
+  await ensureMaterialCategorySchema(env);
+  const material = await env.DB.prepare("SELECT category_id FROM materials WHERE id = ?")
+    .bind(id)
+    .first();
   const { results: chapters } = await env.DB.prepare(
     "SELECT id FROM material_chapters WHERE material_id = ?"
   )
@@ -3004,6 +3231,12 @@ async function deleteMaterial(env, id) {
   await env.DB.prepare("DELETE FROM material_chapters WHERE material_id = ?").bind(id).run();
   await env.DB.prepare("DELETE FROM student_materials WHERE material_id = ?").bind(id).run();
   await env.DB.prepare("DELETE FROM materials WHERE id = ?").bind(id).run();
+  if (material) {
+    await resequenceMaterialsInCategory(
+      env,
+      material.category_id === null ? null : Number(material.category_id)
+    );
+  }
 }
 
 // 教材のチャプター(章)。教材(material_id)に紐付き、sort_orderで並べ替える。
@@ -4087,6 +4320,25 @@ export default {
         return json({ ok: true }, headers);
       }
 
+      if (url.pathname === "/api/material-categories" && request.method === "GET") {
+        return json(await readMaterialCategories(env), headers);
+      }
+
+      if (url.pathname === "/api/material-categories" && request.method === "POST") {
+        const body = await request.json();
+        return json(await createMaterialCategory(env, body), headers, 201);
+      }
+
+      if (url.pathname === "/api/material-categories/reorder" && request.method === "PUT") {
+        return json(await reorderMaterialCategories(env, await request.json()), headers);
+      }
+
+      const materialCategoryMatch = url.pathname.match(/^\/api\/material-categories\/(\d+)$/);
+      if (materialCategoryMatch && request.method === "PUT") {
+        const body = await request.json();
+        return json(await updateMaterialCategory(env, materialCategoryMatch[1], body), headers);
+      }
+
       if (url.pathname === "/api/materials" && request.method === "GET") {
         return json(await readMaterials(env), headers);
       }
@@ -4094,6 +4346,10 @@ export default {
       if (url.pathname === "/api/materials" && request.method === "POST") {
         const body = await request.json();
         return json(await createMaterial(env, body), headers, 201);
+      }
+
+      if (url.pathname === "/api/materials/reorder" && request.method === "PUT") {
+        return json(await reorderMaterialsInCategory(env, await request.json()), headers);
       }
 
       const materialMatch = url.pathname.match(/^\/api\/materials\/(\d+)$/);
