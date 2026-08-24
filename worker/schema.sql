@@ -127,6 +127,23 @@ CREATE TABLE IF NOT EXISTS google_auth (
   updated_at TEXT DEFAULT (datetime('now'))
 );
 
+-- ChatGPT Plugin（MCP）のOAuth認可に使う登録済みクライアントと短命の認可コード。
+CREATE TABLE IF NOT EXISTS mcp_oauth_clients (
+  client_id TEXT PRIMARY KEY,
+  redirect_uris TEXT NOT NULL,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS mcp_oauth_codes (
+  code TEXT PRIMARY KEY,
+  client_id TEXT NOT NULL,
+  redirect_uri TEXT NOT NULL,
+  code_challenge TEXT NOT NULL,
+  scope TEXT NOT NULL,
+  expires_at INTEGER NOT NULL,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
 
 -- 入試管理: 大学・方式・試験段階ごとの日程。複数日程は1日ごとに1行で保存する。
 CREATE TABLE IF NOT EXISTS admission_events (
