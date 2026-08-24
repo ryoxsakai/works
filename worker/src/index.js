@@ -477,9 +477,69 @@ const MCP_SCHEDULE_TOOLS = [
   },
 
   {
+    name: "list_material_categories",
+    title: "教材カテゴリを一覧取得",
+    description: "登録済みの教材カテゴリを表示順で取得します。各カテゴリの教材件数も返します。",
+    inputSchema: {
+      type: "object",
+      properties: {},
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+  },
+  {
+    name: "create_material_category",
+    title: "教材カテゴリを登録",
+    description: "教材の親となるカテゴリを登録します。同名カテゴリがある場合は既存カテゴリを返します。",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string", description: "カテゴリ名。" },
+      },
+      required: ["name"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  {
+    name: "update_material_category",
+    title: "教材カテゴリ名を変更",
+    description: "登録済み教材カテゴリの名称を変更します。同名カテゴリがある場合は停止します。",
+    inputSchema: {
+      type: "object",
+      properties: {
+        category_id: { type: "integer", minimum: 1, description: "list_material_categoriesで取得したカテゴリID。" },
+        name: { type: "string", description: "変更後のカテゴリ名。" },
+      },
+      required: ["category_id", "name"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  {
+    name: "reorder_material_categories",
+    title: "教材カテゴリを並べ替え",
+    description: "全教材カテゴリIDを希望順に並べ替えます。欠落・重複・未登録IDがある場合は停止します。",
+    inputSchema: {
+      type: "object",
+      properties: {
+        category_ids: {
+          type: "array",
+          minItems: 1,
+          maxItems: 200,
+          items: { type: "integer", minimum: 1 },
+          description: "全カテゴリIDを希望する順番で指定。",
+        },
+      },
+      required: ["category_ids"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  {
     name: "list_curriculum_materials",
     title: "カリキュラム教材を一覧取得",
-    description: "登録済みの教材と各教材のチャプターを取得します。教材登録・チャプター登録・生徒への紐付け前のID確認に使用します。",
+    description: "登録済みの教材をカテゴリ順で取得し、カテゴリ情報と各教材のチャプターを返します。教材登録・移動・チャプター登録・生徒への紐付け前のID確認に使用します。",
     inputSchema: {
       type: "object",
       properties: {
@@ -493,13 +553,62 @@ const MCP_SCHEDULE_TOOLS = [
   {
     name: "create_curriculum_material",
     title: "カリキュラム教材を登録",
-    description: "生徒のカリキュラムで使用する教材を登録します。同名教材がある場合は既存教材を返します。",
+    description: "生徒のカリキュラムで使用する教材を登録します。同名教材がある場合はカテゴリを変更せず既存教材を返します。",
     inputSchema: {
       type: "object",
       properties: {
         name: { type: "string", description: "教材名。" },
+        category_id: {
+          type: ["integer", "null"],
+          minimum: 1,
+          description: "追加先カテゴリID。未分類にする場合または省略時はnull。",
+        },
       },
       required: ["name"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  {
+    name: "move_curriculum_material_to_category",
+    title: "教材を別カテゴリへ移動",
+    description: "教材を指定カテゴリへ移動します。未分類へ移す場合はcategory_idにnullを指定します。移動先では末尾に配置されます。",
+    inputSchema: {
+      type: "object",
+      properties: {
+        material_id: { type: "integer", minimum: 1, description: "list_curriculum_materialsで取得した教材ID。" },
+        category_id: {
+          type: ["integer", "null"],
+          minimum: 1,
+          description: "list_material_categoriesで取得した移動先カテゴリID。未分類はnull。",
+        },
+      },
+      required: ["material_id", "category_id"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  {
+    name: "reorder_curriculum_materials_in_category",
+    title: "カテゴリ内の教材を並べ替え",
+    description: "指定カテゴリに属する全教材IDを希望順に並べ替えます。未分類の場合はcategory_idにnullを指定します。欠落・重複・別カテゴリのIDがある場合は停止します。",
+    inputSchema: {
+      type: "object",
+      properties: {
+        category_id: {
+          type: ["integer", "null"],
+          minimum: 1,
+          description: "list_material_categoriesで取得したカテゴリID。未分類はnull。",
+        },
+        material_ids: {
+          type: "array",
+          minItems: 1,
+          maxItems: 500,
+          items: { type: "integer", minimum: 1 },
+          description: "このカテゴリの全教材IDを希望する順番で指定。",
+        },
+      },
+      required: ["category_id", "material_ids"],
       additionalProperties: false,
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -1171,6 +1280,51 @@ function positiveInteger(value, field) {
   return number;
 }
 
+async function listMcpMaterialCategories(env) {
+  const categories = await readMaterialCategories(env);
+  return { count: categories.length, categories };
+}
+
+async function createMcpMaterialCategory(env, args) {
+  await ensureMaterialCategorySchema(env);
+  const name = normalizeCurriculumText(args.name, "name");
+  const existing = await env.DB.prepare(
+    "SELECT id FROM material_categories WHERE lower(trim(name)) = lower(trim(?)) ORDER BY id LIMIT 1"
+  )
+    .bind(name)
+    .first();
+  if (existing) {
+    const categories = await readMaterialCategories(env);
+    return {
+      created: false,
+      category: categories.find((category) => category.id === existing.id),
+    };
+  }
+  return { created: true, category: await createMaterialCategory(env, { name }) };
+}
+
+async function updateMcpMaterialCategory(env, args) {
+  await ensureMaterialCategorySchema(env);
+  const categoryId = positiveInteger(args.category_id, "category_id");
+  const name = normalizeCurriculumText(args.name, "name");
+  const before = await env.DB.prepare("SELECT * FROM material_categories WHERE id = ?")
+    .bind(categoryId)
+    .first();
+  if (!before) throw httpError(404, "material category not found");
+  const category = await updateMaterialCategory(env, categoryId, { name });
+  return { before, category };
+}
+
+async function reorderMcpMaterialCategories(env, args) {
+  if (!Array.isArray(args.category_ids) || args.category_ids.length < 1 || args.category_ids.length > 200) {
+    throw httpError(400, "category_ids must contain between 1 and 200 items");
+  }
+  const categories = await reorderMaterialCategories(env, {
+    category_ids: args.category_ids.map((value) => positiveInteger(value, "category_id")),
+  });
+  return { count: categories.length, categories };
+}
+
 async function listMcpCurriculumMaterials(env, args = {}) {
   await ensureCurriculumIntegrity(env);
   const query = String(args.query || "").trim().toLocaleLowerCase("ja");
@@ -1186,6 +1340,7 @@ async function listMcpCurriculumMaterials(env, args = {}) {
     const matches =
       !query ||
       String(material.name).toLocaleLowerCase("ja").includes(query) ||
+      String(material.category_name || "").toLocaleLowerCase("ja").includes(query) ||
       chapters.some((chapter) =>
         String(chapter.name).toLocaleLowerCase("ja").includes(query)
       );
@@ -1198,19 +1353,59 @@ async function listMcpCurriculumMaterials(env, args = {}) {
 
 async function createMcpCurriculumMaterial(env, args) {
   const name = normalizeCurriculumText(args.name, "name");
+  const categoryId = args.category_id === undefined
+    ? null
+    : parseMaterialCategoryId(args.category_id);
+  await ensureMaterialCategorySchema(env);
+  await assertMaterialCategoryExists(env, categoryId);
   const existing = await env.DB.prepare(
     "SELECT * FROM materials WHERE name = ? COLLATE NOCASE ORDER BY id LIMIT 1"
   )
     .bind(name)
     .first();
   if (existing) {
+    const listedMaterial = (await readMaterials(env)).find((material) => material.id === existing.id);
     return {
       created: false,
-      material: { ...existing, chapters: await readChapters(env, existing.id) },
+      material: { ...(listedMaterial || existing), chapters: await readChapters(env, existing.id) },
     };
   }
-  const material = await createMaterial(env, { name });
+  const material = await createMaterial(env, { name, category_id: categoryId });
   return { created: true, material: { ...material, chapters: [] } };
+}
+
+async function moveMcpCurriculumMaterialToCategory(env, args) {
+  await ensureMaterialCategorySchema(env);
+  const materialId = positiveInteger(args.material_id, "material_id");
+  if (args.category_id === undefined) throw httpError(400, "category_id is required");
+  const categoryId = parseMaterialCategoryId(args.category_id);
+  await assertMaterialCategoryExists(env, categoryId);
+  const before = (await readMaterials(env)).find((material) => material.id === materialId);
+  if (!before) throw httpError(404, "material not found");
+  const beforeCategoryId = before.category_id === null ? null : Number(before.category_id);
+  if (beforeCategoryId === categoryId) {
+    return { moved: false, before, material: before };
+  }
+  await updateMaterial(env, materialId, { category_id: categoryId });
+  const material = (await readMaterials(env)).find((item) => item.id === materialId);
+  return { moved: true, before, material };
+}
+
+async function reorderMcpCurriculumMaterialsInCategory(env, args) {
+  if (args.category_id === undefined) throw httpError(400, "category_id is required");
+  const categoryId = parseMaterialCategoryId(args.category_id);
+  if (!Array.isArray(args.material_ids) || args.material_ids.length < 1 || args.material_ids.length > 500) {
+    throw httpError(400, "material_ids must contain between 1 and 500 items");
+  }
+  const materialIds = args.material_ids.map((value) => positiveInteger(value, "material_id"));
+  await reorderMaterialsInCategory(env, { category_id: categoryId, material_ids: materialIds });
+  const materials = (await readMaterials(env)).filter(
+    (material) => (material.category_id === null ? null : Number(material.category_id)) === categoryId
+  );
+  const category = categoryId === null
+    ? { id: null, name: "未分類" }
+    : (await readMaterialCategories(env)).find((item) => item.id === categoryId);
+  return { category, count: materials.length, materials };
 }
 
 async function createMcpMaterialChapters(env, args) {
@@ -1687,9 +1882,9 @@ async function handleMcp(request, env, url) {
     return mcpResponse(id, {
       protocolVersion: params.protocolVersion || "2025-06-18",
       capabilities: { tools: {} },
-      serverInfo: { name: "works-schedule", version: "1.7.0" },
+      serverInfo: { name: "works-schedule", version: "1.8.0" },
       instructions:
-        "Use search_schedules to find exact event_id and calendar_id values before schedule writes. Use get_student_profile before updating a student memo or print name, and get_student_profile_change_history before undoing a profile update. Use list_curriculum_materials before creating, renaming, reordering, merging, or deleting curriculum chapters, and get_student_materials before updating chapter completion. Merge duplicate chapters to preserve student progress; delete_material_chapter refuses to remove a chapter that has progress. Use briefing and progress tools to prepare and report, history before undoing changes, search_materials before linking a file, and preview_reschedule before apply_reschedule. Dates use Asia/Tokyo. Update tools preserve fields that are not supplied; pass null to clear a text field.",
+        "Use search_schedules to find exact event_id and calendar_id values before schedule writes. Use get_student_profile before updating a student memo or print name, and get_student_profile_change_history before undoing a profile update. Use list_material_categories before creating, renaming, reordering, or moving material categories, and list_curriculum_materials before creating, moving, renaming, reordering, merging, or deleting curriculum materials and chapters. Use get_student_materials before updating chapter completion. Merge duplicate chapters to preserve student progress; delete_material_chapter refuses to remove a chapter that has progress. Use briefing and progress tools to prepare and report, history before undoing changes, search_materials before linking a file, and preview_reschedule before apply_reschedule. Dates use Asia/Tokyo. Update tools preserve fields that are not supplied; pass null to clear a text field.",
     });
   }
   if (method === "notifications/initialized") {
@@ -1767,6 +1962,18 @@ async function handleMcp(request, env, url) {
     if (toolName === "undo_schedule_update") {
       return mcpToolResult(id, await undoScheduleUpdate(env, args));
     }
+    if (toolName === "list_material_categories") {
+      return mcpToolResult(id, await listMcpMaterialCategories(env));
+    }
+    if (toolName === "create_material_category") {
+      return mcpToolResult(id, await createMcpMaterialCategory(env, args));
+    }
+    if (toolName === "update_material_category") {
+      return mcpToolResult(id, await updateMcpMaterialCategory(env, args));
+    }
+    if (toolName === "reorder_material_categories") {
+      return mcpToolResult(id, await reorderMcpMaterialCategories(env, args));
+    }
     if (toolName === "list_curriculum_materials") {
       return mcpToolResult(id, await listMcpCurriculumMaterials(env, args));
     }
@@ -1778,6 +1985,12 @@ async function handleMcp(request, env, url) {
     }
     if (toolName === "update_curriculum_material") {
       return mcpToolResult(id, await updateMcpCurriculumMaterial(env, args));
+    }
+    if (toolName === "move_curriculum_material_to_category") {
+      return mcpToolResult(id, await moveMcpCurriculumMaterialToCategory(env, args));
+    }
+    if (toolName === "reorder_curriculum_materials_in_category") {
+      return mcpToolResult(id, await reorderMcpCurriculumMaterialsInCategory(env, args));
     }
     if (toolName === "update_material_chapter") {
       return mcpToolResult(id, await updateMcpMaterialChapter(env, args));
