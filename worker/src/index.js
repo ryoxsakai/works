@@ -173,6 +173,11 @@ const scheduleUpdateProperties = {
     description:
       "get_scheduleで取得した予定ID。省略する場合はdateとtitleを指定します。",
   },
+  calendar_id: {
+    type: "string",
+    description:
+      "event_idで指定する予定のカレンダーID。省略時は選択済みカレンダーから一意に照合します。",
+  },
   date: {
     type: "string",
     description:
@@ -230,6 +235,26 @@ const MCP_SCHEDULE_TOOLS = [
       destructiveHint: false,
       openWorldHint: false,
     },
+  },
+  {
+    name: "search_schedules",
+    title: "授業予定を期間検索",
+    description:
+      "指定期間の授業予定を予定名の部分一致、完了状態、入力漏れで絞り込みます。更新対象の予定IDとカレンダーIDを探すときに使用します。",
+    inputSchema: {
+      type: "object",
+      properties: {
+        start_date: { type: "string", description: "YYYY-MM-DD形式。省略時は今日。" },
+        end_date: { type: "string", description: "YYYY-MM-DD形式。省略時は開始日から30日後。" },
+        query: { type: "string", description: "予定名の部分一致検索語。" },
+        completed: { type: "boolean", description: "完了状態で絞り込む場合に指定。" },
+        missing_only: { type: "boolean", description: "授業予定・確認テスト・宿題・授業メモのいずれかが未入力の予定だけを返す場合はtrue。" },
+        include_excluded: { type: "boolean", description: "除外設定済みの予定も含める場合はtrue。" },
+        limit: { type: "integer", minimum: 1, maximum: 200, description: "最大件数。省略時は50件。" },
+      },
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
   },
   {
     name: "get_today_briefing",
@@ -297,8 +322,8 @@ const MCP_SCHEDULE_TOOLS = [
     },
     annotations: {
       readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: true,
+      destructiveHint: true,
+      idempotentHint: false,
       openWorldHint: false,
     },
   },
@@ -326,8 +351,8 @@ const MCP_SCHEDULE_TOOLS = [
     },
     annotations: {
       readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: true,
+      destructiveHint: true,
+      idempotentHint: false,
       openWorldHint: false,
     },
   },
@@ -421,7 +446,23 @@ const MCP_SCHEDULE_TOOLS = [
       required: ["event_id", "calendar_id", "material_file_id"],
       additionalProperties: false,
     },
-    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  },
+  {
+    name: "unlink_material_from_schedule",
+    title: "授業から教材リンクを解除",
+    description: "予定ID・カレンダーID・教材ファイルIDが完全一致する教材リンクを解除します。教材ファイル自体は削除しません。",
+    inputSchema: {
+      type: "object",
+      properties: {
+        event_id: { type: "string", description: "get_scheduleまたはsearch_schedulesで取得した予定ID。" },
+        calendar_id: { type: "string", description: "対象予定のカレンダーID。" },
+        material_file_id: { type: "string", description: "解除する教材ファイルID。" },
+      },
+      required: ["event_id", "calendar_id", "material_file_id"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
   },
   {
     name: "preview_reschedule",
@@ -466,6 +507,13 @@ const MCP_SCHEDULE_TOOLS = [
     },
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
   },
+  {
+    name: "get_schedule_data_health",
+    title: "授業予定データの健全性を診断",
+    description: "カレンダー設定、生徒名・calendar_tagの重複、教材リンク切れ、旧形式リンクを読み取り専用で診断します。",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+  },
 ];
 
 function schedulePatchFromArguments(args) {
@@ -493,13 +541,21 @@ function schedulePatchFromArguments(args) {
   return patch;
 }
 
-async function resolveScheduleUpdateTarget(env, args) {
+async function resolveScheduleUpdateTarget(env, args, lookupContext = null) {
   const eventId = String(args.event_id || "").trim();
   if (eventId) {
+    const calendarId = String(args.calendar_id || "").trim();
+    const resolved = await resolveCalendarEventById(
+      env,
+      eventId,
+      calendarId || null,
+      lookupContext
+    );
     return {
       event_id: eventId,
+      calendar_id: resolved.calendar_id,
       date: args.date ? String(args.date).trim() : null,
-      title: args.title ? String(args.title).trim() : null,
+      title: String(resolved.event.summary || args.title || "(無題)").trim(),
     };
   }
 
@@ -526,20 +582,79 @@ async function resolveScheduleUpdateTarget(env, args) {
   }
   return {
     event_id: matches[0].id,
+    calendar_id: matches[0].calendar_id,
     date,
     title: matches[0].title,
   };
+}
+
+async function selectedScheduleCalendarIds(env) {
+  const settings = await readSettings(env);
+  const calendarIds = Array.isArray(settings.selected_calendars)
+    ? [...new Set(settings.selected_calendars.map(String).filter(Boolean))]
+    : [];
+  if (!calendarIds.length) throw httpError(409, "selected calendars are not configured");
+  return calendarIds;
+}
+
+async function fetchCalendarEventWithToken(accessToken, calendarId, eventId) {
+  const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) throw httpError(502, `Google Calendar API error (${res.status})`);
+  return res.json();
+}
+
+async function createCalendarLookupContext(env) {
+  const calendarIds = await selectedScheduleCalendarIds(env);
+  const token = await mintGoogleAccessToken(env);
+  return { calendar_ids: calendarIds, access_token: token.access_token };
+}
+
+async function resolveCalendarEventById(
+  env,
+  eventId,
+  requestedCalendarId = null,
+  lookupContext = null
+) {
+  if (!eventId) throw httpError(400, "event_id is required");
+  const context = lookupContext || (await createCalendarLookupContext(env));
+  const calendarIds = context.calendar_ids;
+  if (requestedCalendarId && !calendarIds.includes(requestedCalendarId)) {
+    throw httpError(403, "calendar is not selected in WORKS settings");
+  }
+  const candidates = requestedCalendarId ? [requestedCalendarId] : calendarIds;
+  const matches = [];
+  for (const calendarId of candidates) {
+    const event = await fetchCalendarEventWithToken(context.access_token, calendarId, eventId);
+    if (event && event.status !== "cancelled") matches.push({ calendar_id: calendarId, event });
+  }
+  if (!matches.length) throw httpError(404, `schedule not found: ${eventId}`);
+  if (matches.length > 1) throw httpError(409, `multiple calendars contain event_id ${eventId}; specify calendar_id`);
+  return matches[0];
 }
 
 let mcpFeatureSchemaReady = null;
 
 async function ensureMcpFeatureSchema(env) {
   if (!mcpFeatureSchemaReady) {
-    mcpFeatureSchemaReady = env.DB.batch([
-      env.DB.prepare("CREATE TABLE IF NOT EXISTS mcp_schedule_changes (id TEXT PRIMARY KEY, event_id TEXT NOT NULL, action TEXT NOT NULL, changed_fields TEXT NOT NULL, before_json TEXT NOT NULL, after_json TEXT NOT NULL, undone_by TEXT, created_at TEXT DEFAULT (datetime('now')))"),
-      env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_mcp_schedule_changes_event ON mcp_schedule_changes(event_id, created_at DESC)"),
-      env.DB.prepare("CREATE TABLE IF NOT EXISTS schedule_material_links (event_id TEXT NOT NULL, material_file_id TEXT NOT NULL, note TEXT, created_at TEXT DEFAULT (datetime('now')), PRIMARY KEY (event_id, material_file_id))"),
-    ]).catch((err) => {
+    mcpFeatureSchemaReady = (async () => {
+      await env.DB.batch([
+        env.DB.prepare("CREATE TABLE IF NOT EXISTS mcp_schedule_changes (id TEXT PRIMARY KEY, event_id TEXT NOT NULL, action TEXT NOT NULL, changed_fields TEXT NOT NULL, before_json TEXT NOT NULL, after_json TEXT NOT NULL, undone_by TEXT, created_at TEXT DEFAULT (datetime('now')))"),
+        env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_mcp_schedule_changes_event ON mcp_schedule_changes(event_id, created_at DESC)"),
+        env.DB.prepare("CREATE TABLE IF NOT EXISTS schedule_material_links (calendar_id TEXT NOT NULL, event_id TEXT NOT NULL, material_file_id TEXT NOT NULL, note TEXT, created_at TEXT DEFAULT (datetime('now')), PRIMARY KEY (calendar_id, event_id, material_file_id))"),
+      ]);
+      const { results: columns } = await env.DB.prepare("PRAGMA table_info(schedule_material_links)").all();
+      if (!columns.some((column) => column.name === "calendar_id")) {
+        await env.DB.batch([
+          env.DB.prepare("ALTER TABLE schedule_material_links RENAME TO schedule_material_links_legacy"),
+          env.DB.prepare("CREATE TABLE schedule_material_links (calendar_id TEXT NOT NULL, event_id TEXT NOT NULL, material_file_id TEXT NOT NULL, note TEXT, created_at TEXT DEFAULT (datetime('now')), PRIMARY KEY (calendar_id, event_id, material_file_id))"),
+          env.DB.prepare("INSERT INTO schedule_material_links (calendar_id, event_id, material_file_id, note, created_at) SELECT '', event_id, material_file_id, note, created_at FROM schedule_material_links_legacy"),
+          env.DB.prepare("DROP TABLE schedule_material_links_legacy"),
+        ]);
+      }
+    })().catch((err) => {
       mcpFeatureSchemaReady = null;
       throw err;
     });
@@ -561,29 +676,47 @@ async function readCurriculumEntry(env, eventId) {
     .first();
 }
 
-async function recordScheduleChange(env, eventId, action, changedFields, before, after) {
-  await ensureMcpFeatureSchema(env);
-  const id = crypto.randomUUID();
-  await env.DB.prepare("INSERT INTO mcp_schedule_changes (id, event_id, action, changed_fields, before_json, after_json) VALUES (?, ?, ?, ?, ?, ?)")
-    .bind(id, eventId, action, JSON.stringify(changedFields), JSON.stringify(before), JSON.stringify(after))
-    .run();
-  return id;
+function curriculumAfterPatch(before, patch) {
+  return {
+    exists: true,
+    completed: patch.completed !== undefined ? patch.completed : before.completed,
+    ...Object.fromEntries(
+      SCHEDULE_TEXT_FIELDS.map((field) => [
+        field,
+        patch[field] !== undefined ? patch[field] : before[field],
+      ])
+    ),
+  };
+}
+
+async function prepareAuditedScheduleUpdate(env, target, patch) {
+  const before = curriculumSnapshot(await readCurriculumEntry(env, target.event_id));
+  const after = curriculumAfterPatch(before, patch);
+  const changeId = crypto.randomUUID();
+  return {
+    target,
+    patch,
+    before,
+    after,
+    change_id: changeId,
+    statements: [
+      env.DB.prepare(`INSERT INTO curriculum_entries (calendar_event_id, completed, lesson_plan, confirmation_test, homework, lesson_memo, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+        ON CONFLICT(calendar_event_id) DO UPDATE SET completed = excluded.completed, lesson_plan = excluded.lesson_plan,
+          confirmation_test = excluded.confirmation_test, homework = excluded.homework,
+          lesson_memo = excluded.lesson_memo, updated_at = excluded.updated_at`)
+        .bind(target.event_id, after.completed ? 1 : 0, after.lesson_plan, after.confirmation_test, after.homework, after.lesson_memo),
+      env.DB.prepare("INSERT INTO mcp_schedule_changes (id, event_id, action, changed_fields, before_json, after_json) VALUES (?, ?, 'update', ?, ?, ?)")
+        .bind(changeId, target.event_id, JSON.stringify(Object.keys(patch)), JSON.stringify(before), JSON.stringify(after)),
+    ],
+  };
 }
 
 async function auditedScheduleUpdate(env, target, patch) {
   await ensureMcpFeatureSchema(env);
-  const before = curriculumSnapshot(await readCurriculumEntry(env, target.event_id));
-  const entry = await upsertCurriculumEntry(env, target.event_id, patch);
-  const after = curriculumSnapshot(entry);
-  const changeId = await recordScheduleChange(
-    env,
-    target.event_id,
-    "update",
-    Object.keys(patch),
-    before,
-    after
-  );
-  return { entry, change_id: changeId };
+  const prepared = await prepareAuditedScheduleUpdate(env, target, patch);
+  await env.DB.batch(prepared.statements);
+  return { entry: await readCurriculumEntry(env, target.event_id), change_id: prepared.change_id };
 }
 
 async function updateScheduleFromArguments(env, args) {
@@ -596,6 +729,7 @@ async function updateScheduleFromArguments(env, args) {
   return {
     change_id: changeId,
     event_id: target.event_id,
+    calendar_id: target.calendar_id,
     date: target.date,
     title: target.title,
     updated_fields: Object.keys(patch),
@@ -613,12 +747,15 @@ async function updateSchedulesFromArguments(env, args) {
 
   // 対象特定と入力検証をすべて先に終え、明らかな入力エラーで途中更新しない。
   const prepared = [];
+  const lookupContext = args.updates.some((update) => update?.event_id)
+    ? await createCalendarLookupContext(env)
+    : null;
   for (const update of args.updates) {
     if (!update || typeof update !== "object" || Array.isArray(update)) {
       throw httpError(400, "each update must be an object");
     }
     prepared.push({
-      target: await resolveScheduleUpdateTarget(env, update),
+      target: await resolveScheduleUpdateTarget(env, update, lookupContext),
       patch: schedulePatchFromArguments(update),
     });
   }
@@ -628,12 +765,21 @@ async function updateSchedulesFromArguments(env, args) {
     throw httpError(409, "updates[] contains duplicate schedules");
   }
 
-  const results = [];
+  await ensureMcpFeatureSchema(env);
+  const atomicUpdates = [];
   for (const { target, patch } of prepared) {
-    const { entry, change_id: changeId } = await auditedScheduleUpdate(env, target, patch);
+    atomicUpdates.push(await prepareAuditedScheduleUpdate(env, target, patch));
+  }
+  await env.DB.batch(atomicUpdates.flatMap((update) => update.statements));
+
+  const results = [];
+  for (const update of atomicUpdates) {
+    const { target, patch, change_id: changeId } = update;
+    const entry = await readCurriculumEntry(env, target.event_id);
     results.push({
       change_id: changeId,
       event_id: target.event_id,
+      calendar_id: target.calendar_id,
       date: target.date,
       title: target.title,
       updated_fields: Object.keys(patch),
@@ -659,9 +805,9 @@ async function handleMcp(request, env, url) {
     return mcpResponse(id, {
       protocolVersion: params.protocolVersion || "2025-06-18",
       capabilities: { tools: {} },
-      serverInfo: { name: "works-schedule", version: "1.3.0" },
+      serverInfo: { name: "works-schedule", version: "1.4.0" },
       instructions:
-        "Use get_schedule to identify lessons, briefing and progress tools to prepare and report, history before undoing changes, search_materials before linking a file, and preview_reschedule before apply_reschedule. Dates use Asia/Tokyo. Update tools preserve fields that are not supplied; pass null to clear a text field.",
+        "Use search_schedules to find exact event_id and calendar_id values before writes. Use briefing and progress tools to prepare and report, history before undoing changes, search_materials before linking a file, and preview_reschedule before apply_reschedule. Dates use Asia/Tokyo. Update tools preserve fields that are not supplied; pass null to clear a text field.",
     });
   }
   if (method === "notifications/initialized") {
@@ -699,6 +845,9 @@ async function handleMcp(request, env, url) {
       if (args.include_excluded) searchParams.set("include_excluded", "true");
       return mcpToolResult(id, await readSchedule(env, searchParams));
     }
+    if (params.name === "search_schedules") {
+      return mcpToolResult(id, await searchSchedules(env, args));
+    }
     if (params.name === "get_today_briefing") {
       return mcpToolResult(id, await readTodayBriefing(env, args));
     }
@@ -729,6 +878,9 @@ async function handleMcp(request, env, url) {
     if (params.name === "link_material_to_schedule") {
       return mcpToolResult(id, await linkMaterialToSchedule(env, args));
     }
+    if (params.name === "unlink_material_from_schedule") {
+      return mcpToolResult(id, await unlinkMaterialFromSchedule(env, args));
+    }
     if (params.name === "preview_reschedule") {
       return mcpToolResult(id, await previewReschedule(env, args));
     }
@@ -737,6 +889,9 @@ async function handleMcp(request, env, url) {
     }
     if (params.name === "get_monthly_report") {
       return mcpToolResult(id, await readMonthlyReport(env, args));
+    }
+    if (params.name === "get_schedule_data_health") {
+      return mcpToolResult(id, await readScheduleDataHealth(env));
     }
     return mcpError(id, -32602, "Unknown tool");
   } catch (err) {
@@ -867,7 +1022,10 @@ async function readScheduleEvents(
     });
   const materialLinks = await readScheduleMaterialLinks(
     env,
-    filteredEvents.map((event) => event.id)
+    filteredEvents.map((event) => ({
+      calendar_id: event.calendar_id,
+      event_id: event.id,
+    }))
   );
   return filteredEvents.map((event) => {
       const detail = details.get(event.id) || {};
@@ -883,7 +1041,8 @@ async function readScheduleEvents(
         confirmation_test: detail.confirmation_test || null,
         homework: detail.homework || null,
         lesson_memo: detail.lesson_memo || null,
-        materials: materialLinks.get(event.id) || [],
+        materials:
+          materialLinks.get(scheduleEventKey(event.calendar_id, event.id)) || [],
       };
     });
 }
@@ -899,6 +1058,42 @@ async function readSchedule(env, searchParams) {
     time_zone: SCHEDULE_TIME_ZONE,
     count: events.length,
     events,
+    generated_at: new Date().toISOString(),
+  };
+}
+
+async function searchSchedules(env, args = {}) {
+  const startDate = String(args.start_date || todayInScheduleTimeZone()).trim();
+  scheduleDateRange(startDate);
+  const endDate = String(args.end_date || shiftScheduleDate(startDate, 30)).trim();
+  scheduleDateRange(endDate);
+  const spanDays = Math.round(
+    (Date.parse(`${endDate}T00:00:00Z`) - Date.parse(`${startDate}T00:00:00Z`)) /
+      (24 * 60 * 60 * 1000)
+  );
+  if (spanDays < 0) throw httpError(400, "start_date must be on or before end_date");
+  if (spanDays > 366) throw httpError(400, "search period must be 366 days or shorter");
+  if (args.completed !== undefined && typeof args.completed !== "boolean") {
+    throw httpError(400, "completed must be boolean");
+  }
+  const query = String(args.query || "").trim().toLocaleLowerCase("ja");
+  if (query.length > 200) throw httpError(400, "query is too long");
+  const limit = readBoundedInteger(args.limit, 50, 1, 200, "limit");
+  const events = await readScheduleEvents(env, startDate, endDate, Boolean(args.include_excluded));
+  const matches = events
+    .filter((event) => !query || event.title.toLocaleLowerCase("ja").includes(query))
+    .filter((event) => args.completed === undefined || event.completed === args.completed)
+    .map((event) => ({ ...event, missing_fields: scheduleMissingFields(event) }))
+    .filter((event) => !args.missing_only || event.missing_fields.length > 0);
+  return {
+    start_date: startDate,
+    end_date: endDate,
+    time_zone: SCHEDULE_TIME_ZONE,
+    query: query || null,
+    total_matches: matches.length,
+    count: Math.min(matches.length, limit),
+    truncated: matches.length > limit,
+    events: matches.slice(0, limit),
     generated_at: new Date().toISOString(),
   };
 }
@@ -1172,14 +1367,23 @@ async function undoScheduleUpdate(env, args = {}) {
   if (!equalCurriculumSnapshots(current, after)) {
     throw httpError(409, "schedule changed after this history entry; undo stopped");
   }
-  if (before.exists) {
-    await upsertCurriculumEntry(env, change.event_id, before);
-  } else {
-    await env.DB.prepare("DELETE FROM curriculum_entries WHERE calendar_event_id = ?").bind(change.event_id).run();
-  }
+  const restoreStatement = before.exists
+    ? env.DB.prepare(`INSERT INTO curriculum_entries (calendar_event_id, completed, lesson_plan, confirmation_test, homework, lesson_memo, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+        ON CONFLICT(calendar_event_id) DO UPDATE SET completed = excluded.completed, lesson_plan = excluded.lesson_plan,
+          confirmation_test = excluded.confirmation_test, homework = excluded.homework,
+          lesson_memo = excluded.lesson_memo, updated_at = excluded.updated_at`)
+        .bind(change.event_id, before.completed ? 1 : 0, before.lesson_plan, before.confirmation_test, before.homework, before.lesson_memo)
+    : env.DB.prepare("DELETE FROM curriculum_entries WHERE calendar_event_id = ?").bind(change.event_id);
+  const undoId = crypto.randomUUID();
+  await env.DB.batch([
+    restoreStatement,
+    env.DB.prepare("INSERT INTO mcp_schedule_changes (id, event_id, action, changed_fields, before_json, after_json) VALUES (?, ?, 'undo', ?, ?, ?)")
+      .bind(undoId, change.event_id, change.changed_fields, JSON.stringify(current), JSON.stringify(before)),
+    env.DB.prepare("UPDATE mcp_schedule_changes SET undone_by = ? WHERE id = ?")
+      .bind(undoId, changeId),
+  ]);
   const restored = curriculumSnapshot(await readCurriculumEntry(env, change.event_id));
-  const undoId = await recordScheduleChange(env, change.event_id, "undo", parseJsonColumn(change.changed_fields, []), current, restored);
-  await env.DB.prepare("UPDATE mcp_schedule_changes SET undone_by = ? WHERE id = ?").bind(undoId, changeId).run();
   return { undone_change_id: changeId, undo_change_id: undoId, event_id: change.event_id, restored };
 }
 
@@ -1224,29 +1428,68 @@ async function linkMaterialToSchedule(env, args = {}) {
   await ensureMaterialSchema(env);
   const file = await getMaterialDb(env).prepare("SELECT id, folder_id, name, mime_type, size FROM material_files WHERE id = ?").bind(materialFileId).first();
   if (!file) throw httpError(404, "material file not found");
-  const { event } = await fetchCalendarEvent(env, calendarId, eventId);
-  await env.DB.prepare("INSERT INTO schedule_material_links (event_id, material_file_id, note) VALUES (?, ?, ?) ON CONFLICT(event_id, material_file_id) DO UPDATE SET note = excluded.note")
-    .bind(eventId, materialFileId, note)
-    .run();
+  const { event } = await resolveCalendarEventById(env, eventId, calendarId);
+  await env.DB.batch([
+    env.DB.prepare("INSERT INTO schedule_material_links (calendar_id, event_id, material_file_id, note) VALUES (?, ?, ?, ?) ON CONFLICT(calendar_id, event_id, material_file_id) DO UPDATE SET note = excluded.note")
+      .bind(calendarId, eventId, materialFileId, note),
+    env.DB.prepare("DELETE FROM schedule_material_links WHERE calendar_id = '' AND event_id = ? AND material_file_id = ?")
+      .bind(eventId, materialFileId),
+  ]);
   return { event_id: eventId, calendar_id: calendarId, title: String(event.summary || "(無題)").trim(), material: file, note };
 }
 
-async function readScheduleMaterialLinks(env, eventIds) {
-  const result = new Map();
-  if (!eventIds.length) return result;
+async function unlinkMaterialFromSchedule(env, args = {}) {
   await ensureMcpFeatureSchema(env);
-  const wanted = new Set(eventIds);
+  const eventId = String(args.event_id || "").trim();
+  const calendarId = String(args.calendar_id || "").trim();
+  const materialFileId = String(args.material_file_id || "").trim();
+  if (!eventId || !calendarId || !materialFileId) {
+    throw httpError(400, "event_id, calendar_id and material_file_id are required");
+  }
+  const selectedCalendars = await selectedScheduleCalendarIds(env);
+  if (!selectedCalendars.includes(calendarId)) {
+    throw httpError(403, "calendar is not selected in WORKS settings");
+  }
+  const existing = await env.DB.prepare("SELECT * FROM schedule_material_links WHERE calendar_id = ? AND event_id = ? AND material_file_id = ?")
+    .bind(calendarId, eventId, materialFileId)
+    .first();
+  if (!existing) throw httpError(404, "material link not found");
+  await env.DB.prepare("DELETE FROM schedule_material_links WHERE calendar_id = ? AND event_id = ? AND material_file_id = ?")
+    .bind(calendarId, eventId, materialFileId)
+    .run();
+  return {
+    calendar_id: calendarId,
+    event_id: eventId,
+    material_file_id: materialFileId,
+    unlinked: true,
+  };
+}
+
+function scheduleEventKey(calendarId, eventId) {
+  return `${calendarId}\u0000${eventId}`;
+}
+
+async function readScheduleMaterialLinks(env, events) {
+  const result = new Map();
+  if (!events.length) return result;
+  await ensureMcpFeatureSchema(env);
+  const wanted = new Set(
+    events.map((event) => scheduleEventKey(event.calendar_id, event.event_id))
+  );
   const { results: links } = await env.DB.prepare("SELECT * FROM schedule_material_links").all();
-  const relevant = links.filter((link) => wanted.has(link.event_id));
+  const relevant = links.filter((link) =>
+    wanted.has(scheduleEventKey(link.calendar_id, link.event_id))
+  );
   if (!relevant.length) return result;
   const files = await readAllMaterialFiles(env);
   const fileMap = new Map(files.map((file) => [file.id, file]));
   for (const link of relevant) {
     const file = fileMap.get(link.material_file_id);
     if (!file) continue;
-    const items = result.get(link.event_id) || [];
+    const key = scheduleEventKey(link.calendar_id, link.event_id);
+    const items = result.get(key) || [];
     items.push({ ...file, note: link.note || null, linked_at: link.created_at });
-    result.set(link.event_id, items);
+    result.set(key, items);
   }
   return result;
 }
@@ -1334,8 +1577,10 @@ function scheduleMonthRange(value) {
 async function readMonthlyReport(env, args = {}) {
   const { month, startDate, endDate } = scheduleMonthRange(args.month);
   const name = String(args.name || "").trim();
+  const identity = name ? await resolveStudentIdentity(env, name) : null;
+  const scheduleTitle = identity?.schedule_title || null;
   const events = (await readScheduleEvents(env, startDate, endDate, false))
-    .filter((event) => !event.all_day && (!name || event.title === name));
+    .filter((event) => !event.all_day && (!scheduleTitle || event.title === scheduleTitle));
   const now = Date.now();
   const elapsed = events.filter((event) => Date.parse(event.end || "") < now);
   const completed = elapsed.filter((event) => event.completed);
@@ -1356,11 +1601,107 @@ async function readMonthlyReport(env, args = {}) {
   return {
     month,
     name: name || null,
+    schedule_title: scheduleTitle,
     time_zone: SCHEDULE_TIME_ZONE,
     totals: { lessons: events.length, elapsed: elapsed.length, completed: completed.length, unrecorded: unrecorded.length, completion_rate: percent(completed.length, elapsed.length) },
     missing_fields: missingFields,
     by_title: byTitle,
     unrecorded_lessons: unrecorded,
+    generated_at: new Date().toISOString(),
+  };
+}
+
+function duplicateValues(rows, field) {
+  const grouped = new Map();
+  for (const row of rows) {
+    const value = String(row[field] || "").trim();
+    if (!value) continue;
+    const items = grouped.get(value) || [];
+    items.push(row.id ?? row.name);
+    grouped.set(value, items);
+  }
+  return [...grouped.entries()]
+    .filter(([, items]) => items.length > 1)
+    .map(([value, items]) => ({ value, records: items }));
+}
+
+async function readScheduleDataHealth(env) {
+  await ensureMcpFeatureSchema(env);
+  const [settings, students, links, files, orphanStudentMaterials, orphanChapterProgress] = await Promise.all([
+    readSettings(env),
+    readStudents(env),
+    env.DB.prepare("SELECT * FROM schedule_material_links").all(),
+    readAllMaterialFiles(env),
+    env.DB.prepare("SELECT sm.id, sm.name, sm.material_id FROM student_materials sm LEFT JOIN materials m ON m.id = sm.material_id WHERE m.id IS NULL").all(),
+    env.DB.prepare("SELECT p.name, p.chapter_id FROM chapter_progress p LEFT JOIN material_chapters c ON c.id = p.chapter_id WHERE c.id IS NULL").all(),
+  ]);
+  const selectedCalendars = Array.isArray(settings.selected_calendars)
+    ? [...new Set(settings.selected_calendars.map(String).filter(Boolean))]
+    : [];
+  const fileIds = new Set(files.map((file) => file.id));
+  const legacyMaterialLinks = links.results.filter((link) => !link.calendar_id);
+  const missingMaterialFiles = links.results.filter(
+    (link) => !fileIds.has(link.material_file_id)
+  );
+  const unselectedCalendarLinks = links.results.filter(
+    (link) => link.calendar_id && !selectedCalendars.includes(link.calendar_id)
+  );
+  const missingCalendarEvents = [];
+  let calendarValidationError = null;
+  let calendarValidationChecked = 0;
+  let calendarValidationTruncated = false;
+  if (selectedCalendars.length) {
+    try {
+      const lookupContext = await createCalendarLookupContext(env);
+      const linksToValidate = links.results.filter(
+        (link) => link.calendar_id && selectedCalendars.includes(link.calendar_id)
+      );
+      calendarValidationTruncated = linksToValidate.length > 40;
+      for (const link of linksToValidate.slice(0, 40)) {
+        const event = await fetchCalendarEventWithToken(
+          lookupContext.access_token,
+          link.calendar_id,
+          link.event_id
+        );
+        calendarValidationChecked += 1;
+        if (!event || event.status === "cancelled") missingCalendarEvents.push(link);
+      }
+    } catch (err) {
+      calendarValidationError = err?.message || String(err);
+    }
+  }
+  const duplicateStudentNames = duplicateValues(students, "name");
+  const duplicateCalendarTags = duplicateValues(students, "calendar_tag");
+  const issues = {
+    missing_selected_calendars: selectedCalendars.length === 0,
+    duplicate_student_names: duplicateStudentNames,
+    duplicate_calendar_tags: duplicateCalendarTags,
+    legacy_material_links: legacyMaterialLinks,
+    missing_material_files: missingMaterialFiles,
+    unselected_calendar_links: unselectedCalendarLinks,
+    missing_calendar_events: missingCalendarEvents,
+    orphan_student_materials: orphanStudentMaterials.results,
+    orphan_chapter_progress: orphanChapterProgress.results,
+    calendar_validation_error: calendarValidationError,
+  };
+  const issueCount =
+    (issues.missing_selected_calendars ? 1 : 0) +
+    (calendarValidationError ? 1 : 0) +
+    Object.values(issues)
+      .filter(Array.isArray)
+      .reduce((sum, items) => sum + items.length, 0);
+  return {
+    healthy: issueCount === 0,
+    issue_count: issueCount,
+    selected_calendars: selectedCalendars,
+    counts: {
+      students: students.length,
+      material_files: files.length,
+      material_links: links.results.length,
+      calendar_links_checked: calendarValidationChecked,
+    },
+    calendar_validation_truncated: calendarValidationTruncated,
+    issues,
     generated_at: new Date().toISOString(),
   };
 }
