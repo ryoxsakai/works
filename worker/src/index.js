@@ -1429,9 +1429,12 @@ async function linkMaterialToSchedule(env, args = {}) {
   const file = await getMaterialDb(env).prepare("SELECT id, folder_id, name, mime_type, size FROM material_files WHERE id = ?").bind(materialFileId).first();
   if (!file) throw httpError(404, "material file not found");
   const { event } = await resolveCalendarEventById(env, eventId, calendarId);
-  await env.DB.prepare("INSERT INTO schedule_material_links (calendar_id, event_id, material_file_id, note) VALUES (?, ?, ?, ?) ON CONFLICT(calendar_id, event_id, material_file_id) DO UPDATE SET note = excluded.note")
-    .bind(calendarId, eventId, materialFileId, note)
-    .run();
+  await env.DB.batch([
+    env.DB.prepare("INSERT INTO schedule_material_links (calendar_id, event_id, material_file_id, note) VALUES (?, ?, ?, ?) ON CONFLICT(calendar_id, event_id, material_file_id) DO UPDATE SET note = excluded.note")
+      .bind(calendarId, eventId, materialFileId, note),
+    env.DB.prepare("DELETE FROM schedule_material_links WHERE calendar_id = '' AND event_id = ? AND material_file_id = ?")
+      .bind(eventId, materialFileId),
+  ]);
   return { event_id: eventId, calendar_id: calendarId, title: String(event.summary || "(無題)").trim(), material: file, note };
 }
 
