@@ -1327,7 +1327,12 @@
 
 .admission-calendar-continuous-grid {
   grid-template-rows: 2rem;
-  grid-auto-rows: 5.6rem;
+  grid-auto-rows: minmax(6.25rem, auto);
+}
+
+.admission-calendar-continuous-grid .admission-calendar-cell {
+  min-height: 6.25rem;
+  padding-top: .45rem;
 }
 
 .admission-calendar-continuous-grid .admission-calendar-cell.is-month-start {
@@ -1366,7 +1371,7 @@
 
   .admission-calendar-continuous-grid {
     grid-template-rows: 2rem;
-    grid-auto-rows: 22mm;
+    grid-auto-rows: minmax(22mm, auto);
   }
 
   .admission-calendar-month-label {
