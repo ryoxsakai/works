@@ -158,6 +158,20 @@ CREATE TABLE IF NOT EXISTS mcp_schedule_changes (
 CREATE INDEX IF NOT EXISTS idx_mcp_schedule_changes_event
   ON mcp_schedule_changes(event_id, created_at DESC);
 
+-- MCPからの生徒メモ・印刷用氏名の変更履歴。取り消し時は現在値との競合を確認する。
+CREATE TABLE IF NOT EXISTS mcp_student_profile_changes (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  action TEXT NOT NULL,
+  changed_fields TEXT NOT NULL,
+  before_json TEXT NOT NULL,
+  after_json TEXT NOT NULL,
+  undone_by TEXT,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_mcp_student_profile_changes_name
+  ON mcp_student_profile_changes(name, created_at DESC);
+
 -- 教材ライブラリのファイルとGoogleカレンダー予定の対応。
 CREATE TABLE IF NOT EXISTS schedule_material_links (
   calendar_id TEXT NOT NULL,
