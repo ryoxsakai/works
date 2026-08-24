@@ -17,7 +17,7 @@
     })();
   </script>
   <link rel="apple-touch-icon" href="../shared/logo.png" />
-  <link rel="stylesheet" href="../shared/styles.css?v=51" />
+  <link rel="stylesheet" href="../shared/styles.css?v=52" />
     <link rel="stylesheet" href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" />
 </head>
 <body>
@@ -275,12 +275,36 @@
       <button type="button" class="tab-btn" data-tab="appearance" role="tab" aria-selected="false"><i class="bx bx-palette"></i> デザイン</button>
     </div>
     <div class="modal-tab-panel" data-tab-panel="materials" hidden>
-      <p class="hint">教材を登録すると、生徒情報タブの「教材・提出物進捗」で使用教材として選べます。詳細アイコンからチャプター(章)を登録してください。</p>
-      <div id="material-list"></div>
-      <form id="add-material-form" class="inline-form">
-        <input id="new-material-name" type="text" placeholder="例: 青チャート数学I+A" required />
-        <button type="submit" class="btn-add" aria-label="教材を追加"><i class="bx bx-plus"></i></button>
-      </form>
+      <p class="hint">教材カテゴリを作ると、教材を目的や科目ごとに整理できます。教材の詳細アイコンからチャプター(章)を登録してください。</p>
+      <section class="material-settings-section" aria-labelledby="material-category-heading">
+        <div class="settings-section-heading">
+          <div>
+            <h3 id="material-category-heading"><i class="bx bx-category"></i> 教材カテゴリ</h3>
+            <p class="hint">上から表示したい順に並べ替えられます。</p>
+          </div>
+        </div>
+        <div id="material-category-list"></div>
+        <form id="add-material-category-form" class="inline-form material-category-add-form">
+          <input id="new-material-category-name" type="text" placeholder="例: 英語" required />
+          <button type="submit" class="btn-add" aria-label="教材カテゴリを追加"><i class="bx bx-plus"></i></button>
+        </form>
+      </section>
+      <section class="material-settings-section" aria-labelledby="material-heading">
+        <div class="settings-section-heading">
+          <div>
+            <h3 id="material-heading"><i class="bx bx-book"></i> 教材</h3>
+            <p class="hint">カテゴリ欄を変更すると、教材を別のカテゴリへ移動できます。</p>
+          </div>
+        </div>
+        <div id="material-list"></div>
+        <form id="add-material-form" class="inline-form material-add-form">
+          <select id="new-material-category" aria-label="追加先の教材カテゴリ">
+            <option value="">未分類</option>
+          </select>
+          <input id="new-material-name" type="text" placeholder="例: 青チャート数学I+A" required />
+          <button type="submit" class="btn-add" aria-label="教材を追加"><i class="bx bx-plus"></i></button>
+        </form>
+      </section>
     </div>
     <div class="modal-tab-panel" data-tab-panel="calendar">
       <p class="hint">授業予定が入っているカレンダーにチェックを入れてください(全デバイス共通の設定です)。色はGoogleカレンダー側の設定がそのまま使われます。</p>
@@ -444,6 +468,6 @@
     </div>
   </dialog>
 
-  <script type="module" src="./app.js?v=53"></script>
+  <script type="module" src="./app.js?v=54"></script>
 </body>
 </html>
