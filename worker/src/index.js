@@ -50,6 +50,108 @@ async function verifyReadApiKey(request, env) {
   }
 }
 
+// --- ChatGPT Plugin用のMCP/OAuth ---
+// 授業予定は個人情報を含むため、MCPのtools/callはOAuthで発行した短命の
+// Bearer tokenでのみ実行できるようにする。OAuthの認可画面では既存の
+// WORKS_API_KEYを本人確認用に使い、キー自体はChatGPTへ保存しない。
+const MCP_SCOPE = "schedule:read";
+const MCP_TOKEN_MAX_AGE_MS = 60 * 60 * 1000;
+const MCP_AUTH_CODE_MAX_AGE_MS = 5 * 60 * 1000;
+
+function mcpBaseUrl(url) { return `${url.protocol}//${url.host}`; }
+function mcpJson(payload, status = 200, extraHeaders = {}) {
+  return new Response(JSON.stringify(payload), { status, headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", ...extraHeaders } });
+}
+function html(body, status = 200) {
+  return new Response(body, { status, headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } });
+}
+function escapeHtml(value) {
+  return String(value).replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[char]));
+}
+async function ensureMcpOAuthSchema(env) {
+  await env.DB.batch([
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS mcp_oauth_clients (client_id TEXT PRIMARY KEY, redirect_uris TEXT NOT NULL, created_at TEXT DEFAULT (datetime('now')))"),
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS mcp_oauth_codes (code TEXT PRIMARY KEY, client_id TEXT NOT NULL, redirect_uri TEXT NOT NULL, code_challenge TEXT NOT NULL, scope TEXT NOT NULL, expires_at INTEGER NOT NULL, created_at TEXT DEFAULT (datetime('now')))"),
+  ]);
+}
+async function registerMcpOAuthClient(request, env) {
+  await ensureMcpOAuthSchema(env);
+  const body = await request.json();
+  const redirectUris = Array.isArray(body.redirect_uris) ? body.redirect_uris.map(String) : [];
+  if (!redirectUris.length || redirectUris.some((uri) => !uri.startsWith("https://"))) return mcpJson({ error: "invalid_client_metadata" }, 400);
+  const clientId = crypto.randomUUID();
+  await env.DB.prepare("INSERT INTO mcp_oauth_clients (client_id, redirect_uris) VALUES (?, ?)").bind(clientId, JSON.stringify(redirectUris)).run();
+  return mcpJson({ client_id: clientId, token_endpoint_auth_method: "none", grant_types: ["authorization_code"], response_types: ["code"] }, 201);
+}
+async function readMcpOAuthClient(env, clientId) {
+  await ensureMcpOAuthSchema(env);
+  const client = await env.DB.prepare("SELECT client_id, redirect_uris FROM mcp_oauth_clients WHERE client_id = ?").bind(clientId).first();
+  if (!client) return null;
+  try { return { ...client, redirect_uris: JSON.parse(client.redirect_uris) }; } catch { return null; }
+}
+function oauthErrorPage(message) {
+  return html(`<!doctype html><html lang="ja"><meta charset="utf-8"><title>WORKS 認証</title><body style="font-family:-apple-system,BlinkMacSystemFont,'Noto Sans JP',sans-serif;max-width:560px;margin:48px auto;padding:0 20px"><h1>WORKS 認証エラー</h1><p>${escapeHtml(message)}</p></body></html>`, 400);
+}
+function renderMcpAuthorizeForm(params) {
+  const fields = ["response_type", "client_id", "redirect_uri", "state", "code_challenge", "code_challenge_method", "scope"].map((name) => `<input type="hidden" name="${name}" value="${escapeHtml(params.get(name) || "")}">`).join("");
+  return html(`<!doctype html><html lang="ja"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>WORKS を接続</title><body style="font-family:-apple-system,BlinkMacSystemFont,'Noto Sans JP',sans-serif;max-width:560px;margin:48px auto;padding:0 20px"><h1>WORKS をChatGPTに接続</h1><p>授業予定・宿題・授業メモの読み取りを許可します。</p><form method="post"><label style="display:block;margin:24px 0 8px">WORKS APIキー</label><input name="api_key" type="password" autocomplete="current-password" required style="box-sizing:border-box;width:100%;padding:12px;font-size:16px">${fields}<button type="submit" style="margin-top:24px;padding:12px 18px;font-size:16px">接続を許可</button></form></body></html>`);
+}
+async function authorizeMcpClient(request, env, url) {
+  const params = request.method === "POST" ? new URLSearchParams(await request.text()) : url.searchParams;
+  const clientId = params.get("client_id") || "";
+  const redirectUri = params.get("redirect_uri") || "";
+  const codeChallenge = params.get("code_challenge") || "";
+  const scope = params.get("scope") || MCP_SCOPE;
+  const client = await readMcpOAuthClient(env, clientId);
+  if (params.get("response_type") !== "code" || !client || !client.redirect_uris.includes(redirectUri) || !codeChallenge || params.get("code_challenge_method") !== "S256" || !scope.split(" ").includes(MCP_SCOPE)) return oauthErrorPage("認可リクエストが正しくありません。");
+  if (request.method === "GET") return renderMcpAuthorizeForm(params);
+  const suppliedKey = params.get("api_key") || "";
+  if (!env.WORKS_API_KEY || !suppliedKey || !(await constantTimeEqual(suppliedKey, env.WORKS_API_KEY))) return oauthErrorPage("APIキーが正しくありません。ブラウザの戻るボタンで入力し直してください。");
+  const code = crypto.randomUUID();
+  await env.DB.prepare("INSERT INTO mcp_oauth_codes (code, client_id, redirect_uri, code_challenge, scope, expires_at) VALUES (?, ?, ?, ?, ?, ?)").bind(code, clientId, redirectUri, codeChallenge, scope, Date.now() + MCP_AUTH_CODE_MAX_AGE_MS).run();
+  const redirect = new URL(redirectUri); redirect.searchParams.set("code", code); if (params.get("state")) redirect.searchParams.set("state", params.get("state"));
+  return Response.redirect(redirect.toString(), 302);
+}
+async function sha256Base64Url(value) {
+  return toBase64Url(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value))));
+}
+async function createMcpAccessToken(env, scope) {
+  const payloadB64 = toBase64Url(new TextEncoder().encode(JSON.stringify({ email: env.ALLOWED_EMAIL, aud: "works-mcp", scope, exp: Date.now() + MCP_TOKEN_MAX_AGE_MS })));
+  return `${payloadB64}.${await hmacSign(env, payloadB64)}`;
+}
+async function exchangeMcpToken(request, env) {
+  await ensureMcpOAuthSchema(env);
+  const params = new URLSearchParams(await request.text());
+  const code = params.get("code") || "";
+  const row = await env.DB.prepare("SELECT * FROM mcp_oauth_codes WHERE code = ?").bind(code).first();
+  if (!row || row.client_id !== params.get("client_id") || row.redirect_uri !== params.get("redirect_uri") || row.expires_at < Date.now() || !params.get("code_verifier") || !(await constantTimeEqual(await sha256Base64Url(params.get("code_verifier")), row.code_challenge))) return mcpJson({ error: "invalid_grant" }, 400);
+  await env.DB.prepare("DELETE FROM mcp_oauth_codes WHERE code = ?").bind(code).run();
+  return mcpJson({ access_token: await createMcpAccessToken(env, row.scope), token_type: "Bearer", expires_in: MCP_TOKEN_MAX_AGE_MS / 1000, scope: row.scope });
+}
+async function verifyMcpAccessToken(request, env) {
+  const match = (request.headers.get("Authorization") || "").match(/^Bearer (.+)$/);
+  if (!match) throw httpError(401, "missing MCP bearer token");
+  const [payloadB64, sig] = match[1].split(".");
+  if (!payloadB64 || !sig || sig !== await hmacSign(env, payloadB64)) throw httpError(401, "invalid MCP bearer token");
+  let payload; try { payload = JSON.parse(fromBase64Url(payloadB64)); } catch { throw httpError(401, "invalid MCP bearer token"); }
+  if (payload.aud !== "works-mcp" || payload.exp < Date.now() || payload.email?.toLowerCase() !== env.ALLOWED_EMAIL.toLowerCase() || !String(payload.scope || "").split(" ").includes(MCP_SCOPE)) throw httpError(401, "invalid MCP bearer token");
+}
+function mcpResponse(id, result) { return mcpJson({ jsonrpc: "2.0", id, result }); }
+function mcpError(id, code, message) { return mcpJson({ jsonrpc: "2.0", id: id ?? null, error: { code, message } }); }
+async function handleMcp(request, env, url) {
+  if (request.method !== "POST") return new Response("Method Not Allowed", { status: 405 });
+  let message; try { message = await request.json(); } catch { return mcpError(null, -32700, "Parse error"); }
+  const { id, method, params = {} } = message;
+  if (method === "initialize") return mcpResponse(id, { protocolVersion: params.protocolVersion || "2025-06-18", capabilities: { tools: {} }, serverInfo: { name: "works-schedule", version: "1.0.0" }, instructions: "Use get_schedule for the user's private WORKS lesson schedule. This tool is read-only and uses Asia/Tokyo dates." });
+  if (method === "notifications/initialized") return new Response(null, { status: 202 });
+  if (method === "tools/list") return mcpResponse(id, { tools: [{ name: "get_schedule", title: "授業予定を取得", description: "指定日（Asia/Tokyo）のWORKS授業予定、授業計画、確認テスト、宿題、授業メモを取得します。日付を省略すると今日です。", inputSchema: { type: "object", properties: { date: { type: "string", description: "YYYY-MM-DD形式。省略時は今日（Asia/Tokyo）。" }, include_excluded: { type: "boolean", description: "除外設定済みの予定も含める場合はtrue。" } }, additionalProperties: false }, annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false } }] });
+  if (method !== "tools/call") return mcpError(id, -32601, "Method not found");
+  try { await verifyMcpAccessToken(request, env); } catch (err) { if (err.status === 401) return mcpJson({ error: "unauthorized" }, 401, { "WWW-Authenticate": `Bearer resource_metadata="${mcpBaseUrl(url)}/.well-known/oauth-protected-resource", scope="${MCP_SCOPE}"` }); throw err; }
+  if (params.name !== "get_schedule") return mcpError(id, -32602, "Unknown tool");
+  const searchParams = new URLSearchParams(); if (params.arguments?.date) searchParams.set("date", String(params.arguments.date)); if (params.arguments?.include_excluded) searchParams.set("include_excluded", "true");
+  try { const schedule = await readSchedule(env, searchParams); return mcpResponse(id, { content: [{ type: "text", text: JSON.stringify(schedule) }], structuredContent: schedule, isError: false }); } catch (err) { return mcpResponse(id, { content: [{ type: "text", text: err.message }], isError: true }); }
+}
+
 function todayInScheduleTimeZone(now = new Date()) {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: SCHEDULE_TIME_ZONE,
@@ -1415,6 +1517,19 @@ export default {
     const url = new URL(request.url);
 
     try {
+      if (url.pathname === "/.well-known/oauth-protected-resource" && request.method === "GET") {
+        const baseUrl = mcpBaseUrl(url);
+        return mcpJson({ resource: `${baseUrl}/mcp`, authorization_servers: [baseUrl], scopes_supported: [MCP_SCOPE], resource_documentation: `${baseUrl}/mcp` });
+      }
+      if (url.pathname === "/.well-known/oauth-authorization-server" && request.method === "GET") {
+        const baseUrl = mcpBaseUrl(url);
+        return mcpJson({ issuer: baseUrl, authorization_endpoint: `${baseUrl}/oauth/authorize`, token_endpoint: `${baseUrl}/oauth/token`, registration_endpoint: `${baseUrl}/oauth/register`, response_types_supported: ["code"], grant_types_supported: ["authorization_code"], token_endpoint_auth_methods_supported: ["none"], code_challenge_methods_supported: ["S256"], scopes_supported: [MCP_SCOPE] });
+      }
+      if (url.pathname === "/oauth/register" && request.method === "POST") return registerMcpOAuthClient(request, env);
+      if (url.pathname === "/oauth/authorize" && ["GET", "POST"].includes(request.method)) return authorizeMcpClient(request, env, url);
+      if (url.pathname === "/oauth/token" && request.method === "POST") return exchangeMcpToken(request, env);
+      if (url.pathname === "/mcp") return handleMcp(request, env, url);
+
       // 認可コードの交換はまだセッションが無い状態で呼ばれるため、
       // セッション検証より前に処理する。
       if (url.pathname === "/api/auth/callback" && request.method === "POST") {
