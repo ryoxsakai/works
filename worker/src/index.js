@@ -1283,6 +1283,12 @@ async function undoStudentProfileUpdate(env, args = {}) {
   };
 }
 
+function normalizeMcpToolName(value) {
+  return String(value || "")
+    .trim()
+    .replace(/^works[./_]/, "");
+}
+
 async function handleMcp(request, env, url) {
   if (request.method !== "POST") {
     return new Response("Method Not Allowed", { status: 405 });
@@ -1299,7 +1305,7 @@ async function handleMcp(request, env, url) {
     return mcpResponse(id, {
       protocolVersion: params.protocolVersion || "2025-06-18",
       capabilities: { tools: {} },
-      serverInfo: { name: "works-schedule", version: "1.6.0" },
+      serverInfo: { name: "works-schedule", version: "1.6.1" },
       instructions:
         "Use search_schedules to find exact event_id and calendar_id values before schedule writes. Use get_student_profile before updating a student memo or print name, and get_student_profile_change_history before undoing a profile update. Use list_curriculum_materials before creating chapters or assigning curriculum materials, and get_student_materials before updating chapter completion. Use briefing and progress tools to prepare and report, history before undoing changes, search_materials before linking a file, and preview_reschedule before apply_reschedule. Dates use Asia/Tokyo. Update tools preserve fields that are not supplied; pass null to clear a text field.",
     });
@@ -1333,88 +1339,89 @@ async function handleMcp(request, env, url) {
 
   try {
     const args = params.arguments || {};
-    if (params.name === "get_schedule") {
+    const toolName = normalizeMcpToolName(params.name);
+    if (toolName === "get_schedule") {
       const searchParams = new URLSearchParams();
       if (args.date) searchParams.set("date", String(args.date));
       if (args.include_excluded) searchParams.set("include_excluded", "true");
       return mcpToolResult(id, await readSchedule(env, searchParams));
     }
-    if (params.name === "search_schedules") {
+    if (toolName === "search_schedules") {
       return mcpToolResult(id, await searchSchedules(env, args));
     }
-    if (params.name === "get_today_briefing") {
+    if (toolName === "get_today_briefing") {
       return mcpToolResult(id, await readTodayBriefing(env, args));
     }
-    if (params.name === "get_unrecorded_lessons") {
+    if (toolName === "get_unrecorded_lessons") {
       return mcpToolResult(id, await readUnrecordedLessons(env, args));
     }
-    if (params.name === "update_schedule") {
+    if (toolName === "update_schedule") {
       return mcpToolResult(id, await updateScheduleFromArguments(env, args));
     }
-    if (params.name === "update_schedules") {
+    if (toolName === "update_schedules") {
       return mcpToolResult(id, await updateSchedulesFromArguments(env, args));
     }
-    if (params.name === "get_student_profile") {
+    if (toolName === "get_student_profile") {
       return mcpToolResult(id, await readMcpStudentProfile(env, args));
     }
-    if (params.name === "update_student_profile") {
+    if (toolName === "update_student_profile") {
       return mcpToolResult(id, await updateMcpStudentProfile(env, args));
     }
-    if (params.name === "get_student_profile_change_history") {
+    if (toolName === "get_student_profile_change_history") {
       return mcpToolResult(id, await readStudentProfileChangeHistory(env, args));
     }
-    if (params.name === "undo_student_profile_update") {
+    if (toolName === "undo_student_profile_update") {
       return mcpToolResult(id, await undoStudentProfileUpdate(env, args));
     }
-    if (params.name === "get_student_overview") {
+    if (toolName === "get_student_overview") {
       return mcpToolResult(id, await readStudentOverview(env, args));
     }
-    if (params.name === "get_curriculum_progress") {
+    if (toolName === "get_curriculum_progress") {
       return mcpToolResult(id, await readCurriculumProgress(env, args));
     }
-    if (params.name === "get_schedule_change_history") {
+    if (toolName === "get_schedule_change_history") {
       return mcpToolResult(id, await readScheduleChangeHistory(env, args));
     }
-    if (params.name === "undo_schedule_update") {
+    if (toolName === "undo_schedule_update") {
       return mcpToolResult(id, await undoScheduleUpdate(env, args));
     }
-    if (params.name === "list_curriculum_materials") {
+    if (toolName === "list_curriculum_materials") {
       return mcpToolResult(id, await listMcpCurriculumMaterials(env, args));
     }
-    if (params.name === "create_curriculum_material") {
+    if (toolName === "create_curriculum_material") {
       return mcpToolResult(id, await createMcpCurriculumMaterial(env, args));
     }
-    if (params.name === "create_material_chapters") {
+    if (toolName === "create_material_chapters") {
       return mcpToolResult(id, await createMcpMaterialChapters(env, args));
     }
-    if (params.name === "get_student_materials") {
+    if (toolName === "get_student_materials") {
       return mcpToolResult(id, await readMcpStudentMaterials(env, args));
     }
-    if (params.name === "assign_material_to_student") {
+    if (toolName === "assign_material_to_student") {
       return mcpToolResult(id, await assignMcpMaterialToStudent(env, args));
     }
-    if (params.name === "set_chapter_completion") {
+    if (toolName === "set_chapter_completion") {
       return mcpToolResult(id, await setMcpChapterCompletion(env, args));
     }
-    if (params.name === "search_materials") {
+    if (toolName === "search_materials") {
       return mcpToolResult(id, await searchMcpMaterials(env, args));
     }
-    if (params.name === "link_material_to_schedule") {
+    if (toolName === "link_material_to_schedule") {
       return mcpToolResult(id, await linkMaterialToSchedule(env, args));
     }
-    if (params.name === "unlink_material_from_schedule") {
+    if (toolName === "unlink_material_from_schedule") {
       return mcpToolResult(id, await unlinkMaterialFromSchedule(env, args));
     }
-    if (params.name === "preview_reschedule") {
+    if (toolName === "preview_reschedule") {
       return mcpToolResult(id, await previewReschedule(env, args));
     }
-    if (params.name === "apply_reschedule") {
+    if (toolName === "apply_reschedule") {
       return mcpToolResult(id, await applyReschedule(env, args));
     }
-    if (params.name === "get_monthly_report") {
+    if (toolName === "get_monthly_report") {
       return mcpToolResult(id, await readMonthlyReport(env, args));
     }
-    if (params.name === "get_schedule_data_health") {
+    if (toolName === "get_schedule_data_health") {
       return mcpToolResult(id, await readScheduleDataHealth(env));
     }
     return mcpError(id, -32602, "Unknown tool");
