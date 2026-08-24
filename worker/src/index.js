@@ -1096,7 +1096,7 @@ async function upsertCurriculumEntry(env, eventId, body) {
   const values = {};
   for (const field of SCHEDULE_TEXT_FIELDS) {
     values[field] =
-      body[field] !== undefined ? body[field] : existing[field] || null;
+      body[field] !== undefined ? body[field] || null : existing[field] || null;
   }
 
   await env.DB.prepare(
