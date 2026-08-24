@@ -1,7 +1,7 @@
 import { GOOGLE_CLIENT_ID, ALLOWED_EMAIL } from "./google-config.js?v=5";
 
 // カレンダー読み取りとユーザー確認(email)の両方をこのスコープでまとめて取得する。
-const SCOPES = "openid email profile https://www.googleapis.com/auth/calendar.readonly";
+const SCOPES = "openid email profile https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events";
 
 // works.lrnr.jp 配下の全ページで共有されるキー。
 // ここに保存しておくことで、他のモジュールに移動してもログイン状態を引き継げる(ワンログイン)。
