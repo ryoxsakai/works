@@ -17,24 +17,22 @@
     })();
   </script>
   <link rel="apple-touch-icon" href="/shared/logo.png" />
-  <link rel="stylesheet" href="/shared/styles.css?v=52" />
+  <link rel="stylesheet" href="/shared/styles.css?v=53" />
   <link rel="stylesheet" href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" />
-  <link rel="stylesheet" href="/admission/admission.css?v=14" />
+  <link rel="stylesheet" href="/admission/admission.css?v=15" />
 </head>
 <body>
   <header class="page-header">
     <h1><a href="/">入試管理</a></h1>
+    <div class="user-bar" hidden>
+      <button id="sign-out" type="button" class="user-icon-btn" aria-label="ログアウト">
+        <img id="user-avatar" alt="" hidden />
+        <i class="bx bx-user-circle" id="user-avatar-fallback"></i>
+      </button>
+    </div>
   </header>
 
   <main class="admission-main">
-    <a class="admission-back" href="/"><i class="bx bx-chevron-left"></i> Worksトップへ</a>
-
-    <section id="signed-out" class="admission-auth">
-      <p>入試日程の登録・編集にはログインが必要です。</p>
-      <button id="sign-in" type="button" class="btn-primary">Googleでログイン</button>
-      <p id="auth-error" class="error"></p>
-    </section>
-
     <section id="signed-in" hidden>
       <p id="admission-error" class="error" role="alert"></p>
       <section class="admission-panel" aria-labelledby="admission-title">
@@ -192,6 +190,6 @@
     </form>
   </dialog>
 
-  <script type="module" src="/admission/app.js?v=14"></script>
+  <script type="module" src="/admission/app.js?v=15"></script>
 </body>
 </html>

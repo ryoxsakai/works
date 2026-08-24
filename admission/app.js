@@ -1,4 +1,4 @@
-import { getSessionToken, signIn, watchAuth } from "../shared/auth.js?v=11";
+import { getSessionToken, signOutUser, watchAuth } from "../shared/auth.js?v=11";
 
 const VIEW_KEY = "works_admission_view";
 const FILTER_KEY = "works_admission_filters";
@@ -67,10 +67,11 @@ const universityReadings = {
 const universityCollator = new Intl.Collator("ja-JP", { sensitivity: "base", numeric: true });
 
 const els = {
-  signedOut: document.querySelector("#signed-out"),
   signedIn: document.querySelector("#signed-in"),
-  signIn: document.querySelector("#sign-in"),
-  authError: document.querySelector("#auth-error"),
+  signOut: document.querySelector("#sign-out"),
+  userBar: document.querySelector(".user-bar"),
+  userAvatar: document.querySelector("#user-avatar"),
+  userAvatarFallback: document.querySelector("#user-avatar-fallback"),
   error: document.querySelector("#admission-error"),
   tabs: [...document.querySelectorAll("[data-admission-view-tab]")],
   views: [...document.querySelectorAll("[data-admission-view]")],
@@ -711,7 +712,6 @@ async function loadEvents() {
   render();
 }
 
-els.signIn.addEventListener("click", signIn);
 els.print.addEventListener("click", printActiveView);
 window.addEventListener("afterprint", cleanupPrintView);
 els.filterOpen.addEventListener("click", openFilterModal);
@@ -791,19 +791,31 @@ els.tabs.forEach((tab) => {
 activateFilterTab("universities");
 activateCalendarMode(calendarMode);
 activateView(localStorage.getItem(VIEW_KEY) || "list");
+els.signOut.addEventListener("click", async () => {
+  await signOutUser();
+  window.location.assign("/");
+});
+
 watchAuth({
-  onSignedIn: async () => {
-    els.signedOut.hidden = true;
+  onSignedIn: async ({ email, picture }) => {
     els.signedIn.hidden = false;
+    els.userBar.hidden = false;
+    els.signOut.title = `${email} (クリックでログアウト)`;
+    if (picture) {
+      els.userAvatar.src = picture;
+      els.userAvatar.hidden = false;
+      els.userAvatarFallback.hidden = true;
+    } else {
+      els.userAvatar.hidden = true;
+      els.userAvatarFallback.hidden = false;
+    }
     try {
       await loadEvents();
     } catch (error) {
       showError(error);
     }
   },
-  onSignedOut: (message) => {
-    els.signedOut.hidden = false;
-    els.signedIn.hidden = true;
-    els.authError.textContent = message || "";
+  onSignedOut: () => {
+    window.location.replace("/");
   },
 });

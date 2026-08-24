@@ -1,10 +1,8 @@
 import {
   watchAuth,
-  signIn,
   signOutUser,
   getGoogleAccessToken,
   getSessionToken,
-  isStandaloneHomeScreenApp,
 } from "../shared/auth.js?v=11";
 import { getTheme, setTheme } from "../shared/theme.js?v=5";
 
@@ -91,10 +89,8 @@ const PRIVATE_MED_SCHOOLS = [
 ];
 
 const els = {
-  signedOut: document.querySelector("#signed-out"),
   signedIn: document.querySelector("#signed-in"),
   userBar: document.querySelector(".user-bar"),
-  signInBtn: document.querySelector("#sign-in"),
   signOutBtn: document.querySelector("#sign-out"),
   userAvatar: document.querySelector("#user-avatar"),
   userAvatarFallback: document.querySelector("#user-avatar-fallback"),
@@ -145,7 +141,6 @@ const els = {
   listWeekNextBtn: document.querySelector("#list-week-next"),
   listWeekLabel: document.querySelector("#list-week-label"),
   scheduleWeekDays: document.querySelector("#schedule-week-days"),
-  authError: document.querySelector("#auth-error"),
   pageTabBtns: document.querySelectorAll(".page-tab-btn"),
   pageTabPanels: document.querySelectorAll("[data-page-tab-panel]"),
   recordDayBtns: document.querySelectorAll(".record-day-btn"),
@@ -596,25 +591,13 @@ els.clearNameFilterBtn.addEventListener("click", () => {
   renderCurrentView();
 });
 
-// --- ログイン ---
-
-els.signInBtn.addEventListener("click", () => {
-  els.authError.textContent = "";
-  try {
-    signIn();
-  } catch (err) {
-    els.authError.textContent = err.message;
-  }
-});
-
 els.signOutBtn.addEventListener("click", async () => {
   await signOutUser();
-  window.location.reload();
+  window.location.assign("/");
 });
 
 watchAuth({
   onSignedIn: async (user) => {
-    els.signedOut.hidden = true;
     els.signedIn.hidden = false;
     els.userBar.hidden = false;
     els.signOutBtn.title = `${user.email} (クリックでログアウト)`;
@@ -665,15 +648,8 @@ watchAuth({
       showActionError(err);
     }
   },
-  onSignedOut: (message) => {
-    els.signedOut.hidden = false;
-    els.signedIn.hidden = true;
-    els.userBar.hidden = true;
-    els.authError.textContent =
-      message ||
-      (isStandaloneHomeScreenApp()
-        ? "ホーム画面のアイコンから起動しています。ログインボタンを押すとSafariが開きます。ログイン後、このアイコンに戻ってきてください。"
-        : "");
+  onSignedOut: () => {
+    window.location.replace("/");
   },
 });
 
