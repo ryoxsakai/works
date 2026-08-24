@@ -144,6 +144,29 @@ CREATE TABLE IF NOT EXISTS mcp_oauth_codes (
   created_at TEXT DEFAULT (datetime('now'))
 );
 
+-- MCPからの授業記録変更履歴。取り消し時は現在値との競合を確認する。
+CREATE TABLE IF NOT EXISTS mcp_schedule_changes (
+  id TEXT PRIMARY KEY,
+  event_id TEXT NOT NULL,
+  action TEXT NOT NULL,
+  changed_fields TEXT NOT NULL,
+  before_json TEXT NOT NULL,
+  after_json TEXT NOT NULL,
+  undone_by TEXT,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_mcp_schedule_changes_event
+  ON mcp_schedule_changes(event_id, created_at DESC);
+
+-- 教材ライブラリのファイルとGoogleカレンダー予定の対応。
+CREATE TABLE IF NOT EXISTS schedule_material_links (
+  event_id TEXT NOT NULL,
+  material_file_id TEXT NOT NULL,
+  note TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  PRIMARY KEY (event_id, material_file_id)
+);
+
 
 -- 入試管理: 大学・方式・試験段階ごとの日程。複数日程は1日ごとに1行で保存する。
 CREATE TABLE IF NOT EXISTS admission_events (
