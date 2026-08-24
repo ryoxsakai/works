@@ -232,6 +232,60 @@ const MCP_SCHEDULE_TOOLS = [
     },
   },
   {
+    name: "get_today_briefing",
+    title: "今日の授業準備情報を取得",
+    description:
+      "指定日（省略時は今日）の授業予定に、同じ授業名の直前の授業内容・宿題・確認テスト・授業メモを付けて取得します。",
+    inputSchema: {
+      type: "object",
+      properties: {
+        date: {
+          type: "string",
+          description: "YYYY-MM-DD形式。省略時は今日（Asia/Tokyo）。",
+        },
+        previous_lookback_days: {
+          type: "integer",
+          minimum: 1,
+          maximum: 365,
+          description: "前回授業を探す日数。省略時は90日。",
+        },
+      },
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      openWorldHint: false,
+    },
+  },
+  {
+    name: "get_unrecorded_lessons",
+    title: "未記録の授業を取得",
+    description:
+      "指定した終了日までの期間から、終了時刻を過ぎても完了扱いになっていない授業を取得します。入力漏れの確認に使用します。",
+    inputSchema: {
+      type: "object",
+      properties: {
+        end_date: {
+          type: "string",
+          description: "YYYY-MM-DD形式。省略時は今日（Asia/Tokyo）。",
+        },
+        lookback_days: {
+          type: "integer",
+          minimum: 1,
+          maximum: 90,
+          description: "確認する日数。終了日を含み、省略時は7日。",
+        },
+      },
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      openWorldHint: false,
+    },
+  },
+  {
     name: "update_schedule",
     title: "授業予定を更新",
     description:
@@ -413,9 +467,9 @@ async function handleMcp(request, env, url) {
     return mcpResponse(id, {
       protocolVersion: params.protocolVersion || "2025-06-18",
       capabilities: { tools: {} },
-      serverInfo: { name: "works-schedule", version: "1.1.0" },
+      serverInfo: { name: "works-schedule", version: "1.2.0" },
       instructions:
-        "Use get_schedule to identify lessons. Use update_schedule for one lesson and update_schedules for multiple lessons. Dates use Asia/Tokyo. Update tools preserve fields that are not supplied; pass null to clear a text field.",
+        "Use get_schedule to identify lessons, get_today_briefing to prepare for lessons, and get_unrecorded_lessons to find missing records. Use update_schedule for one lesson and update_schedules for multiple lessons. Dates use Asia/Tokyo. Update tools preserve fields that are not supplied; pass null to clear a text field.",
     });
   }
   if (method === "notifications/initialized") {
@@ -452,6 +506,12 @@ async function handleMcp(request, env, url) {
       if (args.date) searchParams.set("date", String(args.date));
       if (args.include_excluded) searchParams.set("include_excluded", "true");
       return mcpToolResult(id, await readSchedule(env, searchParams));
+    }
+    if (params.name === "get_today_briefing") {
+      return mcpToolResult(id, await readTodayBriefing(env, args));
+    }
+    if (params.name === "get_unrecorded_lessons") {
+      return mcpToolResult(id, await readUnrecordedLessons(env, args));
     }
     if (params.name === "update_schedule") {
       return mcpToolResult(id, await updateScheduleFromArguments(env, args));
@@ -494,6 +554,26 @@ function scheduleDateRange(date) {
   return { timeMin: start.toISOString(), timeMax: end.toISOString() };
 }
 
+function shiftScheduleDate(date, days) {
+  scheduleDateRange(date);
+  const [year, month, day] = date.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day + days))
+    .toISOString()
+    .slice(0, 10);
+}
+
+function readBoundedInteger(value, fallback, minimum, maximum, fieldName) {
+  if (value === undefined || value === null || value === "") return fallback;
+  const number = Number(value);
+  if (!Number.isInteger(number) || number < minimum || number > maximum) {
+    throw httpError(
+      400,
+      `${fieldName} must be an integer between ${minimum} and ${maximum}`
+    );
+  }
+  return number;
+}
+
 async function fetchCalendarEventsForSchedule(accessToken, calendarId, timeMin, timeMax) {
   const events = [];
   let pageToken = "";
@@ -522,12 +602,17 @@ async function fetchCalendarEventsForSchedule(accessToken, calendarId, timeMin, 
   return events;
 }
 
-async function readSchedule(env, searchParams) {
-  const date = (searchParams.get("date") || todayInScheduleTimeZone()).trim();
-  const { timeMin, timeMax } = scheduleDateRange(date);
-  const includeExcluded = ["1", "true"].includes(
-    (searchParams.get("include_excluded") || "").toLowerCase()
-  );
+async function readScheduleEvents(
+  env,
+  startDate,
+  endDate,
+  includeExcluded = false
+) {
+  const { timeMin } = scheduleDateRange(startDate);
+  const { timeMax } = scheduleDateRange(endDate);
+  if (timeMin >= timeMax) {
+    throw httpError(400, "start_date must be on or before end_date");
+  }
   const settings = await readSettings(env);
   const calendarIds = Array.isArray(settings.selected_calendars)
     ? [...new Set(settings.selected_calendars.map(String).filter(Boolean))]
@@ -549,7 +634,7 @@ async function readSchedule(env, searchParams) {
   const details = new Map(
     (await readCurriculumEntries(env)).map((entry) => [entry.calendar_event_id, entry])
   );
-  const events = eventGroups
+  return eventGroups
     .flat()
     .filter((event) => event.status !== "cancelled")
     .filter(
@@ -577,11 +662,118 @@ async function readSchedule(env, searchParams) {
         lesson_memo: detail.lesson_memo || null,
       };
     });
+}
+
+async function readSchedule(env, searchParams) {
+  const date = (searchParams.get("date") || todayInScheduleTimeZone()).trim();
+  const includeExcluded = ["1", "true"].includes(
+    (searchParams.get("include_excluded") || "").toLowerCase()
+  );
+  const events = await readScheduleEvents(env, date, date, includeExcluded);
   return {
     date,
     time_zone: SCHEDULE_TIME_ZONE,
     count: events.length,
     events,
+    generated_at: new Date().toISOString(),
+  };
+}
+
+function scheduleMissingFields(event) {
+  return SCHEDULE_TEXT_FIELDS.filter((field) => !event[field]);
+}
+
+async function readTodayBriefing(env, args = {}) {
+  const date = String(args.date || todayInScheduleTimeZone()).trim();
+  scheduleDateRange(date);
+  const previousLookbackDays = readBoundedInteger(
+    args.previous_lookback_days,
+    90,
+    1,
+    365,
+    "previous_lookback_days"
+  );
+  const startDate = shiftScheduleDate(date, -previousLookbackDays);
+  const events = await readScheduleEvents(env, startDate, date, false);
+  const { timeMin, timeMax } = scheduleDateRange(date);
+  const dayStart = Date.parse(timeMin);
+  const dayEnd = Date.parse(timeMax);
+  const currentEvents = events.filter((event) => {
+    const start = Date.parse(event.start || "");
+    return Number.isFinite(start) && start >= dayStart && start < dayEnd;
+  });
+
+  const lessons = currentEvents.map((event) => {
+    const currentStart = Date.parse(event.start || "");
+    const previousLesson = events
+      .filter(
+        (candidate) =>
+          candidate.id !== event.id &&
+          candidate.title === event.title &&
+          Date.parse(candidate.start || "") < currentStart
+      )
+      .sort(
+        (left, right) =>
+          Date.parse(right.start || "") - Date.parse(left.start || "")
+      )[0];
+
+    return {
+      ...event,
+      missing_fields: scheduleMissingFields(event),
+      previous_lesson: previousLesson
+        ? {
+            id: previousLesson.id,
+            start: previousLesson.start,
+            completed: previousLesson.completed,
+            lesson_plan: previousLesson.lesson_plan,
+            confirmation_test: previousLesson.confirmation_test,
+            homework: previousLesson.homework,
+            lesson_memo: previousLesson.lesson_memo,
+          }
+        : null,
+    };
+  });
+
+  return {
+    date,
+    time_zone: SCHEDULE_TIME_ZONE,
+    previous_lookback_days: previousLookbackDays,
+    count: lessons.length,
+    lessons,
+    generated_at: new Date().toISOString(),
+  };
+}
+
+async function readUnrecordedLessons(env, args = {}) {
+  const endDate = String(args.end_date || todayInScheduleTimeZone()).trim();
+  scheduleDateRange(endDate);
+  const lookbackDays = readBoundedInteger(
+    args.lookback_days,
+    7,
+    1,
+    90,
+    "lookback_days"
+  );
+  const startDate = shiftScheduleDate(endDate, -(lookbackDays - 1));
+  const events = await readScheduleEvents(env, startDate, endDate, false);
+  const now = Date.now();
+  const lessons = events
+    .filter((event) => {
+      const end = Date.parse(event.end || "");
+      return !event.all_day && Number.isFinite(end) && end < now && !event.completed;
+    })
+    .map((event) => ({
+      ...event,
+      missing_fields: scheduleMissingFields(event),
+    }));
+
+  return {
+    start_date: startDate,
+    end_date: endDate,
+    time_zone: SCHEDULE_TIME_ZONE,
+    lookback_days: lookbackDays,
+    count: lessons.length,
+    lessons,
     generated_at: new Date().toISOString(),
   };
 }
