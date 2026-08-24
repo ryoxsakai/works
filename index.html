@@ -17,15 +17,25 @@
     })();
   </script>
   <link rel="apple-touch-icon" href="/shared/logo.png" />
-  <link rel="stylesheet" href="/shared/styles.css?v=52" />
-    <link rel="stylesheet" href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" />
+  <link rel="stylesheet" href="/shared/styles.css?v=53" />
+  <link rel="stylesheet" href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" />
 </head>
 <body>
   <header class="page-header">
     <h1><span class="page-header-icon"><i class="bx bx-layer"></i></span> Works</h1>
+    <div class="user-bar">
+      <button id="open-home-settings" type="button" aria-label="設定" title="設定">
+        <i class="bx bx-cog"></i>
+      </button>
+      <button id="home-auth-action" type="button" class="user-icon-btn" aria-label="Googleでログイン" title="Googleでログイン">
+        <img id="user-avatar" alt="" hidden />
+        <i class="bx bx-user-circle" id="user-avatar-fallback"></i>
+      </button>
+    </div>
   </header>
 
   <main>
+    <p id="home-auth-error" class="error home-auth-error" role="alert"></p>
     <ul class="module-grid">
       <li>
         <a class="module-card" href="/tutor/">
@@ -47,5 +57,20 @@
       </li>
     </ul>
   </main>
+
+  <dialog id="home-settings-modal" class="app-modal home-settings-modal">
+    <div class="modal-header">
+      <h2><i class="bx bx-cog"></i> 設定</h2>
+      <button type="button" id="home-settings-close" class="modal-close" aria-label="閉じる"><i class="bx bx-x"></i></button>
+    </div>
+    <div class="modal-tab-panel">
+      <div class="theme-options">
+        <label><input type="radio" name="home-theme" value="light" /> ライト</label>
+        <label><input type="radio" name="home-theme" value="dark" /> ダーク</label>
+      </div>
+    </div>
+  </dialog>
+
+  <script type="module" src="/home.js?v=1"></script>
 </body>
 </html>

@@ -184,6 +184,24 @@ main {
   color: var(--fg);
 }
 
+.home-auth-error:empty {
+  display: none;
+}
+
+.home-settings-modal {
+  width: min(420px, 92vw);
+}
+
+.home-settings-modal[open] {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.home-settings-modal .modal-header {
+  padding: .8rem 1rem;
+  background: color-mix(in srgb, var(--bg-elevated) 92%, var(--accent) 8%);
+}
+
 #user-avatar {
   width: 1.6rem;
   height: 1.6rem;
@@ -803,6 +821,15 @@ dialog.app-modal::backdrop {
 .add-term-form {
   display: grid;
   gap: 0.4rem;
+}
+
+.add-term-form .btn-add {
+  width: 2.5rem;
+  height: 2.5rem;
+  min-width: 2.5rem;
+  min-height: 2.5rem;
+  justify-self: end;
+  padding: 0;
 }
 
 .table-scroll {

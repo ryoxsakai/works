@@ -1,6 +1,5 @@
 import {
   watchAuth,
-  signIn,
   signOutUser,
   getSessionToken,
 } from "../shared/auth.js?v=11";
@@ -9,14 +8,11 @@ const API_BASE = "/api/material-library";
 const ACTIVE_TAB_KEY = "works_material_active_tab";
 
 const els = {
-  signedOut: document.querySelector("#signed-out"),
   signedIn: document.querySelector("#signed-in"),
-  signIn: document.querySelector("#sign-in"),
   signOut: document.querySelector("#sign-out"),
   userBar: document.querySelector(".user-bar"),
   userAvatar: document.querySelector("#user-avatar"),
   userAvatarFallback: document.querySelector("#user-avatar-fallback"),
-  authError: document.querySelector("#auth-error"),
   error: document.querySelector("#material-error"),
   tabButtons: document.querySelectorAll("[data-material-tab]"),
   tabPanels: document.querySelectorAll("[data-material-tab-panel]"),
@@ -967,34 +963,30 @@ els.fileInput.addEventListener("change", () => {
 });
 els.dropzone.addEventListener("drop", (event) => addUploadFiles(event.dataTransfer.files));
 els.uploadStart.addEventListener("click", uploadAll);
-els.signIn.addEventListener("click", signIn);
 els.signOut.addEventListener("click", async () => {
   await signOutUser();
-  els.signedIn.hidden = true;
-  els.signedOut.hidden = false;
-  els.userBar.hidden = true;
+  window.location.assign("/");
 });
 
 switchTab(localStorage.getItem(ACTIVE_TAB_KEY) || "library");
 
 watchAuth({
-  onSignedIn: async ({ picture }) => {
-    els.signedOut.hidden = true;
+  onSignedIn: async ({ email, picture }) => {
     els.signedIn.hidden = false;
     els.userBar.hidden = false;
-    els.authError.textContent = "";
+    els.signOut.title = `${email} (クリックでログアウト)`;
     if (picture) {
       els.userAvatar.src = picture;
       els.userAvatar.hidden = false;
       els.userAvatarFallback.hidden = true;
+    } else {
+      els.userAvatar.hidden = true;
+      els.userAvatarFallback.hidden = false;
     }
     await loadLibrary();
     if (!els.tabPanels[1].hidden) await loadTreeFiles();
   },
-  onSignedOut: (message) => {
-    els.signedOut.hidden = false;
-    els.signedIn.hidden = true;
-    els.userBar.hidden = true;
-    els.authError.textContent = message || "";
+  onSignedOut: () => {
+    window.location.replace("/");
   },
 });
