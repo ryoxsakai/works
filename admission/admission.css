@@ -1325,41 +1325,6 @@
   min-width: 640px;
 }
 
-.admission-calendar-month + .admission-calendar-month {
-  border-top: 1px solid var(--border);
-}
-
-.admission-calendar-month > h3 {
-  margin: 0;
-  padding: .52rem .7rem;
-  background: color-mix(in srgb, var(--bg-hover) 58%, var(--bg-elevated));
-  color: var(--fg);
-  font-size: .78rem;
-  font-weight: 700;
-}
-
-.admission-calendar-month .admission-calendar-grid {
-  grid-template-rows: 2rem;
-  grid-auto-rows: 5.6rem;
-}
-
-.admission-calendar-month .admission-calendar-cell:nth-last-child(-n + 7) {
-  border-bottom: 0;
-}
-
-@media print {
-  .admission-calendar-mode {
-    display: none !important;
-  }
-
-  .admission-calendar-controls {
-    margin-bottom: 3mm;
-  }
-
-  .admission-calendar-continuous {
-  min-width: 640px;
-}
-
 .admission-calendar-continuous-grid {
   grid-template-rows: 2rem;
   grid-auto-rows: 5.6rem;
