@@ -1260,3 +1260,23 @@
 :root[data-theme="dark"] .admission-table tbody tr[class*="admission-type-"] > td {
   background: color-mix(in srgb, var(--admission-type-color) 16%, var(--bg-elevated));
 }
+
+
+/* 入試管理: 印刷時のカレンダー年月 */
+@media print {
+  .admission-calendar-nav {
+    display: block;
+    width: 100%;
+    max-width: none;
+    margin: 0 0 4mm;
+    text-align: center;
+  }
+
+  .admission-calendar-nav strong {
+    display: inline-block;
+    font-size: 11pt;
+    line-height: 1.2;
+    white-space: nowrap;
+    word-break: keep-all;
+  }
+}
