@@ -1051,7 +1051,7 @@ function renderMaterialCategoryList() {
         </form>`;
       }
       return `<div class="term-item material-category-item" data-material-category-id="${category.id}">
-        <span class="term-item-label">${escapeHtml(category.name)}</span>
+        <span class="term-item-label material-category-title"><i class="bx bx-folder"></i>${escapeHtml(category.name)}</span>
         <span class="material-count">${Number(category.material_count || 0)}件</span>
         <button type="button" class="material-category-move-up" ${index === 0 ? "disabled" : ""} aria-label="カテゴリを上へ"><i class="bx bx-chevron-up"></i></button>
         <button type="button" class="material-category-move-down" ${index === materialCategories.length - 1 ? "disabled" : ""} aria-label="カテゴリを下へ"><i class="bx bx-chevron-down"></i></button>
@@ -1099,8 +1099,8 @@ function renderMaterialList() {
         : `<p class="hint material-group-empty">教材はありません。</p>`;
       return `<section class="material-category-group" data-material-category-id="${group.id ?? ""}">
         <div class="material-category-group-header">
-          <h4>${escapeHtml(group.name)}</h4>
-          <span>${groupMaterials.length}件</span>
+          <h4><i class="bx ${group.id === null ? "bx-folder" : "bx-folder-open"}"></i><span class="material-category-name">${escapeHtml(group.name)}</span></h4>
+          <span class="material-category-count">${groupMaterials.length}件</span>
         </div>
         ${rows}
       </section>`;
