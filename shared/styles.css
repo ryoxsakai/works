@@ -2079,9 +2079,26 @@ body {
 
 .material-category-item .material-count {
   min-width: 2.5rem;
-  color: var(--muted);
-  font-size: .74rem;
-  text-align: right;
+  padding: .16rem .42rem;
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--border));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 7%, var(--bg-elevated));
+  color: var(--accent);
+  font-size: .7rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.material-category-title {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  font-weight: 700;
+}
+
+.material-category-title .bx {
+  color: var(--accent);
+  font-size: 1rem;
 }
 
 .material-category-edit-form,
@@ -2102,6 +2119,7 @@ body {
   border: 1px solid var(--border);
   border-radius: .6rem;
   background: var(--bg);
+  overflow: hidden;
 }
 
 .material-category-group:last-child {
@@ -2113,18 +2131,49 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: .5rem;
-  margin-bottom: .55rem;
+  margin: -.65rem -.65rem .65rem;
+  padding: .52rem .65rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 18%, var(--border));
+  border-left: 3px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 7%, var(--bg-elevated));
 }
 
 .material-category-group-header h4 {
+  display: flex;
+  align-items: center;
+  gap: .42rem;
   margin: 0;
-  font-size: .83rem;
+  min-width: 0;
+  font-size: .88rem;
   font-weight: 700;
 }
 
-.material-category-group-header span {
-  color: var(--muted);
-  font-size: .72rem;
+.material-category-group-header h4 .bx {
+  display: inline-grid;
+  flex: 0 0 1.65rem;
+  width: 1.65rem;
+  height: 1.65rem;
+  place-items: center;
+  border-radius: .36rem;
+  background: color-mix(in srgb, var(--accent) 13%, var(--bg-elevated));
+  color: var(--accent);
+  font-size: .95rem;
+}
+
+.material-category-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.material-category-count {
+  flex: 0 0 auto;
+  padding: .18rem .48rem;
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--border));
+  border-radius: 999px;
+  background: var(--bg-elevated);
+  color: var(--accent);
+  font-size: .68rem;
+  font-weight: 600;
 }
 
 .material-category-group .term-item {
@@ -2222,6 +2271,27 @@ button {
 
 .btn-add {
   border-radius: 50%;
+}
+
+/* 設定モーダル内の追加ボタンは、フォーム幅に引き伸ばさず右端に揃える。 */
+#settings-modal .btn-add {
+  display: inline-grid;
+  flex: 0 0 2.5rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  min-width: 2.5rem;
+  min-height: 2.5rem;
+  align-self: end;
+  justify-self: end;
+  place-items: center;
+  margin-left: auto;
+  padding: 0;
+  aspect-ratio: 1;
+}
+
+#settings-modal .btn-add .bx {
+  font-size: 1.05rem;
+  line-height: 1;
 }
 
 .page-tabs,
