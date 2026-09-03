@@ -4479,12 +4479,19 @@ async function ensureAdmissionSupplement2027(env) {
       inserted,
     });
   }
-  const row = await env.DB.prepare(
-    "SELECT COUNT(*) AS total FROM admission_events WHERE id LIKE 'admission-2027-supplement-v1-%'"
-  ).first();
+  const { results } = await env.DB.prepare(
+    "SELECT university, selection_type, stage, schedule_date FROM admission_events " +
+    "WHERE selection_type = 'general' AND schedule_date LIKE '2027-%'"
+  ).all();
+  const existingKeys = new Set(results.map((event) =>
+    [event.university, event.selection_type, event.stage, event.schedule_date].join("\\u0000")
+  ));
+  const registered = ADMISSION_SUPPLEMENT_2027.filter((event) =>
+    existingKeys.has([event.university, event.selectionType, event.stage, event.schedule_date].join("\\u0000"))
+  ).length;
   return {
     expected: ADMISSION_SUPPLEMENT_2027.length,
-    registered: Number(row?.total || 0),
+    registered,
   };
 }
 
