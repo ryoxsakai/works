@@ -6,7 +6,7 @@ import {
 import {
   parseWeeklyTestDraft,
   createPrintDocumentHtml,
-} from "./print-template.mjs?v=1";
+} from "./print-template.mjs?v=2";
 
 const API_BASE = "/api/material-library";
 
