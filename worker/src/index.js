@@ -895,6 +895,10 @@ const MCP_SCHEDULE_TOOLS = [
           description: "現在のステータス。",
         },
         deadline: { type: "string", description: "締切日。YYYY-MM-DD形式。" },
+        memo: {
+          type: ["string", "null"],
+          description: "案件の注意事項や作業内容を記録するメモ。空文字列またはnullで空欄にします。",
+        },
         ...ssSourceEmailProperties,
       },
       required: ["name", "status", "deadline"],
@@ -918,6 +922,10 @@ const MCP_SCHEDULE_TOOLS = [
           description: "変更後のステータス。",
         },
         deadline: { type: "string", description: "変更後の締切日。YYYY-MM-DD形式。" },
+        memo: {
+          type: ["string", "null"],
+          description: "変更後のメモ。空文字列またはnullで消去します。",
+        },
         ...ssSourceEmailProperties,
       },
       required: ["project_id"],
@@ -1100,23 +1108,29 @@ let ssProjectSchemaReady = null;
 
 async function ensureSsProjectSchema(env) {
   if (!ssProjectSchemaReady) {
-    ssProjectSchemaReady = env.DB.batch([
-      env.DB.prepare(
-        "CREATE TABLE IF NOT EXISTS ss_projects (id TEXT PRIMARY KEY, name TEXT NOT NULL, status TEXT NOT NULL CHECK (status IN ('原稿待ち', '素材案作成中', '素材案確認待ち', '問題作成中', '完了')), deadline TEXT NOT NULL, last_source_email_id TEXT, last_source_email_subject TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')))"
-      ),
-      env.DB.prepare(
-        "CREATE UNIQUE INDEX IF NOT EXISTS idx_ss_projects_unique_name ON ss_projects(lower(trim(name)))"
-      ),
-      env.DB.prepare(
-        "CREATE INDEX IF NOT EXISTS idx_ss_projects_deadline ON ss_projects(status, deadline)"
-      ),
-      env.DB.prepare(
-        "CREATE TABLE IF NOT EXISTS mcp_ss_project_changes (id TEXT PRIMARY KEY, project_id TEXT NOT NULL, action TEXT NOT NULL, changed_fields TEXT NOT NULL, before_json TEXT NOT NULL, after_json TEXT NOT NULL, source_email_id TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')))"
-      ),
-      env.DB.prepare(
-        "CREATE INDEX IF NOT EXISTS idx_mcp_ss_project_changes_project ON mcp_ss_project_changes(project_id, created_at DESC)"
-      ),
-    ]).catch((err) => {
+    ssProjectSchemaReady = (async () => {
+      await env.DB.batch([
+        env.DB.prepare(
+          "CREATE TABLE IF NOT EXISTS ss_projects (id TEXT PRIMARY KEY, name TEXT NOT NULL, status TEXT NOT NULL CHECK (status IN ('原稿待ち', '素材案作成中', '素材案確認待ち', '問題作成中', '完了')), deadline TEXT NOT NULL, memo TEXT, last_source_email_id TEXT, last_source_email_subject TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')))"
+        ),
+        env.DB.prepare(
+          "CREATE UNIQUE INDEX IF NOT EXISTS idx_ss_projects_unique_name ON ss_projects(lower(trim(name)))"
+        ),
+        env.DB.prepare(
+          "CREATE INDEX IF NOT EXISTS idx_ss_projects_deadline ON ss_projects(status, deadline)"
+        ),
+        env.DB.prepare(
+          "CREATE TABLE IF NOT EXISTS mcp_ss_project_changes (id TEXT PRIMARY KEY, project_id TEXT NOT NULL, action TEXT NOT NULL, changed_fields TEXT NOT NULL, before_json TEXT NOT NULL, after_json TEXT NOT NULL, source_email_id TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')))"
+        ),
+        env.DB.prepare(
+          "CREATE INDEX IF NOT EXISTS idx_mcp_ss_project_changes_project ON mcp_ss_project_changes(project_id, created_at DESC)"
+        ),
+      ]);
+      const { results: columns } = await env.DB.prepare("PRAGMA table_info(ss_projects)").all();
+      if (!columns.some((column) => column.name === "memo")) {
+        await env.DB.prepare("ALTER TABLE ss_projects ADD COLUMN memo TEXT").run();
+      }
+    })().catch((err) => {
       ssProjectSchemaReady = null;
       throw err;
     });
@@ -1152,6 +1166,13 @@ function normalizeSsProjectDeadline(value) {
     throw httpError(400, "deadline is not a valid date");
   }
   return deadline;
+}
+
+function normalizeSsProjectMemo(value) {
+  if (value === undefined || value === null) return null;
+  const memo = String(value).trim();
+  if (memo.length > 5000) throw httpError(400, "memo is too long");
+  return memo || null;
 }
 
 function normalizeSsSourceEmail(value, field, maxLength) {
@@ -1210,6 +1231,7 @@ async function createSsProject(env, args = {}) {
   const name = normalizeSsProjectName(args.name);
   const status = normalizeSsProjectStatus(args.status);
   const deadline = normalizeSsProjectDeadline(args.deadline);
+  const memo = normalizeSsProjectMemo(args.memo);
   const sourceEmailId = normalizeSsSourceEmail(args.source_email_id, "source_email_id", 255);
   const sourceEmailSubject = normalizeSsSourceEmail(
     args.source_email_subject,
@@ -1220,7 +1242,8 @@ async function createSsProject(env, args = {}) {
     "SELECT * FROM ss_projects WHERE lower(trim(name)) = lower(trim(?)) LIMIT 1"
   ).bind(name).first();
   if (existing) {
-    if (existing.status === status && existing.deadline === deadline) {
+    const memoMatches = args.memo === undefined || (existing.memo ?? null) === memo;
+    if (existing.status === status && existing.deadline === deadline && memoMatches) {
       return { created: false, project: withSsProjectRemainingDays(existing) };
     }
     throw httpError(
@@ -1237,6 +1260,7 @@ async function createSsProject(env, args = {}) {
     name,
     status,
     deadline,
+    memo,
     last_source_email_id: sourceEmailId,
     last_source_email_subject: sourceEmailSubject,
     created_at: now,
@@ -1244,14 +1268,14 @@ async function createSsProject(env, args = {}) {
   };
   await env.DB.batch([
     env.DB.prepare(
-      "INSERT INTO ss_projects (id, name, status, deadline, last_source_email_id, last_source_email_subject, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-    ).bind(id, name, status, deadline, sourceEmailId, sourceEmailSubject, now, now),
+      "INSERT INTO ss_projects (id, name, status, deadline, memo, last_source_email_id, last_source_email_subject, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    ).bind(id, name, status, deadline, memo, sourceEmailId, sourceEmailSubject, now, now),
     env.DB.prepare(
       "INSERT INTO mcp_ss_project_changes (id, project_id, action, changed_fields, before_json, after_json, source_email_id, created_at) VALUES (?, ?, 'create', ?, '{}', ?, ?, ?)"
     ).bind(
       changeId,
       id,
-      JSON.stringify(["name", "status", "deadline"]),
+      JSON.stringify(["name", "status", "deadline", ...(memo === null ? [] : ["memo"])]),
       JSON.stringify(project),
       sourceEmailId,
       now
@@ -1279,8 +1303,11 @@ async function updateSsProject(env, args = {}) {
   if (Object.prototype.hasOwnProperty.call(args, "deadline")) {
     requested.deadline = normalizeSsProjectDeadline(args.deadline);
   }
+  if (Object.prototype.hasOwnProperty.call(args, "memo")) {
+    requested.memo = normalizeSsProjectMemo(args.memo);
+  }
   if (!Object.keys(requested).length) {
-    throw httpError(400, "at least one of name, status, or deadline is required");
+    throw httpError(400, "at least one of name, status, deadline, or memo is required");
   }
 
   if (requested.name && requested.name !== before.name) {
@@ -2222,7 +2249,7 @@ async function handleMcp(request, env, url) {
     return mcpResponse(id, {
       protocolVersion: params.protocolVersion || "2025-06-18",
       capabilities: { tools: {} },
-      serverInfo: { name: "works-schedule", version: "1.9.0" },
+      serverInfo: { name: "works-schedule", version: "1.10.0" },
       instructions:
         "Use search_schedules to find exact event_id and calendar_id values before schedule writes. Use get_student_profile before updating a student memo or print name, and get_student_profile_change_history before undoing a profile update. Use list_material_categories before creating, renaming, reordering, or moving material categories, and list_curriculum_materials before creating, moving, renaming, reordering, merging, or deleting curriculum materials and chapters. Use get_student_materials before updating chapter completion. For SS project changes based on email, read the relevant email, call list_ss_projects before every write, then call create_ss_project or update_ss_project with the exact Gmail message_id and subject when available. Do not infer a deadline or status that the email does not establish. Merge duplicate chapters to preserve student progress; delete_material_chapter refuses to remove a chapter that has progress. Use briefing and progress tools to prepare and report, history before undoing changes, search_materials before linking a file, and preview_reschedule before apply_reschedule. Dates use Asia/Tokyo. Update tools preserve fields that are not supplied; pass null to clear a text field where supported.",
     });

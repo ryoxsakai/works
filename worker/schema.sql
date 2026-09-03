@@ -198,6 +198,7 @@ CREATE TABLE IF NOT EXISTS ss_projects (
   name TEXT NOT NULL,
   status TEXT NOT NULL CHECK (status IN ('原稿待ち', '素材案作成中', '素材案確認待ち', '問題作成中', '完了')),
   deadline TEXT NOT NULL,
+  memo TEXT,
   last_source_email_id TEXT,
   last_source_email_subject TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),

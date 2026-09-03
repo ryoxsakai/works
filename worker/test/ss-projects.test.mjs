@@ -28,6 +28,11 @@ test("SS projects support browser listing and email-sourced MCP updates", async 
     SESSION_SECRET: "ss-project-test-secret",
   };
 
+  // 既存環境のメモ列なしテーブルからも自動移行できることを確認する。
+  await db.prepare(
+    "CREATE TABLE ss_projects (id TEXT PRIMARY KEY, name TEXT NOT NULL, status TEXT NOT NULL, deadline TEXT NOT NULL, last_source_email_id TEXT, last_source_email_subject TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')))"
+  ).run();
+
   const toolsResponse = await functions.handleMcp(
     new Request("https://works.lrnr.jp/mcp", {
       method: "POST",
@@ -46,11 +51,13 @@ test("SS projects support browser listing and email-sourced MCP updates", async 
     name: "cheetah",
     status: "素材案作成中",
     deadline: "2026-09-16",
+    memo: "高校入試英語1大問。オリジナル作成。",
     source_email_id: "message-001",
     source_email_subject: "cheetah問題作成のお願い",
   });
   assert.equal(created.created, true);
   assert.equal(created.project.name, "cheetah");
+  assert.equal(created.project.memo, "高校入試英語1大問。オリジナル作成。");
   assert.equal(created.project.last_source_email_id, "message-001");
 
   const duplicate = await functions.createSsProject(env, {
@@ -86,6 +93,7 @@ test("SS projects support browser listing and email-sourced MCP updates", async 
           arguments: {
             project_id: created.project.id,
             status: "素材案確認待ち",
+            memo: "作成用ファイル受領済み。",
             source_email_id: "message-002",
             source_email_subject: "Re: cheetah問題作成のお願い",
           },
@@ -98,7 +106,8 @@ test("SS projects support browser listing and email-sourced MCP updates", async 
   const updatePayload = await updateResponse.json();
   assert.equal(updatePayload.result.structuredContent.updated, true);
   assert.equal(updatePayload.result.structuredContent.project.status, "素材案確認待ち");
-  assert.deepEqual(updatePayload.result.structuredContent.changed_fields, ["status"]);
+  assert.equal(updatePayload.result.structuredContent.project.memo, "作成用ファイル受領済み。");
+  assert.deepEqual(updatePayload.result.structuredContent.changed_fields, ["status", "memo"]);
 
   const projects = await functions.readSsProjects(env);
   assert.equal(projects.length, 1);
