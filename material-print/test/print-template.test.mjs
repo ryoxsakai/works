@@ -85,6 +85,19 @@ test("空欄の丸括弧内を全角スペース2つで出力する", () => {
   assert.doesNotMatch(sheets, /\(   \)/);
 });
 
+test("解答・解説ページの設問番号を太字にしない", () => {
+  const parsed = parseWeeklyTestDraft(makeDraft());
+  const sheets = renderPrintSheets(parsed);
+  assert.match(sheets, /<span class="answer-number">\(1\)<\/span>/);
+  assert.doesNotMatch(sheets, /<strong[^>]*>\(1\)/);
+});
+
+test("解説が次ページへ続く場合は同じ大問見出しを繰り返さない", () => {
+  const parsed = parseWeeklyTestDraft(makeDraft());
+  const sheets = renderPrintSheets(parsed);
+  assert.equal((sheets.match(/<span class="section-number">2\.<\/span>/g) || []).length, 1);
+});
+
 test("印刷HTMLではPaged.jsを任意に無効化できる", () => {
   const parsed = parseWeeklyTestDraft(makeDraft());
   const browserHtml = createPrintDocumentHtml(parsed, { paged: true });
