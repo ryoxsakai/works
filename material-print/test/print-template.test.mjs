@@ -74,6 +74,15 @@ test("問題3ページ・白紙1ページ・解答2ページを出力する", ()
   assert.match(sheets, /class="sheet blank-sheet" data-page="4"/);
   assert.match(sheets, /data-page="6"/);
   assert.match(sheets, /解答・解説/);
+  assert.match(sheets, /<span class="explanation-label">【解説】<\/span>/);
+});
+
+test("空欄の丸括弧内を全角スペース2つで出力する", () => {
+  const parsed = parseWeeklyTestDraft(makeDraft());
+  const sheets = renderPrintSheets(parsed);
+  assert.match(sheets, /This is \(　　\) question 1\./);
+  assert.match(sheets, /class="word-blank"[^>]*>\(　　\)<\/span>/);
+  assert.doesNotMatch(sheets, /\(   \)/);
 });
 
 test("印刷HTMLではPaged.jsを任意に無効化できる", () => {
