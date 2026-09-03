@@ -163,6 +163,20 @@ function formatDate(value) {
   });
 }
 
+function daysUntil(value, now = new Date()) {
+  const parts = String(value || "").split("-").map(Number);
+  if (parts.length !== 3 || parts.some((part) => !Number.isInteger(part))) return null;
+  const target = Date.UTC(parts[0], parts[1] - 1, parts[2]);
+  const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.round((target - today) / 86400000);
+}
+
+function formatDaysUntil(value) {
+  const days = daysUntil(value);
+  if (days === null) return "";
+  return days >= 0 ? `あと${days}日` : `${Math.abs(days)}日前`;
+}
+
 function canonicalUniversityName(value) {
   return String(value || "")
     .replace(/（[^）]*）/g, "")
@@ -402,7 +416,10 @@ function renderList(viewEvents) {
     <article class="admission-list-item admission-stage-${escapeHtml(event.stage)}">
       <time datetime="${escapeHtml(event.schedule_date)}">${escapeHtml(formatDate(event.schedule_date))}</time>
       <div class="admission-list-copy">
-        <strong>${escapeHtml(event.university)}</strong>
+        <div class="admission-list-title">
+          <strong>${escapeHtml(event.university)}</strong>
+          <span class="admission-countdown">${escapeHtml(formatDaysUntil(event.schedule_date))}</span>
+        </div>
         <span>${escapeHtml(typeLabels[event.selection_type] || event.selection_type)} ・ ${escapeHtml(stageLabels[event.stage] || event.stage)}</span>
         ${event.notes ? `<small>${escapeHtml(event.notes)}</small>` : ""}
       </div>
