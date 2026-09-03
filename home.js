@@ -10,9 +10,28 @@ const els = {
   settingsModal: document.querySelector("#home-settings-modal"),
   settingsClose: document.querySelector("#home-settings-close"),
   themeRadios: [...document.querySelectorAll('input[name="home-theme"]')],
+  moduleLinks: [...document.querySelectorAll(".module-card")],
 };
 
+const PENDING_DESTINATION_KEY = "works_pending_destination";
+const MODULE_DESTINATION_RE = /^\/(?:tutor|material|admission|ss)\/$/;
+
 let signedIn = false;
+
+function isModuleDestination(value) {
+  return MODULE_DESTINATION_RE.test(String(value || ""));
+}
+
+function savePendingDestination(value) {
+  if (!isModuleDestination(value)) return;
+  localStorage.setItem(PENDING_DESTINATION_KEY, value);
+}
+
+function consumePendingDestination() {
+  const value = localStorage.getItem(PENDING_DESTINATION_KEY);
+  localStorage.removeItem(PENDING_DESTINATION_KEY);
+  return isModuleDestination(value) ? value : "";
+}
 
 function showSignedOut(message = "") {
   signedIn = false;
@@ -37,7 +56,20 @@ function showSignedIn(user) {
     els.userAvatar.hidden = true;
     els.userAvatarFallback.hidden = false;
   }
+
+  const pendingDestination = consumePendingDestination();
+  if (pendingDestination) window.location.assign(pendingDestination);
 }
+
+els.moduleLinks.forEach((link) => {
+  link.addEventListener("click", (event) => {
+    if (signedIn) return;
+    event.preventDefault();
+    const destination = new URL(link.href, window.location.origin).pathname;
+    savePendingDestination(destination);
+    signIn();
+  });
+});
 
 els.authAction.addEventListener("click", async () => {
   els.authError.textContent = "";
