@@ -16,7 +16,23 @@ const els = {
 const PENDING_DESTINATION_KEY = "works_pending_destination";
 const MODULE_DESTINATION_RE = /^\/(?:tutor|material|admission|ss)\/$/;
 
-let signedIn = false;
+let authState = "checking";
+let resolveAuthState;
+const authStateReady = new Promise((resolve) => {
+  resolveAuthState = resolve;
+});
+
+function settleAuthState(nextState) {
+  authState = nextState;
+  if (resolveAuthState) {
+    resolveAuthState(nextState);
+    resolveAuthState = null;
+  }
+}
+
+async function waitForAuthState() {
+  return authState === "checking" ? authStateReady : authState;
+}
 
 function isModuleDestination(value) {
   return MODULE_DESTINATION_RE.test(String(value || ""));
@@ -34,7 +50,7 @@ function consumePendingDestination() {
 }
 
 function showSignedOut(message = "") {
-  signedIn = false;
+  settleAuthState("signed-out");
   els.authError.textContent = message;
   els.authAction.setAttribute("aria-label", "Googleでログイン");
   els.authAction.title = "Googleでログイン";
@@ -44,7 +60,7 @@ function showSignedOut(message = "") {
 }
 
 function showSignedIn(user) {
-  signedIn = true;
+  settleAuthState("signed-in");
   els.authError.textContent = "";
   els.authAction.setAttribute("aria-label", "ログアウト");
   els.authAction.title = `${user.email} (クリックでログアウト)`;
@@ -62,19 +78,30 @@ function showSignedIn(user) {
 }
 
 els.moduleLinks.forEach((link) => {
-  link.addEventListener("click", (event) => {
-    if (signedIn) return;
+  link.addEventListener("click", async (event) => {
+    if (authState === "signed-in") return;
     event.preventDefault();
     const destination = new URL(link.href, window.location.origin).pathname;
     savePendingDestination(destination);
-    signIn();
+
+    try {
+      const state = await waitForAuthState();
+      if (state === "signed-in") {
+        window.location.assign(destination);
+        return;
+      }
+      signIn();
+    } catch (error) {
+      els.authError.textContent = error instanceof Error ? error.message : String(error);
+    }
   });
 });
 
 els.authAction.addEventListener("click", async () => {
   els.authError.textContent = "";
   try {
-    if (signedIn) {
+    const state = await waitForAuthState();
+    if (state === "signed-in") {
       await signOutUser();
       showSignedOut();
       return;
