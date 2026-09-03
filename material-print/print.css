@@ -168,7 +168,7 @@ body {
 }
 
 .problem-number {
-  font-family: Arial, sans-serif;
+  font-family: "Times New Roman", "Yu Mincho", serif;
   font-variant-numeric: tabular-nums;
 }
 
@@ -302,7 +302,7 @@ body {
 
 .correction-fields b,
 .correction-fields strong {
-  font-family: Arial, sans-serif;
+  font-family: "Times New Roman", "Yu Mincho", serif;
 }
 
 .blank-sheet {
@@ -344,7 +344,7 @@ body {
 }
 
 .answer-key strong {
-  font-family: Arial, "Yu Mincho", sans-serif;
+  font-family: "Times New Roman", "Yu Mincho", serif;
 }
 
 .answer-key span {
@@ -357,8 +357,8 @@ body {
   text-indent: -3mm;
 }
 
-.answer-explanation::before {
-  content: "解説 ";
+.explanation-label {
+  margin-right: .5em;
   font-weight: 700;
 }
 
