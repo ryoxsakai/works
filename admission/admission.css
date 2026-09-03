@@ -318,6 +318,27 @@
   gap: .1rem;
 }
 
+.admission-list-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  min-width: 0;
+  gap: .75rem;
+}
+
+.admission-list-title strong {
+  min-width: 0;
+}
+
+.admission-list-copy .admission-countdown {
+  flex-shrink: 0;
+  color: var(--admission-color);
+  font-size: .7rem;
+  font-weight: 700;
+  text-align: right;
+  white-space: nowrap;
+}
+
 .admission-list-copy strong {
   overflow: hidden;
   color: var(--fg);
