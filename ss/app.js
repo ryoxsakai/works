@@ -85,9 +85,7 @@ function remainingDays(deadline) {
 
 function remaining(project) {
   if (project.status === "完了") return { text: "完了", className: "completed" };
-  const days = project.remaining_days === null || project.remaining_days === undefined
-    ? remainingDays(project.deadline)
-    : Number(project.remaining_days);
+  const days = remainingDays(project.deadline);
   if (!Number.isFinite(days)) return { text: "—", className: "" };
   if (days < 0) return { text: `${Math.abs(days)}日超過`, className: "overdue" };
   if (days === 0) return { text: "本日", className: "due-week-1" };
@@ -114,11 +112,7 @@ function sortValue(project, key) {
   if (key === "name") return String(project.name || "");
   if (key === "status") return STATUS_ORDER[project.status] ?? Number.MAX_SAFE_INTEGER;
   if (key === "deadline") return dateNumber(project.deadline);
-  if (key === "remaining") {
-    return project.remaining_days === null || project.remaining_days === undefined
-      ? remainingDays(project.deadline)
-      : Number(project.remaining_days);
-  }
+  if (key === "remaining") return remainingDays(project.deadline);
   return "";
 }
 
