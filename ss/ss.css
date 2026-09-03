@@ -1,0 +1,276 @@
+.ss-main {
+  max-width: 1120px;
+}
+
+.ss-panel {
+  padding: 1rem;
+}
+
+.ss-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.ss-heading .eyebrow {
+  margin: 0 0 .2rem;
+}
+
+.ss-heading h2 {
+  margin: 0;
+}
+
+.ss-heading h2 i {
+  color: var(--accent);
+}
+
+.ss-summary {
+  margin: 0 0 .15rem;
+  color: var(--muted);
+  font-size: .78rem;
+  white-space: nowrap;
+}
+
+.ss-table-shell {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: .44rem;
+  background: var(--bg-elevated);
+  box-shadow: var(--card-shadow);
+}
+
+.ss-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.ss-table th,
+.ss-table td {
+  padding: .8rem .9rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.ss-table th {
+  color: var(--muted);
+  font-size: .72rem;
+  font-weight: 500;
+  letter-spacing: .02em;
+}
+
+.ss-table th:first-child {
+  width: 42%;
+}
+
+.ss-table th:nth-child(2) {
+  width: 22%;
+}
+
+.ss-table th:nth-child(3) {
+  width: 22%;
+}
+
+.ss-table th:last-child {
+  width: 14%;
+}
+
+.ss-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.ss-project-name {
+  font-weight: 500;
+}
+
+.ss-deadline,
+.ss-remaining {
+  font-variant-numeric: tabular-nums;
+}
+
+.ss-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.7rem;
+  padding: .18rem .55rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: .72rem;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.ss-status-waiting {
+  border-color: color-mix(in srgb, #64748b 35%, transparent);
+  background: color-mix(in srgb, #64748b 12%, transparent);
+  color: #64748b;
+}
+
+.ss-status-drafting {
+  border-color: color-mix(in srgb, #2563eb 35%, transparent);
+  background: color-mix(in srgb, #2563eb 11%, transparent);
+  color: #2563eb;
+}
+
+.ss-status-review {
+  border-color: color-mix(in srgb, #d97706 38%, transparent);
+  background: color-mix(in srgb, #d97706 12%, transparent);
+  color: #b45309;
+}
+
+.ss-status-writing {
+  border-color: color-mix(in srgb, #7c3aed 35%, transparent);
+  background: color-mix(in srgb, #7c3aed 11%, transparent);
+  color: #7c3aed;
+}
+
+.ss-status-completed {
+  border-color: color-mix(in srgb, #16a34a 35%, transparent);
+  background: color-mix(in srgb, #16a34a 11%, transparent);
+  color: #15803d;
+}
+
+.ss-remaining {
+  color: var(--fg);
+  font-size: .8rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.ss-remaining.urgent {
+  color: #d97706;
+}
+
+.ss-remaining.overdue {
+  color: #dc2626;
+}
+
+.ss-remaining.completed {
+  color: #15803d;
+}
+
+.ss-empty {
+  display: grid;
+  min-height: 15rem;
+  place-items: center;
+  align-content: center;
+  gap: .35rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+.ss-empty i {
+  color: var(--accent);
+  font-size: 2rem;
+}
+
+.ss-empty p {
+  margin: 0;
+  font-size: .85rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .ss-status-waiting { color: #cbd5e1; }
+  :root:not([data-theme="light"]) .ss-status-drafting { color: #93c5fd; }
+  :root:not([data-theme="light"]) .ss-status-review,
+  :root:not([data-theme="light"]) .ss-remaining.urgent { color: #fbbf24; }
+  :root:not([data-theme="light"]) .ss-status-writing { color: #c4b5fd; }
+  :root:not([data-theme="light"]) .ss-status-completed,
+  :root:not([data-theme="light"]) .ss-remaining.completed { color: #86efac; }
+  :root:not([data-theme="light"]) .ss-remaining.overdue { color: #fca5a5; }
+}
+
+:root[data-theme="dark"] .ss-status-waiting { color: #cbd5e1; }
+:root[data-theme="dark"] .ss-status-drafting { color: #93c5fd; }
+:root[data-theme="dark"] .ss-status-review,
+:root[data-theme="dark"] .ss-remaining.urgent { color: #fbbf24; }
+:root[data-theme="dark"] .ss-status-writing { color: #c4b5fd; }
+:root[data-theme="dark"] .ss-status-completed,
+:root[data-theme="dark"] .ss-remaining.completed { color: #86efac; }
+:root[data-theme="dark"] .ss-remaining.overdue { color: #fca5a5; }
+
+@media (max-width: 700px) {
+  .ss-main {
+    padding: .85rem;
+  }
+
+  .ss-panel {
+    padding: 0;
+  }
+
+  .ss-heading {
+    align-items: flex-start;
+  }
+
+  .ss-table-shell {
+    overflow: visible;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .ss-table,
+  .ss-table tbody,
+  .ss-table tr,
+  .ss-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .ss-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .ss-table tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: .55rem .8rem;
+    margin-bottom: .7rem;
+    padding: .85rem;
+    border: 1px solid var(--border);
+    border-radius: .44rem;
+    background: var(--bg-elevated);
+    box-shadow: var(--card-shadow);
+  }
+
+  .ss-table td {
+    padding: 0;
+    border: 0;
+  }
+
+  .ss-table td::before {
+    display: block;
+    margin-bottom: .14rem;
+    color: var(--muted);
+    content: attr(data-label);
+    font-size: .65rem;
+  }
+
+  .ss-table .ss-project-name {
+    grid-column: 1 / -1;
+  }
+
+  .ss-table td:nth-child(2) {
+    grid-column: 1 / -1;
+  }
+
+  .ss-table td:nth-child(3) {
+    min-width: 0;
+  }
+
+  .ss-table td:nth-child(4) {
+    text-align: right;
+  }
+
+  .ss-table td:nth-child(4)::before {
+    text-align: right;
+  }
+}
