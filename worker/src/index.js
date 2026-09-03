@@ -3196,6 +3196,7 @@ function duplicateCurriculumChapters(rows) {
 }
 
 async function readScheduleDataHealth(env) {
+  const admissionSupplement = await ensureAdmissionSupplement2027(env);
   await Promise.all([
     ensureMcpFeatureSchema(env),
     ensureCurriculumIntegrity(env),
@@ -3285,6 +3286,7 @@ async function readScheduleDataHealth(env) {
       calendar_links_checked: calendarValidationChecked,
     },
     calendar_validation_truncated: calendarValidationTruncated,
+    admissions_2027_supplement: admissionSupplement,
     issues,
     generated_at: new Date().toISOString(),
   };
@@ -4371,6 +4373,121 @@ const INITIAL_ADMISSION_EVENTS_2027 = [
   ...scheduleSeed("産業医科大学医学部（学校推薦）", "recommendation", "final_result", ["2026-12-11"]),
 ].flat();
 
+
+function admissionSupplementSeed(university, stage, dates, notes, sourceUrl) {
+  return dates.map((schedule_date) => ({
+    university,
+    selectionType: "general",
+    stage,
+    schedule_date,
+    notes,
+    sourceUrl,
+  }));
+}
+
+const ADMISSION_SUPPLEMENT_2027 = [
+  ...admissionSupplementSeed("関西医科大学医学部（前期）", "primary", ["2027-02-02"], "", "https://www.kmu.ac.jp/juk/fom/exam/general_first.html"),
+  ...admissionSupplementSeed("関西医科大学医学部（前期）", "first_result", ["2027-02-15"], "", "https://www.kmu.ac.jp/juk/fom/exam/general_first.html"),
+  ...admissionSupplementSeed("関西医科大学医学部（前期）", "secondary", ["2027-02-20","2027-02-21"], "大学指定日", "https://www.kmu.ac.jp/juk/fom/exam/general_first.html"),
+  ...admissionSupplementSeed("関西医科大学医学部（前期）", "final_result", ["2027-03-01"], "", "https://www.kmu.ac.jp/juk/fom/exam/general_first.html"),
+  ...admissionSupplementSeed("関西医科大学医学部（後期）", "primary", ["2027-03-06"], "", "https://www.kmu.ac.jp/juk/fom/exam/general_second.html"),
+  ...admissionSupplementSeed("関西医科大学医学部（後期）", "first_result", ["2027-03-12"], "", "https://www.kmu.ac.jp/juk/fom/exam/general_second.html"),
+  ...admissionSupplementSeed("関西医科大学医学部（後期）", "secondary", ["2027-03-16"], "", "https://www.kmu.ac.jp/juk/fom/exam/general_second.html"),
+  ...admissionSupplementSeed("関西医科大学医学部（後期）", "final_result", ["2027-03-19"], "", "https://www.kmu.ac.jp/juk/fom/exam/general_second.html"),
+  ...admissionSupplementSeed("久留米大学医学部（前期）", "primary", ["2027-02-01"], "", "https://best.kurume-u.ac.jp/admissions/type/exam-first/"),
+  ...admissionSupplementSeed("久留米大学医学部（前期）", "first_result", ["2027-02-08"], "", "https://best.kurume-u.ac.jp/admissions/type/exam-first/"),
+  ...admissionSupplementSeed("久留米大学医学部（前期）", "secondary", ["2027-02-13"], "", "https://best.kurume-u.ac.jp/admissions/type/exam-first/"),
+  ...admissionSupplementSeed("久留米大学医学部（前期）", "final_result", ["2027-02-19"], "", "https://best.kurume-u.ac.jp/admissions/type/exam-first/"),
+  ...admissionSupplementSeed("久留米大学医学部（後期）", "primary", ["2027-03-08"], "", "https://best.kurume-u.ac.jp/admissions/type/exam-second/"),
+  ...admissionSupplementSeed("久留米大学医学部（後期）", "first_result", ["2027-03-12"], "", "https://best.kurume-u.ac.jp/admissions/type/exam-second/"),
+  ...admissionSupplementSeed("久留米大学医学部（後期）", "secondary", ["2027-03-16"], "", "https://best.kurume-u.ac.jp/admissions/type/exam-second/"),
+  ...admissionSupplementSeed("久留米大学医学部（後期）", "final_result", ["2027-03-19"], "", "https://best.kurume-u.ac.jp/admissions/type/exam-second/"),
+  ...admissionSupplementSeed("埼玉医科大学医学部（前期）", "primary", ["2027-02-04"], "", "https://adm.saitama-med.ac.jp/admission/general/"),
+  ...admissionSupplementSeed("埼玉医科大学医学部（前期）", "first_result", ["2027-02-10"], "", "https://adm.saitama-med.ac.jp/admission/general/"),
+  ...admissionSupplementSeed("埼玉医科大学医学部（前期）", "secondary", ["2027-02-14"], "", "https://adm.saitama-med.ac.jp/admission/general/"),
+  ...admissionSupplementSeed("埼玉医科大学医学部（前期）", "final_result", ["2027-02-18"], "", "https://adm.saitama-med.ac.jp/admission/general/"),
+  ...admissionSupplementSeed("埼玉医科大学医学部（後期）", "primary", ["2027-02-28"], "", "https://adm.saitama-med.ac.jp/admission/general/"),
+  ...admissionSupplementSeed("埼玉医科大学医学部（後期）", "first_result", ["2027-03-04"], "", "https://adm.saitama-med.ac.jp/admission/general/"),
+  ...admissionSupplementSeed("埼玉医科大学医学部（後期）", "secondary", ["2027-03-07"], "", "https://adm.saitama-med.ac.jp/admission/general/"),
+  ...admissionSupplementSeed("埼玉医科大学医学部（後期）", "final_result", ["2027-03-11"], "", "https://adm.saitama-med.ac.jp/admission/general/"),
+  ...admissionSupplementSeed("昭和医科大学医学部（I期）", "primary", ["2027-02-05"], "", "https://adm.showa-u.ac.jp/admission/info/schedule.html"),
+  ...admissionSupplementSeed("昭和医科大学医学部（I期）", "first_result", ["2027-02-10"], "", "https://adm.showa-u.ac.jp/admission/info/schedule.html"),
+  ...admissionSupplementSeed("昭和医科大学医学部（I期）", "secondary", ["2027-02-13","2027-02-14"], "出願時選択", "https://adm.showa-u.ac.jp/admission/info/schedule.html"),
+  ...admissionSupplementSeed("昭和医科大学医学部（I期）", "final_result", ["2027-02-15"], "", "https://adm.showa-u.ac.jp/admission/info/schedule.html"),
+  ...admissionSupplementSeed("昭和医科大学医学部（II期）", "primary", ["2027-03-06"], "", "https://adm.showa-u.ac.jp/admission/info/schedule.html"),
+  ...admissionSupplementSeed("昭和医科大学医学部（II期）", "first_result", ["2027-03-10"], "", "https://adm.showa-u.ac.jp/admission/info/schedule.html"),
+  ...admissionSupplementSeed("昭和医科大学医学部（II期）", "secondary", ["2027-03-13"], "", "https://adm.showa-u.ac.jp/admission/info/schedule.html"),
+  ...admissionSupplementSeed("昭和医科大学医学部（II期）", "final_result", ["2027-03-15"], "", "https://adm.showa-u.ac.jp/admission/info/schedule.html"),
+  ...admissionSupplementSeed("聖マリアンナ医科大学医学部（前期）", "primary", ["2027-02-04"], "", "https://www.marianna-u.ac.jp/univ/ent_info/ent_general.html"),
+  ...admissionSupplementSeed("聖マリアンナ医科大学医学部（前期）", "first_result", ["2027-02-10"], "", "https://www.marianna-u.ac.jp/univ/ent_info/ent_general.html"),
+  ...admissionSupplementSeed("聖マリアンナ医科大学医学部（前期）", "secondary", ["2027-02-13","2027-02-14"], "出願時選択", "https://www.marianna-u.ac.jp/univ/ent_info/ent_general.html"),
+  ...admissionSupplementSeed("聖マリアンナ医科大学医学部（前期）", "final_result", ["2027-02-18"], "", "https://www.marianna-u.ac.jp/univ/ent_info/ent_general.html"),
+  ...admissionSupplementSeed("聖マリアンナ医科大学医学部（後期）", "primary", ["2027-03-02"], "", "https://www.marianna-u.ac.jp/univ/ent_info/ent_general.html"),
+  ...admissionSupplementSeed("聖マリアンナ医科大学医学部（後期）", "first_result", ["2027-03-09"], "", "https://www.marianna-u.ac.jp/univ/ent_info/ent_general.html"),
+  ...admissionSupplementSeed("聖マリアンナ医科大学医学部（後期）", "secondary", ["2027-03-12"], "", "https://www.marianna-u.ac.jp/univ/ent_info/ent_general.html"),
+  ...admissionSupplementSeed("聖マリアンナ医科大学医学部（後期）", "final_result", ["2027-03-18"], "", "https://www.marianna-u.ac.jp/univ/ent_info/ent_general.html"),
+  ...admissionSupplementSeed("東海大学医学部", "primary", ["2027-02-02","2027-02-03"], "受験日自由選択・両日受験可", "https://www.u-tokai.ac.jp/examination-admissions/examination-system/undergraduate-academic-medicine/"),
+  ...admissionSupplementSeed("東海大学医学部", "secondary", ["2027-02-13","2027-02-14"], "出願時選択", "https://www.u-tokai.ac.jp/examination-admissions/examination-system/undergraduate-academic-medicine/"),
+  ...admissionSupplementSeed("東邦大学医学部", "primary", ["2027-02-07"], "", "https://www.toho-u.ac.jp/med/info_exam/ippan.html"),
+  ...admissionSupplementSeed("東邦大学医学部", "first_result", ["2027-02-10"], "", "https://www.toho-u.ac.jp/med/info_exam/ippan.html"),
+  ...admissionSupplementSeed("東邦大学医学部", "secondary", ["2027-02-15","2027-02-16"], "大学指定日", "https://www.toho-u.ac.jp/med/info_exam/ippan.html"),
+  ...admissionSupplementSeed("東邦大学医学部", "final_result", ["2027-02-18"], "", "https://www.toho-u.ac.jp/med/info_exam/ippan.html"),
+  ...admissionSupplementSeed("日本大学医学部（N方式第1期）", "primary", ["2027-02-01"], "", "https://www.nihon-u.ac.jp/assets/ippan_suke_260518.pdf"),
+  ...admissionSupplementSeed("日本大学医学部（N方式第1期）", "first_result", ["2027-02-08"], "", "https://www.nihon-u.ac.jp/assets/ippan_suke_260518.pdf"),
+  ...admissionSupplementSeed("日本大学医学部（N方式第1期）", "secondary", ["2027-02-11"], "", "https://www.nihon-u.ac.jp/assets/ippan_suke_260518.pdf"),
+  ...admissionSupplementSeed("日本大学医学部（N方式第1期）", "final_result", ["2027-02-17"], "", "https://www.nihon-u.ac.jp/assets/ippan_suke_260518.pdf"),
+  ...admissionSupplementSeed("日本大学医学部（N方式第2期）", "primary", ["2027-03-04"], "", "https://www.nihon-u.ac.jp/assets/ippan_suke_260518.pdf"),
+  ...admissionSupplementSeed("日本大学医学部（N方式第2期）", "first_result", ["2027-03-12"], "", "https://www.nihon-u.ac.jp/assets/ippan_suke_260518.pdf"),
+  ...admissionSupplementSeed("日本大学医学部（N方式第2期）", "secondary", ["2027-03-17"], "", "https://www.nihon-u.ac.jp/assets/ippan_suke_260518.pdf"),
+  ...admissionSupplementSeed("日本大学医学部（N方式第2期）", "final_result", ["2027-03-23"], "", "https://www.nihon-u.ac.jp/assets/ippan_suke_260518.pdf"),
+  ...admissionSupplementSeed("福岡大学医学部", "primary", ["2027-02-02"], "", "https://nyushi.fukuoka-u.ac.jp/nyushi/type-3/"),
+  ...admissionSupplementSeed("福岡大学医学部", "first_result", ["2027-02-09"], "", "https://nyushi.fukuoka-u.ac.jp/nyushi/type-3/"),
+  ...admissionSupplementSeed("福岡大学医学部", "secondary", ["2027-02-14"], "", "https://nyushi.fukuoka-u.ac.jp/nyushi/type-3/"),
+  ...admissionSupplementSeed("福岡大学医学部", "final_result", ["2027-02-23"], "", "https://nyushi.fukuoka-u.ac.jp/nyushi/type-3/"),
+].flat();
+
+async function ensureAdmissionSupplement2027(env) {
+  await ensureInitialAdmissionSchedule(env);
+  const migrationKey = "admission_supplement_2027_missing_private_medical_v1";
+  const migrated = await env.DB.prepare("SELECT value FROM settings WHERE key = ?").bind(migrationKey).first();
+  if (!migrated) {
+    const statements = ADMISSION_SUPPLEMENT_2027.map((event, index) =>
+      env.DB.prepare(
+        "INSERT INTO admission_events (id, university, selection_type, stage, schedule_date, notes, source_url) " +
+        "SELECT ?, ?, ?, ?, ?, ?, ? WHERE NOT EXISTS (" +
+        "SELECT 1 FROM admission_events WHERE university = ? AND selection_type = ? AND stage = ? AND schedule_date = ?" +
+        ")"
+      ).bind(
+        "admission-2027-supplement-v1-" + (index + 1),
+        event.university,
+        event.selectionType,
+        event.stage,
+        event.schedule_date,
+        event.notes || null,
+        event.sourceUrl,
+        event.university,
+        event.selectionType,
+        event.stage,
+        event.schedule_date
+      )
+    );
+    const results = await env.DB.batch(statements);
+    const inserted = results.reduce((sum, result) => sum + Number(result?.meta?.changes || 0), 0);
+    await writeSetting(env, migrationKey, {
+      migrated_at: new Date().toISOString(),
+      expected: ADMISSION_SUPPLEMENT_2027.length,
+      inserted,
+    });
+  }
+  const row = await env.DB.prepare(
+    "SELECT COUNT(*) AS total FROM admission_events WHERE id LIKE 'admission-2027-supplement-v1-%'"
+  ).first();
+  return {
+    expected: ADMISSION_SUPPLEMENT_2027.length,
+    registered: Number(row?.total || 0),
+  };
+}
+
 async function ensureInitialAdmissionSchedule(env) {
   await ensureAdmissionSchema(env);
   const seeded = await env.DB.prepare("SELECT value FROM settings WHERE key = 'admission_seed_2027'").first();
@@ -4387,7 +4504,7 @@ async function ensureInitialAdmissionSchedule(env) {
 }
 
 async function readAdmissionEvents(env, year) {
-  await ensureInitialAdmissionSchedule(env);
+  await ensureAdmissionSupplement2027(env);
   const query = year
     ? env.DB.prepare("SELECT * FROM admission_events WHERE schedule_date LIKE ? ORDER BY schedule_date, university, stage").bind(String(year) + "-%")
     : env.DB.prepare("SELECT * FROM admission_events ORDER BY schedule_date, university, stage");
