@@ -90,6 +90,10 @@ test("admission schedules are available through a read-only MCP tool", async (co
 
   await assert.rejects(
     functions.listMcpAdmissionEvents(env, { date_from: "2027/02/01" }),
-    /date_from must be YYYY-MM-DD/
+    /date_from must be a valid date/
+  );
+  await assert.rejects(
+    functions.listMcpAdmissionEvents(env, { date_to: "2027-02-30" }),
+    /date_to must be a valid date/
   );
 });
