@@ -1,7 +1,7 @@
 const SECTION_DEFAULTS = {
-  1: "次の(   )内に入れるのに最も適切なものを選択肢から1つ選びなさい。",
-  2: "日本語の意味に合うように、(   )内の語句を並び替えて正しい英文を完成させなさい。",
-  3: "日本語の意味に合うように、(   )内にそれぞれ適切な英語を入れなさい。",
+  1: "次の(　　)内に入れるのに最も適切なものを選択肢から1つ選びなさい。",
+  2: "日本語の意味に合うように、(　　)内の語句を並び替えて正しい英文を完成させなさい。",
+  3: "日本語の意味に合うように、(　　)内にそれぞれ適切な英語を入れなさい。",
   4: "次の各英文の下線部（①〜④）の中に、文法上誤っているものが1つあります。その番号を選び、正しい形に直しなさい。誤りがない場合は「誤りなし」としなさい。",
 };
 
@@ -24,6 +24,10 @@ export function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
+}
+
+function escapePrintText(value) {
+  return escapeHtml(String(value ?? "").replace(/\([\t 　]*\)/g, "(　　)"));
 }
 
 function normalizedFieldName(label) {
@@ -175,7 +179,7 @@ function renderSectionHeading(number, instruction, compact = false) {
   return `
     <div class="section-heading${compact ? " is-compact" : ""}">
       <span class="section-number">${compact ? `${number}.` : roman}</span>
-      <p>${escapeHtml(instruction)}</p>
+      <p>${escapePrintText(instruction)}</p>
       ${number === 1 && !compact ? '<span class="section-score">配点　各1点</span>' : ""}
     </div>`;
 }
@@ -189,7 +193,7 @@ function splitChoices(rawChoices) {
 function renderChoiceQuestion(question) {
   return `
     <article class="problem problem-choice">
-      <p class="problem-line"><span class="problem-number">(${question.number}) [${question.sourceNumber}]</span><span>${escapeHtml(question.prompt)}</span></p>
+      <p class="problem-line"><span class="problem-number">(${question.number}) [${question.sourceNumber}]</span><span>${escapePrintText(question.prompt)}</span></p>
       <div class="choice-row">${splitChoices(question.choices).map((choice) => `<span>${escapeHtml(choice)}</span>`).join("")}</div>
     </article>`;
 }
@@ -205,8 +209,8 @@ function renderOrderingAnswerLine(sentence) {
 function renderOrderingQuestion(question) {
   return `
     <article class="problem problem-ordering">
-      <p class="problem-japanese"><span class="problem-number">(${question.number}) [${question.sourceNumber}]</span><span>${escapeHtml(question.prompt)}</span></p>
-      <p class="problem-english">${escapeHtml(question.sentence)}</p>
+      <p class="problem-japanese"><span class="problem-number">(${question.number}) [${question.sourceNumber}]</span><span>${escapePrintText(question.prompt)}</span></p>
+      <p class="problem-english">${escapePrintText(question.sentence)}</p>
       <p class="ordering-answer">${renderOrderingAnswerLine(question.sentence)}</p>
     </article>`;
 }
@@ -222,7 +226,7 @@ function renderFillSentence(question) {
     if (segmentIndex < blanks.length) {
       const word = words[index++] || "answer";
       const width = Math.max(7, Math.min(13, word.length + 3));
-      html += `<span class="word-blank" style="--blank-ch:${width}ch">(&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;)</span>`;
+      html += `<span class="word-blank" style="--blank-ch:${width}ch">(　　)</span>`;
     }
   });
   return html;
@@ -231,7 +235,7 @@ function renderFillSentence(question) {
 function renderFillQuestion(question) {
   return `
     <article class="problem problem-fill">
-      <p class="problem-japanese"><span class="problem-number">(${question.number}) [${question.sourceNumber}]</span><span>${escapeHtml(question.prompt)}</span></p>
+      <p class="problem-japanese"><span class="problem-number">(${question.number}) [${question.sourceNumber}]</span><span>${escapePrintText(question.prompt)}</span></p>
       <p class="problem-english">${renderFillSentence(question)}</p>
     </article>`;
 }
@@ -242,11 +246,11 @@ function renderMarkedSentence(sentence) {
   let html = "";
   let cursor = 0;
   for (const match of text.matchAll(pattern)) {
-    html += escapeHtml(text.slice(cursor, match.index));
+    html += escapePrintText(text.slice(cursor, match.index));
     html += `<span class="error-marker">${match[1]}<span>${escapeHtml(match[2])}</span></span>`;
     cursor = match.index + match[0].length;
   }
-  html += escapeHtml(text.slice(cursor));
+  html += escapePrintText(text.slice(cursor));
   return html;
 }
 
@@ -283,7 +287,7 @@ function renderAnswerItem(question) {
   return `
     <article class="answer-item answer-item--section-${question.section}">
       ${detail}
-      <p class="answer-explanation">${escapeHtml(question.explanation)}</p>
+      <p class="answer-explanation"><span class="explanation-label">【解説】</span>${escapeHtml(question.explanation)}</p>
     </article>`;
 }
 
