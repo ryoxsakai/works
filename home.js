@@ -1,4 +1,4 @@
-import { signIn, signOutUser, watchAuth } from "./shared/auth.js?v=11";
+import { signIn, signOutUser, watchAuth } from "./shared/auth.js?v=12";
 import { getTheme, setTheme } from "./shared/theme.js?v=5";
 
 const els = {
@@ -14,7 +14,7 @@ const els = {
 };
 
 const PENDING_DESTINATION_KEY = "works_pending_destination";
-const MODULE_DESTINATION_RE = /^\/(?:tutor|material|admission|ss)\/$/;
+const SAFE_DESTINATION_RE = /^(?:\/|\/(?:tutor|material|admission|ss)\/$)/;
 
 let authState = "checking";
 let resolveAuthState;
@@ -34,19 +34,19 @@ async function waitForAuthState() {
   return authState === "checking" ? authStateReady : authState;
 }
 
-function isModuleDestination(value) {
-  return MODULE_DESTINATION_RE.test(String(value || ""));
+function isSafeDestination(value) {
+  return SAFE_DESTINATION_RE.test(String(value || ""));
 }
 
 function savePendingDestination(value) {
-  if (!isModuleDestination(value)) return;
+  if (!isSafeDestination(value)) return;
   localStorage.setItem(PENDING_DESTINATION_KEY, value);
 }
 
 function consumePendingDestination() {
   const value = localStorage.getItem(PENDING_DESTINATION_KEY);
   localStorage.removeItem(PENDING_DESTINATION_KEY);
-  return isModuleDestination(value) ? value : "";
+  return isSafeDestination(value) ? value : "";
 }
 
 function showSignedOut(message = "") {
@@ -90,7 +90,7 @@ els.moduleLinks.forEach((link) => {
         window.location.assign(destination);
         return;
       }
-      signIn();
+      signIn("/tutor/");
     } catch (error) {
       els.authError.textContent = error instanceof Error ? error.message : String(error);
     }
@@ -106,7 +106,8 @@ els.authAction.addEventListener("click", async () => {
       showSignedOut();
       return;
     }
-    signIn();
+    savePendingDestination("/");
+    signIn("/tutor/");
   } catch (error) {
     els.authError.textContent = error instanceof Error ? error.message : String(error);
   }
