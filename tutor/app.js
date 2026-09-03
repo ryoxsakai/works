@@ -3,7 +3,7 @@ import {
   signOutUser,
   getGoogleAccessToken,
   getSessionToken,
-} from "../shared/auth.js?v=11";
+} from "../shared/auth.js?v=12";
 import { getTheme, setTheme } from "../shared/theme.js?v=5";
 
 const PASTEL_FALLBACK_COLORS = [
@@ -17,6 +17,14 @@ const PASTEL_FALLBACK_COLORS = [
 ];
 
 const API_BASE = "/api";
+const PENDING_DESTINATION_KEY = "works_pending_destination";
+const SAFE_DESTINATION_RE = /^(?:\/|\/(?:tutor|material|admission|ss)\/)$/;
+
+function consumePendingDestination() {
+  const value = localStorage.getItem(PENDING_DESTINATION_KEY);
+  localStorage.removeItem(PENDING_DESTINATION_KEY);
+  return SAFE_DESTINATION_RE.test(String(value || "")) ? value : "";
+}
 const EVENT_VIEW_KEY = "works_event_view";
 const ACTIVE_PAGE_TAB_KEY = "works_active_page_tab";
 const CURRICULUM_STATE_KEY = "works_curriculum_state";
@@ -598,6 +606,12 @@ els.signOutBtn.addEventListener("click", async () => {
 
 watchAuth({
   onSignedIn: async (user) => {
+    const pendingDestination = consumePendingDestination();
+    if (pendingDestination && pendingDestination !== window.location.pathname) {
+      window.location.replace(pendingDestination);
+      return;
+    }
+
     els.signedIn.hidden = false;
     els.userBar.hidden = false;
     els.signOutBtn.title = `${user.email} (クリックでログアウト)`;

@@ -13,8 +13,8 @@ let sessionToken = null;
 let cachedGoogleToken = null; // { access_token, expires_at }
 let googleTokenPromise = null; // 同時に複数箇所から呼ばれても1回のリクエストにまとめる
 
-function redirectUri() {
-  const u = new URL(window.location.href);
+function redirectUri(pathname = window.location.pathname) {
+  const u = new URL(pathname, window.location.origin);
   u.search = "";
   u.hash = "";
   return u.toString();
@@ -143,10 +143,10 @@ export function isStandaloneHomeScreenApp() {
   return Boolean(window.navigator.standalone);
 }
 
-export function signIn() {
+export function signIn(redirectPath) {
   const params = new URLSearchParams({
     client_id: GOOGLE_CLIENT_ID,
-    redirect_uri: redirectUri(),
+    redirect_uri: redirectUri(redirectPath),
     response_type: "code",
     scope: SCOPES,
     access_type: "offline",
