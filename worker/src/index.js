@@ -4401,8 +4401,20 @@ async function listMcpAdmissionEvents(env, args = {}) {
 
   const dateFrom = args.date_from === undefined ? "" : String(args.date_from).trim();
   const dateTo = args.date_to === undefined ? "" : String(args.date_to).trim();
-  if (dateFrom && !/^\d{4}-\d{2}-\d{2}$/.test(dateFrom)) throw httpError(400, "date_from must be YYYY-MM-DD");
-  if (dateTo && !/^\d{4}-\d{2}-\d{2}$/.test(dateTo)) throw httpError(400, "date_to must be YYYY-MM-DD");
+  if (dateFrom) {
+    try {
+      scheduleDateRange(dateFrom);
+    } catch {
+      throw httpError(400, "date_from must be a valid date in YYYY-MM-DD format");
+    }
+  }
+  if (dateTo) {
+    try {
+      scheduleDateRange(dateTo);
+    } catch {
+      throw httpError(400, "date_to must be a valid date in YYYY-MM-DD format");
+    }
+  }
   if (dateFrom && dateTo && dateFrom > dateTo) throw httpError(400, "date_from must not be after date_to");
 
   const universityQuery = String(args.university || "").trim().toLocaleLowerCase("ja-JP");
