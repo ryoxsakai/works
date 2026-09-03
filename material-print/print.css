@@ -347,8 +347,9 @@ body {
   font-family: "Times New Roman", "Yu Mincho", serif;
 }
 
-.answer-key span {
-  margin-left: 2mm;
+.answer-number {
+  font-family: "Times New Roman", "Yu Mincho", serif;
+  font-weight: 400;
 }
 
 .answer-explanation {
