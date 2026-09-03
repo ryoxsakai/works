@@ -19,7 +19,7 @@
   <link rel="apple-touch-icon" href="/shared/logo.png" />
   <link rel="stylesheet" href="/shared/styles.css?v=55" />
   <link rel="stylesheet" href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" />
-  <link rel="stylesheet" href="/ss/ss.css?v=1" />
+  <link rel="stylesheet" href="/ss/ss.css?v=2" />
 </head>
 <body>
   <header class="page-header">
@@ -44,14 +44,29 @@
           <p id="ss-summary" class="ss-summary" aria-live="polite"></p>
         </div>
 
+        <div class="ss-sort-toolbar" aria-label="案件の並べ替え">
+          <label for="ss-sort-key">並べ替え</label>
+          <select id="ss-sort-key">
+            <option value="name">案件</option>
+            <option value="status">進捗</option>
+            <option value="deadline" selected>締切日</option>
+            <option value="remaining">残り期間</option>
+          </select>
+          <button id="ss-sort-direction" type="button" aria-label="降順に切り替える">
+            <i class="bx bx-sort-up" aria-hidden="true"></i>
+            <span>昇順</span>
+          </button>
+        </div>
+
         <div class="ss-table-shell">
           <table class="ss-table">
             <thead>
               <tr>
-                <th>プロジェクト名</th>
-                <th>ステータス</th>
-                <th>締切日</th>
-                <th>のこり期間</th>
+                <th aria-sort="none"><button class="ss-sort-button" type="button" data-sort-key="name">案件<i class="bx bx-sort-alt-2" aria-hidden="true"></i></button></th>
+                <th aria-sort="none"><button class="ss-sort-button" type="button" data-sort-key="status">進捗<i class="bx bx-sort-alt-2" aria-hidden="true"></i></button></th>
+                <th aria-sort="ascending"><button class="ss-sort-button" type="button" data-sort-key="deadline">締切日<i class="bx bx-sort-up" aria-hidden="true"></i></button></th>
+                <th aria-sort="none"><button class="ss-sort-button" type="button" data-sort-key="remaining">残り期間<i class="bx bx-sort-alt-2" aria-hidden="true"></i></button></th>
+                <th>メモ</th>
               </tr>
             </thead>
             <tbody id="ss-project-list"></tbody>
@@ -65,6 +80,6 @@
     </section>
   </main>
 
-  <script type="module" src="/ss/app.js?v=1"></script>
+  <script type="module" src="/ss/app.js?v=2"></script>
 </body>
 </html>

@@ -8,6 +8,14 @@ const STATUS_CLASSES = {
   "完了": "completed",
 };
 
+const STATUS_ORDER = {
+  "原稿待ち": 0,
+  "素材案作成中": 1,
+  "素材案確認待ち": 2,
+  "問題作成中": 3,
+  "完了": 4,
+};
+
 const els = {
   signedIn: document.querySelector("#signed-in"),
   signOut: document.querySelector("#sign-out"),
@@ -18,9 +26,32 @@ const els = {
   list: document.querySelector("#ss-project-list"),
   empty: document.querySelector("#ss-empty"),
   summary: document.querySelector("#ss-summary"),
+  sortButtons: [...document.querySelectorAll(".ss-sort-button")],
+  sortKey: document.querySelector("#ss-sort-key"),
+  sortDirection: document.querySelector("#ss-sort-direction"),
 };
 
 let projects = [];
+let sortState = loadSortState();
+
+function loadSortState() {
+  try {
+    const saved = JSON.parse(localStorage.getItem("works_ss_sort") || "null");
+    if (["name", "status", "deadline", "remaining"].includes(saved?.key)
+      && ["asc", "desc"].includes(saved?.direction)) {
+      return saved;
+    }
+  } catch {
+    // 破損した保存値は既定値へ戻す。
+  }
+  return { key: "deadline", direction: "asc" };
+}
+
+function setSort(key, direction) {
+  sortState = { key, direction };
+  localStorage.setItem("works_ss_sort", JSON.stringify(sortState));
+  render();
+}
 
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, (character) => ({
@@ -54,11 +85,17 @@ function remainingDays(deadline) {
 
 function remaining(project) {
   if (project.status === "完了") return { text: "完了", className: "completed" };
-  const days = remainingDays(project.deadline);
+  const days = project.remaining_days === null || project.remaining_days === undefined
+    ? remainingDays(project.deadline)
+    : Number(project.remaining_days);
   if (!Number.isFinite(days)) return { text: "—", className: "" };
-  if (days > 0) return { text: `あと${days}日`, className: days <= 3 ? "urgent" : "" };
-  if (days === 0) return { text: "本日", className: "urgent" };
-  return { text: `${Math.abs(days)}日超過`, className: "overdue" };
+  if (days < 0) return { text: `${Math.abs(days)}日超過`, className: "overdue" };
+  if (days === 0) return { text: "本日", className: "due-week-1" };
+  if (days <= 7) return { text: `あと${days}日`, className: "due-week-1" };
+  if (days <= 14) return { text: `あと${days}日`, className: "due-week-2" };
+  if (days <= 21) return { text: `あと${days}日`, className: "due-week-3" };
+  if (days <= 28) return { text: `あと${days}日`, className: "due-week-4" };
+  return { text: `あと${days}日`, className: "due-beyond" };
 }
 
 function formatDate(value) {
@@ -73,19 +110,67 @@ function formatDate(value) {
   }).format(date);
 }
 
+function sortValue(project, key) {
+  if (key === "name") return String(project.name || "");
+  if (key === "status") return STATUS_ORDER[project.status] ?? Number.MAX_SAFE_INTEGER;
+  if (key === "deadline") return dateNumber(project.deadline);
+  if (key === "remaining") {
+    return project.remaining_days === null || project.remaining_days === undefined
+      ? remainingDays(project.deadline)
+      : Number(project.remaining_days);
+  }
+  return "";
+}
+
+function sortedProjects() {
+  const multiplier = sortState.direction === "desc" ? -1 : 1;
+  return [...projects].sort((a, b) => {
+    const left = sortValue(a, sortState.key);
+    const right = sortValue(b, sortState.key);
+    let result;
+    if (typeof left === "string" || typeof right === "string") {
+      result = String(left).localeCompare(String(right), "ja", { numeric: true, sensitivity: "base" });
+    } else {
+      result = Number(left) - Number(right);
+    }
+    return result === 0
+      ? String(a.name || "").localeCompare(String(b.name || ""), "ja", { numeric: true })
+      : result * multiplier;
+  });
+}
+
+function renderSortControls() {
+  els.sortKey.value = sortState.key;
+  const ascending = sortState.direction === "asc";
+  els.sortDirection.querySelector("span").textContent = ascending ? "昇順" : "降順";
+  els.sortDirection.querySelector("i").className = `bx ${ascending ? "bx-sort-up" : "bx-sort-down"}`;
+  els.sortDirection.setAttribute("aria-label", `${ascending ? "降順" : "昇順"}に切り替える`);
+
+  for (const button of els.sortButtons) {
+    const active = button.dataset.sortKey === sortState.key;
+    const header = button.closest("th");
+    header.setAttribute("aria-sort", active ? (ascending ? "ascending" : "descending") : "none");
+    button.classList.toggle("active", active);
+    button.querySelector("i").className = `bx ${active ? (ascending ? "bx-sort-up" : "bx-sort-down") : "bx-sort-alt-2"}`;
+  }
+}
+
 function render() {
   const active = projects.filter((project) => project.status !== "完了").length;
   els.summary.textContent = projects.length ? `進行中 ${active}件／全${projects.length}件` : "";
   els.empty.hidden = projects.length > 0;
-  els.list.innerHTML = projects.map((project) => {
+  renderSortControls();
+  els.list.innerHTML = sortedProjects().map((project) => {
     const remainingState = remaining(project);
     const statusClass = STATUS_CLASSES[project.status] || "unknown";
+    const memo = project.memo || "—";
     return `
       <tr>
-        <td data-label="プロジェクト名" class="ss-project-name">${escapeHtml(project.name)}</td>
-        <td data-label="ステータス"><span class="ss-status ss-status-${statusClass}">${escapeHtml(project.status)}</span></td>
+        <td data-label="案件" class="ss-project-name">${escapeHtml(project.name)}</td>
+        <td data-label="進捗"><span class="ss-status ss-status-${statusClass}">${escapeHtml(project.status)}</span></td>
         <td data-label="締切日" class="ss-deadline"><time datetime="${escapeHtml(project.deadline)}">${escapeHtml(formatDate(project.deadline))}</time></td>
         <td data-label="のこり期間"><span class="ss-remaining ${remainingState.className}">${escapeHtml(remainingState.text)}</span></td>
+        <td data-label="メモ" class="ss-memo ${project.memo ? "" : "empty"}">${escapeHtml(memo)}</td>
       </tr>`;
   }).join("");
 }
@@ -114,6 +199,18 @@ els.signOut.addEventListener("click", async () => {
 
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden && projects.length) render();
+});
+
+for (const button of els.sortButtons) {
+  button.addEventListener("click", () => {
+    const key = button.dataset.sortKey;
+    setSort(key, sortState.key === key && sortState.direction === "asc" ? "desc" : "asc");
+  });
+}
+
+els.sortKey.addEventListener("change", () => setSort(els.sortKey.value, "asc"));
+els.sortDirection.addEventListener("click", () => {
+  setSort(sortState.key, sortState.direction === "asc" ? "desc" : "asc");
 });
 
 watchAuth({
