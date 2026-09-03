@@ -3,11 +3,14 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { Miniflare } from "miniflare";
 
+let moduleSequence = 0;
+
 async function loadAdmissionFunctions() {
   const sourceUrl = new URL("../src/index.js", import.meta.url);
   const source = await readFile(sourceUrl, "utf8");
   const exposedSource = `${source}\nexport { createMcpAccessToken, handleMcp, ensureAdmissionSchema, ensureAdmissionSupplement2027, listMcpAdmissionEvents };`;
-  return import(`data:text/javascript;base64,${Buffer.from(exposedSource).toString("base64")}`);
+  moduleSequence += 1;
+  return import(`data:text/javascript;base64,${Buffer.from(exposedSource).toString("base64")}#${moduleSequence}`);
 }
 
 test("admission schedules are available through a read-only MCP tool", async (context) => {
