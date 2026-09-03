@@ -231,6 +231,26 @@ const ssSourceEmailProperties = {
 
 const MCP_SCHEDULE_TOOLS = [
   {
+    name: "list_admission_events",
+    title: "入試日程を一覧取得",
+    description:
+      "WORKS入試管理に登録された日程を取得します。年度、大学名、入試方式、段階、日付範囲で絞り込めます。未登録校の照合や登録状況の確認に使用します。",
+    inputSchema: {
+      type: "object",
+      properties: {
+        year: { type: "integer", minimum: 2000, maximum: 2100, description: "対象年度。schedule_dateの年で絞り込みます。" },
+        university: { type: "string", description: "大学名の部分一致検索語。" },
+        selection_type: { type: "string", description: "入試方式の完全一致値。例: general, ct, regional, recommendation, comprehensive。" },
+        stage: { type: "string", description: "段階の完全一致値。例: primary, first_result, secondary, final_result。" },
+        date_from: { type: "string", description: "YYYY-MM-DD形式の開始日。" },
+        date_to: { type: "string", description: "YYYY-MM-DD形式の終了日。" },
+        limit: { type: "integer", minimum: 1, maximum: 500, description: "返す日程の最大件数。省略時は200件。" },
+      },
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+  },
+  {
     name: "get_schedule",
     title: "授業予定を取得",
     description:
@@ -2249,9 +2269,9 @@ async function handleMcp(request, env, url) {
     return mcpResponse(id, {
       protocolVersion: params.protocolVersion || "2025-06-18",
       capabilities: { tools: {} },
-      serverInfo: { name: "works-schedule", version: "1.10.0" },
+      serverInfo: { name: "works-schedule", version: "1.11.0" },
       instructions:
-        "Use search_schedules to find exact event_id and calendar_id values before schedule writes. Use get_student_profile before updating a student memo or print name, and get_student_profile_change_history before undoing a profile update. Use list_material_categories before creating, renaming, reordering, or moving material categories, and list_curriculum_materials before creating, moving, renaming, reordering, merging, or deleting curriculum materials and chapters. Use get_student_materials before updating chapter completion. For SS project changes based on email, read the relevant email, call list_ss_projects before every write, then call create_ss_project or update_ss_project with the exact Gmail message_id and subject when available. Do not infer a deadline or status that the email does not establish. Merge duplicate chapters to preserve student progress; delete_material_chapter refuses to remove a chapter that has progress. Use briefing and progress tools to prepare and report, history before undoing changes, search_materials before linking a file, and preview_reschedule before apply_reschedule. Dates use Asia/Tokyo. Update tools preserve fields that are not supplied; pass null to clear a text field where supported.",
+        "Use list_admission_events to inspect WORKS admission schedules and compare registered universities before reporting missing schools. Use search_schedules to find exact event_id and calendar_id values before schedule writes. Use get_student_profile before updating a student memo or print name, and get_student_profile_change_history before undoing a profile update. Use list_material_categories before creating, renaming, reordering, or moving material categories, and list_curriculum_materials before creating, moving, renaming, reordering, merging, or deleting curriculum materials and chapters. Use get_student_materials before updating chapter completion. For SS project changes based on email, read the relevant email, call list_ss_projects before every write, then call create_ss_project or update_ss_project with the exact Gmail message_id and subject when available. Do not infer a deadline or status that the email does not establish. Merge duplicate chapters to preserve student progress; delete_material_chapter refuses to remove a chapter that has progress. Use briefing and progress tools to prepare and report, history before undoing changes, search_materials before linking a file, and preview_reschedule before apply_reschedule. Dates use Asia/Tokyo. Update tools preserve fields that are not supplied; pass null to clear a text field where supported.",
     });
   }
   if (method === "notifications/initialized") {
@@ -2289,6 +2309,9 @@ async function handleMcp(request, env, url) {
       if (args.date) searchParams.set("date", String(args.date));
       if (args.include_excluded) searchParams.set("include_excluded", "true");
       return mcpToolResult(id, await readSchedule(env, searchParams));
+    }
+    if (toolName === "list_admission_events") {
+      return mcpToolResult(id, await listMcpAdmissionEvents(env, args));
     }
     if (toolName === "search_schedules") {
       return mcpToolResult(id, await searchSchedules(env, args));
@@ -4370,6 +4393,51 @@ async function readAdmissionEvents(env, year) {
     : env.DB.prepare("SELECT * FROM admission_events ORDER BY schedule_date, university, stage");
   const { results } = await query.all();
   return results;
+}
+
+async function listMcpAdmissionEvents(env, args = {}) {
+  const year = args.year === undefined ? null : String(args.year).trim();
+  if (year && !/^\d{4}$/.test(year)) throw httpError(400, "year must be a four-digit year");
+
+  const dateFrom = args.date_from === undefined ? "" : String(args.date_from).trim();
+  const dateTo = args.date_to === undefined ? "" : String(args.date_to).trim();
+  if (dateFrom && !/^\d{4}-\d{2}-\d{2}$/.test(dateFrom)) throw httpError(400, "date_from must be YYYY-MM-DD");
+  if (dateTo && !/^\d{4}-\d{2}-\d{2}$/.test(dateTo)) throw httpError(400, "date_to must be YYYY-MM-DD");
+  if (dateFrom && dateTo && dateFrom > dateTo) throw httpError(400, "date_from must not be after date_to");
+
+  const universityQuery = String(args.university || "").trim().toLocaleLowerCase("ja-JP");
+  const selectionType = String(args.selection_type || "").trim();
+  const stage = String(args.stage || "").trim();
+  const limit = Math.min(500, Math.max(1, Number(args.limit) || 200));
+
+  let events = await readAdmissionEvents(env, year);
+  events = events.filter((event) => {
+    if (universityQuery && !String(event.university || "").toLocaleLowerCase("ja-JP").includes(universityQuery)) return false;
+    if (selectionType && event.selection_type !== selectionType) return false;
+    if (stage && event.stage !== stage) return false;
+    if (dateFrom && event.schedule_date < dateFrom) return false;
+    if (dateTo && event.schedule_date > dateTo) return false;
+    return true;
+  });
+
+  const universities = [...new Set(events.map((event) => event.university))]
+    .sort((left, right) => left.localeCompare(right, "ja"));
+  const total = events.length;
+  return {
+    filters: {
+      year: year ? Number(year) : null,
+      university: args.university || null,
+      selection_type: selectionType || null,
+      stage: stage || null,
+      date_from: dateFrom || null,
+      date_to: dateTo || null,
+    },
+    total,
+    university_count: universities.length,
+    universities,
+    events: events.slice(0, limit),
+    truncated: total > limit,
+  };
 }
 
 async function createAdmissionEvent(env, body) {
