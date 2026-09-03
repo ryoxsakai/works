@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=M+PLUS+1p:wght@400;500;700&display=swap" rel="stylesheet" />
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <title>SS管理 | Works</title>
+  <script>
+    (function () {
+      var t = localStorage.getItem("works_theme");
+      if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+    })();
+  </script>
+  <link rel="apple-touch-icon" href="/shared/logo.png" />
+  <link rel="stylesheet" href="/shared/styles.css?v=55" />
+  <link rel="stylesheet" href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" />
+  <link rel="stylesheet" href="/ss/ss.css?v=1" />
+</head>
+<body>
+  <header class="page-header">
+    <h1><a href="/">SS管理</a></h1>
+    <div class="user-bar" hidden>
+      <button id="sign-out" type="button" class="user-icon-btn" aria-label="ログアウト">
+        <img id="user-avatar" alt="" hidden />
+        <i class="bx bx-user-circle" id="user-avatar-fallback"></i>
+      </button>
+    </div>
+  </header>
+
+  <main class="ss-main">
+    <section id="signed-in" hidden>
+      <p id="ss-error" class="error" role="alert"></p>
+      <section class="ss-panel" aria-labelledby="ss-title">
+        <div class="ss-heading">
+          <div>
+            <p class="eyebrow">PROJECT TRACKER</p>
+            <h2 id="ss-title"><i class="bx bx-briefcase-alt-2"></i> SS案件</h2>
+          </div>
+          <p id="ss-summary" class="ss-summary" aria-live="polite"></p>
+        </div>
+
+        <div class="ss-table-shell">
+          <table class="ss-table">
+            <thead>
+              <tr>
+                <th>プロジェクト名</th>
+                <th>ステータス</th>
+                <th>締切日</th>
+                <th>のこり期間</th>
+              </tr>
+            </thead>
+            <tbody id="ss-project-list"></tbody>
+          </table>
+          <div id="ss-empty" class="ss-empty" hidden>
+            <i class="bx bx-inbox"></i>
+            <p>登録中のプロジェクトはありません。</p>
+          </div>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script type="module" src="/ss/app.js?v=1"></script>
+</body>
+</html>

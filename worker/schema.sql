@@ -192,6 +192,36 @@ CREATE TABLE IF NOT EXISTS mcp_student_profile_changes (
 CREATE INDEX IF NOT EXISTS idx_mcp_student_profile_changes_name
   ON mcp_student_profile_changes(name, created_at DESC);
 
+-- SS管理: 問題作成案件の進行状況。画面は閲覧専用とし、更新はMCPから行う。
+CREATE TABLE IF NOT EXISTS ss_projects (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('原稿待ち', '素材案作成中', '素材案確認待ち', '問題作成中', '完了')),
+  deadline TEXT NOT NULL,
+  last_source_email_id TEXT,
+  last_source_email_subject TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_ss_projects_unique_name
+  ON ss_projects(lower(trim(name)));
+CREATE INDEX IF NOT EXISTS idx_ss_projects_deadline
+  ON ss_projects(status, deadline);
+
+-- メールを根拠にMCPから行ったSS案件の登録・更新履歴。
+CREATE TABLE IF NOT EXISTS mcp_ss_project_changes (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  action TEXT NOT NULL,
+  changed_fields TEXT NOT NULL,
+  before_json TEXT NOT NULL,
+  after_json TEXT NOT NULL,
+  source_email_id TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_mcp_ss_project_changes_project
+  ON mcp_ss_project_changes(project_id, created_at DESC);
+
 -- 教材ライブラリのファイルとGoogleカレンダー予定の対応。
 CREATE TABLE IF NOT EXISTS schedule_material_links (
   calendar_id TEXT NOT NULL,

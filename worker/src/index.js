@@ -210,6 +210,25 @@ const scheduleUpdateProperties = {
   },
 };
 
+const SS_PROJECT_STATUSES = [
+  "原稿待ち",
+  "素材案作成中",
+  "素材案確認待ち",
+  "問題作成中",
+  "完了",
+];
+
+const ssSourceEmailProperties = {
+  source_email_id: {
+    type: "string",
+    description: "更新根拠となったメールのmessage_id。Gmailで取得できた場合は正確な値を指定します。",
+  },
+  source_email_subject: {
+    type: "string",
+    description: "更新根拠となったメールの件名。監査用に保存し、SS管理画面には表示しません。",
+  },
+};
+
 const MCP_SCHEDULE_TOOLS = [
   {
     name: "get_schedule",
@@ -839,6 +858,74 @@ const MCP_SCHEDULE_TOOLS = [
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
   },
   {
+    name: "list_ss_projects",
+    title: "SS案件を一覧取得",
+    description:
+      "SS管理の案件を締切順で取得します。メールをもとに登録・更新する前に、同じ案件がないか確認し、更新対象のproject_idを取得するときに使用します。",
+    inputSchema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "プロジェクト名の部分一致検索語。" },
+        status: {
+          type: "string",
+          enum: SS_PROJECT_STATUSES,
+          description: "ステータスで絞り込む場合に指定します。",
+        },
+        include_completed: {
+          type: "boolean",
+          description: "完了案件を含めるか。省略時はtrue。",
+        },
+      },
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+  },
+  {
+    name: "create_ss_project",
+    title: "SS案件を登録",
+    description:
+      "メールなどで確認したSS案件を登録します。同名かつ同内容の案件がある場合は既存案件を返し、内容が異なる場合はupdate_ss_projectの使用を求めて停止します。",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string", description: "プロジェクト名。" },
+        status: {
+          type: "string",
+          enum: SS_PROJECT_STATUSES,
+          description: "現在のステータス。",
+        },
+        deadline: { type: "string", description: "締切日。YYYY-MM-DD形式。" },
+        ...ssSourceEmailProperties,
+      },
+      required: ["name", "status", "deadline"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  {
+    name: "update_ss_project",
+    title: "SS案件を更新",
+    description:
+      "既存のSS案件を部分更新します。メールを根拠に更新する場合はsource_email_idとsource_email_subjectも指定します。省略した項目は変更しません。",
+    inputSchema: {
+      type: "object",
+      properties: {
+        project_id: { type: "string", description: "list_ss_projectsで取得した案件ID。" },
+        name: { type: "string", description: "変更後のプロジェクト名。" },
+        status: {
+          type: "string",
+          enum: SS_PROJECT_STATUSES,
+          description: "変更後のステータス。",
+        },
+        deadline: { type: "string", description: "変更後の締切日。YYYY-MM-DD形式。" },
+        ...ssSourceEmailProperties,
+      },
+      required: ["project_id"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  },
+  {
     name: "get_monthly_report",
     title: "月次授業レポートを取得",
     description: "指定月の授業数、完了率、未記録数、入力漏れ、生徒別集計を取得します。",
@@ -1007,6 +1094,259 @@ async function ensureMcpFeatureSchema(env) {
     });
   }
   await mcpFeatureSchemaReady;
+}
+
+let ssProjectSchemaReady = null;
+
+async function ensureSsProjectSchema(env) {
+  if (!ssProjectSchemaReady) {
+    ssProjectSchemaReady = env.DB.batch([
+      env.DB.prepare(
+        "CREATE TABLE IF NOT EXISTS ss_projects (id TEXT PRIMARY KEY, name TEXT NOT NULL, status TEXT NOT NULL CHECK (status IN ('原稿待ち', '素材案作成中', '素材案確認待ち', '問題作成中', '完了')), deadline TEXT NOT NULL, last_source_email_id TEXT, last_source_email_subject TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')))"
+      ),
+      env.DB.prepare(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_ss_projects_unique_name ON ss_projects(lower(trim(name)))"
+      ),
+      env.DB.prepare(
+        "CREATE INDEX IF NOT EXISTS idx_ss_projects_deadline ON ss_projects(status, deadline)"
+      ),
+      env.DB.prepare(
+        "CREATE TABLE IF NOT EXISTS mcp_ss_project_changes (id TEXT PRIMARY KEY, project_id TEXT NOT NULL, action TEXT NOT NULL, changed_fields TEXT NOT NULL, before_json TEXT NOT NULL, after_json TEXT NOT NULL, source_email_id TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')))"
+      ),
+      env.DB.prepare(
+        "CREATE INDEX IF NOT EXISTS idx_mcp_ss_project_changes_project ON mcp_ss_project_changes(project_id, created_at DESC)"
+      ),
+    ]).catch((err) => {
+      ssProjectSchemaReady = null;
+      throw err;
+    });
+  }
+  await ssProjectSchemaReady;
+}
+
+function normalizeSsProjectName(value) {
+  const name = String(value || "").trim();
+  if (!name) throw httpError(400, "name is required");
+  if (name.length > 200) throw httpError(400, "name is too long");
+  return name;
+}
+
+function normalizeSsProjectStatus(value) {
+  const status = String(value || "").trim();
+  if (!SS_PROJECT_STATUSES.includes(status)) {
+    throw httpError(400, `status must be one of: ${SS_PROJECT_STATUSES.join("・")}`);
+  }
+  return status;
+}
+
+function normalizeSsProjectDeadline(value) {
+  const deadline = String(value || "").trim();
+  const match = deadline.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) throw httpError(400, "deadline must be YYYY-MM-DD");
+  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+  if (
+    date.getUTCFullYear() !== Number(match[1]) ||
+    date.getUTCMonth() !== Number(match[2]) - 1 ||
+    date.getUTCDate() !== Number(match[3])
+  ) {
+    throw httpError(400, "deadline is not a valid date");
+  }
+  return deadline;
+}
+
+function normalizeSsSourceEmail(value, field, maxLength) {
+  if (value === undefined || value === null) return null;
+  const normalized = String(value).trim();
+  if (normalized.length > maxLength) throw httpError(400, `${field} is too long`);
+  return normalized || null;
+}
+
+function ssProjectRemainingDays(deadline, today = todayInScheduleTimeZone()) {
+  const toUtc = (value) => {
+    const [year, month, day] = String(value).split("-").map(Number);
+    return Date.UTC(year, month - 1, day);
+  };
+  return Math.round((toUtc(deadline) - toUtc(today)) / 86_400_000);
+}
+
+function withSsProjectRemainingDays(project, today) {
+  return {
+    ...project,
+    remaining_days: ssProjectRemainingDays(project.deadline, today),
+  };
+}
+
+async function readSsProjects(env, args = {}) {
+  await ensureSsProjectSchema(env);
+  const clauses = [];
+  const values = [];
+  const query = String(args.query || "").trim();
+  if (query) {
+    clauses.push("instr(lower(name), lower(?)) > 0");
+    values.push(query);
+  }
+  if (args.status !== undefined) {
+    clauses.push("status = ?");
+    values.push(normalizeSsProjectStatus(args.status));
+  }
+  if (args.include_completed === false) {
+    clauses.push("status <> '完了'");
+  }
+  const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
+  const statement = env.DB.prepare(
+    `SELECT * FROM ss_projects ${where}
+     ORDER BY CASE WHEN status = '完了' THEN 1 ELSE 0 END,
+              CASE WHEN status <> '完了' THEN deadline END ASC,
+              CASE WHEN status = '完了' THEN deadline END DESC,
+              name ASC`
+  );
+  const { results } = values.length ? await statement.bind(...values).all() : await statement.all();
+  const today = todayInScheduleTimeZone();
+  return results.map((project) => withSsProjectRemainingDays(project, today));
+}
+
+async function createSsProject(env, args = {}) {
+  await ensureSsProjectSchema(env);
+  const name = normalizeSsProjectName(args.name);
+  const status = normalizeSsProjectStatus(args.status);
+  const deadline = normalizeSsProjectDeadline(args.deadline);
+  const sourceEmailId = normalizeSsSourceEmail(args.source_email_id, "source_email_id", 255);
+  const sourceEmailSubject = normalizeSsSourceEmail(
+    args.source_email_subject,
+    "source_email_subject",
+    500
+  );
+  const existing = await env.DB.prepare(
+    "SELECT * FROM ss_projects WHERE lower(trim(name)) = lower(trim(?)) LIMIT 1"
+  ).bind(name).first();
+  if (existing) {
+    if (existing.status === status && existing.deadline === deadline) {
+      return { created: false, project: withSsProjectRemainingDays(existing) };
+    }
+    throw httpError(
+      409,
+      `project already exists with different values: ${existing.id}; use update_ss_project`
+    );
+  }
+
+  const id = crypto.randomUUID();
+  const changeId = crypto.randomUUID();
+  const now = new Date().toISOString();
+  const project = {
+    id,
+    name,
+    status,
+    deadline,
+    last_source_email_id: sourceEmailId,
+    last_source_email_subject: sourceEmailSubject,
+    created_at: now,
+    updated_at: now,
+  };
+  await env.DB.batch([
+    env.DB.prepare(
+      "INSERT INTO ss_projects (id, name, status, deadline, last_source_email_id, last_source_email_subject, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+    ).bind(id, name, status, deadline, sourceEmailId, sourceEmailSubject, now, now),
+    env.DB.prepare(
+      "INSERT INTO mcp_ss_project_changes (id, project_id, action, changed_fields, before_json, after_json, source_email_id, created_at) VALUES (?, ?, 'create', ?, '{}', ?, ?, ?)"
+    ).bind(
+      changeId,
+      id,
+      JSON.stringify(["name", "status", "deadline"]),
+      JSON.stringify(project),
+      sourceEmailId,
+      now
+    ),
+  ]);
+  return { created: true, project: withSsProjectRemainingDays(project) };
+}
+
+async function updateSsProject(env, args = {}) {
+  await ensureSsProjectSchema(env);
+  const projectId = String(args.project_id || "").trim();
+  if (!projectId) throw httpError(400, "project_id is required");
+  const before = await env.DB.prepare("SELECT * FROM ss_projects WHERE id = ?")
+    .bind(projectId)
+    .first();
+  if (!before) throw httpError(404, `SS project not found: ${projectId}`);
+
+  const requested = {};
+  if (Object.prototype.hasOwnProperty.call(args, "name")) {
+    requested.name = normalizeSsProjectName(args.name);
+  }
+  if (Object.prototype.hasOwnProperty.call(args, "status")) {
+    requested.status = normalizeSsProjectStatus(args.status);
+  }
+  if (Object.prototype.hasOwnProperty.call(args, "deadline")) {
+    requested.deadline = normalizeSsProjectDeadline(args.deadline);
+  }
+  if (!Object.keys(requested).length) {
+    throw httpError(400, "at least one of name, status, or deadline is required");
+  }
+
+  if (requested.name && requested.name !== before.name) {
+    const duplicate = await env.DB.prepare(
+      "SELECT id FROM ss_projects WHERE id <> ? AND lower(trim(name)) = lower(trim(?)) LIMIT 1"
+    ).bind(projectId, requested.name).first();
+    if (duplicate) throw httpError(409, `another project already uses this name: ${duplicate.id}`);
+  }
+
+  const changedFields = Object.keys(requested).filter((field) => requested[field] !== before[field]);
+  if (!changedFields.length) {
+    return { updated: false, changed_fields: [], project: withSsProjectRemainingDays(before) };
+  }
+
+  const sourceEmailId = normalizeSsSourceEmail(args.source_email_id, "source_email_id", 255);
+  const sourceEmailSubject = normalizeSsSourceEmail(
+    args.source_email_subject,
+    "source_email_subject",
+    500
+  );
+  const now = new Date().toISOString();
+  const after = {
+    ...before,
+    ...requested,
+    last_source_email_id: sourceEmailId ?? before.last_source_email_id,
+    last_source_email_subject: sourceEmailSubject ?? before.last_source_email_subject,
+    updated_at: now,
+  };
+  const assignments = changedFields.map((field) => `${field} = ?`);
+  const values = changedFields.map((field) => requested[field]);
+  if (sourceEmailId !== null) {
+    assignments.push("last_source_email_id = ?");
+    values.push(sourceEmailId);
+  }
+  if (sourceEmailSubject !== null) {
+    assignments.push("last_source_email_subject = ?");
+    values.push(sourceEmailSubject);
+  }
+  assignments.push("updated_at = ?");
+  values.push(now, projectId);
+
+  await env.DB.batch([
+    env.DB.prepare(`UPDATE ss_projects SET ${assignments.join(", ")} WHERE id = ?`).bind(...values),
+    env.DB.prepare(
+      "INSERT INTO mcp_ss_project_changes (id, project_id, action, changed_fields, before_json, after_json, source_email_id, created_at) VALUES (?, ?, 'update', ?, ?, ?, ?, ?)"
+    ).bind(
+      crypto.randomUUID(),
+      projectId,
+      JSON.stringify(changedFields),
+      JSON.stringify(before),
+      JSON.stringify(after),
+      sourceEmailId,
+      now
+    ),
+  ]);
+  return {
+    updated: true,
+    changed_fields: changedFields,
+    before: withSsProjectRemainingDays(before),
+    project: withSsProjectRemainingDays(after),
+  };
+}
+
+async function listMcpSsProjects(env, args = {}) {
+  const projects = await readSsProjects(env, args);
+  return { count: projects.length, projects };
 }
 
 let curriculumIntegrityReady = null;
@@ -1882,9 +2222,9 @@ async function handleMcp(request, env, url) {
     return mcpResponse(id, {
       protocolVersion: params.protocolVersion || "2025-06-18",
       capabilities: { tools: {} },
-      serverInfo: { name: "works-schedule", version: "1.8.0" },
+      serverInfo: { name: "works-schedule", version: "1.9.0" },
       instructions:
-        "Use search_schedules to find exact event_id and calendar_id values before schedule writes. Use get_student_profile before updating a student memo or print name, and get_student_profile_change_history before undoing a profile update. Use list_material_categories before creating, renaming, reordering, or moving material categories, and list_curriculum_materials before creating, moving, renaming, reordering, merging, or deleting curriculum materials and chapters. Use get_student_materials before updating chapter completion. Merge duplicate chapters to preserve student progress; delete_material_chapter refuses to remove a chapter that has progress. Use briefing and progress tools to prepare and report, history before undoing changes, search_materials before linking a file, and preview_reschedule before apply_reschedule. Dates use Asia/Tokyo. Update tools preserve fields that are not supplied; pass null to clear a text field.",
+        "Use search_schedules to find exact event_id and calendar_id values before schedule writes. Use get_student_profile before updating a student memo or print name, and get_student_profile_change_history before undoing a profile update. Use list_material_categories before creating, renaming, reordering, or moving material categories, and list_curriculum_materials before creating, moving, renaming, reordering, merging, or deleting curriculum materials and chapters. Use get_student_materials before updating chapter completion. For SS project changes based on email, read the relevant email, call list_ss_projects before every write, then call create_ss_project or update_ss_project with the exact Gmail message_id and subject when available. Do not infer a deadline or status that the email does not establish. Merge duplicate chapters to preserve student progress; delete_material_chapter refuses to remove a chapter that has progress. Use briefing and progress tools to prepare and report, history before undoing changes, search_materials before linking a file, and preview_reschedule before apply_reschedule. Dates use Asia/Tokyo. Update tools preserve fields that are not supplied; pass null to clear a text field where supported.",
     });
   }
   if (method === "notifications/initialized") {
@@ -2012,6 +2352,15 @@ async function handleMcp(request, env, url) {
     }
     if (toolName === "set_chapter_completion") {
       return mcpToolResult(id, await setMcpChapterCompletion(env, args));
+    }
+    if (toolName === "list_ss_projects") {
+      return mcpToolResult(id, await listMcpSsProjects(env, args));
+    }
+    if (toolName === "create_ss_project") {
+      return mcpToolResult(id, await createSsProject(env, args));
+    }
+    if (toolName === "update_ss_project") {
+      return mcpToolResult(id, await updateSsProject(env, args));
     }
     if (toolName === "search_materials") {
       return mcpToolResult(id, await searchMcpMaterials(env, args));
@@ -4722,6 +5071,9 @@ export default {
         return json({ ok: true }, headers);
       }
 
+      if (url.pathname === "/api/ss-projects" && request.method === "GET") {
+        return json(await readSsProjects(env), headers);
+      }
 
       if (url.pathname === "/api/admissions" && request.method === "GET") {
         return json(await readAdmissionEvents(env, url.searchParams.get("year")), headers);
