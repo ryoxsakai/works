@@ -271,18 +271,19 @@ function renderAnswerGrid(start, end) {
 }
 
 function renderAnswerItem(question) {
+  const answerNumber = `<span class="answer-number">(${question.number})</span>`;
   let detail = "";
   if (question.section === 1) {
-    detail = `<p class="answer-key"><strong>(${question.number})　${escapeHtml(question.answer)}</strong></p>`;
+    detail = `<p class="answer-key">${answerNumber}　<strong class="answer-value">${escapeHtml(question.answer)}</strong></p>`;
   } else if (question.section === 2) {
-    detail = `<p class="answer-key"><strong>(${question.number})</strong> ${escapeHtml(question.answer)}</p>`;
+    detail = `<p class="answer-key">${answerNumber} ${escapeHtml(question.answer)}</p>`;
   } else if (question.section === 3) {
-    detail = `<p class="answer-key"><strong>(${question.number})</strong> ${escapeHtml(question.answer)}</p>`;
+    detail = `<p class="answer-key">${answerNumber} ${escapeHtml(question.answer)}</p>`;
   } else {
     const correction = question.answer === "誤りなし"
       ? "誤りなし"
       : `${question.answer}　${question.correction}`;
-    detail = `<p class="answer-key"><strong>(${question.number})</strong> ${escapeHtml(correction)}</p>`;
+    detail = `<p class="answer-key">${answerNumber} ${escapeHtml(correction)}</p>`;
   }
   return `
     <article class="answer-item answer-item--section-${question.section}">
@@ -329,8 +330,8 @@ function renderAnswerPage(test, page, groups) {
   return `
     <section class="sheet answer-sheet answer-sheet-${page}" data-page="${page}">
       ${page === 5 ? renderTestHeader(test, true) : ""}
-      ${groups.map(([section, start, end]) => `
-        ${renderSectionHeading(section, ANSWER_SECTION_LABELS[section], true)}
+      ${groups.map(([section, start, end, showHeading = true]) => `
+        ${showHeading ? renderSectionHeading(section, ANSWER_SECTION_LABELS[section], true) : ""}
         <div class="answer-list">${questions(test, start, end).map(renderAnswerItem).join("")}</div>`).join("")}
     </section>`;
 }
@@ -342,7 +343,7 @@ export function renderPrintSheets(test) {
     renderProblemPageThree(test),
     renderBlankPage(),
     renderAnswerPage(test, 5, [[1, 1, 10], [2, 11, 13]]),
-    renderAnswerPage(test, 6, [[2, 14, 15], [3, 16, 20], [4, 21, 25]]),
+    renderAnswerPage(test, 6, [[2, 14, 15, false], [3, 16, 20], [4, 21, 25]]),
   ].join("\n");
 }
 
