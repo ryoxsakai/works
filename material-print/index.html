@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=M+PLUS+1p:wght@400;500;700&display=swap" rel="stylesheet" />
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <title>教材印刷 | Works</title>
+  <script>
+    (function () {
+      var t = localStorage.getItem("works_theme");
+      if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+    })();
+  </script>
+  <link rel="apple-touch-icon" href="/shared/logo.png" />
+  <link rel="stylesheet" href="../shared/styles.css?v=55" />
+  <link rel="stylesheet" href="./app.css?v=1" />
+  <link rel="stylesheet" href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" />
+</head>
+<body>
+  <header class="page-header">
+    <h1><a href="/"><i class="bx bx-printer"></i> 教材印刷</a></h1>
+    <div class="user-bar" hidden>
+      <button id="sign-out" type="button" class="user-icon-btn" aria-label="ログアウト">
+        <img id="user-avatar" alt="" hidden />
+        <i class="bx bx-user-circle" id="user-avatar-fallback"></i>
+      </button>
+    </div>
+  </header>
+
+  <main class="print-app-main">
+    <section id="signed-in" hidden>
+      <p id="print-error" class="error" role="alert"></p>
+
+      <div class="print-workspace">
+        <section class="panel material-panel print-library" aria-labelledby="print-library-title">
+          <div class="panel-header material-heading">
+            <div>
+              <p class="eyebrow">PRINT LIBRARY</p>
+              <h2 id="print-library-title"><i class="bx bx-folder-open"></i> 教材を選択</h2>
+            </div>
+            <label class="print-local-button" for="print-local-file">
+              <input id="print-local-file" type="file" accept=".txt,text/plain" hidden />
+              <i class="bx bx-file"></i> ローカル原稿
+            </label>
+          </div>
+
+          <nav id="print-breadcrumb" class="material-breadcrumb" aria-label="フォルダ階層"></nav>
+
+          <label class="material-search print-search">
+            <i class="bx bx-search"></i>
+            <input id="print-search-input" type="search" placeholder="このフォルダ内を検索" />
+          </label>
+
+          <div id="print-folder-grid" class="material-folder-grid"></div>
+
+          <div class="material-file-section">
+            <div class="material-file-heading">
+              <h3>印刷できる原稿</h3>
+              <span id="print-file-count" class="material-count">0件</span>
+            </div>
+            <ul id="print-file-list" class="material-file-list"></ul>
+            <div id="print-empty" class="material-empty" hidden>
+              <i class="bx bx-file-blank"></i>
+              <p>このフォルダには印刷できるTXT原稿がありません。</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel material-panel print-preview-panel" aria-labelledby="print-preview-title">
+          <div class="panel-header material-heading print-preview-heading">
+            <div>
+              <p class="eyebrow">A4 PRINT PREVIEW</p>
+              <h2 id="print-preview-title"><i class="bx bx-file-find"></i> 印刷プレビュー</h2>
+              <p id="print-selected-path" class="print-selected-path">教材を選択してください</p>
+            </div>
+            <button id="print-action" type="button" class="btn-primary print-action" disabled>
+              <i class="bx bx-printer"></i> 印刷
+            </button>
+          </div>
+
+          <div id="print-status" class="print-status" role="status">
+            <i class="bx bx-info-circle"></i>
+            <span>Weekly TestのHS用TXT原稿を選択すると、問題・解答の6ページを作成します。</span>
+          </div>
+
+          <div id="print-preview-empty" class="print-preview-empty">
+            <i class="bx bx-printer"></i>
+            <p>左側のフォルダから教材を選択してください。</p>
+            <small>ローカル原稿はWorksへアップロードせず、この端末内だけで処理します。</small>
+          </div>
+          <iframe id="print-preview-frame" class="print-preview-frame" title="教材印刷プレビュー" hidden></iframe>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="./app.js?v=1"></script>
+</body>
+</html>
