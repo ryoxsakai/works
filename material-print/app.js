@@ -6,7 +6,7 @@ import {
 import {
   parseWeeklyTestDraft,
   createPrintDocumentHtml,
-} from "./print-template.mjs?v=3";
+} from "./print-template.mjs?v=4";
 
 const API_BASE = "/api/material-library";
 
@@ -231,7 +231,7 @@ function showPreview(text, label, key) {
   setStatus(`${test.round}回・25問を読み込みました。A4 6ページを組版しています。`);
 
   els.previewFrame.srcdoc = createPrintDocumentHtml(test, {
-    cssHref: "/material-print/print.css?v=3",
+    cssHref: "/material-print/print.css?v=4",
     paged: true,
   });
 
