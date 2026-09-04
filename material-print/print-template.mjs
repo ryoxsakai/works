@@ -156,7 +156,6 @@ function renderTestHeader(test, answer = false) {
     return `
       <header class="test-header answer-header">
         <div class="answer-title"><span class="heading-lead">${escapeHtml(test.year)} 年度　Weekly Test　</span>第${escapeHtml(test.round)}回　<span class="course-label">${escapeHtml(test.course)}</span>　解答</div>
-        <div class="answer-label">解答・解説一覧</div>
       </header>`;
   }
   return `
@@ -177,7 +176,7 @@ function renderTestHeader(test, answer = false) {
 function renderSectionHeading(number, instruction, compact = false) {
   const roman = ["", "I.", "II.", "III.", "IV."][number];
   return `
-    <div class="section-heading${compact ? " is-compact" : ""}">
+    <div class="section-heading section-heading--section-${number}${compact ? " is-compact" : ""}">
       <span class="section-number">${compact ? `${number}.` : roman}</span>
       <p>${escapePrintText(instruction)}</p>
     </div>`;
@@ -221,17 +220,13 @@ function renderOrderingQuestion(question) {
 }
 
 function renderFillSentence(question) {
-  const words = question.answer.split(/\s+/).filter(Boolean);
-  let index = 0;
   const segments = String(question.sentence).split(/\([A-Za-z]\s+\)/g);
   const blanks = [...String(question.sentence).matchAll(/\([A-Za-z]\s+\)/g)];
   let html = "";
   segments.forEach((segment, segmentIndex) => {
     html += escapeHtml(segment);
     if (segmentIndex < blanks.length) {
-      const word = words[index++] || "answer";
-      const width = Math.max(7, Math.min(13, word.length + 3));
-      html += `<span class="word-blank" style="--blank-ch:${width}ch">(　　)</span>`;
+      html += '<span class="word-blank">(　　)</span>';
     }
   });
   return html;
