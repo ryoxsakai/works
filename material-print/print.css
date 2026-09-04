@@ -6,7 +6,9 @@
 :root {
   color: #111;
   background: #d8dde3;
-  font-family: "Yu Mincho", "Hiragino Mincho ProN", "HGPMinchoE", "MS PMincho", serif;
+  --weekly-body-font: "YuMincho-Regular", "Yu Mincho", "YuMincho", "游明朝", "Hiragino Mincho ProN", "Hiragino Mincho Pro", "MS PMincho", serif;
+  --weekly-heading-font: "HGPMinchoE", "HGP明朝E", "HG明朝E", "YuMincho-Regular", "Yu Mincho", "YuMincho", "游明朝", "Hiragino Mincho ProN", serif;
+  font-family: var(--weekly-body-font);
   font-synthesis: none;
 }
 
@@ -41,7 +43,7 @@ body {
   page-break-after: always;
   background: #fff;
   box-shadow: 0 1.5mm 5mm rgb(0 0 0 / 18%);
-  font-size: 10.25pt;
+  font-size: 10.5pt;
   line-height: 1.42;
 }
 
@@ -51,23 +53,29 @@ body {
 }
 
 .test-header {
-  margin-bottom: 13mm;
+  margin-bottom: 10.5mm;
+}
+
+.problem-sheet-one .test-header {
+  margin-bottom: 2.5mm;
 }
 
 .test-heading {
   display: flex;
   align-items: baseline;
   gap: 4mm;
-  font-family: "HGPMinchoE", "HG明朝E", "Yu Mincho", "Hiragino Mincho ProN", serif;
-  font-size: 18pt;
-  font-weight: 400;
+  font-family: var(--weekly-heading-font);
+  font-size: 20pt;
+  font-weight: 600;
+  font-synthesis: weight;
   white-space: nowrap;
 }
 
+.test-heading .heading-lead,
 .test-heading strong {
-  font-size: 18pt;
-  font-weight: 400;
-  letter-spacing: .03em;
+  font-size: 20pt;
+  font-weight: 700;
+  letter-spacing: 0;
 }
 
 .test-score {
@@ -88,14 +96,20 @@ body {
 
 .student-fields {
   display: grid;
-  grid-template-columns: auto 18mm auto 43mm auto 8mm auto 8mm auto;
-  justify-content: end;
+  grid-template-columns: auto 16mm auto 43mm auto 7mm auto 7mm auto;
+  width: 132mm;
+  margin-left: auto;
   align-items: end;
-  gap: 1.3mm;
+  gap: 1mm;
   margin-top: 6mm;
-  font-size: 11.5pt;
-  font-weight: 700;
-  font-style: italic;
+  font-family: var(--weekly-heading-font);
+  font-size: 16pt;
+  font-weight: 600;
+  font-style: normal;
+}
+
+.student-fields span {
+  white-space: nowrap;
 }
 
 .student-fields i,
@@ -106,45 +120,50 @@ body {
 }
 
 .answer-title {
-  font-family: "HGPMinchoE", "HG明朝E", "Yu Mincho", "Hiragino Mincho ProN", serif;
-  font-size: 18pt;
-  font-weight: 400;
-  letter-spacing: .025em;
+  font-family: var(--weekly-heading-font);
+  font-size: 20pt;
+  font-weight: 600;
+  font-synthesis: weight;
+  letter-spacing: 0;
+}
+
+.answer-title .heading-lead {
+  font-weight: 700;
 }
 
 .answer-label {
   margin-top: 7mm;
-  font-size: 9.5pt;
+  font-family: "MS PGothic", "ＭＳ Ｐゴシック", "Hiragino Kaku Gothic ProN", sans-serif;
+  font-size: 10.5pt;
   font-weight: 700;
 }
 
 .section-heading {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto 1fr;
   align-items: start;
   gap: 2mm;
-  margin: 0 0 4mm;
+  margin: 0 0 1.5mm;
   break-after: avoid;
   page-break-after: avoid;
 }
 
 .section-number {
   min-width: 5mm;
-  font-size: 10.25pt;
+  font-size: 10.5pt;
   line-height: 1.55;
 }
 
 .section-heading p {
   margin: .15mm 0 0;
-  font-weight: 600;
+  font-weight: 400;
   line-height: 1.55;
 }
 
-.section-score {
-  align-self: center;
-  padding-left: 3mm;
-  font-size: 8.7pt;
-  white-space: nowrap;
+.section-score-line {
+  margin: 0 0 3mm;
+  font-size: 10.5pt;
+  line-height: 1.2;
 }
 
 .problem-list {
@@ -168,12 +187,12 @@ body {
 }
 
 .problem-number {
-  font-family: "Times New Roman", "Yu Mincho", serif;
+  font-family: var(--weekly-body-font);
   font-variant-numeric: tabular-nums;
 }
 
 .choice-list {
-  gap: 6.7mm;
+  gap: 5mm;
 }
 
 .choice-row {
@@ -181,12 +200,17 @@ body {
   flex-wrap: wrap;
   column-gap: 6mm;
   margin: .5mm 0 0 2mm;
-  font-size: 9.4pt;
-  line-height: 1.3;
+  font-size: 10.5pt;
+  line-height: 1.25;
+}
+
+.choice-marker,
+.circled-number {
+  font-family: "Cambria Math", var(--weekly-body-font);
 }
 
 .problem-sheet-one .answer-grid {
-  margin-top: 18mm;
+  margin-top: 22mm;
 }
 
 .problem-sheet-two {
@@ -208,7 +232,7 @@ body {
 .problem-english {
   margin-top: .55mm !important;
   margin-left: 0 !important;
-  font-family: "Times New Roman", "Yu Mincho", serif;
+  font-family: var(--weekly-body-font);
   font-size: 10.5pt;
 }
 
@@ -238,7 +262,7 @@ body {
 .answer-cell span {
   border-bottom: .2mm solid #777;
   font-family: Arial, sans-serif;
-  font-size: 8pt;
+  font-size: 10pt;
   line-height: 5mm;
 }
 
@@ -255,7 +279,8 @@ body {
   right: 14mm;
   bottom: 6mm;
   margin: 0;
-  font-size: 8pt;
+  font-size: 10.5pt;
+  font-weight: 700;
 }
 
 .problem-sheet-three {
@@ -281,13 +306,17 @@ body {
   align-items: baseline;
   gap: .7mm;
   margin: 0 .5mm;
-  font-family: "Yu Mincho", "Hiragino Mincho ProN", serif;
+  font-family: var(--weekly-body-font);
 }
 
-.error-marker > span {
+.error-marker > span:not(.circled-number) {
   border-bottom: .28mm solid #111;
-  font-family: "Times New Roman", serif;
+  font-family: var(--weekly-body-font);
   line-height: 1.2;
+}
+
+.error-marker > .circled-number {
+  font-family: "Cambria Math", var(--weekly-body-font);
 }
 
 .correction-fields {
@@ -297,12 +326,12 @@ body {
   justify-content: end;
   gap: 1mm;
   margin: 1.3mm 0 0 19mm;
-  font-size: 9.5pt;
+  font-size: 10.5pt;
 }
 
 .correction-fields b,
 .correction-fields strong {
-  font-family: "Times New Roman", "Yu Mincho", serif;
+  font-family: var(--weekly-body-font);
 }
 
 .blank-sheet {
@@ -311,8 +340,8 @@ body {
 
 .answer-sheet {
   padding-top: 11.5mm;
-  font-size: 9.3pt;
-  line-height: 1.48;
+  font-size: 10.5pt;
+  line-height: 1.35;
 }
 
 .section-heading.is-compact {
@@ -321,13 +350,13 @@ body {
 }
 
 .section-heading.is-compact p {
-  font-size: 9.5pt;
+  font-size: 10.5pt;
   font-weight: 400;
 }
 
 .answer-list {
   display: grid;
-  gap: 4.2mm;
+  gap: 2.7mm;
 }
 
 .answer-item {
@@ -340,15 +369,15 @@ body {
 }
 
 .answer-key {
-  font-family: "Times New Roman", "Yu Mincho", serif;
+  font-family: var(--weekly-body-font);
 }
 
 .answer-key strong {
-  font-family: "Times New Roman", "Yu Mincho", serif;
+  font-family: var(--weekly-body-font);
 }
 
 .answer-number {
-  font-family: "Times New Roman", "Yu Mincho", serif;
+  font-family: var(--weekly-body-font);
   font-weight: 400;
 }
 
@@ -365,12 +394,12 @@ body {
 
 .completed-sentence {
   margin: .2mm 0 .2mm 6mm !important;
-  font-family: "Times New Roman", serif;
-  font-size: 9pt;
+  font-family: var(--weekly-body-font);
+  font-size: 10.5pt;
 }
 
 .answer-sheet-6 .answer-list {
-  gap: 3.5mm;
+  gap: 2.2mm;
 }
 
 .pagedjs_pages {
@@ -415,7 +444,7 @@ body {
   align-items: baseline;
   min-height: 5.6mm;
   margin: .8mm 0 0 !important;
-  font-family: "Times New Roman", serif;
+  font-family: var(--weekly-body-font);
   font-size: 10.5pt;
   white-space: nowrap;
 }
