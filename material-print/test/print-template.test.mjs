@@ -92,6 +92,16 @@ test("解答・解説ページの設問番号を太字にしない", () => {
   assert.doesNotMatch(sheets, /<strong[^>]*>\(1\)/);
 });
 
+test("Word原稿の見出しと丸数字に合わせた書体用マークアップを出力する", () => {
+  const parsed = parseWeeklyTestDraft(makeDraft());
+  const sheets = renderPrintSheets(parsed);
+  assert.match(sheets, /class="heading-lead">2026 年度<\/span>/);
+  assert.match(sheets, /class="answer-title"><span class="heading-lead">2026 年度　Weekly Test　<\/span>/);
+  assert.match(sheets, /class="choice-marker">①<\/span>/);
+  assert.match(sheets, /class="circled-number">①<\/span>/);
+  assert.equal((sheets.match(/class="section-score-line">配点　各1点<\/p>/g) || []).length, 1);
+});
+
 test("解説が次ページへ続く場合は同じ大問見出しを繰り返さない", () => {
   const parsed = parseWeeklyTestDraft(makeDraft());
   const sheets = renderPrintSheets(parsed);

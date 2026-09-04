@@ -155,14 +155,14 @@ function renderTestHeader(test, answer = false) {
   if (answer) {
     return `
       <header class="test-header answer-header">
-        <div class="answer-title">${escapeHtml(test.year)} 年度　Weekly Test　第${escapeHtml(test.round)}回　<span class="course-label">${escapeHtml(test.course)}</span>　解答</div>
+        <div class="answer-title"><span class="heading-lead">${escapeHtml(test.year)} 年度　Weekly Test　</span>第${escapeHtml(test.round)}回　<span class="course-label">${escapeHtml(test.course)}</span>　解答</div>
         <div class="answer-label">解答・解説一覧</div>
       </header>`;
   }
   return `
     <header class="test-header">
       <div class="test-heading">
-        <span>${escapeHtml(test.year)} 年度</span>
+        <span class="heading-lead">${escapeHtml(test.year)} 年度</span>
         <strong>Weekly Test</strong>
         <span>第${escapeHtml(test.round)}回</span>
         <span class="course-slot"><span class="course-label">${escapeHtml(test.course)}</span></span>
@@ -180,7 +180,6 @@ function renderSectionHeading(number, instruction, compact = false) {
     <div class="section-heading${compact ? " is-compact" : ""}">
       <span class="section-number">${compact ? `${number}.` : roman}</span>
       <p>${escapePrintText(instruction)}</p>
-      ${number === 1 && !compact ? '<span class="section-score">配点　各1点</span>' : ""}
     </div>`;
 }
 
@@ -190,11 +189,17 @@ function splitChoices(rawChoices) {
   return matches.map((match) => `${match[1]} ${match[2].trim()}`);
 }
 
+function renderChoice(choice) {
+  const match = String(choice).match(/^([①②③④⑤⑥⑦⑧⑨⑩])\s*(.*)$/s);
+  if (!match) return escapeHtml(choice);
+  return `<span class="choice-marker">${escapeHtml(match[1])}</span> ${escapeHtml(match[2])}`;
+}
+
 function renderChoiceQuestion(question) {
   return `
     <article class="problem problem-choice">
       <p class="problem-line"><span class="problem-number">(${question.number}) [${question.sourceNumber}]</span><span>${escapePrintText(question.prompt)}</span></p>
-      <div class="choice-row">${splitChoices(question.choices).map((choice) => `<span>${escapeHtml(choice)}</span>`).join("")}</div>
+      <div class="choice-row">${splitChoices(question.choices).map((choice) => `<span>${renderChoice(choice)}</span>`).join("")}</div>
     </article>`;
 }
 
@@ -247,7 +252,7 @@ function renderMarkedSentence(sentence) {
   let cursor = 0;
   for (const match of text.matchAll(pattern)) {
     html += escapePrintText(text.slice(cursor, match.index));
-    html += `<span class="error-marker">${match[1]}<span>${escapeHtml(match[2])}</span></span>`;
+    html += `<span class="error-marker"><span class="circled-number">${match[1]}</span><span>${escapeHtml(match[2])}</span></span>`;
     cursor = match.index + match[0].length;
   }
   html += escapePrintText(text.slice(cursor));
@@ -296,6 +301,7 @@ function renderProblemPageOne(test) {
   return `
     <section class="sheet problem-sheet problem-sheet-one" data-page="1">
       ${renderTestHeader(test)}
+      <p class="section-score-line">配点　各1点</p>
       ${renderSectionHeading(1, test.instructions[1])}
       <div class="problem-list choice-list">${questions(test, 1, 10).map(renderChoiceQuestion).join("")}</div>
       ${renderAnswerGrid(1, 10)}
