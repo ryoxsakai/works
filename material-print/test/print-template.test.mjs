@@ -73,7 +73,7 @@ test("問題3ページ・白紙1ページ・解答2ページを出力する", ()
   assert.equal((sheets.match(/class="sheet/g) || []).length, 6);
   assert.match(sheets, /class="sheet blank-sheet" data-page="4"/);
   assert.match(sheets, /data-page="6"/);
-  assert.match(sheets, /解答・解説/);
+  assert.match(sheets, /英語H\/S<\/span>　解答/);
   assert.match(sheets, /<span class="explanation-label">【解説】<\/span>/);
 });
 
@@ -81,8 +81,16 @@ test("空欄の丸括弧内を全角スペース2つで出力する", () => {
   const parsed = parseWeeklyTestDraft(makeDraft());
   const sheets = renderPrintSheets(parsed);
   assert.match(sheets, /This is \(　　\) question 1\./);
-  assert.match(sheets, /class="word-blank"[^>]*>\(　　\)<\/span>/);
+  assert.match(sheets, /class="word-blank">\(　　\)<\/span>/);
+  assert.doesNotMatch(sheets, /--blank-ch/);
   assert.doesNotMatch(sheets, /\(   \)/);
+});
+
+test("大問IIIの余白用クラスを出力し、解答ページの補助見出しを表示しない", () => {
+  const parsed = parseWeeklyTestDraft(makeDraft());
+  const sheets = renderPrintSheets(parsed);
+  assert.match(sheets, /class="section-heading section-heading--section-3"/);
+  assert.doesNotMatch(sheets, /解答・解説一覧/);
 });
 
 test("解答・解説ページの設問番号を太字にしない", () => {
