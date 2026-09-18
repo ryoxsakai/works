@@ -95,7 +95,7 @@ function oauthErrorPage(message) {
 }
 function renderMcpAuthorizeForm(params) {
   const fields = ["response_type", "client_id", "redirect_uri", "state", "code_challenge", "code_challenge_method", "scope"].map((name) => `<input type="hidden" name="${name}" value="${escapeHtml(params.get(name) || "")}">`).join("");
-  return html(`<!doctype html><html lang="ja"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>WORKS を接続</title><body style="font-family:-apple-system,BlinkMacSystemFont,'Noto Sans JP',sans-serif;max-width:560px;margin:48px auto;padding:0 20px"><h1>WORKS をChatGPTに接続</h1><p>授業予定・確認テスト・宿題・授業メモの読み取りと更新を許可します。</p><form method="post"><label style="display:block;margin:24px 0 8px">WORKS APIキー</label><input name="api_key" type="password" autocomplete="current-password" required style="box-sizing:border-box;width:100%;padding:12px;font-size:16px">${fields}<button type="submit" style="margin-top:24px;padding:12px 18px;font-size:16px">接続を許可</button></form></body></html>`);
+  return html(`<!doctype html><html lang="ja"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>WORKS を接続</title><body style="font-family:-apple-system,BlinkMacSystemFont,'Noto Sans JP',sans-serif;max-width:560px;margin:48px auto;padding:0 20px"><h1>WORKS をChatGPTに接続</h1><p>授業予定・確認テスト・宿題・授業メモの読み取りと更新、およびJ-Quantsの株価データ取得を許可します。</p><form method="post"><label style="display:block;margin:24px 0 8px">WORKS APIキー</label><input name="api_key" type="password" autocomplete="current-password" required style="box-sizing:border-box;width:100%;padding:12px;font-size:16px">${fields}<button type="submit" style="margin-top:24px;padding:12px 18px;font-size:16px">接続を許可</button></form></body></html>`);
 }
 async function authorizeMcpClient(request, env, url) {
   const params = request.method === "POST" ? new URLSearchParams(await request.text()) : url.searchParams;
@@ -229,7 +229,113 @@ const ssSourceEmailProperties = {
   },
 };
 
+// --- J-Quants V2: read-only market data through the existing owner-only MCP ---
+const JQUANTS_TOOLS = [
+  {
+    name: "search_stock_symbols", title: "日本株の銘柄を検索",
+    description: "J-Quantsの最新上場銘柄一覧を企業名・証券コードで検索します。株価取得前の銘柄照合に使用します。",
+    inputSchema: { type: "object", properties: { query: { type: "string", minLength: 1, maxLength: 100 }, limit: { type: "integer", minimum: 1, maximum: 50 } }, required: ["query"], additionalProperties: false },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },
+  },
+  {
+    name: "get_stock_price_history", title: "日本株の終値推移を取得",
+    description: "J-Quants V2から銘柄・期間を指定して日次株価を取得します。closeは当日の終値、adjusted_closeは分割等調整済み終値（現金配当調整なし）。欠損はnullのまま返します。取得期間は契約範囲内かつ最大5年程度です。",
+    inputSchema: { type: "object", properties: { code: { type: "string", description: "4桁または5桁の証券コード。英字対応。" }, start_date: { type: "string", description: "YYYY-MM-DD" }, end_date: { type: "string", description: "YYYY-MM-DD" } }, required: ["code", "start_date", "end_date"], additionalProperties: false },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },
+  },
+  {
+    name: "get_latest_stock_price", title: "日本株の直近の終値を取得",
+    description: "日本時間の当日まで直近30暦日を検索し、取得可能な最も新しい非欠損の終値と実際の取引日を返します。リアルタイム株価ではありません。当日分の配信前・休場日は以前の日付になります。",
+    inputSchema: { type: "object", properties: { code: { type: "string", description: "4桁または5桁の証券コード。英字対応。" } }, required: ["code"], additionalProperties: false },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },
+  },
+];
+
+function jquantsValidateArgs(args, allowed) {
+  if (!args || typeof args !== "object" || Array.isArray(args) || Object.keys(args).some(key => !allowed.includes(key))) throw httpError(400, "株価取得の引数が正しくありません。");
+}
+function jquantsCode(value) {
+  if (typeof value !== "string" || !/^[0-9A-Z]{4}(?:[0-9])?$/.test(value.trim().toUpperCase())) throw httpError(400, "codeは4桁または5桁の証券コードを指定してください。");
+  return value.trim().toUpperCase();
+}
+function jquantsDate(value) {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) throw httpError(400, "日付はYYYY-MM-DD形式で指定してください。");
+  const date = new Date(`${value}T00:00:00Z`);
+  if (!Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== value) throw httpError(400, "実在する日付を指定してください。");
+  return value;
+}
+function jquantsToday() { return new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10); }
+
+async function jquantsRead(env, path, query) {
+  if (!env.JQUANTS_API_KEY) throw httpError(503, "Works WorkerのSecret JQUANTS_API_KEYが未設定です。キーはチャットではなくCloudflareのシークレット設定に入力してください。");
+  if (!["/equities/master", "/equities/bars/daily"].includes(path)) throw httpError(400, "unsupported J-Quants endpoint");
+  const url = new URL(`https://api.jquants.com/v2${path}`);
+  for (const [key, value] of Object.entries(query)) url.searchParams.set(key, value);
+  const rows = [], seen = new Set();
+  for (let page = 0; page < 10; page += 1) {
+    let response, payload;
+    try {
+      response = await fetch(url.toString(), { headers: { "x-api-key": env.JQUANTS_API_KEY, Accept: "application/json" }, redirect: "error", signal: AbortSignal.timeout(15000) });
+    } catch { throw httpError(502, "J-Quantsへの接続に失敗しました。時間をおいて再試行してください。"); }
+    // Do not echo upstream bodies or exception strings: they can contain credentials.
+    if (!response.ok) {
+      const messages = { 400: "銘柄・期間の指定をJ-Quantsが受け付けませんでした。", 401: "J-Quants APIキーを確認してください。", 403: "J-Quantsの契約プラン・取得可能期間・APIキーの権限を確認してください。", 429: "J-Quantsの取得回数制限に達しました。時間をおいて再試行してください。" };
+      throw httpError(502, messages[response.status] || `J-Quantsでエラーが発生しました（HTTP ${response.status}）。`);
+    }
+    try { payload = await response.json(); } catch { throw httpError(502, "J-Quantsの応答形式が正しくありません。"); }
+    if (!payload || !Array.isArray(payload.data) || payload.data.some(row => !row || typeof row !== "object" || Array.isArray(row))) throw httpError(502, "J-Quantsの応答形式が正しくありません。");
+    rows.push(...payload.data);
+    if (rows.length > 20000) throw httpError(502, "取得件数が多すぎます。期間を短くしてください。");
+    const next = payload.pagination_key;
+    if (next === undefined || next === null || next === "") return rows;
+    if (typeof next !== "string" || seen.has(next)) throw httpError(502, "J-Quantsのページングが完了しませんでした。部分データは返していません。");
+    seen.add(next); url.searchParams.set("pagination_key", next);
+  }
+  throw httpError(502, "取得ページ数の上限です。期間を短くしてください。部分データは返していません。");
+}
+function jquantsNumber(value) { return typeof value === "number" && Number.isFinite(value) ? value : null; }
+function jquantsPrice(row) {
+  return { date: row.Date, code: row.Code, open: jquantsNumber(row.O), high: jquantsNumber(row.H), low: jquantsNumber(row.L), close: jquantsNumber(row.C), adjusted_close: jquantsNumber(row.AdjC), volume: jquantsNumber(row.Vo), adjusted_volume: jquantsNumber(row.AdjVo), adjustment_factor: jquantsNumber(row.AdjFactor) };
+}
+async function readStockPriceHistory(env, args) {
+  jquantsValidateArgs(args, ["code", "start_date", "end_date"]);
+  const code = jquantsCode(args.code), start = jquantsDate(args.start_date), end = jquantsDate(args.end_date);
+  if (start > end || end > jquantsToday() || (Date.parse(end) - Date.parse(start)) / 86400000 > 1830) throw httpError(400, "期間は開始日≦終了日≦今日（日本時間）、最大1830日で指定してください。");
+  const rows = await jquantsRead(env, "/equities/bars/daily", { code, from: start, to: end });
+  // Validate identity and dates before presenting upstream data as this security's prices.
+  const expectedCode = code.length === 4 ? `${code}0` : code;
+  const unique = new Map();
+  for (const row of rows) {
+    if (row.Code !== expectedCode || typeof row.Date !== "string" || row.Date < start || row.Date > end) throw httpError(502, "J-Quantsが指定した銘柄・期間と異なるデータを返しました。");
+    jquantsDate(row.Date);
+    const mapped = jquantsPrice(row);
+    if (unique.has(row.Date) && JSON.stringify(unique.get(row.Date)) !== JSON.stringify(mapped)) throw httpError(502, "J-Quantsの同一日付データが一致しません。");
+    unique.set(row.Date, mapped);
+  }
+  const data = [...unique.values()].sort((a, b) => a.date.localeCompare(b.date));
+  return { source: "J-Quants API V2", currency: "JPY", time_zone: "Asia/Tokyo", code, requested_period: { start_date: start, end_date: end }, retrieved_at: new Date().toISOString(), count: data.length, actual_period: data.length ? { start_date: data[0].date, end_date: data.at(-1).date } : null, notes: ["closeは当日の調整前終値。adjusted_closeは分割等調整済みで現金配当調整を含みません。", "nullは欠損であり0円ではありません。休場日・未上場期間等は行がない場合があります。", "取得可能期間・配信時刻は契約と提供元に依存します。要求期間の全営業日が揃うことは保証しません。"], data };
+}
+async function readLatestStockPrice(env, args) {
+  jquantsValidateArgs(args, ["code"]);
+  const end = jquantsToday(), start = new Date(Date.parse(end) - 29 * 86400000).toISOString().slice(0, 10);
+  const history = await readStockPriceHistory(env, { code: args.code, start_date: start, end_date: end });
+  const data = history.data.filter(row => row.close !== null).at(-1) || null;
+  return { source: history.source, currency: history.currency, time_zone: history.time_zone, code: history.code, retrieved_at: history.retrieved_at, search_period: history.requested_period, latest_record_date: history.data.at(-1)?.date || null, data, notes: [...history.notes, data ? "直近30暦日の取得結果のうち最も新しい非欠損終値です。必ず取引日を併記してください。" : "直近30暦日に非欠損終値がありません。必要なら期間指定で検索してください。"] };
+}
+async function searchStockSymbols(env, args) {
+  jquantsValidateArgs(args, ["query", "limit"]);
+  if (typeof args.query !== "string" || !args.query.trim() || args.query.length > 100) throw httpError(400, "queryに1〜100文字の企業名・証券コードを指定してください。");
+  const limit = args.limit ?? 20;
+  if (!Number.isInteger(limit) || limit < 1 || limit > 50) throw httpError(400, "limitは1〜50で指定してください。");
+  const query = args.query.trim().normalize("NFKC").toLowerCase();
+  const rows = await jquantsRead(env, "/equities/master", {});
+  const matches = rows.filter(row => [row.Code, row.CoName, row.CoNameEn].some(value => typeof value === "string" && value.normalize("NFKC").toLowerCase().includes(query)));
+  return { source: "J-Quants API V2", retrieved_at: new Date().toISOString(), total_matches: matches.length, truncated: matches.length > limit, data: matches.slice(0, limit).map(row => ({ code: row.Code, name: row.CoName, english_name: row.CoNameEn, date: row.Date, market: row.MktNm })) };
+}
+
+
 const MCP_SCHEDULE_TOOLS = [
+  ...JQUANTS_TOOLS,
   {
     name: "list_admission_events",
     title: "入試日程を一覧取得",
@@ -2269,7 +2375,7 @@ async function handleMcp(request, env, url) {
     return mcpResponse(id, {
       protocolVersion: params.protocolVersion || "2025-06-18",
       capabilities: { tools: {} },
-      serverInfo: { name: "works-schedule", version: "1.11.0" },
+      serverInfo: { name: "works-schedule", version: "1.12.0" },
       instructions:
         "Use list_admission_events to inspect WORKS admission schedules and compare registered universities before reporting missing schools. Use search_schedules to find exact event_id and calendar_id values before schedule writes. Use get_student_profile before updating a student memo or print name, and get_student_profile_change_history before undoing a profile update. Use list_material_categories before creating, renaming, reordering, or moving material categories, and list_curriculum_materials before creating, moving, renaming, reordering, merging, or deleting curriculum materials and chapters. Use get_student_materials before updating chapter completion. For SS project changes based on email, read the relevant email, call list_ss_projects before every write, then call create_ss_project or update_ss_project with the exact Gmail message_id and subject when available. Do not infer a deadline or status that the email does not establish. Merge duplicate chapters to preserve student progress; delete_material_chapter refuses to remove a chapter that has progress. Use briefing and progress tools to prepare and report, history before undoing changes, search_materials before linking a file, and preview_reschedule before apply_reschedule. Dates use Asia/Tokyo. Update tools preserve fields that are not supplied; pass null to clear a text field where supported.",
     });
@@ -2304,6 +2410,9 @@ async function handleMcp(request, env, url) {
   try {
     const args = params.arguments || {};
     const toolName = normalizeMcpToolName(params.name);
+    if (toolName === "search_stock_symbols") return mcpToolResult(id, await searchStockSymbols(env, args));
+    if (toolName === "get_stock_price_history") return mcpToolResult(id, await readStockPriceHistory(env, args));
+    if (toolName === "get_latest_stock_price") return mcpToolResult(id, await readLatestStockPrice(env, args));
     if (toolName === "get_schedule") {
       const searchParams = new URLSearchParams();
       if (args.date) searchParams.set("date", String(args.date));
@@ -5425,3 +5534,4 @@ export default {
     }
   },
 };
+
