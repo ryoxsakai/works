@@ -19,6 +19,7 @@ ALLOWED_ORIGIN = "https://works.lrnr.jp"
 # 設定 → 変数とシークレット)でSecretとして追加すること:
 #   GOOGLE_CLIENT_SECRET … Google Cloud Consoleの同じOAuthクライアントのクライアントシークレット
 #   SESSION_SECRET        … このWorkerが発行するセッショントークン署名用のランダムな文字列
+#   JQUANTS_API_KEY       … J-Quants V2のAPIキー（株価取得用、ソースやチャットに貼らない）
 #   WORKS_API_KEY         … /api/schedule専用の十分に長いランダムなAPIキー
 
 [[d1_databases]]
@@ -37,3 +38,4 @@ database_id = "2d4fa45f-4d4d-437d-8cc2-7a8531b27e18"
 [[r2_buckets]]
 binding = "MATERIALS_BUCKET"
 bucket_name = "works-materials-files"
+
