@@ -268,6 +268,8 @@ function jquantsToday() { return new Date(Date.now() + 9 * 3600000).toISOString(
 
 async function jquantsRead(env, path, query) {
   if (!env.JQUANTS_API_KEY) throw httpError(503, "Works WorkerのSecret JQUANTS_API_KEYが未設定です。キーはチャットではなくCloudflareのシークレット設定に入力してください。");
+  // Validate locally before constructing headers; never echo the secret or exception text.
+  if (typeof env.JQUANTS_API_KEY !== "string" || !/^[\x21-\x7e]+$/.test(env.JQUANTS_API_KEY)) throw httpError(503, "[JQ_KEY_FORMAT] JQUANTS_API_KEYに空白・改行・非ASCII文字などが含まれています。CloudflareのSecretを確認してください。");
   if (!["/equities/master", "/equities/bars/daily"].includes(path)) throw httpError(400, "unsupported J-Quants endpoint");
   const url = new URL(`https://api.jquants.com/v2${path}`);
   for (const [key, value] of Object.entries(query)) url.searchParams.set(key, value);
@@ -275,12 +277,20 @@ async function jquantsRead(env, path, query) {
   for (let page = 0; page < 10; page += 1) {
     let response, payload;
     try {
-      response = await fetch(url.toString(), { headers: { "x-api-key": env.JQUANTS_API_KEY, Accept: "application/json" }, redirect: "error", signal: AbortSignal.timeout(15000) });
-    } catch { throw httpError(502, "J-Quantsへの接続に失敗しました。時間をおいて再試行してください。"); }
+      response = await fetch(url.toString(), { headers: { "x-api-key": env.JQUANTS_API_KEY, Accept: "application/json" }, redirect: "manual", signal: AbortSignal.timeout(15000) });
+    } catch (err) {
+      // Only fixed classifications are exposed. Message, stack, cause and URL are never returned.
+      const kind = err?.name;
+      if (kind === "TimeoutError") throw httpError(504, "[JQ_TIMEOUT] J-Quantsへの接続が15秒以内に完了しませんでした。");
+      if (kind === "AbortError") throw httpError(502, "[JQ_ABORTED] J-Quantsへの通信が中断されました。");
+      if (kind === "TypeError") throw httpError(502, "[JQ_FETCH_TYPE] リクエスト構築または通信処理でTypeErrorが発生しました。これだけでは原因を特定できません。");
+      throw httpError(502, "[JQ_NETWORK] J-Quantsへの通信処理で例外が発生しました。DNS・TLS・接続障害などの詳細は未確定です。");
+    }
+    if (response.status >= 300 && response.status < 400) throw httpError(502, `[JQ_REDIRECT] J-QuantsからHTTP ${response.status}のリダイレクトが返されました。APIキー保護のため追従していません。`);
     // Do not echo upstream bodies or exception strings: they can contain credentials.
     if (!response.ok) {
       const messages = { 400: "銘柄・期間の指定をJ-Quantsが受け付けませんでした。", 401: "J-Quants APIキーを確認してください。", 403: "J-Quantsの契約プラン・取得可能期間・APIキーの権限を確認してください。", 429: "J-Quantsの取得回数制限に達しました。時間をおいて再試行してください。" };
-      throw httpError(502, messages[response.status] || `J-Quantsでエラーが発生しました（HTTP ${response.status}）。`);
+      throw httpError(502, `[JQ_HTTP_${response.status}] ${messages[response.status] || "J-QuantsでHTTPエラーが発生しました。"}`);
     }
     try { payload = await response.json(); } catch { throw httpError(502, "J-Quantsの応答形式が正しくありません。"); }
     if (!payload || !Array.isArray(payload.data) || payload.data.some(row => !row || typeof row !== "object" || Array.isArray(row))) throw httpError(502, "J-Quantsの応答形式が正しくありません。");

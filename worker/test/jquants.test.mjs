@@ -32,7 +32,7 @@ test('J-Quants MCP authentication, paging, values, and failure boundaries', asyn
   globalThis.fetch = async (url, options) => {
     calls++;
     assert.equal(options.headers['x-api-key'], env.JQUANTS_API_KEY);
-    assert.equal(options.redirect, 'error');
+    assert.equal(options.redirect, 'manual');
     const parsed = new URL(url);
     assert.equal(parsed.origin, 'https://api.jquants.com');
     assert.equal(parsed.searchParams.get('code'), '7203');
@@ -63,6 +63,28 @@ test('J-Quants MCP authentication, paging, values, and failure boundaries', asyn
   }
   globalThis.fetch = async () => { throw new Error(env.JQUANTS_API_KEY); };
   assert.ok(!JSON.stringify(await call('get_stock_price_history', args)).includes(env.JQUANTS_API_KEY));
+  for (const [name, code] of [['TimeoutError', 'JQ_TIMEOUT'], ['AbortError', 'JQ_ABORTED'], ['TypeError', 'JQ_FETCH_TYPE'], ['Error', 'JQ_NETWORK'], [env.JQUANTS_API_KEY, 'JQ_NETWORK']]) {
+    globalThis.fetch = async () => { const error = new Error(env.JQUANTS_API_KEY); error.name = name; throw error; };
+    const result = (await call('get_stock_price_history', args)).body.result;
+    assert.equal(result.isError, true);
+    assert.ok(result.content[0].text.includes(code));
+    assert.ok(!JSON.stringify(result).includes(env.JQUANTS_API_KEY));
+  }
+  let redirectCalls = 0;
+  globalThis.fetch = async (_url, options) => {
+    redirectCalls++;
+    assert.equal(options.redirect, 'manual');
+    return new Response(env.JQUANTS_API_KEY, { status: 302, headers: { Location: 'https://example.com/' + env.JQUANTS_API_KEY } });
+  };
+  const redirect = (await call('get_stock_price_history', args)).body.result;
+  assert.match(redirect.content[0].text, /JQ_REDIRECT/);
+  assert.ok(!JSON.stringify(redirect).includes(env.JQUANTS_API_KEY));
+  assert.equal(redirectCalls, 1);
+  for (const key of ['key\nvalue', ' key', 'キー', '   ', 123]) {
+    const result = (await call('get_stock_price_history', args, true, { ...env, JQUANTS_API_KEY: key })).body.result;
+    assert.match(result.content[0].text, /JQ_KEY_FORMAT/);
+  }
+  assert.equal(redirectCalls, 1);
   globalThis.fetch = async () => Response.json({ data: [{ Code: '72030', CoName: 'トヨタ自動車', CoNameEn: 'TOYOTA MOTOR', MktNm: 'プライム', Date: '2026-09-18' }] });
   const search = (await call('search_stock_symbols', { query: 'ｔｏｙｏｔａ' })).body.result.structuredContent;
   assert.equal(search.data[0].code, '72030');
