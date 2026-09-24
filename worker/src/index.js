@@ -5112,6 +5112,9 @@ async function callTodoTool(env, name, args = {}) {
   if (name === "list_todos") return { tasks: args.category ? state.tasks.filter(t => t.category === args.category) : state.tasks, categories: state.categories };
   if (name === "manage_todo_categories") {
     if (args.categories === undefined) return state.categories;
+    if (!Array.isArray(args.categories) || state.tasks.some(t => !args.categories.includes(t.category))) {
+      throw new Error("existing tasks use a category missing from the replacement list");
+    }
     state.categories = args.categories;
     await writeTodo(env, state);
     return state.categories;

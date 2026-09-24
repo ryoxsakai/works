@@ -316,12 +316,16 @@
     const FORM_KEY = 'todo-tracker-form-collapsed';
     // The Works API is the shared source for the browser and MCP clients.
     let saveQueue = Promise.resolve();
+    let saveGeneration = 0;
     function saveData() {
+      const generation = saveGeneration;
       const snapshot = { tasks: structuredClone(tasks), categories: [...categories] };
       saveQueue = saveQueue.then(async () => {
+        if (generation !== saveGeneration) return;
         const saved = await api('/todo', { method: 'PUT', body: JSON.stringify({ ...snapshot, revision }) });
         revision = saved.revision;
       }).catch(async error => {
+        saveGeneration++; // Discard snapshots queued before the failed save.
         alert('保存に失敗しました: ' + error.message);
         await loadData();
       });
@@ -561,7 +565,9 @@
         task.progress = inp ? Math.min(100, Math.max(0, parseInt(inp.value) || 0)) : task.progress;
       } else {
         const inp = document.getElementById('edit-cell-input');
-        task[field] = inp ? inp.value.trim() : task[field];
+        const value = inp ? inp.value.trim() : task[field];
+        if (field === 'name' && !value) { alert('タスク名を入力してください'); inp?.focus(); return; }
+        task[field] = value;
       }
       saveData(); editingCell = null; renderTaskList();
     }
@@ -601,12 +607,15 @@
       if (!tabs.includes(activeTab)) activeTab = 'すべて';
       container.innerHTML = tabs.map(t => {
         const active = t === activeTab;
-        return `<button onclick="setTab('${esc(t)}')"
+        return `<button data-todo-tab="${esc(t)}"
           class="tab-btn px-4 py-2.5 text-sm font-medium rounded-t-lg border-b-2 whitespace-nowrap
             ${active ? 'border-slate-700 text-slate-700 bg-slate-50' : 'border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50'}">
           ${esc(t)}
         </button>`;
       }).join('');
+      container.querySelectorAll('[data-todo-tab]').forEach(button => {
+        button.addEventListener('click', () => setTab(button.dataset.todoTab));
+      });
     }
 
     // ─── Sort ─────────────────────────────────────────────────
