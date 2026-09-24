@@ -250,3 +250,9 @@ CREATE TABLE IF NOT EXISTS admission_events (
 );
 CREATE INDEX IF NOT EXISTS idx_admission_events_date ON admission_events(schedule_date);
 CREATE INDEX IF NOT EXISTS idx_admission_events_stage ON admission_events(stage);
+
+CREATE TABLE IF NOT EXISTS todo_state (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  data TEXT NOT NULL,
+  revision INTEGER NOT NULL DEFAULT 1
+);
