@@ -5066,7 +5066,7 @@ async function deleteMaterialFile(env, id) {
 // Shared ToDo document.  Initialize only after the schema migration has run.
 const emptyTodo = () => ({ tasks: [], categories: ["仕事", "個人", "その他"] });
 async function readTodo(env) {
-  const row = await env.DB.prepare("SELECT data FROM todo_state WHERE id = 1").first();
+  const row = await env.DB.prepare("SELECT data, revision FROM todo_state WHERE id = 1").first();
   return row ? { ...JSON.parse(row.data), revision: row.revision } : { ...emptyTodo(), revision: 0 };
 }
 function validateTodo(state) {
