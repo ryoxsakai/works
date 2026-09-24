@@ -2394,7 +2394,7 @@ async function handleMcp(request, env, url) {
     return new Response(null, { status: 202 });
   }
   if (method === "tools/list") {
-    return mcpResponse(id, { tools: MCP_SCHEDULE_TOOLS });
+    return mcpResponse(id, { tools: [...MCP_SCHEDULE_TOOLS, ...todoTools] });
   }
   if (method !== "tools/call") {
     return mcpError(id, -32601, "Method not found");
@@ -2420,6 +2420,7 @@ async function handleMcp(request, env, url) {
   try {
     const args = params.arguments || {};
     const toolName = normalizeMcpToolName(params.name);
+    if (todoTools.some(tool => tool.name === toolName)) return mcpToolResult(id, await callTodoTool(env, toolName, args));
     if (toolName === "search_stock_symbols") return mcpToolResult(id, await searchStockSymbols(env, args));
     if (toolName === "get_stock_price_history") return mcpToolResult(id, await readStockPriceHistory(env, args));
     if (toolName === "get_latest_stock_price") return mcpToolResult(id, await readLatestStockPrice(env, args));
@@ -5062,6 +5063,81 @@ async function deleteMaterialFile(env, id) {
   await db.prepare("DELETE FROM material_files WHERE id = ?").bind(id).run();
 }
 
+// Shared ToDo document.  Initialize only after the schema migration has run.
+const emptyTodo = () => ({ tasks: [], categories: ["仕事", "個人", "その他"] });
+async function readTodo(env) {
+  const row = await env.DB.prepare("SELECT data FROM todo_state WHERE id = 1").first();
+  return row ? { ...JSON.parse(row.data), revision: row.revision } : { ...emptyTodo(), revision: 0 };
+}
+function validateTodo(state) {
+  if (!state || !Array.isArray(state.tasks) || !Array.isArray(state.categories) ||
+      state.tasks.length > 10000 || state.categories.length > 200 ||
+      new Set(state.categories).size !== state.categories.length ||
+      state.tasks.some(t => !t || typeof t.id !== "string" || !t.id ||
+        typeof t.name !== "string" || !t.name.trim() || t.name.length > 500 ||
+        typeof t.category !== "string" || t.category.length > 100 ||
+        ![null, 1, 2, 3].includes(t.priority) ||
+        (t.deadline !== null && !/^\d{4}-\d{2}-\d{2}$/.test(t.deadline)) ||
+        !Number.isInteger(t.progress) || t.progress < 0 || t.progress > 100 ||
+        typeof t.memo !== "string" || t.memo.length > 10000) ||
+      new Set(state.tasks.map(t => t.id)).size !== state.tasks.length ||
+      state.categories.some(c => typeof c !== "string" || !c.trim() || c.length > 100)) {
+    throw new Error("invalid todo data");
+  }
+  return state;
+}
+async function writeTodo(env, state) {
+  validateTodo(state);
+  if (!Number.isSafeInteger(state.revision) || state.revision < 0) throw new Error("revision is required");
+  const data = JSON.stringify({ tasks: state.tasks, categories: state.categories });
+  let result;
+  if (state.revision === 0) {
+    result = await env.DB.prepare("INSERT OR IGNORE INTO todo_state (id, data, revision) VALUES (1, ?, 1)").bind(data).run();
+  } else {
+    result = await env.DB.prepare("UPDATE todo_state SET data = ?, revision = revision + 1 WHERE id = 1 AND revision = ?")
+      .bind(data, state.revision).run();
+  }
+  if (!result.meta.changes) { const error = new Error("変更が競合しました。再読み込みしてください"); error.status = 409; throw error; }
+  return { ...state, revision: state.revision + 1 };
+}
+const todoTools = [
+  { name: "list_todos", description: "List Works ToDo tasks and categories", inputSchema: { type: "object", properties: { category: { type: "string" } } } },
+  { name: "create_todo", description: "Create a Works ToDo task", inputSchema: { type: "object", required: ["name"], properties: { name: { type: "string" }, category: { type: "string" }, priority: { type: ["integer", "null"] }, deadline: { type: ["string", "null"] }, progress: { type: "integer" }, memo: { type: "string" } } } },
+  { name: "update_todo", description: "Update a Works ToDo task by id", inputSchema: { type: "object", required: ["id"], properties: { id: { type: "string" }, name: { type: "string" }, category: { type: "string" }, priority: { type: ["integer", "null"] }, deadline: { type: ["string", "null"] }, progress: { type: "integer" }, memo: { type: "string" } } } },
+  { name: "delete_todo", description: "Delete a Works ToDo task by id", inputSchema: { type: "object", required: ["id"], properties: { id: { type: "string" } } } },
+  { name: "manage_todo_categories", description: "List or replace ordered Works ToDo categories", inputSchema: { type: "object", properties: { categories: { type: "array", items: { type: "string" } } } } },
+];
+async function callTodoTool(env, name, args = {}) {
+  const state = await readTodo(env);
+  if (name === "list_todos") return { tasks: args.category ? state.tasks.filter(t => t.category === args.category) : state.tasks, categories: state.categories };
+  if (name === "manage_todo_categories") {
+    if (args.categories === undefined) return state.categories;
+    state.categories = args.categories;
+    await writeTodo(env, state);
+    return state.categories;
+  }
+  if (name === "create_todo") {
+    if (typeof args.name !== "string" || !args.name.trim()) throw new Error("name is required");
+    const task = { id: crypto.randomUUID(), name: args.name, category: args.category || state.categories[0] || "その他", priority: args.priority ?? null, deadline: args.deadline ?? null, progress: args.progress ?? 0, memo: args.memo ?? "", createdAt: new Date().toISOString().slice(0, 10) };
+    state.tasks.push(task);
+    await writeTodo(env, state);
+    return task;
+  }
+  const task = state.tasks.find(t => t.id === args.id);
+  if (!task) throw new Error("task not found");
+  if (name === "update_todo") {
+    for (const key of ["name", "category", "priority", "deadline", "progress", "memo"]) if (Object.hasOwn(args, key)) task[key] = args[key];
+    await writeTodo(env, state);
+    return task;
+  }
+  if (name === "delete_todo") {
+    state.tasks = state.tasks.filter(t => t.id !== args.id);
+    await writeTodo(env, state);
+    return { ok: true };
+  }
+  throw new Error("unknown tool");
+}
+
 export default {
   async fetch(request, env) {
     const origin = env.ALLOWED_ORIGIN;
@@ -5123,6 +5199,9 @@ export default {
       }
 
       await verifySession(request, env);
+      if (url.pathname === "/api/todo" && request.method === "GET") return json(await readTodo(env), headers);
+      if (url.pathname === "/api/todo" && request.method === "PUT") return json(await writeTodo(env, await request.json()), headers);
+
 
       if (url.pathname === "/api/auth/logout" && request.method === "POST") {
         await clearRefreshToken(env);
