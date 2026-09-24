@@ -1,0 +1,177 @@
+.todo-page {
+  background: var(--bg-gradient) !important;
+  background-attachment: fixed !important;
+  color: var(--fg);
+}
+
+.todo-page .page-header {
+  position: relative;
+  top: auto;
+  z-index: 30;
+  border: 0;
+  background: var(--bg-elevated) !important;
+  color: var(--fg);
+  box-shadow: var(--card-shadow);
+}
+
+.todo-main {
+  max-width: 1120px !important;
+  padding-top: 1.5rem;
+}
+
+.todo-heading {
+  margin: 0 0 1rem;
+}
+
+.todo-heading h2 {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.todo-heading h2 i {
+  color: var(--accent);
+  font-size: 1.35rem;
+}
+
+.todo-panel {
+  overflow: hidden;
+  border: 1px solid var(--border) !important;
+  border-radius: .65rem !important;
+  background: var(--bg-elevated) !important;
+  box-shadow: var(--card-shadow) !important;
+}
+
+.todo-panel #form-toggle {
+  color: var(--fg);
+  border-radius: .65rem;
+}
+
+.todo-panel #form-toggle:hover,
+.todo-panel .tab-btn:hover,
+.todo-category-button:hover {
+  background: var(--bg-hover) !important;
+}
+
+.todo-page input,
+.todo-page select,
+.todo-page textarea {
+  background: var(--bg-elevated) !important;
+  border-color: var(--border) !important;
+  color: var(--fg) !important;
+}
+
+.todo-page input::placeholder,
+.todo-page .text-gray-300,
+.todo-page .text-gray-400 {
+  color: var(--muted) !important;
+}
+
+.todo-page .text-gray-500,
+.todo-page .text-gray-600,
+.todo-page .text-gray-700,
+.todo-page .text-slate-500,
+.todo-page .text-slate-600,
+.todo-page .text-slate-700 {
+  color: var(--fg) !important;
+}
+
+.todo-page .border-gray-100,
+.todo-page .border-gray-200,
+.todo-page .border-gray-50 {
+  border-color: var(--border) !important;
+}
+
+.todo-add-button,
+.todo-modal button.bg-slate-700 {
+  background: var(--fg) !important;
+  color: var(--bg) !important;
+  border-radius: .5rem !important;
+}
+
+.todo-add-button:hover,
+.todo-modal button.bg-slate-700:hover {
+  opacity: .85;
+}
+
+.todo-category-button {
+  background: var(--bg-elevated) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--muted) !important;
+  border-radius: .5rem !important;
+}
+
+.todo-page #tab-list {
+  gap: .2rem;
+}
+
+.todo-page .tab-btn {
+  min-height: 2.2rem;
+  border-radius: .5rem .5rem 0 0;
+  color: var(--muted) !important;
+  background: transparent !important;
+  border-color: transparent !important;
+}
+
+.todo-page .tab-btn.border-slate-700 {
+  color: var(--accent) !important;
+  background: var(--bg-hover) !important;
+  border-bottom-color: var(--accent) !important;
+}
+
+.todo-table-shell {
+  background: var(--bg-elevated);
+}
+
+.todo-table th,
+.todo-table td {
+  border-bottom: 1px solid var(--border);
+  color: var(--fg);
+}
+
+.todo-table th {
+  color: var(--muted) !important;
+  font-weight: 600;
+}
+
+.todo-table .task-row:hover {
+  background: var(--bg-hover) !important;
+}
+
+.todo-page .progress-track {
+  background: var(--bg-hover);
+}
+
+.todo-page .icon-btn {
+  color: var(--muted);
+}
+
+.todo-page .icon-btn:hover {
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+
+.todo-modal,
+#login-form {
+  background: var(--bg-elevated) !important;
+  color: var(--fg);
+  border: 1px solid var(--border);
+}
+
+#category-list li:hover,
+#category-list li.bg-slate-50 {
+  background: var(--bg-hover) !important;
+}
+
+#login-screen {
+  background: var(--bg-gradient) !important;
+}
+
+@media (max-width: 640px) {
+  .todo-main { padding: 1rem !important; }
+  .todo-heading { margin-bottom: .75rem; }
+  .todo-panel #form-toggle { padding: .8rem 1rem; }
+}
