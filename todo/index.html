@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>ToDo管理 | Works</title>
+  <link rel="apple-touch-icon" href="logo.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="タスクトラッカー">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
+
+    #form-content {
+      transition: max-height 0.35s ease, opacity 0.3s ease;
+      overflow: hidden;
+    }
+    #form-chevron { transition: transform 0.3s ease; }
+
+    .progress-track {
+      background: #e5e7eb;
+      border-radius: 9999px;
+      height: 4px;
+      overflow: hidden;
+      margin-top: 4px;
+    }
+    .progress-fill {
+      height: 100%;
+      border-radius: 9999px;
+      transition: width 0.5s ease, background-color 0.5s ease;
+    }
+
+    .icon-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      transition: background-color 0.15s;
+    }
+
+    @keyframes pulse-warn {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.4; }
+    }
+    .overdue-pulse { animation: pulse-warn 2s ease-in-out infinite; }
+
+    .task-row { transition: background-color 0.12s; }
+    .task-row:hover { background-color: #f9fafb; }
+
+    .pencil-icon { opacity: 0; transition: opacity 0.2s; }
+    .task-row:hover .pencil-icon { opacity: 1; }
+
+    .editable-cell { cursor: pointer; }
+    .editable-cell:hover .cell-inner { background-color: rgba(100,116,139,0.06); border-radius: 6px; }
+
+    #mode-thumb  { transition: transform 0.2s ease; }
+    #mode-toggle { transition: background-color 0.2s ease; }
+
+    input, select, textarea { font-size: 16px !important; }
+
+    .tab-btn { transition: color 0.15s, border-color 0.15s, background-color 0.15s; }
+
+    @media (max-width: 640px) {
+      .pencil-icon { opacity: 0.4; }
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      height: 4px;
+      border-radius: 9999px;
+      background: #e5e7eb;
+      outline: none;
+      cursor: pointer;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #475569;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    input[type="range"]::-webkit-slider-thumb:hover { background: #1e293b; }
+  </style>
+</head>
+<body class="min-h-screen bg-gray-100">
+
+  <!-- ── Header ─────────────────────────────────────────────── -->
+  <header class="bg-white border-b border-gray-200 sticky top-0 z-30 shadow-sm">
+    <div class="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
+      <span class="text-2xl">📋</span>
+      <div>
+        <h1 class="text-lg font-bold text-gray-800 leading-tight"><a href="/">Works</a> / ToDo管理</h1>
+        <p class="text-xs text-gray-400">タスクを管理しましょう</p>
+      </div>
+      <div class="ml-auto flex items-center gap-3">
+        <img id="user-avatar" class="w-7 h-7 rounded-full hidden" src="" alt="">
+        <span id="user-name" class="text-xs text-gray-600 hidden sm:inline max-w-24 truncate"></span>
+        <button onclick="signOutUser()"
+          class="text-xs text-gray-400 hover:text-gray-600 px-2 py-1 rounded-lg hover:bg-gray-100 transition-colors whitespace-nowrap">
+          サインアウト
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-5xl mx-auto px-4 py-5 space-y-4">
+
+    <!-- ── 登録フォーム（折りたたみ） ──────────────────────────── -->
+    <section class="bg-white rounded-2xl shadow-sm border border-gray-200">
+
+      <button id="form-toggle"
+        class="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-gray-50 transition-colors rounded-2xl"
+        onclick="toggleForm()">
+        <div class="flex items-center gap-2 text-gray-700 font-semibold">
+          <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
+          </svg>
+          タスクを登録
+        </div>
+        <svg id="form-chevron" class="w-5 h-5 text-gray-400"
+          fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+        </svg>
+      </button>
+
+      <div id="form-content">
+        <div class="px-5 pb-5">
+          <div class="flex flex-col gap-3">
+
+            <!-- タスク名 -->
+            <div class="w-full">
+              <label class="block text-xs font-medium text-gray-500 mb-1.5">タスク名</label>
+              <input id="input-name" type="text" placeholder="例：企画書を作成する"
+                class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent placeholder-gray-300"
+                onkeydown="if(event.key==='Enter') addTask()"/>
+            </div>
+
+            <!-- カテゴリ＋追加ボタン -->
+            <div class="flex gap-3 items-end">
+            <div class="flex-1">
+              <label class="block text-xs font-medium text-gray-500 mb-1.5">カテゴリ</label>
+              <div class="flex gap-2">
+                <select id="input-category"
+                  class="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent">
+                </select>
+                <button onclick="openCategoryModal()" title="カテゴリを管理"
+                  class="px-2.5 py-2 bg-gray-50 hover:bg-gray-100 text-gray-500 rounded-xl border border-gray-200 transition-colors flex items-center justify-center">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- 追加ボタン -->
+            <button onclick="addTask()"
+              class="px-5 py-2.5 bg-slate-700 hover:bg-slate-800 active:bg-slate-900 text-white rounded-xl font-semibold text-sm shadow-sm transition-colors whitespace-nowrap">
+              追加する
+            </button>
+            </div><!-- end カテゴリ＋追加ボタン row -->
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── タスク一覧 ────────────────────────────────────────── -->
+    <section class="bg-white rounded-2xl shadow-sm border border-gray-200">
+
+      <!-- カテゴリタブ -->
+      <div class="px-4 pt-3 border-b border-gray-200 overflow-x-auto">
+        <div id="tab-list" class="flex gap-0.5 min-w-max"></div>
+      </div>
+
+      <!-- テーブル -->
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm" style="min-width:680px">
+          <colgroup>
+            <col style="min-width:160px">
+            <col style="min-width:80px;width:90px">
+            <col style="min-width:150px;width:170px">
+            <col style="min-width:140px;width:160px">
+            <col style="min-width:160px">
+            <col style="width:44px">
+          </colgroup>
+          <thead>
+            <tr class="border-b border-gray-100">
+              <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide whitespace-nowrap">
+                タスク名
+              </th>
+              <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide whitespace-nowrap cursor-pointer select-none hover:text-slate-600 transition-colors"
+                onclick="setSort('priority')">
+                <span class="flex items-center gap-1">
+                  優先度 <span id="sort-priority-icon" class="text-slate-500 text-sm"></span>
+                </span>
+              </th>
+              <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide whitespace-nowrap cursor-pointer select-none hover:text-slate-600 transition-colors"
+                onclick="setSort('deadline')">
+                <span class="flex items-center gap-1">
+                  締切日 <span id="sort-deadline-icon" class="text-slate-500 text-sm"></span>
+                </span>
+              </th>
+              <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide whitespace-nowrap">
+                進捗
+              </th>
+              <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide whitespace-nowrap">
+                メモ
+              </th>
+              <th class="px-3 py-3"></th>
+            </tr>
+          </thead>
+          <tbody id="task-list"></tbody>
+        </table>
+
+        <!-- 空の状態 -->
+        <div id="empty-state" class="hidden py-16 text-center">
+          <div class="text-4xl mb-3">📋</div>
+          <p class="text-gray-400 font-medium">タスクがありません</p>
+          <p class="text-gray-300 text-xs mt-1">上のフォームからタスクを追加してください</p>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ── カテゴリ管理モーダル ──────────────────────────────────── -->
+  <div id="category-modal"
+    class="fixed inset-0 flex items-center justify-center z-50 hidden"
+    style="background:rgba(0,0,0,0.2);backdrop-filter:blur(4px)"
+    onclick="if(event.target===this) closeCategoryModal()">
+    <div class="bg-white rounded-2xl shadow-2xl w-96 mx-4 flex flex-col" style="max-height:85vh">
+
+      <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <h3 class="font-semibold text-gray-700">カテゴリ管理</h3>
+        <button onclick="closeCategoryModal()" class="icon-btn text-gray-400 hover:text-gray-600 hover:bg-gray-100">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+
+      <ul id="category-list" class="overflow-y-auto flex-1 px-4 py-3 space-y-1"></ul>
+
+      <div class="px-4 py-4 border-t border-gray-100">
+        <p class="text-xs font-medium text-gray-400 mb-2">新しいカテゴリを追加</p>
+        <div class="flex gap-2">
+          <input id="new-category-input" type="text" placeholder="カテゴリ名"
+            class="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400"
+            onkeydown="if(event.key==='Enter') addCategory()"/>
+          <button onclick="addCategory()"
+            class="px-4 py-2 bg-slate-700 hover:bg-slate-800 text-white rounded-xl text-sm font-semibold transition-colors whitespace-nowrap">
+            追加
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── ログイン画面 ───────────────────────────────────────────── -->
+  <div id="login-screen" class="fixed inset-0 flex items-center justify-center z-50 bg-gray-100">
+    <!-- ローディング中 -->
+    <div id="login-loading" class="text-center">
+      <div class="text-5xl mb-4">📋</div>
+      <p class="text-gray-400 text-sm">読み込み中...</p>
+    </div>
+    <!-- ログインフォーム -->
+    <div id="login-form" class="hidden bg-white rounded-2xl shadow-lg px-8 py-10 mx-4 text-center w-full max-w-sm">
+      <div class="text-5xl mb-4">📋</div>
+      <h1 class="text-2xl font-bold text-gray-800 mb-1">タスクトラッカー</h1>
+      <p class="text-gray-400 text-sm mb-8">Googleアカウントでサインインしてください</p>
+      <button onclick="signInWithGoogle()"
+        class="w-full flex items-center justify-center gap-3 px-6 py-3 bg-white border border-gray-300 rounded-xl text-gray-700 font-medium hover:bg-gray-50 active:bg-gray-100 transition-colors shadow-sm">
+        <svg class="w-5 h-5" viewBox="0 0 24 24">
+          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+          <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
+          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+        </svg>
+        Googleでサインイン
+      </button>
+    </div>
+  </div>
+
+  <script type="module">
+    import { watchAuth, signIn, signOutUser as worksSignOut, getSessionToken } from '../shared/auth.js';
+    async function api(path, options = {}) {
+      const response = await fetch('/api' + path, { ...options, headers: {
+        'Content-Type': 'application/json', Authorization: `Bearer ${getSessionToken()}`,
+        ...(options.headers || {})
+      }});
+      if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error || `HTTP ${response.status}`);
+      return response.json();
+    }
+    // ─── State ───────────────────────────────────────────────
+    let tasks      = [];
+    let categories = ['仕事', '個人', 'その他'];
+    let activeTab  = 'すべて';
+    let sortField  = null;
+    let sortDir    = 'desc';
+    let editingCell = null; // { id, field }
+    let editingCatIdx = -1;
+
+    const FORM_KEY = 'todo-tracker-form-collapsed';
+    // The Works API is the shared source for the browser and MCP clients.
+    let saveQueue = Promise.resolve();
+    function saveData() {
+      const snapshot = JSON.stringify({ tasks, categories });
+      saveQueue = saveQueue.catch(() => {}).then(() => api('/todo', { method: 'PUT', body: snapshot }));
+      saveQueue.catch(error => { alert('保存に失敗しました: ' + error.message); });
+    }
+    async function loadData() {
+      const data = await api('/todo');
+      tasks = data.tasks;
+      categories = data.categories;
+      render();
+    }
+    // ─── Date helpers ─────────────────────────────────────────
+    function todayStr() { return new Date().toISOString().split('T')[0]; }
+    function pad(n) { return String(n).padStart(2, '0'); }
+
+    function formatDate(str) {
+      if (!str) return null;
+      const d = new Date(str + 'T00:00:00');
+      return `${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())}`;
+    }
+
+    function daysLeft(str) {
+      if (!str) return null;
+      const dl  = new Date(str + 'T00:00:00');
+      const now = new Date(); now.setHours(0,0,0,0);
+      return Math.ceil((dl - now) / 86400000);
+    }
+
+    function barColor(days) {
+      if (days === null) return '#22c55e';
+      if (days >= 14) return '#22c55e';
+      if (days >= 7)  return '#84cc16';
+      if (days >= 3)  return '#f97316';
+      return '#ef4444';
+    }
+
+    function barPct(days) {
+      if (days === null) return 0;
+      return Math.min(100, Math.max(4, (14 - days) / 14 * 100)).toFixed(1);
+    }
+
+    // ─── Priority helpers ──────────────────────────────────────
+    const PRI_LABEL = { 3: '高', 2: '中', 1: '低' };
+    const PRI_CLASS = {
+      3: 'bg-red-50 text-red-600 border border-red-100',
+      2: 'bg-yellow-50 text-yellow-600 border border-yellow-100',
+      1: 'bg-blue-50 text-blue-600 border border-blue-100',
+    };
+
+    // ─── Form ─────────────────────────────────────────────────
+    function initFormState() {
+      const collapsed = localStorage.getItem(FORM_KEY) === 'true';
+      const content   = document.getElementById('form-content');
+      const chevron   = document.getElementById('form-chevron');
+      if (collapsed) {
+        content.style.maxHeight = '0';
+        content.style.opacity   = '0';
+        chevron.style.transform = 'rotate(0deg)';
+      } else {
+        content.style.maxHeight = '500px';
+        content.style.opacity   = '1';
+        chevron.style.transform = 'rotate(180deg)';
+      }
+    }
+
+    function toggleForm() {
+      const content   = document.getElementById('form-content');
+      const chevron   = document.getElementById('form-chevron');
+      const collapsed = content.style.maxHeight === '0px' || content.style.maxHeight === '0';
+      if (collapsed) {
+        content.style.maxHeight = '500px';
+        content.style.opacity   = '1';
+        chevron.style.transform = 'rotate(180deg)';
+        localStorage.setItem(FORM_KEY, 'false');
+      } else {
+        content.style.maxHeight = '0';
+        content.style.opacity   = '0';
+        chevron.style.transform = 'rotate(0deg)';
+        localStorage.setItem(FORM_KEY, 'true');
+      }
+    }
+
+    function addTask() {
+      const name = document.getElementById('input-name').value.trim();
+      const cat  = document.getElementById('input-category').value;
+      if (!name) {
+        const inp = document.getElementById('input-name');
+        inp.classList.add('ring-2', 'ring-red-400');
+        inp.focus();
+        setTimeout(() => inp.classList.remove('ring-2', 'ring-red-400'), 1500);
+        return;
+      }
+      tasks.push({ id: Date.now().toString(), name, category: cat, priority: null, deadline: null, progress: 0, memo: '', createdAt: todayStr() });
+      saveData();
+      renderTaskList();
+      document.getElementById('input-name').value = '';
+      document.getElementById('input-name').focus();
+    }
+
+    // ─── Category modal ────────────────────────────────────────
+    function openCategoryModal() {
+      editingCatIdx = -1;
+      document.getElementById('category-modal').classList.remove('hidden');
+      document.getElementById('new-category-input').value = '';
+      renderCategoryList();
+      setTimeout(() => document.getElementById('new-category-input').focus(), 50);
+    }
+
+    function closeCategoryModal() {
+      document.getElementById('category-modal').classList.add('hidden');
+      editingCatIdx = -1;
+    }
+
+    function renderCategoryList() {
+      const ul = document.getElementById('category-list');
+      if (!categories.length) {
+        ul.innerHTML = '<li class="text-center text-gray-400 text-sm py-4">カテゴリがありません</li>';
+        return;
+      }
+      ul.innerHTML = categories.map((cat, i) => {
+        const count = tasks.filter(t => t.category === cat).length;
+        if (i === editingCatIdx) {
+          return `<li class="flex items-center gap-2 rounded-xl px-3 py-2 bg-slate-50">
+  <input id="edit-cat-input" type="text" value="${esc(cat)}"
+    class="flex-1 border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400"
+    onkeydown="if(event.key==='Enter') saveEditCat(${i}); else if(event.key==='Escape') cancelEditCat()"/>
+  <button onclick="saveEditCat(${i})" class="icon-btn text-slate-600 hover:bg-slate-100">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+  </button>
+  <button onclick="cancelEditCat()" class="icon-btn text-gray-400 hover:bg-gray-100">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+  </button>
+</li>`;
+        }
+        return `<li class="flex items-center gap-1 rounded-xl px-3 py-2 hover:bg-gray-50 group">
+  <div class="flex flex-col mr-1">
+    <button onclick="moveCat(${i},-1)" ${i===0?'disabled':''} class="icon-btn w-5 h-4 text-gray-300 hover:text-gray-500 ${i===0?'opacity-20 pointer-events-none':''}">
+      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/></svg>
+    </button>
+    <button onclick="moveCat(${i},1)" ${i===categories.length-1?'disabled':''} class="icon-btn w-5 h-4 text-gray-300 hover:text-gray-500 ${i===categories.length-1?'opacity-20 pointer-events-none':''}">
+      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+    </button>
+  </div>
+  <span class="flex-1 text-sm text-gray-700">${esc(cat)}</span>
+  ${count > 0 ? `<span class="text-xs text-gray-400">${count}件</span>` : ''}
+  <button onclick="startEditCat(${i})" class="icon-btn text-gray-300 hover:text-slate-500 hover:bg-slate-50 opacity-0 group-hover:opacity-100 transition-opacity">
+    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+  </button>
+  <button onclick="deleteCat(${i})" class="icon-btn text-gray-300 hover:text-red-400 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity">
+    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+  </button>
+</li>`;
+      }).join('');
+      if (editingCatIdx >= 0) {
+        setTimeout(() => { const el = document.getElementById('edit-cat-input'); if (el) { el.focus(); el.select(); } }, 30);
+      }
+    }
+
+    function startEditCat(i) { editingCatIdx = i; renderCategoryList(); }
+    function cancelEditCat() { editingCatIdx = -1; renderCategoryList(); }
+
+    function saveEditCat(i) {
+      const inp  = document.getElementById('edit-cat-input');
+      const name = inp ? inp.value.trim() : '';
+      if (!name) { if (inp) inp.focus(); return; }
+      if (name === categories[i]) { cancelEditCat(); return; }
+      if (categories.includes(name)) { alert(`「${name}」はすでに存在します`); inp.focus(); return; }
+      const old = categories[i];
+      categories[i] = name;
+      tasks.forEach(t => { if (t.category === old) t.category = name; });
+      saveData(); editingCatIdx = -1;
+      renderCategoryList(); renderCategorySelect(); renderTabs(); renderTaskList();
+    }
+
+    function deleteCat(i) {
+      const name  = categories[i];
+      const count = tasks.filter(t => t.category === name).length;
+      const msg   = count > 0
+        ? `「${name}」は${count}件のタスクで使用中です。\n削除すると別のカテゴリに移動されます。削除しますか？`
+        : `「${name}」を削除しますか？`;
+      if (!confirm(msg)) return;
+      if (count > 0) {
+        const fallback = categories.find((_, idx) => idx !== i) || '';
+        tasks.forEach(t => { if (t.category === name) t.category = fallback; });
+      }
+      categories.splice(i, 1);
+      editingCatIdx = -1;
+      if (activeTab === name) activeTab = 'すべて';
+      saveData();
+      renderCategoryList(); renderCategorySelect(); renderTabs(); renderTaskList();
+    }
+
+    function moveCat(i, dir) {
+      const j = i + dir;
+      if (j < 0 || j >= categories.length) return;
+      [categories[i], categories[j]] = [categories[j], categories[i]];
+      saveData(); renderCategoryList(); renderCategorySelect(); renderTabs();
+    }
+
+    function addCategory() {
+      const inp  = document.getElementById('new-category-input');
+      const name = inp.value.trim();
+      if (!name) { inp.focus(); return; }
+      if (categories.includes(name)) { alert(`「${name}」はすでに存在します`); inp.focus(); return; }
+      categories.push(name);
+      saveData();
+      renderCategoryList(); renderCategorySelect(); renderTabs();
+      document.getElementById('input-category').value = name;
+      inp.value = ''; inp.focus();
+    }
+
+    // ─── Inline editing ───────────────────────────────────────
+    function startEdit(id, field) {
+      editingCell = { id, field };
+      renderTaskList();
+      setTimeout(() => {
+        const el = document.getElementById('edit-cell-input') || document.getElementById('edit-cell-select') || document.getElementById('edit-dl-year');
+        if (el) { el.focus(); if (el.select) el.select(); }
+      }, 30);
+    }
+
+    function cancelEdit() { editingCell = null; renderTaskList(); }
+
+    function saveEdit(id, field) {
+      const task = tasks.find(t => t.id === id);
+      if (!task) { editingCell = null; renderTaskList(); return; }
+      if (field === 'priority') {
+        const sel = document.getElementById('edit-cell-select');
+        task.priority = sel && sel.value !== '' ? parseInt(sel.value) : null;
+      } else if (field === 'deadline') {
+        const y = document.getElementById('edit-dl-year')?.value;
+        const m = document.getElementById('edit-dl-month')?.value;
+        const d = document.getElementById('edit-dl-day')?.value;
+        task.deadline = (y && m && d) ? `${y}-${pad(parseInt(m))}-${pad(parseInt(d))}` : null;
+      } else if (field === 'progress') {
+        const inp = document.getElementById('edit-progress-input');
+        task.progress = inp ? Math.min(100, Math.max(0, parseInt(inp.value) || 0)) : task.progress;
+      } else {
+        const inp = document.getElementById('edit-cell-input');
+        task[field] = inp ? inp.value.trim() : task[field];
+      }
+      saveData(); editingCell = null; renderTaskList();
+    }
+
+    function clearDeadline(id) {
+      const task = tasks.find(t => t.id === id);
+      if (task) { task.deadline = null; saveData(); }
+      editingCell = null; renderTaskList();
+    }
+
+    function updateDlDays() {
+      const y = document.getElementById('edit-dl-year')?.value;
+      const m = document.getElementById('edit-dl-month')?.value;
+      const ds = document.getElementById('edit-dl-day');
+      if (!y || !m || !ds) return;
+      const cur = parseInt(ds.value);
+      const max = new Date(parseInt(y), parseInt(m), 0).getDate();
+      ds.innerHTML = Array.from({ length: max }, (_, i) =>
+        `<option value="${i+1}" ${i+1===Math.min(cur,max)?'selected':''}>${i+1}</option>`
+      ).join('');
+    }
+
+    // ─── Delete ───────────────────────────────────────────────
+    function deleteTask(id) {
+      const task = tasks.find(t => t.id === id);
+      if (!task || !confirm(`「${task.name}」を削除しますか？`)) return;
+      tasks = tasks.filter(t => t.id !== id);
+      saveData(); renderTaskList();
+    }
+
+    // ─── Tabs ─────────────────────────────────────────────────
+    function setTab(tab) { activeTab = tab; renderTabs(); renderTaskList(); }
+
+    function renderTabs() {
+      const container = document.getElementById('tab-list');
+      const tabs = ['すべて', ...categories];
+      if (!tabs.includes(activeTab)) activeTab = 'すべて';
+      container.innerHTML = tabs.map(t => {
+        const active = t === activeTab;
+        return `<button onclick="setTab('${esc(t)}')"
+          class="tab-btn px-4 py-2.5 text-sm font-medium rounded-t-lg border-b-2 whitespace-nowrap
+            ${active ? 'border-slate-700 text-slate-700 bg-slate-50' : 'border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50'}">
+          ${esc(t)}
+        </button>`;
+      }).join('');
+    }
+
+    // ─── Sort ─────────────────────────────────────────────────
+    function setSort(field) {
+      if (sortField === field) { sortDir = sortDir === 'asc' ? 'desc' : 'asc'; }
+      else { sortField = field; sortDir = field === 'deadline' ? 'asc' : 'desc'; }
+      updateSortIcons(); renderTaskList();
+    }
+
+    function updateSortIcons() {
+      const pi = document.getElementById('sort-priority-icon');
+      const di = document.getElementById('sort-deadline-icon');
+      if (pi) pi.textContent = sortField === 'priority' ? (sortDir === 'asc' ? '↑' : '↓') : '';
+      if (di) di.textContent = sortField === 'deadline' ? (sortDir === 'asc' ? '↑' : '↓') : '';
+    }
+
+    function sortedTasks(list) {
+      if (!sortField) return [...list];
+      return [...list].sort((a, b) => {
+        if (sortField === 'priority') {
+          const pa = a.priority ?? -1, pb = b.priority ?? -1;
+          return sortDir === 'desc' ? pb - pa : pa - pb;
+        }
+        if (!a.deadline && !b.deadline) return 0;
+        if (!a.deadline) return 1;
+        if (!b.deadline) return -1;
+        return sortDir === 'asc' ? a.deadline.localeCompare(b.deadline) : b.deadline.localeCompare(a.deadline);
+      });
+    }
+
+    // ─── Render helpers ───────────────────────────────────────
+    const pencilSvg = `<svg class="pencil-icon w-3 h-3 text-gray-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>`;
+    const checkSvg  = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>`;
+    const xSvg      = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>`;
+
+    function saveBtn(id, field) {
+      return `<button onclick="saveEdit('${esc(id)}','${field}')" class="icon-btn text-slate-500 hover:bg-slate-100">${checkSvg}</button>`;
+    }
+    function cancelBtn() {
+      return `<button onclick="cancelEdit()" class="icon-btn text-gray-300 hover:bg-gray-100">${xSvg}</button>`;
+    }
+
+    // ─── Render task list ─────────────────────────────────────
+    function renderCategorySelect() {
+      const sel  = document.getElementById('input-category');
+      const prev = sel.value;
+      sel.innerHTML = categories.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+      if (categories.includes(prev)) sel.value = prev;
+    }
+
+    function renderTaskList() {
+      const tbody = document.getElementById('task-list');
+      const empty = document.getElementById('empty-state');
+      const filtered = activeTab === 'すべて' ? tasks : tasks.filter(t => t.category === activeTab);
+
+      if (!filtered.length) {
+        tbody.innerHTML = ''; empty.classList.remove('hidden'); return;
+      }
+      empty.classList.add('hidden');
+
+      tbody.innerHTML = sortedTasks(filtered).map(task => {
+        const isOver = task.deadline && daysLeft(task.deadline) < 0;
+        const days   = daysLeft(task.deadline);
+
+        // ── Name cell
+        const nameCell = editingCell?.id === task.id && editingCell?.field === 'name'
+          ? `<td class="px-4 py-2"><div class="flex items-center gap-1">
+               <input id="edit-cell-input" type="text" value="${esc(task.name)}"
+                 class="border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400 w-44"
+                 onkeydown="if(event.key==='Enter') saveEdit('${esc(task.id)}','name'); else if(event.key==='Escape') cancelEdit()"/>
+               ${saveBtn(task.id,'name')} ${cancelBtn()}
+             </div></td>`
+          : `<td class="px-5 py-3.5 editable-cell" onclick="startEdit('${esc(task.id)}','name')">
+               <span class="cell-inner inline-flex items-center gap-1.5 px-1.5 py-0.5 font-medium text-gray-700">${esc(task.name)} ${pencilSvg}</span>
+             </td>`;
+
+        // ── Priority cell
+        const priCell = editingCell?.id === task.id && editingCell?.field === 'priority'
+          ? `<td class="px-4 py-2 whitespace-nowrap"><div class="flex items-center gap-1">
+               <select id="edit-cell-select"
+                 class="border border-slate-300 rounded-lg px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-400"
+                 onkeydown="if(event.key==='Escape') cancelEdit()">
+                 <option value="" ${task.priority===null?'selected':''}>—</option>
+                 <option value="3" ${task.priority===3?'selected':''}>3　高</option>
+                 <option value="2" ${task.priority===2?'selected':''}>2　中</option>
+                 <option value="1" ${task.priority===1?'selected':''}>1　低</option>
+               </select>
+               ${saveBtn(task.id,'priority')} ${cancelBtn()}
+             </div></td>`
+          : `<td class="px-5 py-3.5 editable-cell" onclick="startEdit('${esc(task.id)}','priority')">
+               <span class="cell-inner inline-flex items-center gap-1.5 px-1.5 py-0.5">
+                 ${task.priority
+                   ? `<span class="inline-block px-2 py-0.5 rounded-full text-xs font-medium ${PRI_CLASS[task.priority]}">${PRI_LABEL[task.priority]}</span>`
+                   : `<span class="text-gray-300">—</span>`}
+                 ${pencilSvg}
+               </span>
+             </td>`;
+
+        // ── Deadline cell
+        let dlCell;
+        if (editingCell?.id === task.id && editingCell?.field === 'deadline') {
+          const base  = task.deadline ? new Date(task.deadline + 'T00:00:00') : new Date();
+          const cy = base.getFullYear(), cm = base.getMonth()+1, cd = base.getDate();
+          const maxD  = new Date(cy, cm, 0).getDate();
+          const nowY  = new Date().getFullYear();
+          const years = Array.from({ length: nowY - 2019 + 6 }, (_, i) => 2020 + i);
+          dlCell = `<td class="px-4 py-2 whitespace-nowrap"><div class="flex items-center gap-1 flex-wrap">
+            <select id="edit-dl-year" onchange="updateDlDays()"
+              class="border border-slate-300 rounded-lg px-1.5 py-1.5 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-slate-400">
+              ${years.map(y=>`<option value="${y}" ${y===cy?'selected':''}>${y}</option>`).join('')}
+            </select><span class="text-gray-400 text-xs">年</span>
+            <select id="edit-dl-month" onchange="updateDlDays()"
+              class="border border-slate-300 rounded-lg px-1.5 py-1.5 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-slate-400">
+              ${Array.from({length:12},(_,i)=>i+1).map(m=>`<option value="${m}" ${m===cm?'selected':''}>${m}</option>`).join('')}
+            </select><span class="text-gray-400 text-xs">月</span>
+            <select id="edit-dl-day"
+              class="border border-slate-300 rounded-lg px-1.5 py-1.5 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-slate-400">
+              ${Array.from({length:maxD},(_,i)=>i+1).map(d=>`<option value="${d}" ${d===cd?'selected':''}>${d}</option>`).join('')}
+            </select><span class="text-gray-400 text-xs">日</span>
+            ${saveBtn(task.id,'deadline')}
+            ${task.deadline ? `<button onclick="clearDeadline('${esc(task.id)}')" class="icon-btn text-gray-300 hover:text-red-400 hover:bg-red-50" title="締切日をクリア">${xSvg}</button>` : cancelBtn()}
+            ${task.deadline ? cancelBtn() : ''}
+          </div></td>`;
+        } else {
+          const dLabel = days === null ? '' : isOver
+            ? `<span class="text-red-500 text-xs font-semibold">${Math.abs(days)}日超過</span>`
+            : days === 0
+              ? `<span class="text-orange-500 text-xs font-semibold">今日</span>`
+              : `<span class="text-gray-400 text-xs">あと${days}日</span>`;
+          dlCell = `<td class="px-5 py-3.5 editable-cell" onclick="startEdit('${esc(task.id)}','deadline')" style="min-width:140px">
+            ${task.deadline
+              ? `<div class="space-y-1">
+                   <span class="cell-inner inline-flex items-center gap-1.5 px-1.5 py-0.5 text-gray-600">${formatDate(task.deadline)} ${pencilSvg}</span>
+                   <div class="flex items-center gap-2 px-1.5">
+                     <div class="progress-track flex-1">
+                       <div class="progress-fill ${isOver?'overdue-pulse':''}" style="width:${barPct(days)}%;background-color:${barColor(days)}"></div>
+                     </div>
+                     ${dLabel}
+                   </div>
+                 </div>`
+              : `<span class="cell-inner inline-flex items-center gap-1.5 px-1.5 py-0.5 text-gray-300">— ${pencilSvg}</span>`}
+          </td>`;
+        }
+
+        // ── Progress cell
+        const pct = task.progress ?? 0;
+        const progColor = pct >= 100 ? '#22c55e' : pct >= 60 ? '#3b82f6' : pct >= 30 ? '#f97316' : '#94a3b8';
+        const progressCell = editingCell?.id === task.id && editingCell?.field === 'progress'
+          ? `<td class="px-4 py-2" style="min-width:140px"><div class="space-y-2">
+               <div class="flex items-center gap-2">
+                 <input id="edit-progress-input" type="range" min="0" max="100" step="5" value="${pct}"
+                   class="flex-1"
+                   style="background:linear-gradient(to right,${progColor} ${pct}%,#e5e7eb ${pct}%)"
+                   oninput="this.style.background='linear-gradient(to right,${progColor} '+this.value+'%,#e5e7eb '+this.value+'%)'; document.getElementById('edit-progress-val').textContent=this.value+'%'"/>
+                 <span id="edit-progress-val" class="text-sm font-medium text-gray-600 w-10 text-right">${pct}%</span>
+               </div>
+               <div class="flex gap-1">
+                 ${saveBtn(task.id,'progress')} ${cancelBtn()}
+               </div>
+             </div></td>`
+          : `<td class="px-5 py-3.5 editable-cell" onclick="startEdit('${esc(task.id)}','progress')" style="min-width:140px">
+               <div class="space-y-1">
+                 <div class="flex items-center gap-2">
+                   <div class="progress-track flex-1">
+                     <div class="progress-fill" style="width:${pct}%;background-color:${progColor}"></div>
+                   </div>
+                   <span class="text-xs text-gray-500 w-8 text-right">${pct}%</span>
+                   ${pencilSvg}
+                 </div>
+               </div>
+             </td>`;
+
+        // ── Memo cell
+        const memoCell = editingCell?.id === task.id && editingCell?.field === 'memo'
+          ? `<td class="px-4 py-2"><div class="flex items-center gap-1">
+               <input id="edit-cell-input" type="text" value="${esc(task.memo||'')}" placeholder="メモを入力"
+                 class="border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400 w-48"
+                 onkeydown="if(event.key==='Enter') saveEdit('${esc(task.id)}','memo'); else if(event.key==='Escape') cancelEdit()"/>
+               ${saveBtn(task.id,'memo')} ${cancelBtn()}
+             </div></td>`
+          : `<td class="px-5 py-3.5 editable-cell max-w-xs" onclick="startEdit('${esc(task.id)}','memo')">
+               <span class="cell-inner inline-flex items-center gap-1.5 px-1.5 py-0.5 text-gray-500">
+                 <span class="truncate" style="max-width:12rem">${task.memo ? esc(task.memo) : '<span class="text-gray-300">—</span>'}</span>
+                 ${pencilSvg}
+               </span>
+             </td>`;
+
+        return `<tr class="task-row border-b border-gray-50 ${isOver?'bg-red-50/30':''}">
+  ${nameCell}${priCell}${dlCell}${progressCell}${memoCell}
+  <td class="px-3 py-3.5">
+    <button onclick="deleteTask('${esc(task.id)}')" class="icon-btn text-gray-300 hover:text-red-400 hover:bg-red-50" title="削除">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+    </button>
+  </td>
+</tr>`;
+      }).join('');
+    }
+
+    function render() { renderCategorySelect(); renderTabs(); renderTaskList(); updateSortIcons(); }
+
+    function esc(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    }
+
+    // ─── Works authentication ──────────────────────────────
+    function signInWithGoogle() { signIn(); }
+    async function signOutUser() { await worksSignOut(); location.reload(); }
+    watchAuth({
+      onSignedIn: async () => {
+        try {
+          await loadData();
+          initFormState();
+          document.getElementById('login-screen').classList.add('hidden');
+        } catch (error) {
+          document.getElementById('login-loading').textContent = '読み込みに失敗しました: ' + error.message;
+        }
+      },
+      onSignedOut: message => {
+        document.getElementById('login-loading').classList.add('hidden');
+        document.getElementById('login-form').classList.remove('hidden');
+        if (message) document.querySelector('#login-form p').textContent = message;
+      }
+    });
+    // ─── Expose globals ───────────────────────────────────────
+    Object.assign(window, {
+      toggleForm, addTask,
+      openCategoryModal, closeCategoryModal,
+      addCategory, startEditCat, cancelEditCat, saveEditCat, deleteCat, moveCat,
+      startEdit, cancelEdit, saveEdit, clearDeadline, updateDlDays,
+      deleteTask, setTab, setSort,
+      signInWithGoogle, signOutUser,
+    });
+  </script>
+</body>
+</html>
