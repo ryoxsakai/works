@@ -73,6 +73,7 @@
 .todo-page .text-gray-500,
 .todo-page .text-gray-600,
 .todo-page .text-gray-700,
+.todo-page .text-gray-800,
 .todo-page .text-slate-500,
 .todo-page .text-slate-600,
 .todo-page .text-slate-700 {
@@ -168,6 +169,16 @@
 
 #login-screen {
   background: var(--bg-gradient) !important;
+}
+
+#login-form button {
+  background: var(--bg-elevated) !important;
+  color: var(--fg) !important;
+  border-color: var(--border) !important;
+}
+
+#login-form button:hover {
+  background: var(--bg-hover) !important;
 }
 
 @media (max-width: 640px) {
