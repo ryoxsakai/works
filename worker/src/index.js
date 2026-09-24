@@ -690,6 +690,73 @@ async function deleteCandidateSchool(env, id) {
   await env.DB.prepare("DELETE FROM candidate_schools WHERE id = ?").bind(id).run();
 }
 
+// Shared ToDo document.  Initialize only after the schema migration has run.
+const emptyTodo = () => ({ tasks: [], categories: ["仕事", "個人", "その他"] });
+async function readTodo(env) {
+  const row = await env.DB.prepare("SELECT data FROM todo_state WHERE id = 1").first();
+  return row ? JSON.parse(row.data) : emptyTodo();
+}
+function validateTodo(state) {
+  if (!state || !Array.isArray(state.tasks) || !Array.isArray(state.categories) ||
+      state.tasks.length > 10000 || state.categories.length > 200 ||
+      new Set(state.categories).size !== state.categories.length ||
+      state.tasks.some(t => !t || typeof t.id !== "string" || !t.id ||
+        typeof t.name !== "string" || !t.name.trim() || t.name.length > 500 ||
+        typeof t.category !== "string" || t.category.length > 100 ||
+        ![null, 1, 2, 3].includes(t.priority) ||
+        (t.deadline !== null && !/^\d{4}-\d{2}-\d{2}$/.test(t.deadline)) ||
+        !Number.isInteger(t.progress) || t.progress < 0 || t.progress > 100 ||
+        typeof t.memo !== "string" || t.memo.length > 10000) ||
+      new Set(state.tasks.map(t => t.id)).size !== state.tasks.length ||
+      state.categories.some(c => typeof c !== "string" || !c.trim() || c.length > 100)) {
+    throw new Error("invalid todo data");
+  }
+  return state;
+}
+async function writeTodo(env, state) {
+  validateTodo(state);
+  await env.DB.prepare("INSERT INTO todo_state (id, data) VALUES (1, ?) ON CONFLICT(id) DO UPDATE SET data = excluded.data")
+    .bind(JSON.stringify(state)).run();
+  return state;
+}
+const todoTools = [
+  { name: "list_todos", description: "List Works ToDo tasks and categories", inputSchema: { type: "object", properties: { category: { type: "string" } } } },
+  { name: "create_todo", description: "Create a Works ToDo task", inputSchema: { type: "object", required: ["name"], properties: { name: { type: "string" }, category: { type: "string" }, priority: { type: ["integer", "null"] }, deadline: { type: ["string", "null"] }, progress: { type: "integer" }, memo: { type: "string" } } } },
+  { name: "update_todo", description: "Update a Works ToDo task by id", inputSchema: { type: "object", required: ["id"], properties: { id: { type: "string" }, name: { type: "string" }, category: { type: "string" }, priority: { type: ["integer", "null"] }, deadline: { type: ["string", "null"] }, progress: { type: "integer" }, memo: { type: "string" } } } },
+  { name: "delete_todo", description: "Delete a Works ToDo task by id", inputSchema: { type: "object", required: ["id"], properties: { id: { type: "string" } } } },
+  { name: "manage_todo_categories", description: "List or replace ordered Works ToDo categories", inputSchema: { type: "object", properties: { categories: { type: "array", items: { type: "string" } } } } },
+];
+async function callTodoTool(env, name, args = {}) {
+  const state = await readTodo(env);
+  if (name === "list_todos") return { tasks: args.category ? state.tasks.filter(t => t.category === args.category) : state.tasks, categories: state.categories };
+  if (name === "manage_todo_categories") {
+    if (args.categories === undefined) return state.categories;
+    state.categories = args.categories;
+    await writeTodo(env, state);
+    return state.categories;
+  }
+  if (name === "create_todo") {
+    if (typeof args.name !== "string" || !args.name.trim()) throw new Error("name is required");
+    const task = { id: crypto.randomUUID(), name: args.name, category: args.category || state.categories[0] || "その他", priority: args.priority ?? null, deadline: args.deadline ?? null, progress: args.progress ?? 0, memo: args.memo ?? "", createdAt: new Date().toISOString().slice(0, 10) };
+    state.tasks.push(task);
+    await writeTodo(env, state);
+    return task;
+  }
+  const task = state.tasks.find(t => t.id === args.id);
+  if (!task) throw new Error("task not found");
+  if (name === "update_todo") {
+    for (const key of ["name", "category", "priority", "deadline", "progress", "memo"]) if (Object.hasOwn(args, key)) task[key] = args[key];
+    await writeTodo(env, state);
+    return task;
+  }
+  if (name === "delete_todo") {
+    state.tasks = state.tasks.filter(t => t.id !== args.id);
+    await writeTodo(env, state);
+    return { ok: true };
+  }
+  throw new Error("unknown tool");
+}
+
 export default {
   async fetch(request, env) {
     const origin = env.ALLOWED_ORIGIN;
@@ -733,6 +800,31 @@ export default {
       }
 
       await verifySession(request, env);
+
+      if (url.pathname === "/api/todo" && request.method === "GET") {
+        return json(await readTodo(env), headers);
+      }
+      if (url.pathname === "/api/todo" && request.method === "PUT") {
+        return json(await writeTodo(env, await request.json()), headers);
+      }
+      // Streamable HTTP MCP JSON-RPC endpoint; the same Works bearer session is required.
+      if (url.pathname === "/api/mcp" && request.method === "POST") {
+        const rpc = await request.json();
+        if (rpc.method === "notifications/initialized") return new Response(null, { status: 202, headers });
+        const reply = result => json({ jsonrpc: "2.0", id: rpc.id, result }, headers);
+        if (rpc.method === "initialize") return reply({ protocolVersion: "2025-03-26", capabilities: { tools: {} }, serverInfo: { name: "works", version: "1.0.0" } });
+        if (rpc.method === "tools/list") return reply({ tools: todoTools });
+        if (rpc.method === "tools/call") {
+          try {
+            if (!todoTools.some(tool => tool.name === rpc.params?.name)) throw new Error("unknown tool");
+            const result = await callTodoTool(env, rpc.params.name, rpc.params.arguments || {});
+            return reply({ content: [{ type: "text", text: JSON.stringify(result) }] });
+          } catch (error) {
+            return reply({ content: [{ type: "text", text: error.message }], isError: true });
+          }
+        }
+        return json({ jsonrpc: "2.0", id: rpc.id, error: { code: -32601, message: "Method not found" } }, headers);
+      }
 
       if (url.pathname === "/api/auth/logout" && request.method === "POST") {
         await clearRefreshToken(env);
