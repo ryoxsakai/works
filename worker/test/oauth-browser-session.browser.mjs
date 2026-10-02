@@ -21,33 +21,41 @@ try {
   const authorizeURL = ORIGIN + "/oauth/authorize?" + params;
   const requests = [];
   browser = await chromium.launch({ headless: true, ...(process.env.BROWSER_EXECUTABLE ? { executablePath: process.env.BROWSER_EXECUTABLE } : {}) });
-  async function attach(context) {
-    await context.route("**/*", async (route) => {
-      const req = route.request();
-      const url = new URL(req.url());
-      if (url.origin === new URL(CALLBACK).origin) {
-        assert.equal(url.pathname, "/callback");
-        assert.ok(url.searchParams.get("code"));
-        assert.equal(url.searchParams.get("state"), "browser-fixture");
-        await route.fulfill({ status: 200, contentType: "text/html", body: "<h1>Fixture callback received</h1>" });
-        return;
+  async function attach(context, page) {
+    // Playwright route() does not intercept every redirected URL. Chromium Fetch
+    // pauses every hop, preserving real redirects, cookies and CSP without DNS.
+    const cdp = await context.newCDPSession(page);
+    await cdp.send("Fetch.enable", { patterns: [{ urlPattern: "*" }] });
+    cdp.on("Fetch.requestPaused", async ({ requestId, request: req }) => {
+      try {
+        const url = new URL(req.url);
+        let result;
+        if (url.origin === new URL(CALLBACK).origin) {
+          assert.equal(url.pathname, "/callback");
+          assert.ok(url.searchParams.get("code"));
+          assert.equal(url.searchParams.get("state"), "browser-fixture");
+          result = new Response("<h1>Fixture callback received</h1>", { headers: { "Content-Type": "text/html" } });
+        } else {
+          assert.equal(url.origin, ORIGIN, "unexpected network request blocked by fixture");
+          const headers = new Headers(req.headers);
+          if (req.method === "POST") {
+            assert.equal(headers.get("Origin"), ORIGIN, "real form navigation preserves same-origin Origin");
+            requests.push({ path: url.pathname, method: req.method });
+          }
+          result = await worker.fetch(new Request(req.url, { method: req.method, headers, ...(req.postData ? { body: req.postData } : {}) }), env);
+        }
+        const responseHeaders = [...result.headers].filter(([name]) => name.toLowerCase() !== "set-cookie").map(([name, value]) => ({ name, value }));
+        for (const value of result.headers.getSetCookie()) responseHeaders.push({ name: "Set-Cookie", value });
+        await cdp.send("Fetch.fulfillRequest", { requestId, responseCode: result.status, responseHeaders, body: Buffer.from(await result.arrayBuffer()).toString("base64") });
+      } catch (error) {
+        console.error(error);
+        await cdp.send("Fetch.failRequest", { requestId, errorReason: "BlockedByClient" }).catch(() => {});
       }
-      assert.equal(url.origin, ORIGIN, "unexpected network request blocked by fixture");
-      const headers = await req.allHeaders();
-      if (req.method() === "POST") {
-        assert.equal(headers.origin, ORIGIN, "real form navigation preserves same-origin Origin");
-        requests.push({ path: url.pathname, method: req.method() });
-      }
-      const result = await worker.fetch(new Request(req.url(), { method: req.method(), headers, ...(req.postData() ? { body: req.postData() } : {}) }), env);
-      const responseHeaders = Object.fromEntries(result.headers);
-      const cookies = result.headers.getSetCookie();
-      if (cookies.length) responseHeaders["set-cookie"] = cookies.join("\n");
-      await route.fulfill({ status: result.status, headers: responseHeaders, body: await result.text() });
     });
   }
   const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
-  await attach(context);
   const page = await context.newPage();
+  await attach(context, page);
   await page.goto(authorizeURL);
   const checkbox = page.getByRole("checkbox");
   assert.equal(await checkbox.isChecked(), false);
@@ -69,8 +77,8 @@ try {
   const originalExpiry = cookie.expires;
   const saved = await context.storageState();
   const restored = await browser.newContext({ storageState: saved });
-  await attach(restored);
   const restoredPage = await restored.newPage();
+  await attach(restored, restoredPage);
   await restoredPage.goto(authorizeURL);
   assert.equal(await restoredPage.locator("input[type=password]").count(), 0, "persistent-cookie restore retains verified browser");
   await restored.close();
