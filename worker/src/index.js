@@ -64,7 +64,7 @@ function mcpJson(payload, status = 200, extraHeaders = {}) {
   return new Response(JSON.stringify(payload), { status, headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", ...extraHeaders } });
 }
 function html(body, status = 200) {
-  return new Response(body, { status, headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } });
+  return new Response(body, { status, headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'", "X-Frame-Options": "DENY", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "same-origin" } });
 }
 function escapeHtml(value) {
   return String(value).replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[char]));
@@ -73,6 +73,10 @@ async function ensureMcpOAuthSchema(env) {
   await env.DB.batch([
     env.DB.prepare("CREATE TABLE IF NOT EXISTS mcp_oauth_clients (client_id TEXT PRIMARY KEY, redirect_uris TEXT NOT NULL, created_at TEXT DEFAULT (datetime('now')))"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS mcp_oauth_codes (code TEXT PRIMARY KEY, client_id TEXT NOT NULL, redirect_uri TEXT NOT NULL, code_challenge TEXT NOT NULL, scope TEXT NOT NULL, expires_at INTEGER NOT NULL, created_at TEXT DEFAULT (datetime('now')))"),
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS mcp_browser_sessions (token_hash TEXT PRIMARY KEY, credential_version TEXT NOT NULL, expires_at INTEGER NOT NULL)"),
+    env.DB.prepare("CREATE INDEX IF NOT EXISTS mcp_browser_sessions_expiry ON mcp_browser_sessions (expires_at)"),
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS mcp_browser_forms (token_hash TEXT PRIMARY KEY, browser_hash TEXT NOT NULL, request_hash TEXT NOT NULL, session_hash TEXT NOT NULL, credential_version TEXT NOT NULL, expires_at INTEGER NOT NULL)"),
+    env.DB.prepare("CREATE INDEX IF NOT EXISTS mcp_browser_forms_expiry ON mcp_browser_forms (expires_at)"),
   ]);
 }
 async function registerMcpOAuthClient(request, env) {
@@ -90,28 +94,153 @@ async function readMcpOAuthClient(env, clientId) {
   if (!client) return null;
   try { return { ...client, redirect_uris: JSON.parse(client.redirect_uris) }; } catch { return null; }
 }
-function oauthErrorPage(message) {
-  return html(`<!doctype html><html lang="ja"><meta charset="utf-8"><title>WORKS 認証</title><body style="font-family:-apple-system,BlinkMacSystemFont,'Noto Sans JP',sans-serif;max-width:560px;margin:48px auto;padding:0 20px"><h1>WORKS 認証エラー</h1><p>${escapeHtml(message)}</p></body></html>`, 400);
+const MCP_BROWSER_SESSION_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+const MCP_BROWSER_FORM_MAX_AGE_MS = 10 * 60 * 1000;
+const MCP_BROWSER_COOKIE = "__Host-works_mcp_session";
+const MCP_BROWSER_CSRF_COOKIE = "__Host-works_mcp_csrf";
+const MCP_AUTHORIZE_FIELDS = ["response_type", "client_id", "redirect_uri", "state", "code_challenge", "code_challenge_method", "scope"];
+
+function randomBrowserToken() {
+  return toBase64Url(crypto.getRandomValues(new Uint8Array(32)));
 }
-function renderMcpAuthorizeForm(params) {
-  const fields = ["response_type", "client_id", "redirect_uri", "state", "code_challenge", "code_challenge_method", "scope"].map((name) => `<input type="hidden" name="${name}" value="${escapeHtml(params.get(name) || "")}">`).join("");
-  return html(`<!doctype html><html lang="ja"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>WORKS を接続</title><body style="font-family:-apple-system,BlinkMacSystemFont,'Noto Sans JP',sans-serif;max-width:560px;margin:48px auto;padding:0 20px"><h1>WORKS をChatGPTに接続</h1><p>授業予定・確認テスト・宿題・授業メモの読み取りと更新、およびJ-Quantsの株価データ取得を許可します。</p><form method="post"><label style="display:block;margin:24px 0 8px">WORKS APIキー</label><input name="api_key" type="password" autocomplete="current-password" required style="box-sizing:border-box;width:100%;padding:12px;font-size:16px">${fields}<button type="submit" style="margin-top:24px;padding:12px 18px;font-size:16px">接続を許可</button></form></body></html>`);
+function browserCookie(request, name) {
+  const matches = (request.headers.get("Cookie") || "").split(";").map((item) => item.trim()).filter((item) => item.startsWith(`${name}=`));
+  if (matches.length !== 1) return null;
+  const value = matches[0].slice(name.length + 1);
+  return /^[A-Za-z0-9_-]{43}$/.test(value) ? value : null;
+}
+function browserCookieHeader(name, value, maxAgeSeconds) {
+  return `${name}=${value}; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=${maxAgeSeconds}`;
+}
+function addBrowserCookies(response, cookies) {
+  for (const cookie of cookies) response.headers.append("Set-Cookie", cookie);
+  return response;
+}
+async function browserCredentialVersion(env, origin) {
+  // A keyed digest invalidates saved sessions on either key rotation, without storing keys.
+  return hmacSign(env, JSON.stringify(["works-mcp-browser:v1", origin, env.WORKS_API_KEY]));
+}
+async function readMcpBrowserSession(request, env) {
+  const token = browserCookie(request, MCP_BROWSER_COOKIE);
+  if (!token) return null;
+  const tokenHash = await sha256Base64Url(token);
+  const row = await env.DB.prepare("SELECT token_hash, credential_version, expires_at FROM mcp_browser_sessions WHERE token_hash = ?").bind(tokenHash).first();
+  if (!row) return null;
+  if (row.expires_at <= Date.now() || !(await constantTimeEqual(row.credential_version, await browserCredentialVersion(env, new URL(request.url).origin)))) {
+    await env.DB.prepare("DELETE FROM mcp_browser_sessions WHERE token_hash = ?").bind(tokenHash).run();
+    return null;
+  }
+  return row;
+}
+async function forgetMcpBrowserSession(request, env) {
+  const token = browserCookie(request, MCP_BROWSER_COOKIE);
+  if (token) await env.DB.prepare("DELETE FROM mcp_browser_sessions WHERE token_hash = ?").bind(await sha256Base64Url(token)).run();
+  return browserCookieHeader(MCP_BROWSER_COOKIE, "", 0);
+}
+async function createMcpBrowserSession(request, env) {
+  const token = randomBrowserToken();
+  await env.DB.prepare("INSERT INTO mcp_browser_sessions (token_hash, credential_version, expires_at) VALUES (?, ?, ?)")
+    .bind(await sha256Base64Url(token), await browserCredentialVersion(env, new URL(request.url).origin), Date.now() + MCP_BROWSER_SESSION_MAX_AGE_MS).run();
+  return browserCookieHeader(MCP_BROWSER_COOKIE, token, MCP_BROWSER_SESSION_MAX_AGE_MS / 1000);
+}
+async function mcpFormRequestHash(action, params) {
+  return sha256Base64Url(JSON.stringify([action, ...MCP_AUTHORIZE_FIELDS.map((name) => params.get(name) || "")]));
+}
+async function issueMcpBrowserForm(request, env, action, params, session) {
+  // Reuse the browser nonce so opening another authorization tab doesn't invalidate this one.
+  const browserToken = browserCookie(request, MCP_BROWSER_CSRF_COOKIE) || randomBrowserToken();
+  const formToken = randomBrowserToken();
+  await env.DB.batch([
+    env.DB.prepare("DELETE FROM mcp_browser_forms WHERE expires_at <= ?").bind(Date.now()),
+    env.DB.prepare("DELETE FROM mcp_browser_sessions WHERE expires_at <= ?").bind(Date.now()),
+    env.DB.prepare("INSERT INTO mcp_browser_forms (token_hash, browser_hash, request_hash, session_hash, credential_version, expires_at) VALUES (?, ?, ?, ?, ?, ?)")
+      .bind(await sha256Base64Url(formToken), await sha256Base64Url(browserToken), await mcpFormRequestHash(action, params), session?.token_hash || "", await browserCredentialVersion(env, new URL(request.url).origin), Date.now() + MCP_BROWSER_FORM_MAX_AGE_MS),
+  ]);
+  return { token: formToken, cookie: browserCookieHeader(MCP_BROWSER_CSRF_COOKIE, browserToken, MCP_BROWSER_FORM_MAX_AGE_MS / 1000) };
+}
+function isSameOriginMcpForm(request, url) {
+  const type = (request.headers.get("Content-Type") || "").split(";")[0].trim().toLowerCase();
+  const fetchSite = request.headers.get("Sec-Fetch-Site");
+  return request.headers.get("Origin") === url.origin &&
+    (!fetchSite || fetchSite === "same-origin") && type === "application/x-www-form-urlencoded";
+}
+async function consumeMcpBrowserForm(request, env, action, params, session) {
+  const formToken = params.get("csrf_token") || "";
+  const browserToken = browserCookie(request, MCP_BROWSER_CSRF_COOKIE);
+  if (!browserToken || !/^[A-Za-z0-9_-]{43}$/.test(formToken)) return false;
+  // DELETE RETURNING makes each rendered form one-use, even for simultaneous double clicks.
+  const row = await env.DB.prepare("DELETE FROM mcp_browser_forms WHERE token_hash = ? AND browser_hash = ? AND request_hash = ? AND session_hash = ? AND credential_version = ? AND expires_at > ? RETURNING token_hash")
+    .bind(await sha256Base64Url(formToken), await sha256Base64Url(browserToken), await mcpFormRequestHash(action, params), session?.token_hash || "", await browserCredentialVersion(env, new URL(request.url).origin), Date.now()).first();
+  return Boolean(row);
+}
+function mcpBrowserPage(title, contents, status = 200) {
+  return html(`<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title)}</title></head><body style="font-family:-apple-system,BlinkMacSystemFont,'Noto Sans JP',sans-serif;max-width:560px;margin:48px auto;padding:0 20px;line-height:1.6"><h1>${escapeHtml(title)}</h1>${contents}</body></html>`, status);
+}
+function oauthErrorPage(message, status = 400) {
+  return mcpBrowserPage("WORKS 認証エラー", `<p>${escapeHtml(message)}</p><p>認証画面を開き直してください。</p>`, status);
+}
+async function renderMcpAuthorizeForm(request, env, params, session, message = "", status = 200, cookies = []) {
+  const form = await issueMcpBrowserForm(request, env, "authorize", params, session);
+  const fields = MCP_AUTHORIZE_FIELDS.map((name) => `<input type="hidden" name="${name}" value="${escapeHtml(params.get(name) || "")}">`).join("");
+  const credentials = session
+    ? `<p>このブラウザのログイン状態を確認しました（期限: ${escapeHtml(new Date(session.expires_at).toISOString().slice(0, 10))} UTC）。</p><p><a href="/oauth/logout">このブラウザのログイン状態を解除</a></p>`
+    : `<label for="api-key" style="display:block;margin:24px 0 8px">WORKS APIキー</label><input id="api-key" name="api_key" type="password" autocomplete="current-password" required style="box-sizing:border-box;width:100%;padding:12px;font-size:16px">`;
+  const page = mcpBrowserPage("WORKS をChatGPTに接続", `<p>授業予定・確認テスト・宿題・授業メモの読み取りと更新、およびJ-Quantsの株価データ取得を許可します。</p><p style="overflow-wrap:anywhere">接続先: ${escapeHtml(params.get("redirect_uri"))}<br>権限: ${escapeHtml(params.get("scope") || MCP_SCOPE)}</p>${message ? `<p role="alert">${escapeHtml(message)}</p>` : ""}<form method="post" action="/oauth/authorize">${credentials}${fields}<input type="hidden" name="csrf_token" value="${form.token}"><label style="display:flex;gap:8px;align-items:baseline;margin-top:20px"><input type="checkbox" name="remember_login" value="1"${session ? " checked" : ""}>ログイン状態を保持する（30日間）</label><p style="font-size:14px">APIキーはブラウザに保存しません。共有端末ではチェックしないでください。チェックを外して接続すると、保存済みのログイン状態も解除されます。保存期限は延長されません。接続の許可は毎回確認します。</p><button type="submit" style="margin-top:16px;padding:12px 18px;font-size:16px">接続を許可</button></form>` , status);
+  // Some browsers apply form-action to the OAuth redirect as well as the form POST.
+  page.headers.set("Content-Security-Policy", `default-src 'none'; style-src 'unsafe-inline'; form-action 'self' ${new URL(params.get("redirect_uri")).origin}; base-uri 'none'; frame-ancestors 'none'`);
+  if (!session && browserCookie(request, MCP_BROWSER_COOKIE)) cookies.push(browserCookieHeader(MCP_BROWSER_COOKIE, "", 0));
+  return addBrowserCookies(page, [...cookies, form.cookie]);
 }
 async function authorizeMcpClient(request, env, url) {
+  if (url.protocol !== "https:") return oauthErrorPage("HTTPSの認証ページを使用してください。");
+  if (!env.WORKS_API_KEY || !env.SESSION_SECRET) return oauthErrorPage("認証が設定されていません。管理者にお問い合わせください。", 503);
+  if (request.method === "POST" && !isSameOriginMcpForm(request, url)) return oauthErrorPage("認証フォームの送信元を確認できませんでした。", 403);
   const params = request.method === "POST" ? new URLSearchParams(await request.text()) : url.searchParams;
+  if ([...MCP_AUTHORIZE_FIELDS, "csrf_token", "remember_login", "api_key"].some((name) => params.getAll(name).length > 1)) return oauthErrorPage("認可リクエストが正しくありません。");
   const clientId = params.get("client_id") || "";
   const redirectUri = params.get("redirect_uri") || "";
   const codeChallenge = params.get("code_challenge") || "";
   const scope = params.get("scope") || MCP_SCOPE;
   const client = await readMcpOAuthClient(env, clientId);
   if (params.get("response_type") !== "code" || !client || !client.redirect_uris.includes(redirectUri) || !codeChallenge || params.get("code_challenge_method") !== "S256" || !scope.split(" ").includes(MCP_SCOPE)) return oauthErrorPage("認可リクエストが正しくありません。");
-  if (request.method === "GET") return renderMcpAuthorizeForm(params);
+  let redirect;
+  try { redirect = new URL(redirectUri); } catch { return oauthErrorPage("接続先が正しくありません。"); }
+  if (redirect.protocol !== "https:") return oauthErrorPage("接続先が正しくありません。");
+  const session = await readMcpBrowserSession(request, env);
+  if (request.method === "GET") return renderMcpAuthorizeForm(request, env, params, session);
+  if (!(await consumeMcpBrowserForm(request, env, "authorize", params, session))) return renderMcpAuthorizeForm(request, env, params, session, "認証フォームの期限が切れたか、すでに送信済みです。内容を確認して再度送信してください。", 403);
   const suppliedKey = params.get("api_key") || "";
-  if (!env.WORKS_API_KEY || !suppliedKey || !(await constantTimeEqual(suppliedKey, env.WORKS_API_KEY))) return oauthErrorPage("APIキーが正しくありません。ブラウザの戻るボタンで入力し直してください。");
+  if (!session && (!suppliedKey || !(await constantTimeEqual(suppliedKey, env.WORKS_API_KEY)))) return renderMcpAuthorizeForm(request, env, params, null, "APIキーが正しくありません。入力し直してください。", 401);
+  const cookies = [];
+  if (params.get("remember_login") === "1") {
+    // Fixed lifetime: ordinary consent does not extend an existing remembered session.
+    if (!session) cookies.push(await createMcpBrowserSession(request, env));
+  } else {
+    cookies.push(await forgetMcpBrowserSession(request, env));
+  }
   const code = crypto.randomUUID();
   await env.DB.prepare("INSERT INTO mcp_oauth_codes (code, client_id, redirect_uri, code_challenge, scope, expires_at) VALUES (?, ?, ?, ?, ?, ?)").bind(code, clientId, redirectUri, codeChallenge, scope, Date.now() + MCP_AUTH_CODE_MAX_AGE_MS).run();
-  const redirect = new URL(redirectUri); redirect.searchParams.set("code", code); if (params.get("state")) redirect.searchParams.set("state", params.get("state"));
-  return Response.redirect(redirect.toString(), 302);
+  redirect.searchParams.set("code", code);
+  if (params.get("state")) redirect.searchParams.set("state", params.get("state"));
+  return addBrowserCookies(new Response(null, { status: 302, headers: { Location: redirect.toString(), "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" } }), cookies);
+}
+async function logoutMcpBrowser(request, env, url) {
+  if (url.protocol !== "https:") return oauthErrorPage("HTTPSの認証ページを使用してください。");
+  if (!env.WORKS_API_KEY || !env.SESSION_SECRET) return oauthErrorPage("認証が設定されていません。", 503);
+  if (request.method === "POST" && !isSameOriginMcpForm(request, url)) return oauthErrorPage("認証フォームの送信元を確認できませんでした。", 403);
+  await ensureMcpOAuthSchema(env);
+  const session = await readMcpBrowserSession(request, env);
+  const params = new URLSearchParams();
+  if (request.method === "POST") {
+    const body = new URLSearchParams(await request.text());
+    if (body.getAll("csrf_token").length !== 1) return oauthErrorPage("解除フォームが正しくありません。", 403);
+    params.set("csrf_token", body.get("csrf_token") || "");
+    if (!(await consumeMcpBrowserForm(request, env, "logout", params, session))) return oauthErrorPage("解除フォームの期限が切れたか、すでに送信済みです。", 403);
+    const cookie = await forgetMcpBrowserSession(request, env);
+    return addBrowserCookies(mcpBrowserPage("WORKS ログイン状態を解除", "<p>このブラウザのログイン状態を解除しました。次回の接続時はAPIキーが必要です。</p><p>すでに許可したChatGPTの接続は変更されません。この画面を閉じてください。</p>"), [cookie, browserCookieHeader(MCP_BROWSER_CSRF_COOKIE, "", 0)]);
+  }
+  const form = await issueMcpBrowserForm(request, env, "logout", params, session);
+  return addBrowserCookies(mcpBrowserPage("WORKS ログイン状態の管理", `<p>このブラウザに保存したログイン状態を解除します。すでに許可したChatGPTの接続は変更されません。</p><form method="post" action="/oauth/logout"><input type="hidden" name="csrf_token" value="${form.token}"><button type="submit" style="padding:12px 18px;font-size:16px">このブラウザのログイン状態を解除</button></form>`), [form.cookie]);
 }
 async function sha256Base64Url(value) {
   return toBase64Url(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value))));
@@ -5162,7 +5291,8 @@ export default {
         return mcpJson({ issuer: baseUrl, authorization_endpoint: `${baseUrl}/oauth/authorize`, token_endpoint: `${baseUrl}/oauth/token`, registration_endpoint: `${baseUrl}/oauth/register`, response_types_supported: ["code"], grant_types_supported: ["authorization_code"], token_endpoint_auth_methods_supported: ["none"], code_challenge_methods_supported: ["S256"], scopes_supported: [MCP_SCOPE] });
       }
       if (url.pathname === "/oauth/register" && request.method === "POST") return registerMcpOAuthClient(request, env);
-      if (url.pathname === "/oauth/authorize" && ["GET", "POST"].includes(request.method)) return authorizeMcpClient(request, env, url);
+      if (url.pathname === "/oauth/authorize" && ["GET", "POST"].includes(request.method)) return await authorizeMcpClient(request, env, url);
+      if (url.pathname === "/oauth/logout" && ["GET", "POST"].includes(request.method)) return await logoutMcpBrowser(request, env, url);
       if (url.pathname === "/oauth/token" && request.method === "POST") return exchangeMcpToken(request, env);
       if (url.pathname === "/mcp") return handleMcp(request, env, url);
 

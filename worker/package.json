@@ -6,9 +6,11 @@
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "db:migrate": "wrangler d1 execute tutor-db --remote --file=./schema.sql",
-    "test": "node --test test/*.test.mjs"
+    "test": "node --test test/*.test.mjs",
+    "test:browser": "node test/oauth-browser-session.browser.mjs"
   },
   "devDependencies": {
+    "@playwright/test": "1.63.0",
     "wrangler": "^3.90.0"
   }
 }
