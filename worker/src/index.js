@@ -1,3 +1,5 @@
+import { ensureRefreshSchema, issueRefreshGrant, readRefreshFamily, rotateRefreshGrant, revokeRefreshGrant } from "./oauth-refresh.js";
+
 function corsHeaders(origin) {
   return {
     "Access-Control-Allow-Origin": origin,
@@ -70,6 +72,7 @@ function escapeHtml(value) {
   return String(value).replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[char]));
 }
 async function ensureMcpOAuthSchema(env) {
+  await ensureRefreshSchema(env.DB);
   await env.DB.batch([
     env.DB.prepare("CREATE TABLE IF NOT EXISTS mcp_oauth_clients (client_id TEXT PRIMARY KEY, redirect_uris TEXT NOT NULL, created_at TEXT DEFAULT (datetime('now')))"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS mcp_oauth_codes (code TEXT PRIMARY KEY, client_id TEXT NOT NULL, redirect_uri TEXT NOT NULL, code_challenge TEXT NOT NULL, scope TEXT NOT NULL, expires_at INTEGER NOT NULL, created_at TEXT DEFAULT (datetime('now')))"),
@@ -86,7 +89,7 @@ async function registerMcpOAuthClient(request, env) {
   if (!redirectUris.length || redirectUris.some((uri) => !uri.startsWith("https://"))) return mcpJson({ error: "invalid_client_metadata" }, 400);
   const clientId = crypto.randomUUID();
   await env.DB.prepare("INSERT INTO mcp_oauth_clients (client_id, redirect_uris) VALUES (?, ?)").bind(clientId, JSON.stringify(redirectUris)).run();
-  return mcpJson({ client_id: clientId, token_endpoint_auth_method: "none", grant_types: ["authorization_code"], response_types: ["code"] }, 201);
+  return mcpJson({ client_id: clientId, token_endpoint_auth_method: "none", grant_types: ["authorization_code", "refresh_token"], response_types: ["code"] }, 201);
 }
 async function readMcpOAuthClient(env, clientId) {
   await ensureMcpOAuthSchema(env);
@@ -201,6 +204,7 @@ async function authorizeMcpClient(request, env, url) {
   const redirectUri = params.get("redirect_uri") || "";
   const codeChallenge = params.get("code_challenge") || "";
   const scope = params.get("scope") || MCP_SCOPE;
+  if (scope !== MCP_SCOPE) return oauthErrorPage("要求された権限はサポートされていません。");
   const client = await readMcpOAuthClient(env, clientId);
   if (params.get("response_type") !== "code" || !client || !client.redirect_uris.includes(redirectUri) || !codeChallenge || params.get("code_challenge_method") !== "S256" || !scope.split(" ").includes(MCP_SCOPE)) return oauthErrorPage("認可リクエストが正しくありません。");
   let redirect;
@@ -245,18 +249,32 @@ async function logoutMcpBrowser(request, env, url) {
 async function sha256Base64Url(value) {
   return toBase64Url(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value))));
 }
-async function createMcpAccessToken(env, scope) {
-  const payloadB64 = toBase64Url(new TextEncoder().encode(JSON.stringify({ email: env.ALLOWED_EMAIL, aud: "works-mcp", scope, exp: Date.now() + MCP_TOKEN_MAX_AGE_MS })));
+async function createMcpAccessToken(env, scope, family) {
+  const payloadB64 = toBase64Url(new TextEncoder().encode(JSON.stringify({ email: env.ALLOWED_EMAIL, aud: "works-mcp", scope, exp: Math.min(Date.now() + MCP_TOKEN_MAX_AGE_MS, family?.expires_at ?? Infinity), ...(family ? { fid: family.id } : {}) })));
   return `${payloadB64}.${await hmacSign(env, payloadB64)}`;
 }
 async function exchangeMcpToken(request, env) {
+  if (!env.SESSION_SECRET || !env.WORKS_API_KEY || !env.ALLOWED_EMAIL) return mcpJson({ error: "temporarily_unavailable" }, 503);
+  const origin = new URL(request.url).origin;
   await ensureMcpOAuthSchema(env);
   const params = new URLSearchParams(await request.text());
+  if (["grant_type", "code", "client_id", "redirect_uri", "code_verifier", "refresh_token", "scope", "resource"].some(name => params.getAll(name).length > 1)) return mcpJson({ error: "invalid_request" }, 400);
+  if (params.has("resource") && params.get("resource") !== `${origin}/mcp`) return mcpJson({ error: "invalid_target" }, 400);
+  if (params.get("grant_type") === "refresh_token") {
+    const grant = await rotateRefreshGrant(env, origin, params);
+    if (grant.error) return mcpJson({ error: grant.error }, 400);
+    return mcpTokenResponse(env, grant);
+  }
+  if (params.get("grant_type") !== "authorization_code") return mcpJson({ error: "unsupported_grant_type" }, 400);
   const code = params.get("code") || "";
   const row = await env.DB.prepare("SELECT * FROM mcp_oauth_codes WHERE code = ?").bind(code).first();
   if (!row || row.client_id !== params.get("client_id") || row.redirect_uri !== params.get("redirect_uri") || row.expires_at < Date.now() || !params.get("code_verifier") || !(await constantTimeEqual(await sha256Base64Url(params.get("code_verifier")), row.code_challenge))) return mcpJson({ error: "invalid_grant" }, 400);
-  await env.DB.prepare("DELETE FROM mcp_oauth_codes WHERE code = ?").bind(code).run();
-  return mcpJson({ access_token: await createMcpAccessToken(env, row.scope), token_type: "Bearer", expires_in: MCP_TOKEN_MAX_AGE_MS / 1000, scope: row.scope });
+  const grant = await issueRefreshGrant(env, origin, row.client_id, row.scope, row);
+  if (!grant) return mcpJson({ error: "invalid_grant" }, 400);
+  return mcpTokenResponse(env, grant);
+}
+async function mcpTokenResponse(env, grant) {
+  return mcpJson({ access_token: await createMcpAccessToken(env, grant.family.scope, grant.family), token_type: "Bearer", expires_in: Math.max(0, Math.floor(Math.min(MCP_TOKEN_MAX_AGE_MS, grant.family.expires_at - Date.now()) / 1000)), refresh_token: grant.token, scope: grant.family.scope });
 }
 async function verifyMcpAccessToken(request, env) {
   const match = (request.headers.get("Authorization") || "").match(/^Bearer (.+)$/);
@@ -265,6 +283,7 @@ async function verifyMcpAccessToken(request, env) {
   if (!payloadB64 || !sig || sig !== await hmacSign(env, payloadB64)) throw httpError(401, "invalid MCP bearer token");
   let payload; try { payload = JSON.parse(fromBase64Url(payloadB64)); } catch { throw httpError(401, "invalid MCP bearer token"); }
   if (payload.aud !== "works-mcp" || payload.exp < Date.now() || payload.email?.toLowerCase() !== env.ALLOWED_EMAIL.toLowerCase() || !String(payload.scope || "").split(" ").includes(MCP_SCOPE)) throw httpError(401, "invalid MCP bearer token");
+  if (payload.fid && !(await readRefreshFamily(env, new URL(request.url).origin, payload.fid))) throw httpError(401, "invalid MCP bearer token");
 }
 function mcpResponse(id, result) {
   return mcpJson({ jsonrpc: "2.0", id, result });
@@ -5288,12 +5307,19 @@ export default {
       }
       if (url.pathname === "/.well-known/oauth-authorization-server" && request.method === "GET") {
         const baseUrl = mcpBaseUrl(url);
-        return mcpJson({ issuer: baseUrl, authorization_endpoint: `${baseUrl}/oauth/authorize`, token_endpoint: `${baseUrl}/oauth/token`, registration_endpoint: `${baseUrl}/oauth/register`, response_types_supported: ["code"], grant_types_supported: ["authorization_code"], token_endpoint_auth_methods_supported: ["none"], code_challenge_methods_supported: ["S256"], scopes_supported: [MCP_SCOPE] });
+        return mcpJson({ issuer: baseUrl, authorization_endpoint: `${baseUrl}/oauth/authorize`, token_endpoint: `${baseUrl}/oauth/token`, registration_endpoint: `${baseUrl}/oauth/register`, revocation_endpoint: `${baseUrl}/oauth/revoke`, revocation_endpoint_auth_methods_supported: ["none"], response_types_supported: ["code"], grant_types_supported: ["authorization_code", "refresh_token"], token_endpoint_auth_methods_supported: ["none"], code_challenge_methods_supported: ["S256"], scopes_supported: [MCP_SCOPE] });
       }
       if (url.pathname === "/oauth/register" && request.method === "POST") return registerMcpOAuthClient(request, env);
       if (url.pathname === "/oauth/authorize" && ["GET", "POST"].includes(request.method)) return await authorizeMcpClient(request, env, url);
       if (url.pathname === "/oauth/logout" && ["GET", "POST"].includes(request.method)) return await logoutMcpBrowser(request, env, url);
       if (url.pathname === "/oauth/token" && request.method === "POST") return exchangeMcpToken(request, env);
+      if (url.pathname === "/oauth/revoke" && request.method === "POST") {
+        await ensureMcpOAuthSchema(env);
+        const params = new URLSearchParams(await request.text());
+        if (["token", "client_id"].some(name => params.getAll(name).length > 1)) return mcpJson({ error: "invalid_request" }, 400);
+        await revokeRefreshGrant(env, url.origin, params);
+        return new Response(null, { status: 200, headers: { "Cache-Control": "no-store" } });
+      }
       if (url.pathname === "/mcp") return handleMcp(request, env, url);
 
       // 認可コードの交換はまだセッションが無い状態で呼ばれるため、
@@ -5756,4 +5782,3 @@ export default {
     }
   },
 };
-
