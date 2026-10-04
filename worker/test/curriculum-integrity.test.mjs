@@ -5,7 +5,7 @@ import { Miniflare } from "miniflare";
 
 async function loadCurriculumFunctions() {
   const sourceUrl = new URL("../src/index.js", import.meta.url);
-  const source = await readFile(sourceUrl, "utf8");
+  const source = (await readFile(sourceUrl, "utf8")).replace("./oauth-refresh.js", new URL("../src/oauth-refresh.js", import.meta.url).href);
   const exposedSource = `${source}\nexport { handleMcp, ensureCurriculumIntegrity, listMcpCurriculumMaterials, updateMcpCurriculumMaterial, updateMcpMaterialChapter, reorderMcpMaterialChapters, mergeMcpMaterialChapters, deleteMcpMaterialChapter };`;
   return import(`data:text/javascript;base64,${Buffer.from(exposedSource).toString("base64")}`);
 }

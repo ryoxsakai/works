@@ -167,7 +167,7 @@ test("MCP remembered login preserves explicit consent and revocable browser-only
     page.body.set("api_key", KEY);
     for (const [field, value] of [["state", "different"], ["code_challenge", "changed"], ["scope", "schedule:read changed"]]) {
       const changed = new URLSearchParams(page.body); changed.set(field, value);
-      assert.equal((await call(request("/oauth/authorize", { jar: page.jar, body: changed }))).status, 403);
+      assert.equal((await call(request("/oauth/authorize", { jar: page.jar, body: changed }))).status, field === "scope" ? 400 : 403);
     }
     const wrongBrowser = { ...page.jar, [CSRF_COOKIE]: "z".repeat(43) };
     assert.equal((await call(request("/oauth/authorize", { jar: wrongBrowser, body: page.body }))).status, 403);
