@@ -31,10 +31,10 @@ try {
     createHmac("sha256", env.SESSION_SECRET)
       .update(payload)
       .digest("base64url");
-  async function api(path, body) {
+  async function api(path, body, method = body ? "POST" : "GET") {
     const r = await worker.fetch(
       new Request(origin + "/api/kdp/" + path, {
-        method: body ? "POST" : "GET",
+        method,
         headers: {
           Authorization: "Bearer " + token,
           "Content-Type": "application/json",
@@ -69,7 +69,11 @@ try {
     });
     const page = await context.newPage();
     let delayPatch = false,
-      delayUpload = false;
+      delayUpload = false,
+      delayHistory = false,
+      delaySection = false,
+      delayBookCreate = false,
+      bookCreateRequests = 0;
     const errors = [];
     page.on("pageerror", (e) => errors.push(e.message));
     await context.route("**/*", async (route) => {
@@ -85,10 +89,21 @@ try {
         if (u.pathname === "/shared/auth.js")
           return route.fulfill({
             contentType: "text/javascript",
-            body: `export const getSessionToken=()=>${JSON.stringify(token)};export function watchAuth(o){queueMicrotask(()=>localStorage.fixtureSignedOut?o.onSignedOut():o.onSignedIn({email:'fixture@example.test'}))}export function signIn(){localStorage.fixtureDestination=localStorage.works_pending_destination}export async function signOutUser(){}`,
+            body: `export const getSessionToken=()=>${JSON.stringify(token)};export function watchAuth(o){queueMicrotask(()=>localStorage.fixtureSignedOut?o.onSignedOut():o.onSignedIn({email:'fixture@example.test'}))}export function signIn(path){localStorage.fixtureSignInPath=path;localStorage.fixtureDestination=localStorage.works_pending_destination}export async function signOutUser(){}`,
           });
         if (u.pathname.startsWith("/api/")) {
+          if (u.pathname === "/api/kdp/books" && req.method() === "POST")
+            bookCreateRequests++;
           if (
+            (delayBookCreate &&
+              u.pathname === "/api/kdp/books" &&
+              req.method() === "POST") ||
+            (delayHistory &&
+              u.pathname.endsWith("/history") &&
+              req.method() === "GET") ||
+            (delaySection &&
+              /^\/api\/kdp\/sections\/[^/]+$/.test(u.pathname) &&
+              req.method() === "GET") ||
             (delayPatch && req.method() === "PATCH") ||
             (delayUpload &&
               u.pathname.endsWith("/images") &&
@@ -154,7 +169,45 @@ try {
       .getByLabel("本タイトル", { exact: true })
       .fill("日本 / English " + name);
     await page.getByLabel("想定読者").fill("English readers / 海外読者");
-    await saveDialog();
+    assert.equal(
+      await page
+        .locator("#dialog-form input[name=title]")
+        .getAttribute("maxlength"),
+      "300",
+    );
+    delayBookCreate = true;
+    await page.locator("#dialog-form").evaluate((form) => {
+      form.requestSubmit();
+      form.requestSubmit();
+      form.dispatchEvent(
+        new Event("submit", { bubbles: true, cancelable: true }),
+      );
+    });
+    await expect(
+      page.locator("#dialog-form button[type=submit]"),
+    ).toBeDisabled();
+    await expect(page.locator("#modal-close")).toBeDisabled();
+    await page.keyboard.press("Escape");
+    assert.equal(
+      await page.locator("#modal").isVisible(),
+      true,
+      "pending dialog cannot close",
+    );
+    await page.locator("#dialog-form input[name=title]").press("Enter");
+    await page.locator("#modal").waitFor({ state: "hidden" });
+    delayBookCreate = false;
+    assert.equal(
+      bookCreateRequests,
+      1,
+      "repeated submit sends one create request",
+    );
+    assert.equal(
+      (await api("books")).books.filter(
+        (b) => b.title === "日本 / English " + name,
+      ).length,
+      1,
+      "one book exists",
+    );
     await page.locator("#new-chapter").click();
     await page.getByLabel("章タイトル").fill("制度 / Systems");
     await saveDialog();
@@ -164,6 +217,10 @@ try {
       .getByLabel("節タイトル", { exact: true })
       .fill("概要 / Overview");
     await saveDialog();
+    assert.equal(
+      await page.locator("#section-title").getAttribute("maxlength"),
+      "300",
+    );
     const original =
       "日本語と English.\n<script>escaped</script>\n" +
       "Long manuscript sentence. ".repeat(500);
@@ -205,6 +262,7 @@ try {
       await page.reload();
       await page.locator(`[data-book="${book.id}"]`).click();
       await page.locator(`[data-section="${section.id}"]`).click();
+      await expect(page.locator("#section-title")).toBeEnabled();
     };
     await api("sections/" + section.id + "/proposals", {
       title: "ChatGPT案",
@@ -236,11 +294,39 @@ try {
     await expect(page.locator("#section-content")).toHaveValue(
       "改訂版 / Revised text",
     );
+    for (let n = 0; n < 12; n++) {
+      const latest = (await api("sections/" + section.id)).section;
+      await api(
+        "sections/" + section.id,
+        { revision: latest.revision, body: "history revision " + n },
+        "PATCH",
+      );
+    }
+    await reopen();
+    delaySection = true;
+    await page.locator(`[data-section="${section.id}"]`).click();
+    await expect(page.locator("#section-title")).toBeDisabled();
+    await page.locator("#back-books").click();
+    assert.equal(await page.locator("#editor").isVisible(), true);
+    await expect(page.locator("#section-title")).toBeEnabled();
+    delaySection = false;
+    delayHistory = true;
     await page.locator("#section-history").click();
+    await expect(page.locator("#section-title")).toBeDisabled();
+    await page.locator("#back-books").click();
+    assert.equal(await page.locator("#editor").isVisible(), true);
+    await expect(page.locator("[data-restore]")).toHaveCount(10);
+    await expect(page.locator("#section-title")).toBeEnabled();
+    delayHistory = false;
+    await page
+      .getByRole("button", { name: "以前の履歴を読み込む", exact: true })
+      .click();
+    await page.locator('[data-restore="2"]').waitFor();
     page.once("dialog", (d) => d.accept());
     await page.locator('[data-restore="2"]').click();
     await page.locator("#modal").waitFor({ state: "hidden" });
     await expect(page.locator("#section-content")).toHaveValue(original);
+    await expect(page.locator("#section-title")).toBeEnabled();
     await page.locator("#section-archive").click();
     await page
       .getByRole("button", { name: "アーカイブから戻す", exact: true })
@@ -250,6 +336,7 @@ try {
     await page
       .getByRole("button", { name: "アーカイブ", exact: true })
       .waitFor();
+    await expect(page.locator("#section-title")).toBeEnabled();
     delayPatch = true;
     await page.locator("#section-content").fill(original + " delayed");
     await page.locator("#save").click();
@@ -260,16 +347,14 @@ try {
     await page.getByText("原稿を保存しました。", { exact: true }).waitFor();
     delayPatch = false;
     delayUpload = true;
-    await page
-      .locator("#image-upload")
-      .setInputFiles({
-        name: "synthetic.png",
-        mimeType: "image/png",
-        buffer: Buffer.from(
-          "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aD1sAAAAASUVORK5CYII=",
-          "base64",
-        ),
-      });
+    await page.locator("#image-upload").setInputFiles({
+      name: "synthetic.png",
+      mimeType: "image/png",
+      buffer: Buffer.from(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aD1sAAAAASUVORK5CYII=",
+        "base64",
+      ),
+    });
     await expect(page.locator("#section-content")).toBeDisabled();
     await page.locator("#back-books").click();
     assert.equal(await page.locator("#editor").isVisible(), true);
@@ -312,6 +397,26 @@ try {
       await page.evaluate(() => localStorage.fixtureDestination),
       "/todo/",
     );
+    await page.goto(origin + "/kdp/");
+    await page.locator("#sign-in").click();
+    assert.equal(
+      await page.evaluate(() => localStorage.fixtureSignInPath),
+      "/tutor/",
+      "direct KDP login uses existing Google callback",
+    );
+    assert.equal(
+      await page.evaluate(() => localStorage.works_pending_destination),
+      "/kdp/",
+    );
+    const tutorSource = await readFile(new URL("tutor/app.js", root), "utf8");
+    const safeRegexLiteral = tutorSource.match(
+      /const SAFE_DESTINATION_RE = (.+);/,
+    )[1];
+    const safeRegex = Function("return (" + safeRegexLiteral + ")")();
+    for (const path of ["/kdp/", "/todo/", "/material-print/"])
+      assert.ok(safeRegex.test(path), "tutor callback permits " + path);
+    for (const path of ["https://evil.test/", "//evil.test/", "/unknown/"])
+      assert.equal(safeRegex.test(path), false);
     assert.deepEqual(errors, []);
     await context.close();
   }

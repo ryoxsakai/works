@@ -2,7 +2,7 @@ name: Test OAuth browser login
 on:
   pull_request:
     branches: [main]
-    paths: ['worker/**', 'kdp/**', 'home.js', 'home.css', 'index.html', 'shared/**', '.github/workflows/oauth-browser-session.yml']
+    paths: ['worker/**', 'kdp/**', 'tutor/**', 'home.js', 'home.css', 'index.html', 'shared/**', '.github/workflows/oauth-browser-session.yml']
   workflow_dispatch:
 permissions:
   contents: read

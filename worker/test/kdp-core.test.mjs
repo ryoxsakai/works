@@ -211,3 +211,56 @@ assert c.execute(${JSON.stringify(KDP_CURRENT_EXPORT_SIZE_SQL)},('b','b','b')).f
   assert.equal(manuscript.chapters[0].sections[0].body, "current text");
   assert.equal(batches, 2);
 });
+
+test("section history uses bounded keyset pages and validates query parameters", async () => {
+  const { readSectionHistory } = await import("../src/kdp.js");
+  let captured;
+  const revisions = Array.from({ length: 25 }, (_, i) => ({
+    revision: 25 - i,
+    snapshot: "{}",
+  }));
+  const db = {
+    prepare: (sql) => ({
+      bind: (...args) => ({
+        all: async () => {
+          captured = { sql, args };
+          const before = args.length === 3 ? args[1] : Infinity;
+          return {
+            results: revisions
+              .filter((row) => row.revision < before)
+              .slice(0, args.at(-1)),
+          };
+        },
+      }),
+    }),
+  };
+  const first = await readSectionHistory(db, "s");
+  assert.equal(first.history.length, 10);
+  assert.equal(first.next_before_revision, 16);
+  assert.deepEqual(captured.args, ["s", 11]);
+  const next = await readSectionHistory(
+    db,
+    "s",
+    new URLSearchParams("before_revision=16&limit=20"),
+  );
+  assert.equal(next.history.length, 15);
+  assert.equal(next.history[0].revision, 15);
+  assert.equal(next.next_before_revision, null);
+  assert.match(captured.sql, /revision<\?/);
+  assert.deepEqual(captured.args, ["s", 16, 21]);
+  for (const query of [
+    "limit=0",
+    "limit=21",
+    "limit=x",
+    "limit=1.5",
+    "before_revision=0",
+    "before_revision=-1",
+    "before_revision=",
+    "before_revision=9007199254740992",
+  ]) {
+    await assert.rejects(
+      readSectionHistory(db, "s", new URLSearchParams(query)),
+      (error) => error.status === 400,
+    );
+  }
+});
