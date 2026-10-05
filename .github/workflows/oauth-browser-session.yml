@@ -2,7 +2,7 @@ name: Test OAuth browser login
 on:
   pull_request:
     branches: [main]
-    paths: ['worker/**', '.github/workflows/oauth-browser-session.yml']
+    paths: ['worker/**', 'kdp/**', 'home.js', 'home.css', 'index.html', 'shared/**', '.github/workflows/oauth-browser-session.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -24,6 +24,7 @@ jobs:
       - run: npm test
       - run: npx playwright install --with-deps chromium
       - run: npm run test:browser
+      - run: npm run test:kdp:browser
       - name: Upload synthetic screenshots
         if: always()
         uses: actions/upload-artifact@v4

@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta http-equiv="Cache-Control" content="no-store" />
+    <title>KDP管理 | Works</title>
+    <script>
+      try {
+        const t = localStorage.getItem("works_theme");
+        if (t === "light" || t === "dark")
+          document.documentElement.dataset.theme = t;
+      } catch {}
+    </script>
+    <link rel="apple-touch-icon" href="/shared/logo.png" />
+    <link rel="stylesheet" href="/shared/styles.css?v=55" />
+    <link rel="stylesheet" href="/kdp/kdp.css?v=1" />
+  </head>
+  <body>
+    <header class="page-header">
+      <h1><a href="/">Works</a><span aria-hidden="true"> / </span>KDP管理</h1>
+      <button id="sign-out" hidden>ログアウト</button>
+    </header>
+    <main class="kdp-main">
+      <div id="message" role="status" aria-live="polite"></div>
+      <section id="login" hidden class="panel">
+        <h2>KDP管理</h2>
+        <p>原稿と出典を安全に保存し、改稿案を確認して採用できます。</p>
+        <button id="sign-in" class="primary">Worksにログイン</button>
+      </section>
+      <section id="workspace" hidden>
+        <div class="toolbar">
+          <div>
+            <p class="eyebrow">WRITING WORKSPACE</p>
+            <h2>KDP管理</h2>
+          </div>
+          <button id="new-book" class="primary">＋ 本を作成</button>
+        </div>
+        <label class="archive-toggle"
+          ><input id="show-archived" type="checkbox" /> アーカイブも表示</label
+        >
+        <div id="books" class="books"></div>
+        <section id="book-panel" hidden>
+          <div class="toolbar">
+            <div>
+              <button id="back-books">← 本一覧</button>
+              <h2 id="book-name"></h2>
+            </div>
+            <button id="book-settings">本の設定</button>
+          </div>
+          <div class="toolbar export-bar">
+            <span>原稿をダウンロード</span
+            ><button data-export="epub">EPUB</button
+            ><button data-export="json">JSON</button
+            ><button data-export="markdown">Markdown</button>
+          </div>
+          <div class="writing-layout">
+            <aside class="panel">
+              <div class="toolbar">
+                <h3>構成</h3>
+                <button id="new-chapter">＋ 章</button>
+              </div>
+              <p class="hint">章・節の順序は ↑ ↓ で変更できます。</p>
+              <div id="outline"></div>
+            </aside>
+            <section id="editor" class="panel" hidden>
+              <nav id="location" aria-label="現在地"></nav>
+              <form id="section-form">
+                <label
+                  >節タイトル<input
+                    id="section-title"
+                    required
+                    maxlength="500" /></label
+                ><label
+                  >採用済み本文（Markdown）<textarea
+                    id="section-content"
+                    rows="20"
+                    spellcheck="true"
+                  ></textarea>
+                </label>
+                <div class="toolbar">
+                  <label class="image-upload"
+                    >画像を挿入（PNG / JPEG・5 MB以下）<input
+                      id="image-upload"
+                      type="file"
+                      accept="image/png,image/jpeg"
+                  /></label>
+                </div>
+                <p class="hint">
+                  見出し・箇条書き・太字・コード・httpsリンク・画像に対応。本文のHTMLは文字として扱われます。
+                </p>
+                <div class="save-bar">
+                  <span id="save-status" role="status"></span
+                  ><button id="save" type="submit" class="primary">保存</button>
+                </div>
+              </form>
+              <div class="toolbar">
+                <button id="section-archive">アーカイブ</button
+                ><button id="section-history">履歴・復元</button>
+              </div>
+              <details open>
+                <summary>出典</summary>
+                <p class="hint">URL・確認日・対象年度を記録します。</p>
+                <div id="sources"></div>
+                <button id="new-source">＋ 出典を追加</button>
+              </details>
+              <details open>
+                <summary>改稿案</summary>
+                <p class="hint">
+                  ChatGPTの案は本文と別に保存されます。確認して採用すると新しい版になります。
+                </p>
+                <div id="proposals"></div>
+                <button id="new-proposal">＋ 改稿案を保存</button>
+              </details>
+            </section>
+            <section id="editor-empty" class="panel empty">
+              <h3>節を選んで執筆</h3>
+              <p>まず章を作成し、節を追加してください。</p>
+            </section>
+          </div>
+        </section>
+      </section>
+    </main>
+    <dialog id="modal">
+      <div class="toolbar">
+        <h2 id="modal-title"></h2>
+        <button id="modal-close" aria-label="閉じる">×</button>
+      </div>
+      <div id="modal-content"></div>
+    </dialog>
+    <script type="module" src="/kdp/app.js?v=1"></script>
+  </body>
+</html>

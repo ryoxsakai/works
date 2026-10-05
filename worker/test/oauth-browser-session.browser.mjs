@@ -30,7 +30,9 @@ try {
       try {
         const url = new URL(req.url);
         let result;
-        if (url.origin === new URL(CALLBACK).origin) {
+        if (url.pathname === "/favicon.ico") {
+          result = new Response(null, {status:204});
+        } else if (url.origin === new URL(CALLBACK).origin) {
           assert.equal(url.pathname, "/callback");
           assert.ok(url.searchParams.get("code"));
           assert.equal(url.searchParams.get("state"), "browser-fixture");

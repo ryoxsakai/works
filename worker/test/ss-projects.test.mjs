@@ -5,7 +5,7 @@ import { Miniflare } from "miniflare";
 
 async function loadSsProjectFunctions() {
   const sourceUrl = new URL("../src/index.js", import.meta.url);
-  const source = (await readFile(sourceUrl, "utf8")).replace("./oauth-refresh.js", new URL("../src/oauth-refresh.js", import.meta.url).href);
+  const source = (await readFile(sourceUrl, "utf8")).replace("./kdp-services.js", new URL("../src/kdp-services.js", import.meta.url).href).replace("./oauth-refresh.js", new URL("../src/oauth-refresh.js", import.meta.url).href);
   const exposedSource = `${source}\nexport { createSessionToken, createMcpAccessToken, handleMcp, ensureSsProjectSchema, readSsProjects, createSsProject, updateSsProject, ssProjectRemainingDays };`;
   return import(`data:text/javascript;base64,${Buffer.from(exposedSource).toString("base64")}`);
 }

@@ -18,6 +18,7 @@
   </script>
   <link rel="apple-touch-icon" href="/shared/logo.png" />
   <link rel="stylesheet" href="/shared/styles.css?v=55" />
+  <link rel="stylesheet" href="/home.css?v=1" />
   <link rel="stylesheet" href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" />
 </head>
 <body>
@@ -36,44 +37,38 @@
 
   <main>
     <p id="home-auth-error" class="error home-auth-error" role="alert"></p>
-    <ul class="module-grid">
-      <li>
-        <a class="module-card" href="/tutor/">
-          <h2><i class="bx bx-book-reader"></i> 授業管理</h2>
-          <p>生徒ごとの授業予定と進捗を管理します</p>
-        </a>
-      </li>
-      <li>
-        <a class="module-card" href="/material/">
-          <h2><i class="bx bx-library"></i> 教材管理</h2>
-          <p>教材を保管し、分類・整理します</p>
-        </a>
-      </li>
-      <li>
-        <a class="module-card" href="/material-print/">
-          <h2><i class="bx bx-printer"></i> 教材印刷</h2>
-          <p>教材を選び、問題と解答の印刷紙面を作成します</p>
-        </a>
-      </li>
-      <li>
-        <a class="module-card" href="/admission/">
-          <h2><i class="bx bx-calendar-event"></i> 入試管理</h2>
-          <p>大学入試の日程と予定を管理します</p>
-        </a>
-      </li>
-      <li>
-        <a class="module-card" href="/ss/">
-          <h2><i class="bx bx-briefcase-alt-2"></i> SS管理</h2>
-          <p>問題作成案件の進行状況と締切を管理します</p>
-        </a>
-      </li>
-      <li>
-        <a class="module-card" href="/todo/">
-          <h2><i class="bx bx-list-check"></i> ToDo管理</h2>
-          <p>タスクの優先度、締切、進捗を管理します</p>
-        </a>
-      </li>
-    </ul>
+    <div class="home-intro">
+      <p class="home-location">ホーム / メニュー</p>
+      <h2>今日は何を進めますか？</h2>
+      <p>授業・教材、制作、業務から使いたい機能を選べます。</p>
+    </div>
+    <nav class="category-nav" aria-label="メニューのカテゴリ">
+      <a href="#teaching">授業・教材 <span>4</span></a>
+      <a href="#creation">制作 <span>2</span></a>
+      <a href="#operations">業務 <span>1</span></a>
+    </nav>
+    <section class="module-section" id="teaching" aria-labelledby="teaching-title">
+      <h2 id="teaching-title" class="category-title"><i class="bx bx-book-reader" aria-hidden="true"></i> 授業・教材</h2>
+      <ul class="module-grid">
+        <li><a class="module-card" href="/tutor/"><h3><i class="bx bx-book-reader" aria-hidden="true"></i> 授業管理</h3><p>生徒ごとの授業予定と進捗を管理します</p></a></li>
+        <li><a class="module-card" href="/material/"><h3><i class="bx bx-library" aria-hidden="true"></i> 教材管理</h3><p>教材を保管し、分類・整理します</p></a></li>
+        <li><a class="module-card" href="/material-print/"><h3><i class="bx bx-printer" aria-hidden="true"></i> 教材印刷</h3><p>問題と解答の印刷紙面を作成します</p></a></li>
+        <li><a class="module-card" href="/admission/"><h3><i class="bx bx-calendar-event" aria-hidden="true"></i> 入試管理</h3><p>大学入試の日程と予定を管理します</p></a></li>
+      </ul>
+    </section>
+    <section class="module-section" id="creation" aria-labelledby="creation-title">
+      <h2 id="creation-title" class="category-title"><i class="bx bx-pencil" aria-hidden="true"></i> 制作</h2>
+      <ul class="module-grid">
+        <li><a class="module-card" href="/kdp/"><h3><i class="bx bx-book-open" aria-hidden="true"></i> KDP管理</h3><p>本の構成、原稿、出典、改稿案を管理します</p></a></li>
+        <li><a class="module-card" href="/ss/"><h3><i class="bx bx-briefcase-alt-2" aria-hidden="true"></i> SS管理</h3><p>問題作成案件の進行状況と締切を管理します</p></a></li>
+      </ul>
+    </section>
+    <section class="module-section" id="operations" aria-labelledby="operations-title">
+      <h2 id="operations-title" class="category-title"><i class="bx bx-list-check" aria-hidden="true"></i> 業務</h2>
+      <ul class="module-grid">
+        <li><a class="module-card" href="/todo/"><h3><i class="bx bx-list-check" aria-hidden="true"></i> ToDo管理</h3><p>タスクの優先度、締切、進捗を管理します</p></a></li>
+      </ul>
+    </section>
   </main>
 
   <dialog id="home-settings-modal" class="app-modal home-settings-modal">
@@ -89,6 +84,6 @@
     </div>
   </dialog>
 
-  <script type="module" src="/home.js?v=4"></script>
+  <script type="module" src="/home.js?v=5"></script>
 </body>
 </html>
