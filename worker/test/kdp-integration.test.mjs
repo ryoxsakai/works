@@ -205,6 +205,47 @@ test("Authenticated API/MCP: no AI adoption, atomic saves, restore, private imag
       .status,
     200,
   );
+  for (let revision = 5; revision < 20; revision++) {
+    const saved = await api(`sections/${section.id}`, "PATCH", {
+      revision,
+      body: `history ${revision}`,
+    });
+    assert.equal(saved.status, 200);
+  }
+  const firstPage = await (await api(`sections/${section.id}/history`)).json();
+  assert.equal(firstPage.history.length, 10);
+  assert.equal(firstPage.history[0].revision, 20);
+  assert.equal(firstPage.next_before_revision, 11);
+  const older = await (
+    await api(
+      `sections/${section.id}/history?before_revision=${firstPage.next_before_revision}`,
+    )
+  ).json();
+  assert.equal(older.history.length, 10);
+  assert.equal(older.history[0].revision, 10);
+  assert.equal(older.history.at(-1).revision, 1);
+  assert.equal(older.next_before_revision, null);
+  assert.equal(
+    new Set([...firstPage.history, ...older.history].map((h) => h.revision))
+      .size,
+    20,
+  );
+  for (const invalid of [
+    "limit=0",
+    "limit=21",
+    "before_revision=-1",
+    "before_revision=not-a-revision",
+  ])
+    assert.equal(
+      (await api(`sections/${section.id}/history?${invalid}`)).status,
+      400,
+    );
+  const pagedRestore = await api(`sections/${section.id}/restore`, "POST", {
+    revision: 20,
+    target_revision: 1,
+  });
+  assert.equal(pagedRestore.status, 200);
+  assert.equal((await pagedRestore.json()).section.revision, 21);
 });
 test("EPUB escapes HTML and preserves mixed language, images and links", () => {
   const html = markdownXhtml(

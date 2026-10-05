@@ -141,7 +141,7 @@ export async function getSection(env, id) {
       "SELECT * FROM kdp_sources WHERE section_id=? ORDER BY created_at DESC,id",
     ).bind(id),
     env.DB.prepare(
-      "SELECT * FROM kdp_proposals WHERE section_id=? ORDER BY created_at DESC,id",
+      "SELECT * FROM kdp_proposals WHERE section_id=? ORDER BY created_at DESC,id LIMIT 20",
     ).bind(id),
     env.DB.prepare(
       "SELECT revision,created_at FROM kdp_history WHERE entity_type='sections' AND entity_id=? ORDER BY revision DESC LIMIT 100",
@@ -154,6 +154,43 @@ export async function getSection(env, id) {
     history: history.results,
   };
 }
+export async function readSectionHistory(
+  db,
+  id,
+  searchParams = new URLSearchParams(),
+) {
+  const limitValue = searchParams.get("limit");
+  const beforeValue = searchParams.get("before_revision");
+  const integerParam = (value, name) => {
+    if (!/^\d+$/.test(value)) fail(400, `${name} must be a positive integer`);
+    const number = Number(value);
+    if (!Number.isSafeInteger(number) || number < 1)
+      fail(400, `${name} must be a positive integer`);
+    return number;
+  };
+  const limit = limitValue === null ? 10 : integerParam(limitValue, "limit");
+  if (limit > 20) fail(400, "limit must be at most 20");
+  const before =
+    beforeValue === null ? null : integerParam(beforeValue, "before_revision");
+  const query =
+    "SELECT revision,snapshot,created_at FROM kdp_history WHERE entity_type='sections' AND entity_id=?" +
+    (before === null ? "" : " AND revision<?") +
+    " ORDER BY revision DESC LIMIT ?";
+  const history = await list(
+    db,
+    query,
+    id,
+    ...(before === null ? [] : [before]),
+    limit + 1,
+  );
+  const hasMore = history.length > limit;
+  if (hasMore) history.pop();
+  return {
+    history,
+    next_before_revision: hasMore ? history[history.length - 1].revision : null,
+  };
+}
+
 async function assertActive(db, type, id) {
   const item = await row(db, type, id);
   if (item.archived) fail(409, "Item is archived; restore it before editing");
@@ -579,13 +616,7 @@ export async function handleKdpRequest(request, env, url, headers = {}) {
     }
     if (type === "sections" && id && action === "history" && method === "GET") {
       await row(env.DB, "sections", id);
-      return send({
-        history: await list(
-          env.DB,
-          "SELECT revision,snapshot,created_at FROM kdp_history WHERE entity_type='sections' AND entity_id=? ORDER BY revision DESC",
-          id,
-        ),
-      });
+      return send(await readSectionHistory(env.DB, id, url.searchParams));
     }
     if (
       type === "sections" &&

@@ -13,6 +13,7 @@ const state = {
   section: null,
   dirty: false,
   busy: false,
+  dialogBusy: false,
 };
 const esc = (s) =>
   String(s ?? "").replace(
@@ -48,7 +49,7 @@ async function api(path, { method = "GET", body } = {}) {
   return data;
 }
 function guard() {
-  if (state.busy) {
+  if (state.busy || state.dialogBusy) {
     notify("保存が終わるまでお待ちください。");
     return false;
   }
@@ -81,6 +82,8 @@ async function run(fn) {
   }
 }
 function modal(title, html) {
+  if (state.dialogBusy) return;
+  $("modal-content").onclick = null;
   $("modal-title").textContent = title;
   $("modal-content").innerHTML = html;
   $("modal").showModal();
@@ -89,7 +92,7 @@ function fields(data, defs) {
   return defs
     .map(
       ([key, label, type = "text"]) =>
-        `<label>${esc(label)}${type === "textarea" ? `<textarea name="${key}" rows="4">${esc(data[key])}</textarea>` : `<input name="${key}" type="${type}" value="${esc(data[key])}" ${key === "title" ? "required" : ""}>`}</label>`,
+        `<label>${esc(label)}${type === "textarea" ? `<textarea name="${key}" rows="4">${esc(data[key])}</textarea>` : `<input name="${key}" type="${type}" value="${esc(data[key])}" ${key === "title" ? 'required maxlength="300"' : ""}>`}</label>`,
     )
     .join("");
 }
@@ -98,12 +101,31 @@ function formDialog(title, data, defs, save, extra = "") {
     title,
     `<form id="dialog-form">${fields(data, defs)}${extra}<button type="submit" class="primary">保存</button></form>`,
   );
-  $("dialog-form").onsubmit = (e) => {
+  const form = $("dialog-form");
+  let pending = false;
+  form.onsubmit = (e) => {
     e.preventDefault();
+    if (pending) return;
+    // Capture values before disabling controls: disabled fields are absent from FormData.
+    const body = Object.fromEntries(new FormData(form));
+    pending = true;
+    state.dialogBusy = true;
+    const controls = [...form.elements, $("modal-close")];
+    const disabled = controls.map((control) => control.disabled);
+    controls.forEach((control) => {
+      control.disabled = true;
+    });
     run(async () => {
-      const body = Object.fromEntries(new FormData(e.currentTarget));
-      await save(body);
-      $("modal").close();
+      try {
+        await save(body);
+        $("modal").close();
+      } finally {
+        state.dialogBusy = false;
+        pending = false;
+        controls.forEach((control, index) => {
+          control.disabled = disabled[index];
+        });
+      }
     });
   };
 }
@@ -125,25 +147,31 @@ async function loadBooks() {
   $("books").hidden = false;
 }
 async function openBook(id) {
-  const data = await api("books/" + idPath(id));
-  state.book = data.book || data;
-  state.chapters = data.chapters || state.book.chapters || [];
-  state.sections =
-    data.sections ||
-    state.chapters.flatMap((c) =>
-      (c.sections || []).map((s) => ({
-        ...s,
-        chapter_id: s.chapter_id || c.id,
-      })),
-    );
-  state.section = null;
-  dirty(false);
-  $("books").hidden = true;
-  $("book-panel").hidden = false;
-  $("book-name").textContent = state.book.title;
-  $("editor").hidden = true;
-  $("editor-empty").hidden = false;
-  outline();
+  const priorBusy = state.busy;
+  setBusy(true);
+  try {
+    const data = await api("books/" + idPath(id));
+    state.book = data.book || data;
+    state.chapters = data.chapters || state.book.chapters || [];
+    state.sections =
+      data.sections ||
+      state.chapters.flatMap((c) =>
+        (c.sections || []).map((s) => ({
+          ...s,
+          chapter_id: s.chapter_id || c.id,
+        })),
+      );
+    state.section = null;
+    dirty(false);
+    $("books").hidden = true;
+    $("book-panel").hidden = false;
+    $("book-name").textContent = state.book.title;
+    $("editor").hidden = true;
+    $("editor-empty").hidden = false;
+    outline();
+  } finally {
+    setBusy(priorBusy);
+  }
 }
 function outline() {
   const visible = (x) => $("show-archived").checked || !x.archived;
@@ -166,23 +194,33 @@ function outline() {
     .join("");
 }
 async function openSection(id) {
-  const data = await api("sections/" + idPath(id));
-  state.section = data.section || data;
-  state.section.sources = data.sources || state.section.sources || [];
-  state.section.proposals = data.proposals || state.section.proposals || [];
-  const c = state.chapters.find((c) => c.id === state.section.chapter_id);
-  $("location").textContent =
-    state.book.title + " / " + (c?.title || "章") + " / " + state.section.title;
-  $("section-title").value = state.section.title;
-  $("section-content").value = state.section.body || "";
-  $("section-archive").textContent = state.section.archived
-    ? "アーカイブから戻す"
-    : "アーカイブ";
-  $("editor").hidden = false;
-  $("editor-empty").hidden = true;
-  dirty(false);
-  outline();
-  await reloadExtras();
+  const priorBusy = state.busy;
+  setBusy(true);
+  try {
+    const data = await api("sections/" + idPath(id));
+    state.section = data.section || data;
+    state.section.sources = data.sources || state.section.sources || [];
+    state.section.proposals = data.proposals || state.section.proposals || [];
+    const c = state.chapters.find((c) => c.id === state.section.chapter_id);
+    $("location").textContent =
+      state.book.title +
+      " / " +
+      (c?.title || "章") +
+      " / " +
+      state.section.title;
+    $("section-title").value = state.section.title;
+    $("section-content").value = state.section.body || "";
+    $("section-archive").textContent = state.section.archived
+      ? "アーカイブから戻す"
+      : "アーカイブ";
+    $("editor").hidden = false;
+    $("editor-empty").hidden = true;
+    dirty(false);
+    outline();
+    await reloadExtras();
+  } finally {
+    setBusy(priorBusy);
+  }
 }
 function renderSources() {
   $("sources").innerHTML =
@@ -461,6 +499,10 @@ const sourceDefs = [
   ["notes", "補足", "textarea"],
 ];
 function sourceDialog(s) {
+  if (state.busy || state.dialogBusy) {
+    notify("読み込みが終わるまでお待ちください。");
+    return;
+  }
   formDialog(
     s.id ? "出典を編集" : "出典を追加",
     s,
@@ -587,39 +629,99 @@ $("proposals").onclick = (e) => {
 };
 $("section-history").onclick = () => {
   if (!guard()) return;
-  run(async () => {
-    const d = await api("sections/" + idPath(state.section.id) + "/history");
-    const history = list(d, "history").map((h) => ({
-      ...h,
-      snapshot:
-        typeof h.snapshot === "string" ? JSON.parse(h.snapshot) : h.snapshot,
-    }));
-    modal(
-      "原稿の履歴",
-      history
+  const sectionId = state.section.id;
+  const sectionRevision = state.section.revision;
+  let nextBefore = null;
+  let loading = false;
+  async function loadPage(append = false) {
+    if (loading) return;
+    loading = true;
+    const priorBusy = state.busy;
+    setBusy(true);
+    const controls = [...$("modal-content").querySelectorAll("button")];
+    controls.forEach((control) => {
+      control.disabled = true;
+    });
+    const more = $("history-more");
+    if (more) more.disabled = true;
+    try {
+      const query =
+        append && nextBefore ? "&before_revision=" + nextBefore : "";
+      const data = await api(
+        "sections/" + idPath(sectionId) + "/history?limit=10" + query,
+      );
+      if (
+        state.section?.id !== sectionId ||
+        (append && (!$("modal").open || !$("history-list")))
+      )
+        return;
+      const history = list(data, "history").map((h) => ({
+        ...h,
+        snapshot:
+          typeof h.snapshot === "string" ? JSON.parse(h.snapshot) : h.snapshot,
+      }));
+      const html = history
         .map(
           (h) =>
             `<div class="item"><strong>revision ${esc(h.revision)}</strong><p>${esc(h.created_at || h.updated_at || "")}</p><details><summary>本文を見る</summary><p>${esc(h.body || h.snapshot?.body || "")}</p></details><button data-restore="${esc(h.revision)}">この版を復元</button></div>`,
         )
-        .join("") || "<p>履歴がありません。</p>",
-    );
-    $("modal-content").onclick = (e) => {
-      const b = e.target.closest("[data-restore]");
-      if (b && confirm("選択した版を新しいrevisionとして復元しますか？"))
+        .join("");
+      if (!append)
+        modal(
+          "原稿の履歴",
+          '<div id="history-list"></div><button id="history-more" type="button" hidden>以前の履歴を読み込む</button>',
+        );
+      $("history-list").insertAdjacentHTML(
+        "beforeend",
+        html || (!append ? "<p>履歴がありません。</p>" : ""),
+      );
+      nextBefore = data.next_before_revision ?? null;
+      $("history-more").hidden = !nextBefore;
+      $("history-more").onclick = () => run(() => loadPage(true));
+      $("modal-content").onclick = (e) => {
+        const button = e.target.closest("[data-restore]");
+        if (
+          !button ||
+          state.dialogBusy ||
+          state.busy ||
+          state.section?.id !== sectionId ||
+          !confirm("選択した版を新しいrevisionとして復元しますか？")
+        )
+          return;
+        state.dialogBusy = true;
+        $("modal-close").disabled = true;
+        for (const control of $("modal-content").querySelectorAll("button"))
+          control.disabled = true;
         run(async () => {
-          await api("sections/" + idPath(state.section.id) + "/restore", {
-            method: "POST",
-            body: {
-              revision: state.section.revision,
-              target_revision: Number(b.dataset.restore),
-            },
-          });
-          $("modal").close();
-          $("modal-content").onclick = null;
-          await refreshBook();
+          try {
+            await api("sections/" + idPath(sectionId) + "/restore", {
+              method: "POST",
+              body: {
+                revision: sectionRevision,
+                target_revision: Number(button.dataset.restore),
+              },
+            });
+            $("modal").close();
+            $("modal-content").onclick = null;
+            await refreshBook();
+          } finally {
+            state.dialogBusy = false;
+            $("modal-close").disabled = false;
+            for (const control of $("modal-content").querySelectorAll("button"))
+              control.disabled = false;
+          }
         });
-    };
-  });
+      };
+    } finally {
+      loading = false;
+      setBusy(priorBusy);
+      controls.forEach((control) => {
+        control.disabled = false;
+      });
+      if ($("history-more")) $("history-more").disabled = state.dialogBusy;
+    }
+  }
+  run(() => loadPage());
 };
 for (const b of document.querySelectorAll("[data-export]"))
   b.onclick = () => {
@@ -648,11 +750,18 @@ for (const b of document.querySelectorAll("[data-export]"))
       notify("原稿を出力しました。");
     });
   };
+$("modal").addEventListener("cancel", (e) => {
+  if (state.dialogBusy) e.preventDefault();
+});
 $("modal-close").onclick = () => {
+  if (state.dialogBusy) return;
   $("modal").close();
   $("modal-content").onclick = null;
 };
-$("sign-in").onclick = () => signIn("/kdp/");
+$("sign-in").onclick = () => {
+  localStorage.setItem("works_pending_destination", "/kdp/");
+  signIn("/tutor/");
+};
 $("sign-out").onclick = () => {
   if (guard())
     run(async () => {
@@ -661,7 +770,7 @@ $("sign-out").onclick = () => {
     });
 };
 window.addEventListener("beforeunload", (e) => {
-  if (state.dirty || state.busy) {
+  if (state.dirty || state.busy || state.dialogBusy) {
     e.preventDefault();
     e.returnValue = "";
   }

@@ -1,6 +1,6 @@
 # KDP管理
 
-Open Works → 制作 → **KDP管理** (`https://works.lrnr.jp/kdp/`) using the existing owner Google session.
+Open Works → 制作 → **KDP管理** (`https://works.lrnr.jp/kdp/`) using the existing owner Google session. New login reuses the established `/tutor/` Google callback and then returns to KDP管理; no additional Google redirect registration is needed.
 Create a book, fill its title/author/language/audience/description, add chapters and sections,
 and select one section to write. Markdown supports headings, unordered/numbered lists,
 bold, inline code, HTTP(S) links and uploaded images. Raw HTML remains literal text.
@@ -12,7 +12,7 @@ Sources store URL, confirmation date, target year and notes for each section. A 
 its own text, change notes and exact base revision. Compare the adopted text and proposal before
 accepting. Acceptance fails if the section has changed. Rejecting does not change adopted text.
 History → 復元 creates a new revision. All books, chapters, sections, sources and proposals have
-immutable database history; section history is available in the UI. Archive is reversible. Turn on
+immutable database history; section history is available in the UI in pages of 10 snapshots; 「以前の履歴を読み込む」 retrieves older revisions. Archive is reversible. Turn on
 「アーカイブも表示」 to restore. Restore an archived parent before editing its children.
 The up/down controls atomically reorder every active sibling using every sibling's current revision.
 
@@ -22,7 +22,7 @@ The existing authenticated `/mcp` connection exposes:
 
 - `list_kdp_books`
 - `get_kdp_book` with `book_id`
-- `get_kdp_section` with `section_id` (adopted body/revision, sources, proposals and history metadata)
+- `get_kdp_section` with `section_id` (adopted body/revision, sources, latest 20 proposals and history metadata)
 - `create_kdp_proposal` with `section_id`, exact `base_revision`, `body`, optional `title`/`notes`
 
 Create the book's structure in the browser, then ask ChatGPT to read the exact section and save its
@@ -75,5 +75,5 @@ CI validation. Rolling back the code leaves the additive KDP data intact.
 SS and admission behavior, plus KDP SQL and real Miniflare D1/R2 authenticated API/MCP tests.
 `npm run test:browser` uses synthetic HTTPS for OAuth browser regression.
 `npm run test:kdp:browser` uses synthetic HTTPS, isolated D1/R2 and desktop/mobile Chromium for
-book/section/source/proposal/history/archive/export/menu flows, including delayed save/upload.
+book/section/source/proposal/history/archive/export/menu flows, including delayed save/upload, duplicate dialog submission protection, title limits and history pagination.
 No real user data is used. On macOS, the fixture uses installed Chrome; Linux CI uses Playwright.

@@ -18,7 +18,7 @@ const PASTEL_FALLBACK_COLORS = [
 
 const API_BASE = "/api";
 const PENDING_DESTINATION_KEY = "works_pending_destination";
-const SAFE_DESTINATION_RE = /^(?:\/|\/(?:tutor|material|admission|ss)\/)$/;
+const SAFE_DESTINATION_RE = /^(?:\/|\/(?:tutor|material|material-print|admission|ss|todo|kdp)\/)$/;
 
 function consumePendingDestination() {
   const value = localStorage.getItem(PENDING_DESTINATION_KEY);
