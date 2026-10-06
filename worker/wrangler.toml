@@ -14,6 +14,8 @@ routes = [
 GOOGLE_CLIENT_ID = "196806466819-2bcole85u4k53h1iqk6jr69ppans7egf.apps.googleusercontent.com"
 ALLOWED_EMAIL = "ryoxsakai@gmail.com"
 ALLOWED_ORIGIN = "https://works.lrnr.jp"
+# Owner approved MCP editing release; each connection still needs kdp:write consent.
+KDP_MCP_WRITE_ENABLED = "true"
 
 # 以下はここに書かず、Cloudflareダッシュボード(Workers & Pages → works →
 # 設定 → 変数とシークレット)でSecretとして追加すること:
@@ -38,4 +40,3 @@ database_id = "2d4fa45f-4d4d-437d-8cc2-7a8531b27e18"
 [[r2_buckets]]
 binding = "MATERIALS_BUCKET"
 bucket_name = "works-materials-files"
-

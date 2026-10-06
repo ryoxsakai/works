@@ -3,6 +3,8 @@ import {
   readBook,
   getSection,
   createProposal,
+  createKdpEntity,
+  decideKdpProposal,
   exportBook,
   exportCurrentBook,
   ensureKdpSchema,
@@ -10,6 +12,8 @@ import {
 } from "./kdp.js";
 import { handleAssets, readAssets, boundedBytes } from "./kdp-assets.js";
 import { buildEpub, exportMarkdown, zipStore } from "./kdp-export.js";
+import { kdpMcpWriteEnabled, requireKdpWrite } from "./mcp-scopes.js";
+import { prepareKdpMutation, replayKdpMutation } from "./kdp-mutations.js";
 const obj = (properties, required = []) => ({
   type: "object",
   properties,
@@ -39,7 +43,7 @@ export const kdpTools = [
   {
     name: "create_kdp_proposal",
     description:
-      "元revisionが一致する節に改稿案を保存。採用本文は変更しません。採用・却下は本人がKDP管理画面で行います。",
+      "元revisionが一致する節に改稿案を保存。採用本文は変更しません。採用はKDP管理画面、または別途kdp:writeの明示同意がある接続から行います。",
     inputSchema: obj(
       {
         section_id: str,
@@ -53,7 +57,60 @@ export const kdpTools = [
     annotations: { readOnlyHint: false, destructiveHint: false },
   },
 ];
-export async function callKdpTool(env, name, args) {
+const rev = { type: "integer", minimum: 1 };
+const title = { type: "string", minLength: 1, maxLength: 300 };
+const requestId = { type: "string", minLength: 8, maxLength: 128, pattern: "^[A-Za-z0-9_-]+$" };
+const writeAnnotations = { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false };
+const retryNote = " kdp:writeの明示同意が必要。同じ送信の再試行ではrequest_idと全引数を維持してください。";
+export const kdpWriteTools = [
+  {
+    name: "create_kdp_book",
+    description: "KDP管理に新しい本を作成。" + retryNote,
+    inputSchema: obj({ request_id: requestId, title, subtitle: { ...str, maxLength: 300 }, author: { ...str, maxLength: 300 }, language: { ...str, maxLength: 20000 }, audience: { ...str, maxLength: 20000 }, description: { ...str, maxLength: 20000 } }, ["request_id", "title"]),
+    annotations: writeAnnotations,
+  },
+  {
+    name: "create_kdp_chapter",
+    description: "get_kdp_bookで本とrevisionを確認して章を作成。" + retryNote,
+    inputSchema: obj({ request_id: requestId, book_id: str, book_revision: rev, title, sort_order: { type: "integer" } }, ["request_id", "book_id", "book_revision", "title"]),
+    annotations: writeAnnotations,
+  },
+  {
+    name: "create_kdp_section",
+    description: "get_kdp_bookで章とrevisionを確認して節を作成。bodyを指定すると初期採用本文として保存。" + retryNote,
+    inputSchema: obj({ request_id: requestId, chapter_id: str, chapter_revision: rev, title, body: { ...str, maxLength: 200000 }, sort_order: { type: "integer" } }, ["request_id", "chapter_id", "chapter_revision", "title"]),
+    annotations: writeAnnotations,
+  },
+  {
+    name: "accept_kdp_proposal",
+    description: "get_kdp_sectionで本文と提案を読み、ユーザーが指定した改稿案を採用。節の現在revision・提案base_revisionが一致する場合だけ採用本文を変更。revisionは提案のrevision。" + retryNote,
+    inputSchema: obj({ request_id: requestId, proposal_id: str, revision: rev, base_revision: rev }, ["request_id", "proposal_id", "revision", "base_revision"]),
+    annotations: { ...writeAnnotations, destructiveHint: true },
+  },
+  {
+    name: "reject_kdp_proposal",
+    description: "get_kdp_sectionで確認した改稿案を却下。採用本文は変更しません。revisionは提案のrevision。" + retryNote,
+    inputSchema: obj({ request_id: requestId, proposal_id: str, revision: rev }, ["request_id", "proposal_id", "revision"]),
+    annotations: writeAnnotations,
+  },
+];
+export const availableKdpTools = env => [...kdpTools, ...(kdpMcpWriteEnabled(env) ? kdpWriteTools : [])];
+
+function validateWriteArguments(tool, args) {
+  if (new TextEncoder().encode(JSON.stringify(args)).byteLength > 512 * 1024)
+    throw Object.assign(new Error("KDP write exceeds 512 KB"), { status: 413 });
+  const { properties, required } = tool.inputSchema;
+  if (Object.keys(args).some(key => !Object.hasOwn(properties, key)))
+    throw Object.assign(new Error("Unknown KDP write argument"), { status: 400 });
+  for (const key of required)
+    if (!Object.hasOwn(args, key)) throw Object.assign(new Error(`${key} is required`), { status: 400 });
+  for (const [key, value] of Object.entries(args)) {
+    const rule = properties[key];
+    if (rule.type === "string" ? typeof value !== "string" || value.length < (rule.minLength ?? 0) || ((key === "title" || key.endsWith("_id")) && !value.trim()) || value.length > (rule.maxLength ?? Infinity) : !Number.isSafeInteger(value) || value < (rule.minimum ?? -Infinity))
+      throw Object.assign(new Error(`Invalid ${key}`), { status: 400 });
+  }
+}
+export async function callKdpTool(env, name, args, auth) {
   if (!args || typeof args !== "object" || Array.isArray(args))
     throw Object.assign(new Error("arguments must be an object"), {
       status: 400,
@@ -63,6 +120,25 @@ export async function callKdpTool(env, name, args) {
   if (name === "get_kdp_section") return getSection(env, args.section_id);
   if (name === "create_kdp_proposal")
     return createProposal(env, args.section_id, args);
+  const tool = kdpWriteTools.find(tool => tool.name === name);
+  if (tool) {
+    requireKdpWrite(env, auth);
+    validateWriteArguments(tool, args);
+    const receipt = await prepareKdpMutation(env.DB, auth.fid, name, args);
+    const replay = await replayKdpMutation(env.DB, receipt);
+    if (replay) return replay;
+    try {
+      if (name === "create_kdp_book") return await createKdpEntity(env, "books", args, undefined, receipt);
+      if (name === "create_kdp_chapter") return await createKdpEntity(env, "chapters", args, { key: "book_id", id: args.book_id }, receipt, args.book_revision);
+      if (name === "create_kdp_section") return await createKdpEntity(env, "sections", args, { key: "chapter_id", id: args.chapter_id }, receipt, args.chapter_revision);
+      return await decideKdpProposal(env, args.proposal_id, args, name === "accept_kdp_proposal", receipt);
+    } catch (error) {
+      // A parallel retry can win after the initial receipt read but before preflight.
+      const saved = await replayKdpMutation(env.DB, receipt);
+      if (saved) return saved;
+      throw error;
+    }
+  }
   throw Object.assign(new Error("Unknown KDP tool"), { status: 404 });
 }
 function base64(bytes) {

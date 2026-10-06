@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
-const source = (await readFile(new URL('../src/index.js', import.meta.url), 'utf8')).replace("./kdp-services.js", new URL("../src/kdp-services.js", import.meta.url).href).replace("./oauth-refresh.js", new URL("../src/oauth-refresh.js", import.meta.url).href);
+const source = (await readFile(new URL('../src/index.js', import.meta.url), 'utf8')).replace("./kdp-services.js", new URL("../src/kdp-services.js", import.meta.url).href).replace("./oauth-refresh.js", new URL("../src/oauth-refresh.js", import.meta.url).href).replace("./mcp-scopes.js", new URL("../src/mcp-scopes.js", import.meta.url).href);
 const f = await import(`data:text/javascript;base64,${Buffer.from(source + '\nexport { handleMcp, createMcpAccessToken };').toString('base64')}`);
 const env = { ALLOWED_EMAIL: 'owner@example.com', SESSION_SECRET: 'test-session', JQUANTS_API_KEY: 'test-key-never-echo' };
 const token = await f.createMcpAccessToken(env, 'schedule:read');

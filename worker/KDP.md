@@ -25,13 +25,53 @@ The existing authenticated `/mcp` connection exposes:
 - `get_kdp_section` with `section_id` (adopted body/revision, sources, latest 20 proposals and history metadata)
 - `create_kdp_proposal` with `section_id`, exact `base_revision`, `body`, optional `title`/`notes`
 
-Create the book's structure in the browser, then ask ChatGPT to read the exact section and save its
-rewrite as a proposal. Return to the browser to compare and adopt. MCP has no adopted-text,
-acceptance, restoration, archive, image upload or structure-write tool. Its audience/scope-bound
-token is explicitly refused by the KDP browser API. No paid AI API runs automatically.
-The existing grant, key, fixed expiry and refresh/revocation implementation is unchanged.
-The consent page describes KDP read/proposal capabilities. Anonymous discovery only describes
-schemas; execution needs the existing short-lived authenticated MCP token.
+MCP proposals remain drafts until adopted. Existing `schedule:read` connections keep these four
+capabilities; refreshing or reconnecting with that scope never grants manuscript editing.
+
+A separately approved release can enable five additional tools:
+
+- `create_kdp_book`: `request_id`, `title`; optional subtitle/author/language/audience/description
+- `create_kdp_chapter`: `request_id`, `book_id`, exact `book_revision`, `title`; optional `sort_order`
+- `create_kdp_section`: `request_id`, `chapter_id`, exact `chapter_revision`, `title`; optional
+  `body` (saved as initial adopted text) and `sort_order`
+- `accept_kdp_proposal`: `request_id`, `proposal_id`, exact proposal `revision` and `base_revision`
+- `reject_kdp_proposal`: `request_id`, `proposal_id`, exact proposal `revision`
+
+Read `get_kdp_book` before creating children and `get_kdp_section` before deciding proposals.
+Compare the current body with the requested proposal. Acceptance changes only the section body
+and proposal status, atomically, when the proposal is pending and its original section revision
+still matches. Rejection preserves the body and, as in the browser, remains available while archived.
+Creation and acceptance require active ancestors; their archive/revision guards run inside the write.
+No MCP direct-update, restoration, archive, upload, publication or deletion tool is added.
+The MCP token remains refused by the browser KDP API. No paid AI API runs automatically.
+
+Each new edit requires a unique `request_id` (8–128 letters, digits, underscores or hyphens).
+Reuse the same ID and **all the same arguments** after a lost response. A grant-bound immutable
+receipt commits in the same D1 transaction as the write, referring to immutable history snapshots.
+An identical retry returns the original committed result even after later browser edits; read again
+for current state. A reused ID with changed arguments/operation fails. A failed CAS stores no receipt.
+Receipts are small metadata, retained separately from portable manuscript backups, and remain
+scoped to that authorization grant (including after access-token refresh).
+
+### Editing authorization and release gate
+
+Without `KDP_MCP_WRITE_ENABLED="true"`, new tools and the `kdp:write` discovery scope are hidden,
+and direct calls are denied. The owner approved the editing release on 2026-10-06; the existing
+Worker configuration now sets this flag. Existing grants, credentials, OAuth registrations,
+bindings and browser login settings remain unchanged. This exposes the editing tools and permits requests for
+`scope=schedule:read kdp:write`. The client must request both scopes and complete a new OAuth
+connection; a plain `schedule:read` request stays at its existing permissions. Scope order is
+normalized. Verify that the connector requests the new scope when it reconnects.
+
+The authorization form describes structure creation, initial text and proposal adoption/rejection,
+and requires a separate **unchecked** editing checkbox. Remembered browser login does not skip
+this consent. The resulting new code/family carries exactly the consented scopes. Existing
+families cannot be upgraded by refresh. Access requires a valid, unrevoked family with matching
+scopes; legacy access tokens without a family cannot edit. The one-hour access-token expiry and
+fixed 30-day refresh deadline remain unchanged. No credential generation/rotation is needed.
+Disabling the flag immediately denies editing even for an already-consented grant; reading,
+proposal creation and normal refresh remain available. Future changes to access still require
+owner approval; no production manuscript writes should be used for verification.
 
 ## Portable downloads
 
@@ -60,10 +100,10 @@ every OS keyboard.
 ## Storage and release
 
 `DB` holds additive `kdp_*` tables and immutable SQLite snapshot triggers. Migrations:
-`migrations/001-kdp.sql` and `002-kdp-assets.sql`. The same CREATE IF NOT EXISTS statements run
+`migrations/001-kdp.sql`, `002-kdp-assets.sql` and `003-kdp-mcp.sql` (edit receipts). The same CREATE IF NOT EXISTS statements run
 lazily only after an authenticated KDP request; no manual production migration is required.
-Existing business tables and assets are not changed. No new binding, credential or persistent
-access is required. Upload quota checks also run atomically in a DB trigger. Failed metadata
+Existing business tables and assets are not changed. No new binding or credential is required. The optional MCP edit permission requires the
+explicit consent and release approval described above. Upload quota checks also run atomically in a DB trigger. Failed metadata
 insertion removes only that upload's newly created R2 object. Assets are retained with revisions.
 
 Deploy through the existing main-branch GitHub Pages/Cloudflare build after draft PR review and
@@ -76,4 +116,8 @@ SS and admission behavior, plus KDP SQL and real Miniflare D1/R2 authenticated A
 `npm run test:browser` uses synthetic HTTPS for OAuth browser regression.
 `npm run test:kdp:browser` uses synthetic HTTPS, isolated D1/R2 and desktop/mobile Chromium for
 book/section/source/proposal/history/archive/export/menu flows, including delayed save/upload, duplicate dialog submission protection, title limits and history pagination.
+OAuth Chromium coverage also checks that remembered login cannot preselect/skip KDP editing consent.
+`test/kdp-mcp-write.test.mjs` checks disabled/old/legacy/revoked/expired grants, exact consent,
+CSRF scope binding, refresh non-expansion, structure/decision retries, concurrent acceptance/rejection,
+CAS/ancestor archives, transactional rollback and immutable receipts/history.
 No real user data is used. On macOS, the fixture uses installed Chrome; Linux CI uses Playwright.

@@ -4,7 +4,7 @@ import test from "node:test";
 import { Miniflare } from "miniflare";
 
 test("ToDo revisions survive a database read and reject stale saves", async (context) => {
-  const source = (await readFile(new URL("../src/index.js", import.meta.url), "utf8")).replace("./kdp-services.js", new URL("../src/kdp-services.js", import.meta.url).href).replace("./oauth-refresh.js", new URL("../src/oauth-refresh.js", import.meta.url).href);
+  const source = (await readFile(new URL("../src/index.js", import.meta.url), "utf8")).replace("./kdp-services.js", new URL("../src/kdp-services.js", import.meta.url).href).replace("./oauth-refresh.js", new URL("../src/oauth-refresh.js", import.meta.url).href).replace("./mcp-scopes.js", new URL("../src/mcp-scopes.js", import.meta.url).href);
   const functions = await import(`data:text/javascript;base64,${Buffer.from(`${source}\nexport { readTodo, writeTodo, callTodoTool };`).toString("base64")}`);
   const miniflare = new Miniflare({
     modules: true,
