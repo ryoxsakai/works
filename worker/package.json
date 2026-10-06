@@ -8,7 +8,8 @@
     "db:migrate": "wrangler d1 execute tutor-db --remote --file=./schema.sql",
     "test": "node --test test/*.test.mjs",
     "test:browser": "node test/oauth-browser-session.browser.mjs",
-    "test:kdp:browser": "node test/kdp-ui.browser.mjs"
+    "test:kdp:browser": "node test/kdp-ui.browser.mjs",
+    "test:ss:browser": "node test/ss-ui.browser.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",

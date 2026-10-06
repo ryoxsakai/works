@@ -33,6 +33,22 @@
   white-space: nowrap;
 }
 
+.ss-completed-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  min-height: 44px;
+  margin-bottom: .75rem;
+  cursor: pointer;
+}
+
+.ss-completed-toggle input {
+  width: 1.1rem;
+  height: 1.1rem;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
 .ss-sort-toolbar {
   display: none;
 }

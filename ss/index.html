@@ -19,7 +19,7 @@
   <link rel="apple-touch-icon" href="/shared/logo.png" />
   <link rel="stylesheet" href="/shared/styles.css?v=55" />
   <link rel="stylesheet" href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" />
-  <link rel="stylesheet" href="/ss/ss.css?v=2" />
+  <link rel="stylesheet" href="/ss/ss.css?v=3" />
 </head>
 <body>
   <header class="page-header">
@@ -43,6 +43,11 @@
           </div>
           <p id="ss-summary" class="ss-summary" aria-live="polite"></p>
         </div>
+
+        <label class="ss-completed-toggle">
+          <input id="ss-show-completed" type="checkbox" />
+          <span>完了を表示</span>
+        </label>
 
         <div class="ss-sort-toolbar" aria-label="案件の並べ替え">
           <label for="ss-sort-key">並べ替え</label>
@@ -80,6 +85,6 @@
     </section>
   </main>
 
-  <script type="module" src="/ss/app.js?v=3"></script>
+  <script type="module" src="/ss/app.js?v=4"></script>
 </body>
 </html>

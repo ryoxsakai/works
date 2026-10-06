@@ -26,6 +26,7 @@ const els = {
   list: document.querySelector("#ss-project-list"),
   empty: document.querySelector("#ss-empty"),
   summary: document.querySelector("#ss-summary"),
+  showCompleted: document.querySelector("#ss-show-completed"),
   sortButtons: [...document.querySelectorAll(".ss-sort-button")],
   sortKey: document.querySelector("#ss-sort-key"),
   sortDirection: document.querySelector("#ss-sort-direction"),
@@ -152,9 +153,13 @@ function renderSortControls() {
 function render() {
   const active = projects.filter((project) => project.status !== "完了").length;
   els.summary.textContent = projects.length ? `進行中 ${active}件／全${projects.length}件` : "";
-  els.empty.hidden = projects.length > 0;
+  const visible = sortedProjects().filter((project) => els.showCompleted.checked || project.status !== "完了");
+  els.empty.hidden = visible.length > 0;
+  els.empty.querySelector("p").textContent = projects.length && !els.showCompleted.checked
+    ? "進行中のプロジェクトはありません。完了案件は「完了を表示」で確認できます。"
+    : "登録中のプロジェクトはありません。";
   renderSortControls();
-  els.list.innerHTML = sortedProjects().map((project) => {
+  els.list.innerHTML = visible.map((project) => {
     const remainingState = remaining(project);
     const statusClass = STATUS_CLASSES[project.status] || "unknown";
     const memo = project.memo || "—";
@@ -201,6 +206,9 @@ for (const button of els.sortButtons) {
     setSort(key, sortState.key === key && sortState.direction === "asc" ? "desc" : "asc");
   });
 }
+
+els.showCompleted.checked = false;
+els.showCompleted.addEventListener("change", render);
 
 els.sortKey.addEventListener("change", () => setSort(els.sortKey.value, "asc"));
 els.sortDirection.addEventListener("click", () => {
