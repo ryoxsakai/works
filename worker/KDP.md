@@ -55,11 +55,10 @@ scoped to that authorization grant (including after access-token refresh).
 
 ### Editing authorization and release gate
 
-`KDP_MCP_WRITE_ENABLED` is absent by default: new tools and the `kdp:write` discovery scope are
-hidden, and direct calls are denied. This PR does **not** set this production variable or change
-existing grants, credentials, OAuth registrations, bindings or browser login settings.
-Before release, the owner must approve enabling `KDP_MCP_WRITE_ENABLED="true"` in the existing
-Worker configuration. This exposes the editing tools and permits requests for
+Without `KDP_MCP_WRITE_ENABLED="true"`, new tools and the `kdp:write` discovery scope are hidden,
+and direct calls are denied. The owner approved the editing release on 2026-10-06; the existing
+Worker configuration now sets this flag. Existing grants, credentials, OAuth registrations,
+bindings and browser login settings remain unchanged. This exposes the editing tools and permits requests for
 `scope=schedule:read kdp:write`. The client must request both scopes and complete a new OAuth
 connection; a plain `schedule:read` request stays at its existing permissions. Scope order is
 normalized. Verify that the connector requests the new scope when it reconnects.
@@ -71,8 +70,8 @@ families cannot be upgraded by refresh. Access requires a valid, unrevoked famil
 scopes; legacy access tokens without a family cannot edit. The one-hour access-token expiry and
 fixed 30-day refresh deadline remain unchanged. No credential generation/rotation is needed.
 Disabling the flag immediately denies editing even for an already-consented grant; reading,
-proposal creation and normal refresh remain available. Merge/deploy and enabling the flag require
-separate owner approval; no production manuscript writes should be used for verification.
+proposal creation and normal refresh remain available. Future changes to access still require
+owner approval; no production manuscript writes should be used for verification.
 
 ## Portable downloads
 
