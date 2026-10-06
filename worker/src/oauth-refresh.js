@@ -1,3 +1,4 @@
+import { canonicalMcpScope } from "./mcp-scopes.js";
 // Refresh credentials are never stored: only SHA-256 hashes and grant metadata.
 export const REFRESH_MAX_AGE_MS = 30 * 86400_000;
 export const REFRESH_RETRY_MS = 5000;
@@ -49,8 +50,8 @@ export async function rotateRefreshGrant(env, origin, params) {
   if (!old) return { error: "invalid_grant" };
   let family = await readRefreshFamily(env, origin, old.family_id);
   if (!family || family.client_id !== params.get("client_id")) return { error: "invalid_grant" };
-  // This personal MCP has one scope; do not allow the refresh request to expand it.
-  if (params.has("scope") && params.get("scope") !== family.scope) return { error: "invalid_scope" };
+  // Preserve the exact consented scope set; refresh cannot expand a grant.
+  if (params.has("scope") && canonicalMcpScope(params.get("scope")) !== family.scope) return { error: "invalid_scope" };
   const nextToken = await sign(env.SESSION_SECRET, JSON.stringify(["works-refresh-rotation:v1", token, family.id, old.generation + 1]));
   const nextHash = await hash(nextToken);
   const now = Date.now();

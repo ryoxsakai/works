@@ -14,7 +14,7 @@ const mf = new Miniflare({ modules: true, script: "export default { fetch() { re
 let browser;
 try {
   const DB = await mf.getD1Database("DB");
-  const env = { DB, WORKS_API_KEY: KEY, SESSION_SECRET: "synthetic-signing-key-only", ALLOWED_EMAIL: "test@example.test", ALLOWED_ORIGIN: ORIGIN };
+  const env = { DB, WORKS_API_KEY: KEY, SESSION_SECRET: "synthetic-signing-key-only", ALLOWED_EMAIL: "test@example.test", ALLOWED_ORIGIN: ORIGIN, KDP_MCP_WRITE_ENABLED: "true" };
   const response = await worker.fetch(new Request(ORIGIN + "/oauth/register", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ redirect_uris: [CALLBACK] }) }), env);
   const { client_id } = await response.json();
   const params = new URLSearchParams({ response_type: "code", client_id, redirect_uri: CALLBACK, code_challenge: "a".repeat(43), code_challenge_method: "S256", scope: "schedule:read", state: "browser-fixture" });
@@ -122,8 +122,32 @@ try {
   await page.waitForURL(CALLBACK + "?**");
   assert.equal((await context.cookies(ORIGIN)).some((c) => c.name === SESSION), false);
   assert.ok(requests.some((r) => r.path === "/oauth/logout"));
+  // Remembered authentication must still require a fresh, unchecked KDP edit consent.
+  await page.goto(authorizeURL);
+  await page.getByLabel("WORKS APIキー", { exact: true }).fill(KEY);
+  await page.getByRole("checkbox").check();
+  await page.getByRole("button", { name: "接続を許可", exact: true }).click();
+  await page.waitForURL(CALLBACK + "?**");
+  const writeParams = new URLSearchParams(params);
+  writeParams.set("scope", "kdp:write schedule:read");
+  await page.goto(ORIGIN + "/oauth/authorize?" + writeParams);
+  assert.equal(await page.locator("input[type=password]").count(), 0);
+  const editConsent = page.getByLabel("KDPの作成・改稿案の採用・却下をこの接続に許可する", { exact: true });
+  assert.equal(await editConsent.isChecked(), false);
+  assert.equal(await editConsent.getAttribute("required"), "");
+  assert.equal(await page.locator('input[name="scope"]').inputValue(), "schedule:read kdp:write");
+  const oldCodeCount = (await DB.prepare("SELECT count(*) n FROM mcp_oauth_codes").first()).n;
+  await page.getByRole("button", { name: "接続を許可", exact: true }).click();
+  assert.equal(new URL(page.url()).pathname, "/oauth/authorize");
+  assert.equal((await DB.prepare("SELECT count(*) n FROM mcp_oauth_codes").first()).n, oldCodeCount);
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+  await page.screenshot({ path: "test-artifacts/works-kdp-write-consent-mobile.png", fullPage: true });
+  await editConsent.check();
+  await page.getByRole("button", { name: "接続を許可", exact: true }).click();
+  await page.waitForURL(CALLBACK + "?**");
+  assert.equal((await DB.prepare("SELECT count(*) n FROM mcp_oauth_codes WHERE scope='schedule:read kdp:write'").first()).n, 1);
   await context.close();
-  console.log("PASS: synthetic HTTPS Chromium checkbox on/off, consent redirects, persisted cookie restoration, HttpOnly/host/security flags, fixed expiry, empty web storage, logout, failed retry, unchecked login, mobile width");
+  console.log("PASS: synthetic HTTPS Chromium checkbox on/off, consent redirects, persisted cookie restoration, HttpOnly/host/security flags, fixed expiry, empty web storage, logout, failed retry, unchecked login, mobile width, separate unchecked KDP edit consent with remembered login");
 } finally {
   if (browser) await browser.close();
   await mf.dispose();

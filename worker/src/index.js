@@ -1,4 +1,5 @@
-import { kdpTools, callKdpTool, handleKdp } from "./kdp-services.js";
+import { kdpTools, kdpWriteTools, availableKdpTools, callKdpTool, handleKdp } from "./kdp-services.js";
+import { MCP_SCOPE, KDP_WRITE_SCOPE, mcpScopes, canonicalMcpScope, supportedMcpScope } from "./mcp-scopes.js";
 import { ensureRefreshSchema, issueRefreshGrant, readRefreshFamily, rotateRefreshGrant, revokeRefreshGrant } from "./oauth-refresh.js";
 
 function corsHeaders(origin) {
@@ -58,7 +59,6 @@ async function verifyReadApiKey(request, env) {
 // Bearer tokenでのみ実行できるようにする。OAuthの認可画面では既存の
 // WORKS_API_KEYを本人確認用に使い、キー自体はChatGPTへ保存しない。
 // schedule:readはこの個人用MCPへの接続権限を表し、取得・更新の両方に使用する。
-const MCP_SCOPE = "schedule:read";
 const MCP_TOKEN_MAX_AGE_MS = 60 * 60 * 1000;
 const MCP_AUTH_CODE_MAX_AGE_MS = 5 * 60 * 1000;
 
@@ -189,7 +189,11 @@ async function renderMcpAuthorizeForm(request, env, params, session, message = "
   const credentials = session
     ? `<p>このブラウザのログイン状態を確認しました（期限: ${escapeHtml(new Date(session.expires_at).toISOString().slice(0, 10))} UTC）。</p><p><a href="/oauth/logout">このブラウザのログイン状態を解除</a></p>`
     : `<label for="api-key" style="display:block;margin:24px 0 8px">WORKS APIキー</label><input id="api-key" name="api_key" type="password" autocomplete="current-password" required style="box-sizing:border-box;width:100%;padding:12px;font-size:16px">`;
-  const page = mcpBrowserPage("WORKS をChatGPTに接続", `<p>授業予定・確認テスト・宿題・授業メモの読み取りと更新、J-Quantsの株価データ取得、およびKDP管理の原稿読み取りと改稿案の登録を許可します。KDPの採用本文の変更・提案採用は画面からのみ行います。</p><p style="overflow-wrap:anywhere">接続先: ${escapeHtml(params.get("redirect_uri"))}<br>権限: ${escapeHtml(params.get("scope") || MCP_SCOPE)}</p>${message ? `<p role="alert">${escapeHtml(message)}</p>` : ""}<form method="post" action="/oauth/authorize">${credentials}${fields}<input type="hidden" name="csrf_token" value="${form.token}"><label style="display:flex;gap:8px;align-items:baseline;margin-top:20px"><input type="checkbox" name="remember_login" value="1"${session ? " checked" : ""}>ログイン状態を保持する（30日間）</label><p style="font-size:14px">APIキーはブラウザに保存しません。共有端末ではチェックしないでください。チェックを外して接続すると、保存済みのログイン状態も解除されます。保存期限は延長されません。接続の許可は毎回確認します。</p><button type="submit" style="margin-top:16px;padding:12px 18px;font-size:16px">接続を許可</button></form>` , status);
+  const writeRequested = (params.get("scope") || MCP_SCOPE).split(" ").includes(KDP_WRITE_SCOPE);
+  const kdpConsent = writeRequested
+    ? `<p><strong>KDP編集権限を追加します。</strong>この接続から本・章・節の作成（初期本文の保存を含む）、改稿案の採用・却下が可能になります。採用すると保存済みの本文が変更されます。権限はこの接続の30日間の期限まで有効です。既存の接続には追加されません。</p><label style="display:flex;gap:8px;align-items:baseline"><input type="checkbox" name="allow_kdp_write" value="1" required>KDPの作成・改稿案の採用・却下をこの接続に許可する</label>`
+    : "";
+  const page = mcpBrowserPage("WORKS をChatGPTに接続", `<p>授業予定・確認テスト・宿題・授業メモの読み取りと更新、J-Quantsの株価データ取得、およびKDP管理の原稿読み取りと改稿案の登録を許可します。${writeRequested ? "KDP編集は下記で追加同意が必要です。" : "KDPの採用本文の変更・提案採用はこの接続には許可されません。"}</p><p style="overflow-wrap:anywhere">接続先: ${escapeHtml(params.get("redirect_uri"))}<br>権限: ${escapeHtml(params.get("scope") || MCP_SCOPE)}</p>${message ? `<p role="alert">${escapeHtml(message)}</p>` : ""}<form method="post" action="/oauth/authorize">${credentials}${fields}${kdpConsent}<input type="hidden" name="csrf_token" value="${form.token}"><label style="display:flex;gap:8px;align-items:baseline;margin-top:20px"><input type="checkbox" name="remember_login" value="1"${session ? " checked" : ""}>ログイン状態を保持する（30日間）</label><p style="font-size:14px">APIキーはブラウザに保存しません。共有端末ではチェックしないでください。チェックを外して接続すると、保存済みのログイン状態も解除されます。保存期限は延長されません。接続の許可は毎回確認します。</p><button type="submit" style="margin-top:16px;padding:12px 18px;font-size:16px">接続を許可</button></form>` , status);
   // Some browsers apply form-action to the OAuth redirect as well as the form POST.
   page.headers.set("Content-Security-Policy", `default-src 'none'; style-src 'unsafe-inline'; form-action 'self' ${new URL(params.get("redirect_uri")).origin}; base-uri 'none'; frame-ancestors 'none'`);
   if (!session && browserCookie(request, MCP_BROWSER_COOKIE)) cookies.push(browserCookieHeader(MCP_BROWSER_COOKIE, "", 0));
@@ -200,12 +204,14 @@ async function authorizeMcpClient(request, env, url) {
   if (!env.WORKS_API_KEY || !env.SESSION_SECRET) return oauthErrorPage("認証が設定されていません。管理者にお問い合わせください。", 503);
   if (request.method === "POST" && !isSameOriginMcpForm(request, url)) return oauthErrorPage("認証フォームの送信元を確認できませんでした。", 403);
   const params = request.method === "POST" ? new URLSearchParams(await request.text()) : url.searchParams;
-  if ([...MCP_AUTHORIZE_FIELDS, "csrf_token", "remember_login", "api_key"].some((name) => params.getAll(name).length > 1)) return oauthErrorPage("認可リクエストが正しくありません。");
+  if ([...MCP_AUTHORIZE_FIELDS, "csrf_token", "remember_login", "api_key", "allow_kdp_write"].some((name) => params.getAll(name).length > 1)) return oauthErrorPage("認可リクエストが正しくありません。");
   const clientId = params.get("client_id") || "";
   const redirectUri = params.get("redirect_uri") || "";
   const codeChallenge = params.get("code_challenge") || "";
-  const scope = params.get("scope") || MCP_SCOPE;
-  if (scope !== MCP_SCOPE) return oauthErrorPage("要求された権限はサポートされていません。");
+  const requestedScope = params.get("scope") || MCP_SCOPE;
+  if (!supportedMcpScope(env, requestedScope)) return oauthErrorPage("要求された権限はサポートされていません。");
+  const scope = canonicalMcpScope(requestedScope);
+  params.set("scope", scope);
   const client = await readMcpOAuthClient(env, clientId);
   if (params.get("response_type") !== "code" || !client || !client.redirect_uris.includes(redirectUri) || !codeChallenge || params.get("code_challenge_method") !== "S256" || !scope.split(" ").includes(MCP_SCOPE)) return oauthErrorPage("認可リクエストが正しくありません。");
   let redirect;
@@ -214,6 +220,8 @@ async function authorizeMcpClient(request, env, url) {
   const session = await readMcpBrowserSession(request, env);
   if (request.method === "GET") return renderMcpAuthorizeForm(request, env, params, session);
   if (!(await consumeMcpBrowserForm(request, env, "authorize", params, session))) return renderMcpAuthorizeForm(request, env, params, session, "認証フォームの期限が切れたか、すでに送信済みです。内容を確認して再度送信してください。", 403);
+  if (scope.split(" ").includes(KDP_WRITE_SCOPE) && params.get("allow_kdp_write") !== "1")
+    return renderMcpAuthorizeForm(request, env, params, session, "KDP編集権限の追加にはチェックを入れて明示的に同意してください。", 403);
   const suppliedKey = params.get("api_key") || "";
   if (!session && (!suppliedKey || !(await constantTimeEqual(suppliedKey, env.WORKS_API_KEY)))) return renderMcpAuthorizeForm(request, env, params, null, "APIキーが正しくありません。入力し直してください。", 401);
   const cookies = [];
@@ -284,7 +292,11 @@ async function verifyMcpAccessToken(request, env) {
   if (!payloadB64 || !sig || sig !== await hmacSign(env, payloadB64)) throw httpError(401, "invalid MCP bearer token");
   let payload; try { payload = JSON.parse(fromBase64Url(payloadB64)); } catch { throw httpError(401, "invalid MCP bearer token"); }
   if (payload.aud !== "works-mcp" || payload.exp < Date.now() || payload.email?.toLowerCase() !== env.ALLOWED_EMAIL.toLowerCase() || !String(payload.scope || "").split(" ").includes(MCP_SCOPE)) throw httpError(401, "invalid MCP bearer token");
-  if (payload.fid && !(await readRefreshFamily(env, new URL(request.url).origin, payload.fid))) throw httpError(401, "invalid MCP bearer token");
+  if (payload.fid) {
+    const family = await readRefreshFamily(env, new URL(request.url).origin, payload.fid);
+    if (!family || family.scope !== payload.scope) throw httpError(401, "invalid MCP bearer token");
+  }
+  return payload;
 }
 function mcpResponse(id, result) {
   return mcpJson({ jsonrpc: "2.0", id, result });
@@ -2534,23 +2546,24 @@ async function handleMcp(request, env, url) {
     return mcpResponse(id, {
       protocolVersion: params.protocolVersion || "2025-06-18",
       capabilities: { tools: {} },
-      serverInfo: { name: "works-schedule", version: "1.12.0" },
+      serverInfo: { name: "works-schedule", version: "1.13.0" },
       instructions:
-        "Use list_admission_events to inspect WORKS admission schedules and compare registered universities before reporting missing schools. Use search_schedules to find exact event_id and calendar_id values before schedule writes. Use get_student_profile before updating a student memo or print name, and get_student_profile_change_history before undoing a profile update. Use list_material_categories before creating, renaming, reordering, or moving material categories, and list_curriculum_materials before creating, moving, renaming, reordering, merging, or deleting curriculum materials and chapters. Use get_student_materials before updating chapter completion. For SS project changes based on email, read the relevant email, call list_ss_projects before every write, then call create_ss_project or update_ss_project with the exact Gmail message_id and subject when available. Do not infer a deadline or status that the email does not establish. Merge duplicate chapters to preserve student progress; delete_material_chapter refuses to remove a chapter that has progress. Use briefing and progress tools to prepare and report, history before undoing changes, search_materials before linking a file, and preview_reschedule before apply_reschedule. For KDP, read the book/section before creating a proposal with its exact base_revision. Never treat proposals as adopted text; the owner accepts in the KDP管理 browser UI. Dates use Asia/Tokyo. Update tools preserve fields that are not supplied; pass null to clear a text field where supported.",
+        "Use list_admission_events to inspect WORKS admission schedules and compare registered universities before reporting missing schools. Use search_schedules to find exact event_id and calendar_id values before schedule writes. Use get_student_profile before updating a student memo or print name, and get_student_profile_change_history before undoing a profile update. Use list_material_categories before creating, renaming, reordering, or moving material categories, and list_curriculum_materials before creating, moving, renaming, reordering, merging, or deleting curriculum materials and chapters. Use get_student_materials before updating chapter completion. For SS project changes based on email, read the relevant email, call list_ss_projects before every write, then call create_ss_project or update_ss_project with the exact Gmail message_id and subject when available. Do not infer a deadline or status that the email does not establish. Merge duplicate chapters to preserve student progress; delete_material_chapter refuses to remove a chapter that has progress. Use briefing and progress tools to prepare and report, history before undoing changes, search_materials before linking a file, and preview_reschedule before apply_reschedule. For KDP, read the book/section before creating a proposal with its exact base_revision. Never treat proposals as adopted text. KDP structure creation and proposal acceptance/rejection require separate kdp:write consent and explicit user instructions. Read get_kdp_book before creating a chapter/section; use the parent revision. Read get_kdp_section and compare proposal/body before acceptance with exact proposal revision and base_revision. Generate a unique request_id for each KDP edit and preserve all arguments on identical retries; read current state after a retried response because it returns the original committed snapshot. Dates use Asia/Tokyo. Update tools preserve fields that are not supplied; pass null to clear a text field where supported.",
     });
   }
   if (method === "notifications/initialized") {
     return new Response(null, { status: 202 });
   }
   if (method === "tools/list") {
-    return mcpResponse(id, { tools: [...MCP_SCHEDULE_TOOLS, ...todoTools, ...kdpTools] });
+    return mcpResponse(id, { tools: [...MCP_SCHEDULE_TOOLS, ...todoTools, ...availableKdpTools(env)] });
   }
   if (method !== "tools/call") {
     return mcpError(id, -32601, "Method not found");
   }
 
+  let mcpAuth;
   try {
-    await verifyMcpAccessToken(request, env);
+    mcpAuth = await verifyMcpAccessToken(request, env);
   } catch (err) {
     if (err.status === 401) {
       return mcpJson(
@@ -2569,7 +2582,7 @@ async function handleMcp(request, env, url) {
   try {
     const args = params.arguments || {};
     const toolName = normalizeMcpToolName(params.name);
-    if (kdpTools.some(tool => tool.name === toolName)) return mcpToolResult(id, await callKdpTool(env, toolName, args));
+    if ([...kdpTools, ...kdpWriteTools].some(tool => tool.name === toolName)) return mcpToolResult(id, await callKdpTool(env, toolName, args, mcpAuth));
     if (todoTools.some(tool => tool.name === toolName)) return mcpToolResult(id, await callTodoTool(env, toolName, args));
     if (toolName === "search_stock_symbols") return mcpToolResult(id, await searchStockSymbols(env, args));
     if (toolName === "get_stock_price_history") return mcpToolResult(id, await readStockPriceHistory(env, args));
@@ -5305,11 +5318,11 @@ export default {
     try {
       if (url.pathname === "/.well-known/oauth-protected-resource" && request.method === "GET") {
         const baseUrl = mcpBaseUrl(url);
-        return mcpJson({ resource: `${baseUrl}/mcp`, authorization_servers: [baseUrl], scopes_supported: [MCP_SCOPE], resource_documentation: `${baseUrl}/mcp` });
+        return mcpJson({ resource: `${baseUrl}/mcp`, authorization_servers: [baseUrl], scopes_supported: mcpScopes(env), resource_documentation: `${baseUrl}/mcp` });
       }
       if (url.pathname === "/.well-known/oauth-authorization-server" && request.method === "GET") {
         const baseUrl = mcpBaseUrl(url);
-        return mcpJson({ issuer: baseUrl, authorization_endpoint: `${baseUrl}/oauth/authorize`, token_endpoint: `${baseUrl}/oauth/token`, registration_endpoint: `${baseUrl}/oauth/register`, revocation_endpoint: `${baseUrl}/oauth/revoke`, revocation_endpoint_auth_methods_supported: ["none"], response_types_supported: ["code"], grant_types_supported: ["authorization_code", "refresh_token"], token_endpoint_auth_methods_supported: ["none"], code_challenge_methods_supported: ["S256"], scopes_supported: [MCP_SCOPE] });
+        return mcpJson({ issuer: baseUrl, authorization_endpoint: `${baseUrl}/oauth/authorize`, token_endpoint: `${baseUrl}/oauth/token`, registration_endpoint: `${baseUrl}/oauth/register`, revocation_endpoint: `${baseUrl}/oauth/revoke`, revocation_endpoint_auth_methods_supported: ["none"], response_types_supported: ["code"], grant_types_supported: ["authorization_code", "refresh_token"], token_endpoint_auth_methods_supported: ["none"], code_challenge_methods_supported: ["S256"], scopes_supported: mcpScopes(env) });
       }
       if (url.pathname === "/oauth/register" && request.method === "POST") return registerMcpOAuthClient(request, env);
       if (url.pathname === "/oauth/authorize" && ["GET", "POST"].includes(request.method)) return await authorizeMcpClient(request, env, url);

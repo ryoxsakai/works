@@ -1,3 +1,5 @@
+import { commitKdpMutation } from "./kdp-mutations.js";
+
 export const KDP_SCHEMA = [
   "CREATE TABLE IF NOT EXISTS kdp_books (id TEXT PRIMARY KEY, title TEXT NOT NULL DEFAULT '', subtitle TEXT NOT NULL DEFAULT '', author TEXT NOT NULL DEFAULT '', language TEXT NOT NULL DEFAULT 'en', audience TEXT NOT NULL DEFAULT '', description TEXT NOT NULL DEFAULT '', archived INTEGER NOT NULL DEFAULT 0, revision INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')));",
   "CREATE TABLE IF NOT EXISTS kdp_chapters (id TEXT PRIMARY KEY, book_id TEXT NOT NULL REFERENCES kdp_books(id), title TEXT NOT NULL DEFAULT '', sort_order INTEGER NOT NULL DEFAULT 0, archived INTEGER NOT NULL DEFAULT 0, revision INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')));",
@@ -209,11 +211,11 @@ function activeParent(type) {
     return "EXISTS (SELECT 1 FROM kdp_sections s JOIN kdp_chapters c ON c.id=s.chapter_id JOIN kdp_books b ON b.id=c.book_id WHERE s.id=kdp_sources.section_id AND s.archived=0 AND c.archived=0 AND b.archived=0)";
   return "1=1";
 }
-async function create(db, type, data, parent) {
+async function create(db, type, data, parent, receipt, parentRevision) {
   const values = validate(data, fields[type]);
   if (type === "sources" && !values.url) fail(400, "Source URL is required");
   if (parent) {
-    await assertActive(
+    const currentParent = await assertActive(
       db,
       parent.key === "book_id"
         ? "books"
@@ -222,6 +224,11 @@ async function create(db, type, data, parent) {
           : "sections",
       parent.id,
     );
+    if (parentRevision !== undefined) {
+      revision(parentRevision);
+      if (currentParent.revision !== parentRevision)
+        fail(409, "Parent revision conflict; reload before creating");
+    }
     values[parent.key] = parent.id;
     const count = await db
       .prepare(`SELECT count(*) AS n FROM kdp_${type} WHERE ${parent.key}=?`)
@@ -236,18 +243,35 @@ async function create(db, type, data, parent) {
   }
   const id = crypto.randomUUID();
   const keys = ["id", ...Object.keys(values)];
-  const guard = parent
+  let guard = parent
     ? activeParent(type).replace(`kdp_${type}.${parent.key}`, "?")
     : "1=1";
   const args = [id, ...Object.values(values), ...(parent ? [parent.id] : [])];
-  const inserted = await db
-    .prepare(
+  // Recheck quotas and the caller's parent revision inside the same write.
+  guard += parent
+    ? ` AND (SELECT count(*) FROM kdp_${type} WHERE ${parent.key}=?)<1000`
+    : " AND (SELECT count(*) FROM kdp_books)<1000";
+  if (parent) args.push(parent.id);
+  if (parentRevision !== undefined) {
+    const parentType = parent.key === "book_id" ? "books" : "chapters";
+    guard += ` AND EXISTS (SELECT 1 FROM kdp_${parentType} WHERE id=? AND revision=?)`;
+    args.push(parent.id, parentRevision);
+  }
+  const statement = db.prepare(
       `INSERT INTO kdp_${type} (${keys.join(",")}) SELECT ${keys.map(() => "?").join(",")} WHERE ${guard} RETURNING id`,
     )
-    .bind(...args)
-    .first();
-  if (!inserted) fail(409, "Parent was archived; reload before creating");
+    .bind(...args);
+  const result = await commitKdpMutation(db, [statement], receipt, [
+    { key: type.slice(0, -1), type, id, revision: 1 },
+  ]);
+  if (result.replay) return result.replay[type.slice(0, -1)];
+  if (!result.results[0].results[0])
+    fail(409, "Parent revision, archive state or item limit changed; reload before creating");
   return row(db, type, id);
+}
+export async function createKdpEntity(env, type, data, parent, receipt, parentRevision) {
+  await ensureKdpSchema(env.DB);
+  return { [type.slice(0, -1)]: await create(env.DB, type, data, parent, receipt, parentRevision) };
 }
 async function update(db, type, id, data) {
   revision(data.revision);
@@ -342,25 +366,33 @@ export async function createProposal(env, id, data) {
     proposal: r,
   };
 }
-async function decide(db, id, data, accept) {
+async function decide(db, id, data, accept, receipt) {
   revision(data.revision);
   const p = await row(db, "proposals", id);
   if (p.revision !== data.revision || p.status !== "pending")
     fail(409, "Proposal already changed");
+  if (data.base_revision !== undefined) {
+    revision(data.base_revision);
+    if (data.base_revision !== p.base_revision)
+      fail(409, "Proposal base revision mismatch; read the section before deciding");
+  }
   if (!accept) {
-    const r = await db
+    const result = await commitKdpMutation(db, [db
       .prepare(
         "UPDATE kdp_proposals SET status='rejected',revision=revision+1,updated_at=datetime('now') WHERE id=? AND revision=? AND status='pending' RETURNING *",
       )
-      .bind(id, data.revision)
-      .first();
+      .bind(id, data.revision)], receipt, [
+        { key: "proposal", type: "proposals", id, revision: data.revision + 1 },
+      ]);
+    if (result.replay) return result.replay;
+    const r = result.results[0].results[0];
     if (!r) fail(409, "Proposal already changed");
     return {
       proposal: r,
     };
   }
   await assertActive(db, "sections", p.section_id);
-  const result = await db.batch([
+  const committed = await commitKdpMutation(db, [
     db
       .prepare(
         "UPDATE kdp_sections SET body=?,revision=revision+1,updated_at=datetime('now') WHERE id=? AND revision=? AND archived=0 AND EXISTS (SELECT 1 FROM kdp_chapters c JOIN kdp_books b ON b.id=c.book_id WHERE c.id=kdp_sections.chapter_id AND c.archived=0 AND b.archived=0) AND EXISTS (SELECT 1 FROM kdp_proposals WHERE id=? AND revision=? AND status='pending') RETURNING *",
@@ -371,7 +403,12 @@ async function decide(db, id, data, accept) {
         "UPDATE kdp_proposals SET status='accepted',revision=revision+1,updated_at=datetime('now') WHERE id=? AND revision=? AND status='pending' AND changes()=1 RETURNING *",
       )
       .bind(id, data.revision),
+  ], receipt, [
+    { key: "section", type: "sections", id: p.section_id, revision: p.base_revision + 1 },
+    { key: "proposal", type: "proposals", id, revision: data.revision + 1 },
   ]);
+  if (committed.replay) return committed.replay;
+  const result = committed.results;
   const section = result[0].results?.[0],
     proposal = result[1].results?.[0];
   if (!section || !proposal)
@@ -380,6 +417,10 @@ async function decide(db, id, data, accept) {
     section,
     proposal,
   };
+}
+export async function decideKdpProposal(env, id, data, accept, receipt) {
+  await ensureKdpSchema(env.DB);
+  return decide(env.DB, id, data, accept, receipt);
 }
 export const KDP_EXPORT_PREFLIGHT_SQL = `WITH chapter_ids AS (SELECT id FROM kdp_chapters WHERE book_id=?),
   section_ids AS (SELECT id FROM kdp_sections WHERE chapter_id IN (SELECT id FROM chapter_ids)),
