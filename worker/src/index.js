@@ -2,6 +2,57 @@ import { kdpTools, kdpWriteTools, availableKdpTools, callKdpTool, handleKdp } fr
 import { MCP_SCOPE, KDP_WRITE_SCOPE, mcpScopes, canonicalMcpScope, supportedMcpScope } from "./mcp-scopes.js";
 import { ensureRefreshSchema, issueRefreshGrant, readRefreshFamily, rotateRefreshGrant, revokeRefreshGrant } from "./oauth-refresh.js";
 
+// Best-effort per-isolate protection: Cloudflare client IP only, no credentials.
+const authBuckets = new Map();
+const AUTH_INPUT_BYTES = 16 * 1024;
+const AUTH_QUERY_BYTES = 8 * 1024;
+const AUTH_BUCKET_LIMIT = 4096;
+function authEndpoint(path) {
+  return ["/oauth/register", "/oauth/authorize", "/oauth/logout", "/oauth/token", "/oauth/revoke", "/api/auth/callback"].includes(path);
+}
+function consumeAuthBudget(request, path, now = Date.now()) {
+  const ip = request.headers.get("CF-Connecting-IP");
+  if (!ip) return true; // No trustworthy client IP in local/non-Cloudflare hosting.
+  const limit = path === "/oauth/register" ? 30 : path === "/oauth/token" ? 240 : 120;
+  const key = `${path}:${ip}`;
+  let bucket = authBuckets.get(key);
+  if (!bucket) {
+    for (const [entry, value] of authBuckets) if (now - value.at >= 60000) authBuckets.delete(entry);
+    if (authBuckets.size >= AUTH_BUCKET_LIMIT) authBuckets.delete(authBuckets.keys().next().value);
+    bucket = { tokens: limit, at: now };
+    authBuckets.set(key, bucket);
+  }
+  bucket.tokens = Math.min(limit, bucket.tokens + Math.max(0, now - bucket.at) * limit / 60000);
+  bucket.at = now;
+  if (bucket.tokens < 1) return false;
+  bucket.tokens -= 1;
+  return true;
+}
+async function boundedAuthRequest(request) {
+  if (!request.body) return request;
+  const length = request.headers.get("Content-Length");
+  if (length && Number(length) > AUTH_INPUT_BYTES) throw httpError(413, "authentication input too large");
+  const reader = request.body.getReader();
+  const chunks = [];
+  let size = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > AUTH_INPUT_BYTES) {
+        await reader.cancel();
+        throw httpError(413, "authentication input too large");
+      }
+      chunks.push(value);
+    }
+  } finally { reader.releaseLock(); }
+  const body = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) { body.set(chunk, offset); offset += chunk.byteLength; }
+  return new Request(request, { body });
+}
+
 function corsHeaders(origin) {
   return {
     "Access-Control-Allow-Origin": origin,
@@ -65,6 +116,11 @@ const MCP_AUTH_CODE_MAX_AGE_MS = 5 * 60 * 1000;
 function mcpBaseUrl(url) { return `${url.protocol}//${url.host}`; }
 function mcpJson(payload, status = 200, extraHeaders = {}) {
   return new Response(JSON.stringify(payload), { status, headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", ...extraHeaders } });
+}
+function authJson(path, headers, payload, status, extra = {}) {
+  return path === "/api/auth/callback"
+    ? json(payload, { ...headers, "Cache-Control": "no-store", ...extra }, status)
+    : mcpJson(payload, status, extra);
 }
 function html(body, status = 200) {
   return new Response(body, { status, headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'", "X-Frame-Options": "DENY", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "same-origin" } });
@@ -289,10 +345,11 @@ async function verifyMcpAccessToken(request, env) {
   const match = (request.headers.get("Authorization") || "").match(/^Bearer (.+)$/);
   if (!match) throw httpError(401, "missing MCP bearer token");
   const [payloadB64, sig] = match[1].split(".");
-  if (!payloadB64 || !sig || sig !== await hmacSign(env, payloadB64)) throw httpError(401, "invalid MCP bearer token");
+  if (!payloadB64 || !sig || !(await constantTimeEqual(sig, await hmacSign(env, payloadB64)))) throw httpError(401, "invalid MCP bearer token");
   let payload; try { payload = JSON.parse(fromBase64Url(payloadB64)); } catch { throw httpError(401, "invalid MCP bearer token"); }
-  if (payload.aud !== "works-mcp" || payload.exp < Date.now() || payload.email?.toLowerCase() !== env.ALLOWED_EMAIL.toLowerCase() || !String(payload.scope || "").split(" ").includes(MCP_SCOPE)) throw httpError(401, "invalid MCP bearer token");
-  if (payload.fid) {
+  if (payload.aud !== "works-mcp" || (!Number.isFinite(payload.exp) || payload.exp < Date.now()) || typeof payload.email !== "string" || payload.email.toLowerCase() !== env.ALLOWED_EMAIL.toLowerCase() || canonicalMcpScope(payload.scope) !== payload.scope) throw httpError(401, "invalid MCP bearer token");
+  if (Object.hasOwn(payload, "fid")) {
+    if (typeof payload.fid !== "string" || !payload.fid) throw httpError(401, "invalid MCP bearer token");
     const family = await readRefreshFamily(env, new URL(request.url).origin, payload.fid);
     if (!family || family.scope !== payload.scope) throw httpError(401, "invalid MCP bearer token");
   }
@@ -3620,7 +3677,7 @@ async function verifySession(request, env) {
   const [payloadB64, sig] = match[1].split(".");
   if (!payloadB64 || !sig) throw new Error("invalid session");
   const expectedSig = await hmacSign(env, payloadB64);
-  if (sig !== expectedSig) throw new Error("invalid session");
+  if (!(await constantTimeEqual(sig, expectedSig))) throw new Error("invalid session");
 
   let payload;
   try {
@@ -3628,6 +3685,8 @@ async function verifySession(request, env) {
   } catch {
     throw new Error("invalid session");
   }
+  // Existing browser sessions have email/exp only. Reject MCP claims even when empty.
+  if (["aud", "scope", "fid"].some(name => Object.hasOwn(payload, name))) throw new Error("invalid session");
   if (!payload.email || !payload.exp || payload.exp < Date.now()) {
     throw new Error("session expired");
   }
@@ -3637,20 +3696,26 @@ async function verifySession(request, env) {
   return payload;
 }
 
+async function googleTokenRequest(params, message) {
+  try {
+    const res = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: params,
+      redirect: "error",
+    });
+    if (!res.ok) throw new Error("upstream failure");
+    return await res.json();
+  } catch {
+    // Network errors, parser errors and upstream bodies may carry credentials.
+    throw httpError(502, message);
+  }
+}
 async function exchangeAuthCode(env, code, redirectUri) {
-  const res = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      code,
-      client_id: env.GOOGLE_CLIENT_ID,
-      client_secret: env.GOOGLE_CLIENT_SECRET,
-      redirect_uri: redirectUri,
-      grant_type: "authorization_code",
-    }),
-  });
-  if (!res.ok) throw new Error(`Googleとのトークン交換に失敗しました: ${await res.text()}`);
-  return res.json();
+  return googleTokenRequest(new URLSearchParams({
+    code, client_id: env.GOOGLE_CLIENT_ID, client_secret: env.GOOGLE_CLIENT_SECRET,
+    redirect_uri: redirectUri, grant_type: "authorization_code",
+  }), "Googleとのトークン交換に失敗しました");
 }
 
 function decodeIdToken(idToken) {
@@ -3676,8 +3741,11 @@ async function clearRefreshToken(env) {
   const refreshToken = await loadRefreshToken(env);
   if (refreshToken) {
     try {
-      await fetch(`https://oauth2.googleapis.com/revoke?token=${encodeURIComponent(refreshToken)}`, {
+      await fetch("https://oauth2.googleapis.com/revoke", {
         method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ token: refreshToken }),
+        redirect: "error",
       });
     } catch {
       // revoke失敗はログアウト自体を妨げない(サーバー側の保存分は次で消す)
@@ -3693,18 +3761,10 @@ async function mintGoogleAccessToken(env) {
   if (!refreshToken) {
     throw new Error("Googleカレンダーへの認可がありません。再度ログインしてください。");
   }
-  const res = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      refresh_token: refreshToken,
-      client_id: env.GOOGLE_CLIENT_ID,
-      client_secret: env.GOOGLE_CLIENT_SECRET,
-      grant_type: "refresh_token",
-    }),
-  });
-  if (!res.ok) throw new Error(`アクセストークンの更新に失敗しました: ${await res.text()}`);
-  return res.json();
+  return googleTokenRequest(new URLSearchParams({
+    refresh_token: refreshToken, client_id: env.GOOGLE_CLIENT_ID,
+    client_secret: env.GOOGLE_CLIENT_SECRET, grant_type: "refresh_token",
+  }), "アクセストークンの更新に失敗しました");
 }
 
 async function readStudents(env) {
@@ -5316,6 +5376,11 @@ export default {
     const url = new URL(request.url);
 
     try {
+      if (authEndpoint(url.pathname)) {
+        if (new TextEncoder().encode(url.search).byteLength > AUTH_QUERY_BYTES) return authJson(url.pathname, headers, { error: "authentication input too large" }, 413);
+        if (!consumeAuthBudget(request, url.pathname)) return authJson(url.pathname, headers, { error: "too_many_requests" }, 429, { "Retry-After": url.pathname === "/oauth/register" ? "2" : "1" });
+        request = await boundedAuthRequest(request);
+      }
       if (url.pathname === "/.well-known/oauth-protected-resource" && request.method === "GET") {
         const baseUrl = mcpBaseUrl(url);
         return mcpJson({ resource: `${baseUrl}/mcp`, authorization_servers: [baseUrl], scopes_supported: mcpScopes(env), resource_documentation: `${baseUrl}/mcp` });
@@ -5324,10 +5389,10 @@ export default {
         const baseUrl = mcpBaseUrl(url);
         return mcpJson({ issuer: baseUrl, authorization_endpoint: `${baseUrl}/oauth/authorize`, token_endpoint: `${baseUrl}/oauth/token`, registration_endpoint: `${baseUrl}/oauth/register`, revocation_endpoint: `${baseUrl}/oauth/revoke`, revocation_endpoint_auth_methods_supported: ["none"], response_types_supported: ["code"], grant_types_supported: ["authorization_code", "refresh_token"], token_endpoint_auth_methods_supported: ["none"], code_challenge_methods_supported: ["S256"], scopes_supported: mcpScopes(env) });
       }
-      if (url.pathname === "/oauth/register" && request.method === "POST") return registerMcpOAuthClient(request, env);
+      if (url.pathname === "/oauth/register" && request.method === "POST") return await registerMcpOAuthClient(request, env);
       if (url.pathname === "/oauth/authorize" && ["GET", "POST"].includes(request.method)) return await authorizeMcpClient(request, env, url);
       if (url.pathname === "/oauth/logout" && ["GET", "POST"].includes(request.method)) return await logoutMcpBrowser(request, env, url);
-      if (url.pathname === "/oauth/token" && request.method === "POST") return exchangeMcpToken(request, env);
+      if (url.pathname === "/oauth/token" && request.method === "POST") return await exchangeMcpToken(request, env);
       if (url.pathname === "/oauth/revoke" && request.method === "POST") {
         await ensureMcpOAuthSchema(env);
         const params = new URLSearchParams(await request.text());
@@ -5797,6 +5862,10 @@ export default {
         "session expired",
       ];
       const status = Number.isInteger(err.status) ? err.status : authErrors.includes(err.message) ? 401 : 400;
+      if (authEndpoint(url.pathname)) {
+        if (status === 413) return authJson(url.pathname, headers, { error: "authentication input too large" }, 413);
+        return authJson(url.pathname, headers, { error: "authentication request failed" }, status === 502 ? 502 : 400);
+      }
       return json({ error: err.message }, headers, status);
     }
   },
