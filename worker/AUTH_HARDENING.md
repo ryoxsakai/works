@@ -59,3 +59,21 @@ API boundary, so prefer fixing forward if a compatibility problem appears.
   Reviewer also independently ran relevant authentication/KDP suites successfully.
 
 Production traffic, deployment state and external rate controls are unverified.
+
+## Worker redirect compatibility correction
+
+PR98 used `redirect: "error"` on Google token and revocation POSTs. Unlike Node's
+fetch, the deployed Workers runtime rejects that mode before sending a request.
+The caught runtime error prevented Google access-token renewal, including schedule
+reads, while MCP OAuth refresh itself continued to succeed. Replace those two
+options with `manual`; the token helper's non-2xx check rejects redirects without
+forwarding credentials. Keys, saved refresh tokens, grants and deadlines do not
+change, and users should retain their existing connection.
+
+The regression test runs the actual source inside workerd, with local D1 and
+network-disabled synthetic upstreams. It renews an existing-format MCP grant in
+parallel, recovers the same successor, preserves expiry and reads a schedule using
+an already stored Google refresh credential. It also checks that Google 302/307
+responses never send a request to Location, and revocation uses form-body POST.
+The original Node-level mocks remain useful for redaction but cannot establish
+Workers option compatibility. This test is included by the existing npm test glob.

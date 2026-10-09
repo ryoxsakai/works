@@ -68,7 +68,7 @@ test("Google failures are redacted and revocation carries its token only in POST
   t.after(() => { globalThis.fetch = previous; });
   const env = { SESSION_SECRET: secret, ALLOWED_EMAIL: "owner@example.test", ALLOWED_ORIGIN: origin, DB: { prepare(sql) { return { first: async () => ({ refresh_token: "synthetic-refresh-private" }), run: async () => ({}) }; } } };
   globalThis.fetch = async (url, options) => {
-    assert.equal(options.redirect, "error");
+    assert.equal(options.redirect, "manual");
     return new Response("synthetic-upstream-private", { status: 400 });
   };
   const response = await worker.fetch(new Request(origin + "/api/google-token", { headers: { Authorization: "Bearer " + await token({}) } }), env);
@@ -90,7 +90,7 @@ test("Google failures are redacted and revocation carries its token only in POST
   globalThis.fetch = async (url, options) => {
     assert.equal(url, "https://oauth2.googleapis.com/revoke");
     assert.equal(options.method, "POST");
-    assert.equal(options.redirect, "error");
+    assert.equal(options.redirect, "manual");
     assert.equal(options.body.get("token"), "synthetic-refresh-private");
     revoked = true;
     return new Response("");
