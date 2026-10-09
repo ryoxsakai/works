@@ -3702,8 +3702,10 @@ async function googleTokenRequest(params, message) {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: params,
-      redirect: "error",
+      redirect: "manual",
     });
+    // Workers supports manual/follow; manual plus !ok rejects redirects without
+    // forwarding the form credentials to Location.
     if (!res.ok) throw new Error("upstream failure");
     return await res.json();
   } catch {
@@ -3745,7 +3747,7 @@ async function clearRefreshToken(env) {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({ token: refreshToken }),
-        redirect: "error",
+        redirect: "manual",
       });
     } catch {
       // revoke失敗はログアウト自体を妨げない(サーバー側の保存分は次で消す)
