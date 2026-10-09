@@ -11,7 +11,7 @@ test("OAuth refresh grants rotate safely for a fixed thirty days", async t => {
   const origin = "https://works.example.test";
   const callback = "https://client.example.test/callback";
   const env = { DB, WORKS_API_KEY: "synthetic-only-key", SESSION_SECRET: "synthetic-only-secret", ALLOWED_EMAIL: "owner@example.test", ALLOWED_ORIGIN: origin };
-  const call = (path, body, overrides = {}) => worker.fetch(new Request(origin + path, { method: body ? "POST" : "GET", headers: body ? { "Content-Type": "application/x-www-form-urlencoded" } : {}, body: body?.toString() }), { ...env, ...overrides });
+  const call = (path, body, overrides = {}) => worker.fetch(new Request(origin + path, { method: body ? "POST" : "GET", headers: body ? { "Content-Type": "application/x-www-form-urlencoded", "CF-Connecting-IP": "192.0.2.80" } : {}, body: body?.toString() }), { ...env, ...overrides });
   const registered = await worker.fetch(new Request(origin + "/oauth/register", { method: "POST", body: JSON.stringify({ redirect_uris: [callback] }) }), env);
   const { client_id: clientId, grant_types: types } = await registered.json();
   assert.ok(types.includes("refresh_token"));
@@ -110,6 +110,8 @@ test("OAuth refresh grants rotate safely for a fixed thirty days", async t => {
   });
   await t.test("revocation is client-bound, idempotent and rejects issued access", async () => {
     const tokens = await issue();
+    const browserApi = path => worker.fetch(new Request(origin + path, { headers: { Authorization: "Bearer " + tokens.access_token } }), env);
+    for (const path of ["/api/todo", "/api/google-token"]) assert.equal((await browserApi(path)).status, 401);
     const revoke = client => call("/oauth/revoke", new URLSearchParams({ token: tokens.refresh_token, client_id: client }));
     assert.equal((await revoke("other")).status, 200);
     assert.notEqual((await access(tokens.access_token)).status, 401);
@@ -118,11 +120,12 @@ test("OAuth refresh grants rotate safely for a fixed thirty days", async t => {
     assert.equal((await refresh(tokens.refresh_token)).status, 400);
     assert.equal((await access(tokens.access_token)).status, 401);
     assert.equal((await call("/oauth/revoke", new URLSearchParams({ token: "unknown", client_id: clientId }))).status, 200);
+    for (const path of ["/api/todo", "/api/google-token"]) assert.equal((await browserApi(path)).status, 401);
   });
   await t.test("transaction failure rolls back code consumption and token creation", async () => {
     const code = await seedCode();
     const failing = { prepare: (...args) => DB.prepare(...args), batch: async statements => { if (statements.length === 3) return DB.batch([...statements, DB.prepare("INSERT INTO missing_synthetic_table VALUES (1)")]); return DB.batch(statements); } };
-    await assert.rejects(call("/oauth/token", exchangeParams(code), { DB: failing }));
+    assert.equal((await call("/oauth/token", exchangeParams(code), { DB: failing })).status, 400);
     assert.ok(await DB.prepare("SELECT code FROM mcp_oauth_codes WHERE code = ?").bind(code).first());
     assert.equal((await call("/oauth/token", exchangeParams(code))).status, 200);
   });
