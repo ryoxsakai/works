@@ -1669,7 +1669,7 @@ button:has(> i:only-child) {
 }
 
 .record-panel .curriculum-table th {
-  background: #ffffff;
+  background: var(--bg-elevated);
 }
 
 .record-panel .record-student-link {
@@ -1822,7 +1822,7 @@ button:has(> i:only-child) {
   padding: .75rem;
   border: 1px solid var(--border);
   border-radius: .6rem;
-  background: #ffffff;
+  background: var(--bg-elevated);
   box-shadow: var(--card-shadow);
 }
 
@@ -1832,7 +1832,7 @@ button:has(> i:only-child) {
 
 #calendar-view .cal-cell {
   border-radius: .35rem;
-  background: #ffffff;
+  background: var(--bg-elevated);
 }
 
 #calendar-view .cal-cell-empty {
@@ -1903,12 +1903,12 @@ body {
   padding-bottom: .55rem;
 }
 
-/* 月間カレンダーは中身まで白で統一した、一枚のカードとして表示する */
+/* 月間カレンダーは共通テーマの一枚のカードとして表示する */
 #calendar-view {
   padding: .9rem;
-  background: #ffffff;
-  color: #1f2328;
-  border: 1px solid #e9eaec;
+  background: var(--bg-elevated);
+  color: var(--fg);
+  border: 1px solid var(--border);
   border-radius: .55rem;
   box-shadow: var(--card-shadow);
   overflow: hidden;
@@ -1916,40 +1916,40 @@ body {
 
 #calendar-view .calendar-nav,
 #calendar-view .calendar-grid {
-  background: #ffffff;
+  background: var(--bg-elevated);
 }
 
 #calendar-view .calendar-grid {
   padding: .35rem;
-  border: 1px solid #eef0f3;
+  border: 1px solid var(--border);
   border-radius: .4rem;
   gap: .25rem;
 }
 
 #calendar-view .cal-weekday {
-  color: #6b7280;
+  color: var(--muted);
 }
 
 #calendar-view .cal-cell {
-  background: #ffffff;
-  border-color: #e9eaec;
+  background: var(--bg-elevated);
+  border-color: var(--border);
 }
 
 #calendar-view .cal-cell-empty {
-  background: #ffffff;
+  background: var(--bg-elevated);
   border-color: transparent;
 }
 
 #calendar-view .cal-day-num {
-  color: #1f2328;
+  color: var(--fg);
 }
 
 #calendar-view .cal-event {
-  color: #1f2328;
+  color: var(--fg);
 }
 
 #calendar-view .cal-more {
-  color: #6b7280;
+  color: var(--muted);
 }
 
 
@@ -2384,11 +2384,11 @@ textarea:focus {
 /* カリキュラムの授業進行表は、授業記録表と同じフラットな表面にそろえる */
 .curriculum-panel .progress-section .table-scroll {
   padding: 0;
-  background: #ffffff;
+  background: var(--bg-elevated);
 }
 
 .curriculum-panel .progress-section .curriculum-table th {
-  background: #ffffff;
+  background: var(--bg-elevated);
 }
 
 
@@ -2507,7 +2507,7 @@ textarea,
 
 .record-panel #record-table .record-empty-slot td {
   padding: .34rem .65rem;
-  background: color-mix(in srgb, #ffffff 94%, var(--record-calendar-accent) 6%);
+  background: color-mix(in srgb, var(--bg-elevated) 94%, var(--record-calendar-accent) 6%);
   vertical-align: middle;
 }
 
@@ -2623,7 +2623,7 @@ textarea,
   padding: 0 .55rem;
   border: 1px solid var(--border);
   border-radius: .4rem;
-  background: #fbfbfc;
+  background: var(--bg-hover);
   color: var(--muted);
 }
 
@@ -2834,7 +2834,7 @@ textarea,
 .material-upload-folder select,
 .material-dialog-field input {
   width: 100%;
-  background: #fbfbfc;
+  background: var(--bg-hover);
   font-size: .82rem;
 }
 
@@ -3044,14 +3044,14 @@ textarea,
   min-height: min(68vh, 680px);
   max-height: 78vh;
   overflow: auto;
-  background: #f7f8fa;
+  background: var(--bg-hover);
 }
 
 .material-pdf-preview {
   width: 100%;
   height: min(72vh, 760px);
   border: 0;
-  background: #ffffff;
+  background: var(--bg-elevated);
 }
 
 .material-image-preview {
@@ -3077,8 +3077,8 @@ textarea,
   margin: 0;
   padding: 1rem;
   overflow: auto;
-  color: #1f2328;
-  background: #ffffff;
+  color: var(--fg);
+  background: var(--bg-elevated);
   font: 400 .78rem/1.65 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   white-space: pre-wrap;
   word-break: break-word;

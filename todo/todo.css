@@ -186,3 +186,12 @@
   .todo-heading { margin-bottom: .75rem; }
   .todo-panel #form-toggle { padding: .8rem 1rem; }
 }
+
+/* Neutral utility surfaces also follow the shared palette inside task modals. */
+.todo-page .bg-white { background: var(--bg-elevated) !important; }
+.todo-page .bg-gray-50,
+.todo-page .bg-gray-100,
+.todo-page .bg-slate-50,
+.todo-page .bg-slate-100 { background: var(--bg-hover) !important; }
+.todo-page .border-gray-300,
+.todo-page .border-slate-300 { border-color: var(--border) !important; }

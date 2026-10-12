@@ -3,26 +3,24 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>個人Wiki | Works</title>
-    <script>
-      try {
-        const t = localStorage.getItem("works_theme");
-        if (t === "light" || t === "dark")
-          document.documentElement.dataset.theme = t;
-      } catch {}
-    </script>
-    <link rel="stylesheet" href="/shared/styles.css?v=55" />
+    <title>Wiki | Works</title>
+    <script src="/shared/theme-init.js?v=1"></script>
+    <link rel="stylesheet" href="/shared/styles.css?v=56" />
     <link rel="stylesheet" href="/wiki/wiki.css?v=2" />
-  </head>
+    <link rel="stylesheet" href="/shared/header.css?v=1" />
+  <script type="module" src="/shared/header.js?v=1"></script>
+</head>
   <body>
-    <header class="page-header">
-      <h1><a href="/">Works</a> / 個人Wiki</h1>
-      <button id="sign-out" hidden>ログアウト</button>
-    </header>
+    <header class="page-header works-header">
+    <h1><a class="works-home" href="/" aria-label="Works ホーム"><span class="page-header-icon" aria-hidden="true">W</span><span>Works</span></a><span class="works-page-title">Wiki</span></h1>
+    <div class="works-header-actions">
+      <button id="sign-out" type="button" class="user-icon-btn" aria-label="ログアウト" title="ログアウト" hidden><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="9" r="3"/><path d="M5.5 18c1-3 3-4.5 6.5-4.5s5.5 1.5 6.5 4.5"/></svg></button>
+    </div>
+  </header>
     <main>
       <p id="message" role="status" aria-live="polite"></p>
       <section id="login" hidden>
-        <h2>個人Wiki</h2>
+        <h2>Wiki</h2>
         <p>原本を残したまま、知識と出典を整理します。</p>
         <button id="sign-in">Worksにログイン</button>
       </section>
@@ -98,6 +96,6 @@
       </section>
     </main>
     <script type="module" src="/wiki/app.js"></script>
-    <script type="module" src="/shared/theme.js"></script>
+    <script type="module" src="/shared/theme.js?v=6"></script>
   </body>
 </html>

@@ -11,7 +11,8 @@
     "test:kdp:browser": "node test/kdp-ui.browser.mjs",
     "test:ss:browser": "node test/ss-ui.browser.mjs",
     "wiki:migrate": "node scripts-wiki-migrate.mjs",
-    "test:wiki:browser": "node test/wiki-ui.browser.mjs"
+    "test:wiki:browser": "node test/wiki-ui.browser.mjs",
+    "test:header:browser": "node test/header-theme.browser.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",

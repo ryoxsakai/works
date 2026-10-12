@@ -27,6 +27,7 @@ jobs:
       - run: npm run test:kdp:browser
       - run: npm run test:ss:browser
       - run: npm run test:wiki:browser
+      - run: npm run test:header:browser
       - name: Upload synthetic screenshots
         if: always()
         uses: actions/upload-artifact@v4
