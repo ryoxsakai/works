@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>個人Wiki | Works</title>
+    <link rel="stylesheet" href="/shared/styles.css?v=55" />
+    <link rel="stylesheet" href="/wiki/wiki.css" />
+  </head>
+  <body>
+    <header class="page-header">
+      <h1><a href="/">Works</a> / 個人Wiki</h1>
+      <button id="sign-out" hidden>ログアウト</button>
+    </header>
+    <main>
+      <p id="message" role="status" aria-live="polite"></p>
+      <section id="login" hidden>
+        <h2>個人Wiki</h2>
+        <p>原本を残したまま、知識と出典を整理します。</p>
+        <button id="sign-in">Worksにログイン</button>
+      </section>
+      <section id="workspace" hidden>
+        <div class="toolbar">
+          <input
+            id="search"
+            type="search"
+            placeholder="本文・タイトル・タグ・別名を検索"
+            aria-label="Wiki検索"
+          /><button id="find">検索</button
+          ><button id="new">＋ 新規ページ</button>
+        </div>
+        <label><input id="archives" type="checkbox" /> アーカイブも表示</label>
+        <div class="layout">
+          <aside>
+            <div id="pages"></div>
+            <button id="more" hidden>続きを表示</button>
+          </aside>
+          <section id="detail" hidden>
+            <div class="toolbar">
+              <h2 id="title"></h2>
+              <button id="edit">編集</button
+              ><button id="archive">アーカイブ</button
+              ><button data-export="markdown">Markdown</button
+              ><button data-export="json">JSON</button>
+            </div>
+            <p id="meta"></p>
+            <article id="body"></article>
+            <h3>出典</h3>
+            <div id="sources"></div>
+            <h3>関連ページ</h3>
+            <div id="links"></div>
+            <h3>改稿案</h3>
+            <div id="proposals"></div>
+            <h3>履歴・比較・復元</h3>
+            <div id="history"></div>
+            <button id="more-history" hidden>さらに履歴を表示</button>
+            <div id="comparison"></div>
+          </section>
+        </div>
+        <form id="editor" hidden>
+          <h2 id="editor-heading">ページ編集</h2>
+          <label>タイトル<input name="title" required maxlength="300" /></label
+          ><label
+            >本文（Markdown・HTML不可）<textarea
+              name="body"
+              rows="14"
+              maxlength="100000"
+            ></textarea></label
+          ><label>タグ（カンマ区切り）<input name="tags" /></label
+          ><label>別名（カンマ区切り）<input name="aliases" /></label
+          ><label>関連ページID（カンマ区切り）<input name="links" /></label
+          ><label
+            >状態<select name="status">
+              <option value="draft">下書き</option>
+              <option value="confirmed">確認済み（出典必須）</option>
+            </select></label
+          >
+          <label
+            >改稿案メモ<input id="proposal-notes" maxlength="3000"
+          /></label>
+          <h3>出典</h3>
+          <p>原本を確認し、種別・IDまたはURL・箇所・確認日を入力します。</p>
+          <div id="source-fields"></div>
+          <button id="add-source" type="button">＋ 出典</button>
+          <div class="toolbar">
+            <button type="submit">本文として保存</button
+            ><button id="propose" type="button">改稿案として保存</button
+            ><button id="cancel" type="button">キャンセル</button>
+          </div>
+        </form>
+      </section>
+    </main>
+    <script type="module" src="/wiki/app.js"></script>
+    <script type="module" src="/shared/theme.js"></script>
+  </body>
+</html>

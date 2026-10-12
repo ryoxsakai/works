@@ -14,7 +14,7 @@ const els = {
 };
 
 const PENDING_DESTINATION_KEY = "works_pending_destination";
-const SAFE_DESTINATION_RE = /^(?:\/|\/(?:tutor|material|material-print|admission|ss|todo|kdp)\/)$/;
+const SAFE_DESTINATION_RE = /^(?:\/|\/(?:tutor|material|material-print|admission|ss|todo|kdp|wiki)\/)$/;
 
 let authState = "checking";
 let resolveAuthState;
