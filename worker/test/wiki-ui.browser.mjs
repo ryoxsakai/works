@@ -57,7 +57,9 @@ try {
   }
   browser = await chromium.launch({
     headless: true,
-    executablePath: process.env.BROWSER_EXECUTABLE || "/usr/bin/chromium",
+    ...(process.env.BROWSER_EXECUTABLE
+      ? { executablePath: process.env.BROWSER_EXECUTABLE }
+      : {}),
   });
   await mkdir("test-artifacts", { recursive: true });
   for (const [name, viewport] of [
