@@ -23,10 +23,11 @@ export const watchAuth = ({onSignedIn,onSignedOut}) => {
   // Synthetic origin: no production credentials, data, or external requests.
   await context.route('**/*', async r => {
     const url = new URL(r.request().url());
+    if (url.origin === 'https://www.googleapis.com') return r.fulfill({contentType:'application/json',body:'{"items":[]}'});
     if (url.origin !== base) return r.abort();
     if (url.pathname === '/shared/auth.js') return r.fulfill({contentType:'text/javascript',body:authStub});
     if (url.pathname.startsWith('/api/')) {
-      const isList = /^\/api\/(goal-templates|students|materials|calendars|records|curriculum|schedules|schedule-names)(\/|$)/.test(url.pathname);
+      const isList = /^\/api\/(goal-templates|students|materials|material-categories|periods|calendars|records|curriculum|schedules|schedule-names|ss-projects|admissions|material-library\/(folders|files))(\/|$)/.test(url.pathname);
       return r.fulfill({contentType:'application/json',body:JSON.stringify(isList ? [] : {items:[],books:[],pages:[],tasks:[],categories:[],calendars:[],events:[],files:[],folders:[],students:[],schedules:[],materials:[]})});
     }
     const file = path.join(root, decodeURIComponent(url.pathname) + (url.pathname.endsWith('/') ? 'index.html' : ''));
