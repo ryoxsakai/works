@@ -33,7 +33,7 @@ test("KDP reuses registered tutor callback and consumes only safe pending destin
     "localStorage",
     constants + "\n" + consume + "\nreturn consumePendingDestination();",
   );
-  for (const path of ["/kdp/", "/todo/", "/material-print/", "/tutor/", "/"]) {
+  for (const path of ["/wiki/", "/kdp/", "/todo/", "/material-print/", "/tutor/", "/"]) {
     let removed = false;
     assert.equal(
       run({
