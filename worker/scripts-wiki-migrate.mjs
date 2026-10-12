@@ -40,7 +40,7 @@ const r = spawnSync(
     "d1",
     "migrations",
     "apply",
-    id,
+    "WIKI_DB",
     mode,
   ],
   {

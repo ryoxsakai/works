@@ -56,7 +56,7 @@ test("Wiki migration guard rejects missing binding, old DB, duplicate UUID, wron
       "d1",
       "migrations",
       "apply",
-      id,
+      "WIKI_DB",
       "--local",
     ]);
   } finally {
