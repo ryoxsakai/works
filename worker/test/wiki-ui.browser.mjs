@@ -12,6 +12,119 @@ const mf = new Miniflare({
   compatibilityDate: "2026-08-01",
   d1Databases: { DB: "wiki-browser-auth", WIKI_DB: "wiki-browser" },
 });
+async function checkTheme(page, theme) {
+  let results;
+  const measure = () =>
+    page.evaluate(() => {
+      const canvas = document.createElement("canvas");
+      canvas.width = canvas.height = 1;
+      const ctx = canvas.getContext("2d");
+      const rgb = (c) => {
+        ctx.clearRect(0, 0, 1, 1);
+        ctx.fillStyle = c;
+        ctx.fillRect(0, 0, 1, 1);
+        return [...ctx.getImageData(0, 0, 1, 1).data]
+          .slice(0, 3)
+          .map((v) => v / 255);
+      };
+      const lum = (c) =>
+        c
+          .map((v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4))
+          .reduce((a, v, i) => a + v * [0.2126, 0.7152, 0.0722][i], 0);
+      const base = getComputedStyle(document.documentElement).getPropertyValue(
+        "--bg-elevated",
+      );
+      const checks = [
+        ...document.querySelectorAll(
+          ".source,.proposal,#history > div,#pages small,#detail p,#detail h1,#detail h2,#detail h3,#detail h4,#detail a,#detail button,#detail pre,#editor input,#editor select,#editor textarea,#editor label,#editor button,#message,#search",
+        ),
+      ]
+        .filter((e) => e.getClientRects().length && !e.disabled)
+        .map((e) => {
+          let a = e,
+            bg = base;
+          while (a) {
+            const c = getComputedStyle(a).backgroundColor;
+            if (c !== "rgba(0, 0, 0, 0)" && c !== "transparent") {
+              bg = c;
+              break;
+            }
+            a = a.parentElement;
+          }
+          const f = lum(rgb(getComputedStyle(e).color)),
+            b = lum(rgb(bg));
+          return {
+            element: e.id || e.tagName + ":" + e.getAttribute("name"),
+            foreground: getComputedStyle(e).color,
+            background: bg,
+            contrast: (Math.max(f, b) + 0.05) / (Math.min(f, b) + 0.05),
+          };
+        });
+      const search = document.querySelector("#search");
+      const placeholder = getComputedStyle(search, "::placeholder");
+      const p = lum(rgb(placeholder.color)),
+        b = lum(rgb(getComputedStyle(search).backgroundColor));
+      checks.push({
+        element: "search placeholder",
+        foreground: placeholder.color,
+        background: getComputedStyle(search).backgroundColor,
+        contrast: (Math.max(p, b) + 0.05) / (Math.min(p, b) + 0.05),
+      });
+      const focus = document.activeElement;
+      if (focus?.matches("textarea,input:not([type=checkbox])")) {
+        const style = getComputedStyle(focus);
+        if (style.outlineStyle === "solid") {
+          const f = lum(rgb(style.outlineColor)),
+            bg = lum(
+              rgb(
+                getComputedStyle(focus.parentElement).backgroundColor ===
+                  "rgba(0, 0, 0, 0)"
+                  ? base
+                  : getComputedStyle(focus.parentElement).backgroundColor,
+              ),
+            );
+          checks.push({
+            element: "focus outline",
+            contrast: (Math.max(f, bg) + 0.05) / (Math.min(f, bg) + 0.05),
+          });
+        }
+      }
+      return checks;
+    });
+  await expect
+    .poll(async () => {
+      results = await measure();
+      return results
+        .filter((r) => r.contrast < 4.5)
+        .map((r) => r.element + ":" + r.contrast)
+        .join(", ");
+    })
+    .toBe("");
+  assert.ok(results.length > 10);
+  for (const r of results)
+    assert.ok(
+      r.contrast >= 4.5,
+      `${theme} ${r.element} contrast ${r.contrast} ${r.foreground} / ${r.background}`,
+    );
+  assert.equal(
+    await page.evaluate(
+      () => getComputedStyle(document.documentElement).colorScheme,
+    ),
+    theme,
+  );
+  assert.equal(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth > innerWidth,
+    ),
+    false,
+  );
+}
+async function setTheme(page, value) {
+  await page.evaluate(async (theme) => {
+    const { setTheme } = await import("/shared/theme.js?v=5");
+    setTheme(theme);
+  }, value);
+}
 let browser;
 try {
   const env = {
@@ -63,15 +176,25 @@ try {
   });
   await mkdir("test-artifacts", { recursive: true });
   for (const [name, viewport] of [
-    ["desktop", { width: 1440, height: 1000 }],
-    ["mobile", { width: 390, height: 844 }],
+    ["desktop-light", { width: 1440, height: 1000 }],
+    ["desktop-dark", { width: 1440, height: 1000 }],
+    ["mobile-light", { width: 390, height: 844 }],
+    ["mobile-dark", { width: 390, height: 844 }],
   ]) {
     const context = await browser.newContext({
         viewport,
+        colorScheme: name.endsWith("dark") ? "light" : "dark",
         acceptDownloads: true,
       }),
       page = await context.newPage(),
       errors = [];
+    const selectedTheme = name.endsWith("dark") ? "dark" : "light";
+    await context.addInitScript((theme) => {
+      if (!sessionStorage.themeSeeded) {
+        localStorage.setItem("works_theme", theme);
+        sessionStorage.themeSeeded = "1";
+      }
+    }, selectedTheme);
     page.on("pageerror", (e) => errors.push(e.message));
     await context.route("**/*", async (route) => {
       const req = route.request(),
@@ -143,6 +266,56 @@ try {
     await expect(page.locator("#comparison")).toContainText(
       "proposed knowledge",
     );
+    const themePageId = await page
+      .locator("#pages button")
+      .filter({ hasText: name + " knowledge" })
+      .getAttribute("data-page");
+    await page.locator("#edit").click();
+    await page.locator("[name=body]").focus();
+    assert.equal(
+      await page
+        .locator("[name=body]")
+        .evaluate((e) => getComputedStyle(e).outlineStyle),
+      "solid",
+    );
+    await checkTheme(page, selectedTheme);
+    await page.locator("[name=title]").focus();
+    await checkTheme(page, selectedTheme);
+    await page.locator("#search").focus();
+    await checkTheme(page, selectedTheme);
+    await page.locator("[name=source-url]").focus();
+    await checkTheme(page, selectedTheme);
+    await page.screenshot({
+      path: "test-artifacts/wiki-theme-" + name + ".png",
+      fullPage: true,
+    });
+    const opposite = selectedTheme === "dark" ? "light" : "dark";
+    await setTheme(page, opposite);
+    await checkTheme(page, opposite);
+    await page.locator("#cancel").click();
+    await page.reload();
+    await expect(page.locator("#find")).toBeEnabled();
+    assert.equal(
+      await page.evaluate(() => localStorage.getItem("works_theme")),
+      opposite,
+    );
+    assert.equal(
+      await page.evaluate(() => document.documentElement.dataset.theme),
+      opposite,
+    );
+    await page.locator('[data-page="' + themePageId + '"]').click();
+    await page.locator("[data-compare-proposal]").click();
+    await checkTheme(page, opposite);
+    await setTheme(page, "system");
+    assert.equal(
+      await page.evaluate(() => localStorage.getItem("works_theme")),
+      null,
+    );
+    await page.emulateMedia({ colorScheme: "dark" });
+    await checkTheme(page, "dark");
+    await page.emulateMedia({ colorScheme: "light" });
+    await checkTheme(page, "light");
+    await setTheme(page, selectedTheme);
     page.on("dialog", (d) => d.accept());
     await page.locator("[data-accept]").click();
     await expect(page.locator("#body")).toContainText("proposed knowledge");
@@ -163,6 +336,7 @@ try {
       .getByRole("button", { name: "本文として保存", exact: true })
       .click();
     await expect(page.locator("#message")).toContainText("入力は保持");
+    await checkTheme(page, selectedTheme);
     await expect(page.locator("[name=body]")).toHaveValue("my unsaved work");
     await page.locator("#cancel").click();
     await page.locator('[data-page="' + id + '"]').click();

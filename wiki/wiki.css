@@ -1,3 +1,83 @@
+/* Use the Works palette and works_theme; automatic mode follows the OS. */
+:root {
+  color-scheme: light;
+  --wiki-muted: color-mix(in srgb, var(--fg) 75%, var(--bg-elevated));
+  --wiki-border: color-mix(in srgb, var(--fg) 50%, var(--bg-elevated));
+  --wiki-link: color-mix(in srgb, var(--fg) 70%, var(--accent));
+  --wiki-error: color-mix(in srgb, var(--fg) 75%, #ef4444);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
+.page-header a {
+  color: var(--fg);
+}
+button {
+  color: var(--fg);
+}
+main button {
+  border: 1px solid var(--wiki-border);
+  background: var(--bg-elevated);
+}
+main button:hover {
+  background: var(--bg-hover);
+}
+main input:not([type="checkbox"]):not([type="radio"]),
+main input:not([type="checkbox"]):not([type="radio"]):focus,
+main textarea,
+main textarea:focus,
+main select,
+main select:focus {
+  border-color: var(--wiki-border);
+  box-shadow: none;
+  background: var(--bg-elevated);
+  color: var(--fg);
+}
+main ::placeholder {
+  color: var(--wiki-muted);
+  opacity: 1;
+}
+#workspace :is(button, input, textarea, select, a):focus-visible,
+#login :is(button, input, textarea, select, a):focus-visible,
+.page-header :is(button, a):focus-visible {
+  outline: 2px solid var(--fg);
+  outline-offset: 3px;
+}
+#detail,
+#editor,
+#login {
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--bg-elevated);
+  box-shadow: var(--card-shadow);
+}
+#meta,
+aside small {
+  color: var(--wiki-muted);
+}
+main a,
+main a:visited {
+  color: var(--wiki-link);
+  text-decoration: underline;
+}
+article :is(pre, code) {
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+article pre {
+  padding: 8px;
+  border-radius: 6px;
+}
+article blockquote {
+  margin-left: 0;
+  padding-left: 12px;
+  border-left: 3px solid var(--wiki-border);
+}
 main {
   max-width: 1200px;
   margin: auto;
@@ -62,18 +142,20 @@ pre {
   white-space: pre-wrap;
 }
 #message {
-  color: var(--muted, #666);
+  color: var(--wiki-muted);
 }
 #message.error {
-  color: #d13b3b;
+  color: var(--wiki-error);
 }
 .source,
 .proposal,
 #history > div {
-  border: 1px solid #8885;
+  border: 1px solid var(--wiki-border);
   border-radius: 8px;
   padding: 12px;
   margin: 10px 0;
+  background: var(--bg-elevated);
+  color: var(--fg);
 }
 #editor {
   max-width: 850px;
@@ -85,15 +167,15 @@ pre {
   gap: 12px;
 }
 .diff pre {
-  border: 1px solid #8885;
+  border: 1px solid var(--wiki-border);
   padding: 12px;
   margin: 0;
 }
 .added {
-  background: #217a3520;
+  background: color-mix(in srgb, var(--bg-elevated) 82%, #22c55e);
 }
 .removed {
-  background: #bb333320;
+  background: color-mix(in srgb, var(--bg-elevated) 82%, #ef4444);
 }
 [hidden] {
   display: none !important;
