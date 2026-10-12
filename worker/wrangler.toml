@@ -41,10 +41,9 @@ database_id = "2d4fa45f-4d4d-437d-8cc2-7a8531b27e18"
 binding = "MATERIALS_BUCKET"
 bucket_name = "works-materials-files"
 
-# Wiki stays unavailable until a separate verified D1 is created and migrated.
-# Add this block only after account-wide Free limits / Paid usage are verified:
-# [[d1_databases]]
-# binding = "WIKI_DB"
-# database_name = "works-wiki-db"
-# database_id = <actual UUID returned by Cloudflare; do not copy an existing DB ID>
-# migrations_dir = "wiki-migrations"
+# Personal Wiki: independently created D1; never reuse the existing DB bindings.
+[[d1_databases]]
+binding = "WIKI_DB"
+database_name = "works-wiki-db"
+database_id = "a6e45689-9835-4ef5-aa34-06130be32bee"
+migrations_dir = "wiki-migrations"

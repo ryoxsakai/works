@@ -14,7 +14,7 @@ Works Worker、Worksログイン、既存MCP OAuthを共用し、Wikiデータ�
 - Markdown exportは現在版+出典+メタ情報。JSON exportは現在版+全履歴+全改稿案を20件ずつstreaming（800件/40MBまで。超過は413で停止し、履歴APIのページングを利用）。画面/通常取得は履歴100件ずつ、改稿案直近100件。検索は30件ずつ、MCPは最大100件。初版は本文部分一致検索のため規模が大きくなるとreadコストが増える。
 - MCP作成/提案には再送receiptがない。応答不明時は検索・ページ取得で実際の保存結果を確認してから再送する（自動再送しない）。
 
-## 新D1作成のブロッカー
+## 作成済みD1と本番適用の確認事項
 
 Cloudflare公式で確認した2026-10-12時点のFree枠はD1 read 500万行/日、write 10万行/日、全DB合計5GB。Freeは超過時にエラー停止、Paidは含有枠超過で従量課金。FreeのDB数10、単一DB500MBも確認する。Workers Freeのリクエスト/CPUなど既存Worker全体の枠にも収まることを確認する。
 
@@ -22,23 +22,29 @@ Cloudflare公式で確認した2026-10-12時点のFree枠はD1 read 500万行/�
 - https://developers.cloudflare.com/d1/platform/limits/
 - https://developers.cloudflare.com/workers/platform/pricing/
 
-現アカウントのプラン、全DB数/容量/使用量と10/27 Paid終了後の枠への収まりは未確認。追加課金の許可はないため、新D1作成・remote migrationは実施していない。新credentialが必要な場合も停止する。無料枠はDB単位ではなくアカウント全体。AI巡回、推論API、Vectorize、R2、Basinの追加はない。
+現アカウントのプラン、全DB数/容量/使用量と10/27 Paid終了後の枠への収まりは未確認。ユーザーが新規 `works-wiki-db` の作成とDatabase ID `a6e45689-9835-4ef5-aa34-06130be32bee` を確認済み（account `a65361433fe11677025317c13697b432`）。専用 `WIKI_DB` 設定は反映済み。エージェントによるremote migration・本番binding反映は実施していない。追加課金の許可はない。新credentialが必要な場合も停止する。無料枠はDB単位ではなくアカウント全体。AI巡回、推論API、Vectorize、R2、Basinの追加はない。
 
 ## 設定とmigration（利用枠確認後、承認された環境で）
 
 1. Cloudflare管理画面で既存accountのプラン、D1全DB数・容量・row metricsとWorkers使用量を確認。Paid残期間の利用超過リスクが解消できなければ停止。Free枠で継続できることを確認し、再契約・自動アップグレードは行わない。
-2. 既存の認可済みCloudflare操作経路で `works-wiki-db` を新規作成。Wranglerを利用できる場合はworkerディレクトリで `npx wrangler d1 create works-wiki-db`。新credential取得や既存secretコピーは不要な経路に限る。
-3. 返された実UUIDを確認し、既存DB UUIDと異なることを照合。`worker/wrangler.toml` のコメント例を実設定にする。IDは捏造しない。
+2. 新DBは作成済み。再作成しない。`worker/wrangler.toml` は次の専用bindingを設定済み。既存 `DB` / `MATERIALS_DB` の設定は変更していない。
 
 ```toml
 [[d1_databases]]
 binding = "WIKI_DB"
 database_name = "works-wiki-db"
-# database_idには作成結果の実UUIDを設定する
+database_id = "a6e45689-9835-4ef5-aa34-06130be32bee"
 migrations_dir = "wiki-migrations"
 ```
 
-4. workerディレクトリで `npm run wiki:migrate -- --local 実UUID` を実施し、ローカル確認後に必要なremote設定をレビュー。remoteは `npm run wiki:migrate -- --remote 実UUID`。この専用scriptはWIKI_DB UUID一致・既存DBとのID重複なし・Wiki migrationディレクトリを確認する。**既存 `npm run db:migrate` をWiki用に実行しない。** 汎用 `wrangler d1 execute tutor-db --file=...` も使用しない。
+3. 本番反映の承認後、Cloudflareの対象account → Workers & Pages → `works` → Bindings → Add binding → D1 database。Variable nameを `WIKI_DB`、Databaseを `works-wiki-db` にする。設定画面でDeployを求められる場合は本番変更になるため、現段階では実行しない。Wranglerから承認済みdeployを行う場合は上記設定でbindingも反映されるため、手動追加は不要。
+4. 初期migrationの最短経路は、既存の認可済みWrangler環境でPRのbranchをcheckoutし、workerディレクトリで次の専用scriptを実行する。新しいcredentialを取得しない。既存ログインが使えなければ停止する。
+
+```sh
+CLOUDFLARE_ACCOUNT_ID=a65361433fe11677025317c13697b432 npm run wiki:migrate -- --remote a6e45689-9835-4ef5-aa34-06130be32bee
+```
+
+このscriptは実UUID一致・既存DBとのID重複なし・専用migrationディレクトリを検査し、Wranglerの `WIKI_DB` bindingだけに適用する。ローカル検証は `npm run wiki:migrate -- --local a6e45689-9835-4ef5-aa34-06130be32bee`。**既存 `npm run db:migrate` は実行しない。** CLIを利用できない場合は対象D1 `works-wiki-db` → Consoleへ `worker/wiki-migrations/0001-wiki.sql` の全SQLを初回のみ貼り付けて実行できるが、その後Wranglerへ切り替える際はmigration台帳の整合が必要。CLI方式を優先する。
 5. 本番merge/deployは親の確認後。Workerの同じルートにAPIを追加し、GitHub Pagesの `/wiki/` 静的ファイルを配信する。OAuth callbackは既存 `/tutor/` を使い、安全な戻り先allowlistに `/wiki/` を追加。
 6. bindingなしの場合はWiki API/MCPのみ503で利用不可。既存機能はそのまま動作。bindingあり・migration未適用もWiki未準備として扱う。rollbackはWikiメニュー/コードを戻すかbindingを外す。既存DB migrationやデータの変更は不要。
 
