@@ -31,20 +31,22 @@ export const watchAuth = ({onSignedIn,onSignedOut}) => {
     }
     const file = path.join(root, decodeURIComponent(url.pathname) + (url.pathname.endsWith('/') ? 'index.html' : ''));
     if (!file.startsWith(root) || !fs.existsSync(file)) return r.fulfill({status:404,body:''});
-    const contentType = ({'.html':'text/html','.js':'text/javascript','.css':'text/css','.png':'image/png'})[path.extname(file)] || 'application/octet-stream';
+    const contentType = ({'.html':'text/html','.js':'text/javascript','.mjs':'text/javascript','.css':'text/css','.png':'image/png'})[path.extname(file)] || 'application/octet-stream';
     return r.fulfill({contentType,body:fs.readFileSync(file)});
   });
   const page = await context.newPage();
   const report = [];
+  await page.goto(base + "/");
   for (const signedIn of [false, true]) {
     for (const width of [320,375,768,1024,1440,1920]) {
       await page.setViewportSize({width,height:900});
       for (const path of paths) {
-        await page.goto(base + path);
         await page.evaluate(value => localStorage.setItem('qa_signed_in',value), signedIn ? 'yes':'no');
-        await page.reload();
+        await page.goto(base + path);
+        if (!signedIn && ["/tutor/", "/material/", "/admission/", "/ss/", "/material-print/"].includes(path)) await page.waitForURL(base + "/");
+        await page.waitForFunction(() => !!window.qaAuth);
         await page.locator('.works-theme-control select').waitFor();
-        if (path === '/') {
+        if (new URL(page.url()).pathname === '/') {
           await page.waitForFunction(expected => document.querySelector('#home-auth-action').getAttribute('aria-label') === expected, signedIn ? 'ログアウト' : 'Googleでログイン');
         } else {
           assert.equal(await page.locator('#sign-out').isVisible(), signedIn, `${path} auth control`);
@@ -74,7 +76,7 @@ export const watchAuth = ({onSignedIn,onSignedOut}) => {
         await page.emulateMedia({media:'print'});
         assert.equal(await page.locator('.works-header').isVisible(), false,`${path} print header`);
         await page.emulateMedia({media:'screen'});
-        report.push({path,width,signedIn,result:'pass'});
+        report.push({path,displayedPath:new URL(page.url()).pathname,width,signedIn,result:'pass'});
       }
     }
   }
