@@ -14,8 +14,8 @@
   <link rel="stylesheet" href="/memo/utilities.css?v=1">
   <script src="/shared/theme-init.js?v=1"></script>
   <link rel="stylesheet" href="/shared/styles.css?v=56">
-  <link rel="stylesheet" href="/shared/task-ui.css?v=1">
-  <link rel="stylesheet" href="/memo/memo.css?v=1">
+  <link rel="stylesheet" href="/shared/task-ui.css?v=2">
+  <link rel="stylesheet" href="/memo/memo.css?v=2">
   <link rel="stylesheet" href="/shared/header.css?v=1">
   <link rel="stylesheet" href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css">
   <script type="module" src="/shared/header.js?v=2"></script><style>
@@ -189,37 +189,25 @@
   </div>
 
   <!-- ── カテゴリ管理モーダル ──────────────────────────────────── -->
-  <div id="category-modal"
-    class="fixed inset-0 flex items-center justify-center z-50 hidden"
-    style="background:rgba(0,0,0,0.2);backdrop-filter:blur(4px)"
-    onclick="if(event.target===this) closeCategoryModal()">
-    <div class="todo-modal bg-white rounded-2xl shadow-2xl w-96 mx-4 flex flex-col" style="max-height:85vh">
-
-      <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-        <h3 class="font-semibold text-gray-700">カテゴリ管理</h3>
-        <button onclick="closeCategoryModal()" class="icon-btn text-gray-400 hover:text-gray-600 hover:bg-gray-100">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-          </svg>
-        </button>
+  <dialog id="category-modal" class="category-dialog" aria-labelledby="category-title" aria-describedby="category-help">
+    <div class="todo-modal category-surface">
+      <div class="category-header">
+        <div><p class="eyebrow">CATEGORIES</p><h3 id="category-title">カテゴリ管理</h3></div>
+        <button type="button" onclick="closeCategoryModal()" class="icon-btn" aria-label="カテゴリ管理を閉じる">×</button>
       </div>
-
-      <ul id="category-list" class="overflow-y-auto flex-1 px-4 py-3 space-y-1"></ul>
-
-      <div class="px-4 py-4 border-t border-gray-100">
-        <p class="text-xs font-medium text-gray-400 mb-2">新しいカテゴリを追加</p>
-        <div class="flex gap-2">
-          <input id="new-category-input" type="text" placeholder="カテゴリ名"
-            class="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400"
-            onkeydown="if(event.key==='Enter') addCategory()"/>
-          <button onclick="addCategory()"
-            class="px-4 py-2 bg-slate-700 hover:bg-slate-800 text-white rounded-xl text-sm font-semibold transition-colors whitespace-nowrap">
-            追加
-          </button>
+      <p id="category-help">矢印で順序を変更できます。変更はその都度保存されます。</p>
+      <ul id="category-list" aria-label="カテゴリ一覧"></ul>
+      <div class="category-add">
+        <label for="new-category-input">新しいカテゴリ</label>
+        <div class="category-add-controls">
+          <input id="new-category-input" type="text" placeholder="カテゴリ名を入力"
+            onkeydown="if(event.key==='Enter' && !event.isComposing) { event.preventDefault(); addCategory(); }"/>
+          <button type="button" onclick="addCategory()" class="bg-slate-700">追加</button>
         </div>
       </div>
+      <div class="category-footer"><button type="button" onclick="closeCategoryModal()">完了</button></div>
     </div>
-  </div>
+  </dialog>
 
   <!-- ── ログイン画面 ───────────────────────────────────────────── -->
   <div id="login-screen" class="fixed inset-0 flex items-center justify-center z-50 bg-gray-100">
@@ -294,6 +282,6 @@
     class="fixed left-1/2 z-50 pointer-events-none bg-gray-800 text-white text-sm px-4 py-2.5 rounded-xl shadow-lg whitespace-nowrap max-w-xs truncate"
     style="top:1rem;transform:translateX(-50%) translateY(-120%);transition:transform 0.3s ease,opacity 0.3s ease;opacity:0"></div>
 
-  <script type="module" src="/memo/app.js?v=1"></script>
+  <script type="module" src="/memo/app.js?v=2"></script>
 </body>
 </html>

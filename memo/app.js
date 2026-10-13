@@ -1,4 +1,6 @@
 import { watchAuth, signIn, signOutUser as worksSignOut, getSessionToken } from '../shared/auth.js?v=12';
+    import { categoryDialog } from '../shared/category-dialog.js?v=1';
+    const categoryUI = categoryDialog(closeCategoryModal);
     // ─── State ───────────────────────────────────────────────
     let memos      = [];
     let categories = ['日常', '仕事', 'アイデア'];
@@ -292,53 +294,52 @@ import { watchAuth, signIn, signOutUser as worksSignOut, getSessionToken } from 
     // ─── Category modal ────────────────────────────────────────
     function openCategoryModal() {
       editingCatIdx = -1;
-      document.getElementById('category-modal').classList.remove('hidden');
       document.getElementById('new-category-input').value = '';
       renderCategoryList();
-      setTimeout(() => document.getElementById('new-category-input').focus(), 50);
+      categoryUI.open();
     }
 
     function closeCategoryModal() {
-      document.getElementById('category-modal').classList.add('hidden');
+      categoryUI.close();
       editingCatIdx = -1;
     }
 
     function renderCategoryList() {
       const ul = document.getElementById('category-list');
       if (!categories.length) {
-        ul.innerHTML = '<li class="text-center text-gray-400 text-sm py-4">カテゴリがありません</li>';
+        ul.innerHTML = '<li class="text-center text-gray-400 text-sm py-4">カテゴリがありません。下の入力欄から追加してください。</li>';
         return;
       }
       ul.innerHTML = categories.map((cat, i) => {
         const count = memos.filter(m => m.category === cat).length;
         if (i === editingCatIdx) {
           return `<li class="flex items-center gap-2 rounded-xl px-3 py-2 bg-slate-50">
-  <input id="edit-cat-input" type="text" value="${esc(cat)}"
+  <input id="edit-cat-input" aria-label="カテゴリ名を変更" type="text" value="${esc(cat)}"
     class="flex-1 border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400"
-    onkeydown="if(event.key==='Enter') saveEditCat(${i}); else if(event.key==='Escape') cancelEditCat()"/>
-  <button onclick="saveEditCat(${i})" class="icon-btn text-slate-600 hover:bg-slate-100">
+    onkeydown="if(event.key==='Enter' && !event.isComposing) { event.preventDefault(); saveEditCat(${i}); } else if(event.key==='Escape') { event.preventDefault(); cancelEditCat(); }"/>
+  <button type="button" aria-label="変更を保存" title="変更を保存" onclick="saveEditCat(${i})" class="icon-btn text-slate-600 hover:bg-slate-100">
     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
   </button>
-  <button onclick="cancelEditCat()" class="icon-btn text-gray-400 hover:bg-gray-100">
+  <button type="button" aria-label="変更をキャンセル" title="変更をキャンセル" onclick="cancelEditCat()" class="icon-btn text-gray-400 hover:bg-gray-100">
     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
   </button>
 </li>`;
         }
-        return `<li class="flex items-center gap-1 rounded-xl px-3 py-2 hover:bg-gray-50 group">
-  <div class="flex flex-col mr-1">
-    <button onclick="moveCat(${i},-1)" ${i===0?'disabled':''} class="icon-btn w-5 h-4 text-gray-300 hover:text-gray-500 ${i===0?'opacity-20 pointer-events-none':''}">
+        return `<li class="category-row flex items-center gap-1 rounded-xl px-3 py-2 hover:bg-gray-50 group">
+  <div class="category-order flex mr-1">
+    <button type="button" aria-label="上へ移動" title="上へ移動" onclick="moveCat(${i},-1)" ${i===0?'disabled':''} class="icon-btn w-5 h-4 text-gray-300 hover:text-gray-500 ${i===0?'opacity-20 pointer-events-none':''}">
       <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/></svg>
     </button>
-    <button onclick="moveCat(${i},1)" ${i===categories.length-1?'disabled':''} class="icon-btn w-5 h-4 text-gray-300 hover:text-gray-500 ${i===categories.length-1?'opacity-20 pointer-events-none':''}">
+    <button type="button" aria-label="下へ移動" title="下へ移動" onclick="moveCat(${i},1)" ${i===categories.length-1?'disabled':''} class="icon-btn w-5 h-4 text-gray-300 hover:text-gray-500 ${i===categories.length-1?'opacity-20 pointer-events-none':''}">
       <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
     </button>
   </div>
-  <span class="flex-1 text-sm text-gray-700">${esc(cat)}</span>
-  ${count > 0 ? `<span class="text-xs text-gray-400">${count}件</span>` : ''}
-  <button onclick="startEditCat(${i})" class="icon-btn text-gray-300 hover:text-slate-500 hover:bg-slate-50 opacity-0 group-hover:opacity-100 transition-opacity">
+  <div class="category-summary"><span class="category-name flex-1 text-sm text-gray-700">${esc(cat)}</span>
+  ${count > 0 ? `<span class="category-count text-xs text-gray-400">${count}件</span>` : ''}</div>
+  <button type="button" aria-label="名前を変更" title="名前を変更" onclick="startEditCat(${i})" class="icon-btn text-gray-300 hover:text-slate-500 hover:bg-slate-50">
     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
   </button>
-  <button onclick="deleteCat(${i})" class="icon-btn text-gray-300 hover:text-red-400 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity">
+  <button type="button" aria-label="削除" title="削除" onclick="deleteCat(${i})" class="icon-btn text-gray-300 hover:text-red-400 hover:bg-red-50">
     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
   </button>
 </li>`;
@@ -349,7 +350,7 @@ import { watchAuth, signIn, signOutUser as worksSignOut, getSessionToken } from 
     }
 
     function startEditCat(i) { editingCatIdx = i; renderCategoryList(); }
-    function cancelEditCat() { editingCatIdx = -1; renderCategoryList(); }
+    function cancelEditCat() { const index = editingCatIdx; editingCatIdx = -1; renderCategoryList(); categoryUI.focus(index); }
 
     function saveEditCat(i) {
       const inp  = document.getElementById('edit-cat-input');
@@ -362,6 +363,7 @@ import { watchAuth, signIn, signOutUser as worksSignOut, getSessionToken } from 
       memos.forEach(m => { if (m.category === old) m.category = name; });
       saveData(); editingCatIdx = -1;
       renderCategoryList(); renderModalCategorySelect(); renderTabs(); renderTagFilter(); renderMemoGrid();
+      categoryUI.focus(i);
     }
 
     function deleteCat(i) {
@@ -380,6 +382,8 @@ import { watchAuth, signIn, signOutUser as worksSignOut, getSessionToken } from 
       if (activeTab === name) activeTab = 'すべて';
       saveData();
       renderCategoryList(); renderModalCategorySelect(); renderTabs(); renderTagFilter(); renderMemoGrid();
+      if (categories.length) categoryUI.focus(Math.min(i, categories.length - 1));
+      else document.getElementById('new-category-input').focus();
     }
 
     function moveCat(i, dir) {
@@ -387,6 +391,7 @@ import { watchAuth, signIn, signOutUser as worksSignOut, getSessionToken } from 
       if (j < 0 || j >= categories.length) return;
       [categories[i], categories[j]] = [categories[j], categories[i]];
       saveData(); renderCategoryList(); renderModalCategorySelect(); renderTabs();
+      categoryUI.focus(j, 'moveCat', dir);
     }
 
     function addCategory() {

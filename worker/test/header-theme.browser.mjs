@@ -7,7 +7,7 @@ const root = fileURLToPath(new URL("../../", import.meta.url));
 const artifacts = fileURLToPath(new URL("../test-artifacts/header-theme/", import.meta.url));
 fs.mkdirSync(artifacts, { recursive: true });
 const base = 'https://works-header.test';
-const paths = ['/', '/tutor/', '/material/', '/admission/', '/wiki/', '/todo/', '/kdp/', '/ss/', '/material-print/'];
+const paths = ['/', '/tutor/', '/material/', '/admission/', '/wiki/', '/memo/', '/todo/', '/kdp/', '/ss/', '/material-print/'];
 const authStub = `export const getSessionToken = () => 'qa';
 export const getGoogleAccessToken = async () => 'qa';
 export const signIn = () => { window.qaSignIn = true; };
@@ -28,7 +28,7 @@ export const watchAuth = ({onSignedIn,onSignedOut}) => {
     if (url.pathname === '/shared/auth.js') return r.fulfill({contentType:'text/javascript',body:authStub});
     if (url.pathname.startsWith('/api/')) {
       const isList = /^\/api\/(goal-templates|students|materials|material-categories|periods|calendars|records|curriculum|schedules|schedule-names|ss-projects|admissions|material-library\/(folders|files))(\/|$)/.test(url.pathname);
-      return r.fulfill({contentType:'application/json',body:JSON.stringify(isList ? [] : {items:[],books:[],pages:[],tasks:[],categories:[],calendars:[],events:[],files:[],folders:[],students:[],schedules:[],materials:[]})});
+      return r.fulfill({contentType:'application/json',body:JSON.stringify(isList ? [] : {items:[],books:[],pages:[],memos:[],tasks:[],categories:[],calendars:[],events:[],files:[],folders:[],students:[],schedules:[],materials:[]})});
     }
     const file = path.join(root, decodeURIComponent(url.pathname) + (url.pathname.endsWith('/') ? 'index.html' : ''));
     if (!file.startsWith(root) || !fs.existsSync(file)) return r.fulfill({status:404,body:''});
@@ -50,8 +50,11 @@ export const watchAuth = ({onSignedIn,onSignedOut}) => {
         if (new URL(page.url()).pathname === '/') {
           await page.waitForFunction(expected => document.querySelector('#home-auth-action').getAttribute('aria-label') === expected, signedIn ? 'ログアウト' : 'Googleでログイン');
         } else {
-          assert.equal(await page.locator('#sign-out').isVisible(), signedIn, `${path} auth control`);
+          const signOut = page.locator(path === '/memo/' ? '#memo-user-bar button' : '#sign-out');
+          assert.equal(await signOut.isVisible(), signedIn, `${path} auth control`);
         }
+        // This harness isolates header geometry from memo's full-screen sign-in view.
+        if (path === '/memo/') await page.locator('#login-screen').evaluate(el => el.style.display = 'none');
         for (const theme of ['light','dark']) {
           await page.selectOption('.works-theme-control select', theme);
           await page.waitForTimeout(180); // Let existing card/button color transitions settle.
@@ -59,12 +62,22 @@ export const watchAuth = ({onSignedIn,onSignedOut}) => {
             const h = document.querySelector('.works-header');
             const rect = h.getBoundingClientRect();
             const children = [...h.querySelectorAll('h1, .works-header-actions, select, summary, button:not([hidden])')].filter(e=>e.getBoundingClientRect().width);
-            return {left:rect.left,right:rect.right,width:innerWidth,theme:document.documentElement.dataset.theme,bg:getComputedStyle(h).backgroundColor,
+            const menu = h.querySelector('.works-navigation');
+            const style = getComputedStyle(menu);
+            const summary = menu.querySelector('summary').getBoundingClientRect();
+            const themeControl = h.querySelector('select').getBoundingClientRect();
+            return {menuTop:style.marginTop,menuPadding:style.paddingTop,menuBorder:style.borderTopWidth,
+              menuCenter:summary.y+summary.height/2,themeCenter:themeControl.y+themeControl.height/2,
+              left:rect.left,right:rect.right,width:innerWidth,theme:document.documentElement.dataset.theme,bg:getComputedStyle(h).backgroundColor,
               clipped:children.filter(e=>{const r=e.getBoundingClientRect();return r.left<0||r.right>innerWidth+1}).map(e=>e.outerHTML)};
           });
           assert.equal(geometry.left,0,`${path} ${width} header left`);
           assert.equal(geometry.right,width,`${path} ${width} header right`);
           assert.equal(geometry.theme,theme);
+          assert.equal(geometry.menuTop, '0px', `${path} menu top margin`);
+          assert.equal(geometry.menuPadding, '0px', `${path} menu top padding`);
+          assert.equal(geometry.menuBorder, '0px', `${path} menu top border`);
+          assert.ok(Math.abs(geometry.menuCenter - geometry.themeCenter) < 2, `${path} menu alignment`);
           assert.deepEqual(geometry.clipped,[],`${path} ${width} clipped controls`);
           await page.locator('.works-navigation summary').click();
           const nav = await page.locator('.works-navigation nav').boundingBox();

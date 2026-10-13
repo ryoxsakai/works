@@ -13,3 +13,4 @@
 .memo-page button.icon-btn.bg-slate-700 { background: var(--fg) !important; color: var(--bg) !important; }
 .memo-page button.icon-btn.bg-gray-50 { background: var(--bg-hover) !important; color: var(--fg) !important; }
 .memo-page button.icon-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.memo-page #category-modal > .category-surface { width: 100%; max-height: calc(100dvh - 2rem) !important; }

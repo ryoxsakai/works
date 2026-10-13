@@ -110,7 +110,15 @@ async function checkTheme(page, theme) {
         .join(", ");
     })
     .toBe("");
-  assert.ok(results.length > 10);
+  // Visible controls vary between listing, viewing, editing and dialogs.
+  await expect(page.locator('#search')).toBeVisible();
+  if (await page.locator('#folder-dialog').isVisible()) {
+    await expect(page.locator('#folder-dialog-title')).toBeVisible();
+    await expect(page.locator('#folder-dialog-submit')).toBeVisible();
+    assert.ok(results.some((r) => r.element === 'folder-dialog-submit'));
+  }
+  assert.ok(results.some((r) => r.element === 'search'));
+  assert.ok(results.length > 0);
   for (const r of results)
     assert.ok(
       r.contrast >= 4.5,
@@ -491,6 +499,7 @@ try {
     assert.equal(await page.evaluate(() => window.__wikiPayload), undefined);
     await page.locator("#mode-edit").click();
     await page.locator("[name=body]").fill(rich);
+    await page.screenshot({path: "test-artifacts/wiki-editor-" + name + ".png", fullPage: true});
     await page
       .getByRole("button", { name: "本文として保存", exact: true })
       .click();
@@ -555,6 +564,8 @@ try {
       page.locator('#folder-tree [data-page="' + richId + '"]'),
     ).toBeVisible();
     await page.locator('#folder-tree [data-page="' + richId + '"]').click();
+    await expect(page.locator('#folder-tree [data-page="' + richId + '"]')).toHaveAttribute('aria-current', 'page');
+    await expect(page.locator('#pages [data-page="' + richId + '"]')).toHaveAttribute('aria-current', 'page');
     await expect(page.locator("#find")).toBeEnabled();
     await page.locator("#new-folder").click();
     await expect(page.locator("#folder-dialog-submit")).toBeEnabled();
@@ -617,6 +628,24 @@ try {
     });
     await page.goto(origin + deepPath);
     await expect(page.locator("#title")).toHaveText(name + " Rich Markdown");
+    // Long labels must wrap in cards, trees and reading views on mobile too.
+    await page.goto(origin + '/wiki/');
+    const longFolderName = name + ' ' + '長いフォルダ名'.repeat(25);
+    const longFolder = await createFolder(longFolderName);
+    await page.goto(origin + '/wiki/?folder=' + longFolder.id);
+    await page.locator('#new').click();
+    const longTitle = '長いページタイトル'.repeat(25);
+    await page.locator('[name=title]').fill(longTitle);
+    await page.locator('[name=body]').fill(rich);
+    await page.getByRole('button', {name:'本文として保存',exact:true}).click();
+    await expect(page.locator('#title')).toHaveText(longTitle);
+    await page.locator('#view-tree').click();
+    await expect(page.locator('#folder-sidebar')).toBeVisible();
+    await checkTheme(page, selectedTheme);
+    await page.locator('#search').fill('no-matching-page-unique-query');
+    await page.locator('#find').click();
+    await expect(page.locator('#pages .wiki-empty')).toContainText('一致するページがありません');
+    await checkTheme(page, selectedTheme);
     assert.deepEqual(errors, []);
     await context.close();
   }

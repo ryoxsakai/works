@@ -29,6 +29,10 @@ jobs:
       - run: npm run test:wiki:browser
       - run: npm run test:header:browser
       - run: node test/memo-ui.browser.mjs
+      - name: Verify category dialogs with compiled ToDo utilities
+        run: |
+          npx --yes --package tailwindcss@3.4.17 tailwindcss --content '../todo/index.html' --output /tmp/works-todo-ui.css --minify
+          TODO_FIXTURE_CSS=/tmp/works-todo-ui.css npm run test:category:browser
       - name: Upload synthetic screenshots
         if: always()
         uses: actions/upload-artifact@v4
