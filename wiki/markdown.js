@@ -1,4 +1,5 @@
-// Small safe Markdown subset. Escape first; never accept HTML or external images.
+import { Marked } from "./vendor/marked.esm.js";
+import DOMPurify from "./vendor/purify.es.mjs";
 export const esc = (s) =>
   String(s ?? "").replace(
     /[&<>"']/g,
@@ -7,40 +8,80 @@ export const esc = (s) =>
         c
       ],
   );
-export function renderMarkdown(body) {
-  const inline = (value) =>
-    esc(value)
-      .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, (_, label, url) => {
-        try {
-          const u = new URL(url.replace(/&amp;/g, "&"));
-          if (
-            !["http:", "https:"].includes(u.protocol) ||
-            u.username ||
-            u.password
-          )
-            return label;
-        } catch {
-          return label;
-        }
-        return `<a href="${url}" target="_blank" rel="noopener noreferrer">${label}</a>`;
-      })
-      .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
-      .replace(/`([^`]+)`/g, "<code>$1</code>");
-  let code = false;
-  return String(body)
-    .split("\n")
-    .map((line) => {
-      if (line.startsWith("```")) {
-        code = !code;
-        return "";
+const markdown = new Marked({
+  gfm: true,
+  breaks: false,
+  renderer: {
+    html(token) {
+      return esc(token.text);
+    },
+    image(token) {
+      return esc(token.text);
+    },
+    link(token) {
+      let url;
+      try {
+        url = new URL(token.href);
+      } catch {
+        return esc(token.text);
       }
-      if (code) return `<pre>${esc(line)}</pre>`;
-      const h = line.match(/^(#{1,6})\s+(.*)$/);
-      if (h) return `<h${h[1].length}>${inline(h[2])}</h${h[1].length}>`;
-      if (/^[-*]\s/.test(line)) return `<p>• ${inline(line.slice(2))}</p>`;
-      if (line.startsWith("> "))
-        return `<blockquote>${inline(line.slice(2))}</blockquote>`;
-      return `<p>${inline(line) || "<br>"}</p>`;
-    })
-    .join("");
+      if (
+        !["http:", "https:"].includes(url.protocol) ||
+        url.username ||
+        url.password
+      )
+        return esc(token.text);
+      return `<a href="${esc(url.href)}" target="_blank" rel="noopener noreferrer"${token.title ? ` title="${esc(token.title)}"` : ""}>${this.parser.parseInline(token.tokens)}</a>`;
+    },
+  },
+});
+export function renderMarkdown(body) {
+  const rendered = markdown.parse(String(body ?? ""));
+  // The strict renderer also works in Node tests. Browsers additionally enforce a DOM allowlist.
+  return typeof DOMPurify.sanitize === "function"
+    ? DOMPurify.sanitize(rendered, {
+        ALLOWED_TAGS: [
+          "p",
+          "br",
+          "hr",
+          "h1",
+          "h2",
+          "h3",
+          "h4",
+          "h5",
+          "h6",
+          "strong",
+          "em",
+          "del",
+          "blockquote",
+          "pre",
+          "code",
+          "ul",
+          "ol",
+          "li",
+          "table",
+          "thead",
+          "tbody",
+          "tr",
+          "th",
+          "td",
+          "a",
+          "input",
+        ],
+        ALLOWED_ATTR: [
+          "href",
+          "title",
+          "target",
+          "rel",
+          "class",
+          "start",
+          "align",
+          "type",
+          "disabled",
+          "checked",
+        ],
+        ALLOW_DATA_ATTR: false,
+        ALLOW_ARIA_ATTR: false,
+      })
+    : rendered;
 }

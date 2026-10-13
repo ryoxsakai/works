@@ -14,7 +14,11 @@ const mf = new Miniflare({
 });
 async function checkTheme(page, theme) {
   // OS changes arrive through matchMedia events; wait for the shared controller.
-  await page.waitForFunction((expected) => getComputedStyle(document.documentElement).colorScheme === expected, theme);
+  await page.waitForFunction(
+    (expected) =>
+      getComputedStyle(document.documentElement).colorScheme === expected,
+    theme,
+  );
   let results;
   const measure = () =>
     page.evaluate(() => {
@@ -38,7 +42,7 @@ async function checkTheme(page, theme) {
       );
       const checks = [
         ...document.querySelectorAll(
-          ".source,.proposal,#history > div,#pages small,#detail p,#detail h1,#detail h2,#detail h3,#detail h4,#detail a,#detail button,#detail pre,#editor input,#editor select,#editor textarea,#editor label,#editor button,#message,#search",
+          ".source,.proposal,#history > div,#pages small,#detail p,#detail h1,#detail h2,#detail h3,#detail h4,#detail a,#detail button,#detail pre,#editor input,#editor select,#editor textarea,#editor label,#editor button,#message,#search,#folder-dialog input,#folder-dialog select,#folder-dialog button,#folder-dialog h2,#folder-dialog-message",
         ),
       ]
         .filter((e) => e.getClientRects().length && !e.disabled)
@@ -123,7 +127,7 @@ async function checkTheme(page, theme) {
 }
 async function setTheme(page, value) {
   await page.evaluate(async (theme) => {
-    const { setTheme } = await import("/shared/theme.js?v=5");
+    const { setTheme } = await import("/shared/theme.js?v=6");
     setTheme(theme);
   }, value);
 }
@@ -136,16 +140,19 @@ try {
     ALLOWED_EMAIL: "fixture@example.test",
     ALLOWED_ORIGIN: origin,
   };
-  const sql = await readFile(
-    new URL("../wiki-migrations/0001-wiki.sql", import.meta.url),
-    "utf8",
-  );
-  await env.WIKI_DB.batch(
-    sql
-      .split(/(?=^CREATE )/m)
-      .filter((s) => s.trim())
-      .map((s) => env.WIKI_DB.prepare(s)),
-  );
+  for (const migration of ["0001-wiki.sql", "0002-wiki-folders.sql"]) {
+    const sql = await readFile(
+      new URL("../wiki-migrations/" + migration, import.meta.url),
+      "utf8",
+    );
+    await env.WIKI_DB.batch(
+      sql
+        .split(/(?=^(?:CREATE|ALTER|DROP) )/m)
+        .filter((s) => s.trim())
+        .map((s) => env.WIKI_DB.prepare(s)),
+    );
+  }
+
   const payload = Buffer.from(
     JSON.stringify({ email: env.ALLOWED_EMAIL, exp: Date.now() + 3600000 }),
   ).toString("base64url");
@@ -206,7 +213,7 @@ try {
         if (u.pathname === "/shared/auth.js")
           return route.fulfill({
             contentType: "text/javascript",
-            body: `export const getSessionToken=()=>${JSON.stringify(token)};export function watchAuth(o){queueMicrotask(()=>o.onSignedIn())}export function signIn(){}export async function signOutUser(){}`,
+            body: `export const getSessionToken=()=>${JSON.stringify(token)};export function watchAuth(o){queueMicrotask(()=>localStorage.fixtureSignedOut ? o.onSignedOut() : o.onSignedIn())}export function signIn(path){window.fixtureSignInPath=path}export async function signOutUser(){}`,
           });
         if (u.pathname.startsWith("/api/")) {
           const r = await worker.fetch(
@@ -228,7 +235,7 @@ try {
           : u.pathname;
         return route.fulfill({
           body: await readFile(new URL("." + p, root)),
-          contentType: p.endsWith(".js")
+          contentType: /\.m?js$/.test(p)
             ? "text/javascript"
             : p.endsWith(".css")
               ? "text/css"
@@ -305,7 +312,7 @@ try {
       await page.evaluate(() => document.documentElement.dataset.theme),
       opposite,
     );
-    await page.locator('[data-page="' + themePageId + '"]').click();
+    await page.locator('#pages [data-page="' + themePageId + '"]').click();
     await page.locator("[data-compare-proposal]").click();
     await checkTheme(page, opposite);
     await setTheme(page, "system");
@@ -318,7 +325,8 @@ try {
     await page.emulateMedia({ colorScheme: "light" });
     await checkTheme(page, "light");
     await setTheme(page, selectedTheme);
-    page.on("dialog", (d) => d.accept());
+    let acceptDialogs = true;
+    page.on("dialog", (d) => (acceptDialogs ? d.accept() : d.dismiss()));
     await page.locator("[data-accept]").click();
     await expect(page.locator("#body")).toContainText("proposed knowledge");
     await expect(page.locator("#meta")).toContainText("revision 2");
@@ -341,7 +349,7 @@ try {
     await checkTheme(page, selectedTheme);
     await expect(page.locator("[name=body]")).toHaveValue("my unsaved work");
     await page.locator("#cancel").click();
-    await page.locator('[data-page="' + id + '"]').click();
+    await page.locator('#pages [data-page="' + id + '"]').click();
     await expect(page.locator("#body")).toContainText("external change");
     // Discarding editor for restore must close it, preventing an old-form save.
     await page.locator("#edit").click();
@@ -354,6 +362,10 @@ try {
     assert.match((await download).suggestedFilename(), /\.json$/);
     await page.locator("#archive").click();
     await expect(page.locator("#meta")).toContainText("アーカイブ");
+    await expect(page.locator("#move-page")).toBeHidden();
+    await page.reload();
+    await expect(page.locator("#title")).toHaveText(name + " knowledge");
+    await expect(page.locator("#move-page")).toBeHidden();
     await page.locator("#archives").check();
     await page.locator("#search").fill("synthetic alias " + name);
     await page.locator("#find").click();
@@ -365,10 +377,234 @@ try {
       false,
     );
     await expect(page.locator("#find")).toBeEnabled();
+    // Material-library patterns: folder dialog, breadcrumb, cards and details tree.
+    await page.locator('#folder-breadcrumb [data-folder-open=""]').click();
+    await expect(page.locator("#find")).toBeEnabled();
+    async function createFolder(title) {
+      await page.locator("#new-folder").click();
+      await expect(page.locator("#folder-dialog")).toBeVisible();
+      await expect(page.locator("#folder-dialog-submit")).toBeEnabled();
+      await page.locator("#folder-name").fill(title);
+      await page.locator("#folder-name").focus();
+      await checkTheme(page, selectedTheme);
+      await page.locator("#folder-dialog-submit").click();
+      await expect(page.locator("#folder-dialog")).toBeHidden();
+      await expect(page.locator("#find")).toBeEnabled();
+      return (await api("folders")).folders.find((f) => f.name === title);
+    }
+    const parentFolder = await createFolder(name + " Parent");
+    await page
+      .locator('#folder-grid [data-folder-open="' + parentFolder.id + '"]')
+      .click();
+    await expect(page.locator("#find")).toBeEnabled();
+    const childFolder = await createFolder(name + " Child");
+    await page
+      .locator('#folder-grid [data-folder-open="' + childFolder.id + '"]')
+      .click();
+    await expect(page.locator("#find")).toBeEnabled();
+    await page.locator("#view-tree").click();
+    await expect(
+      page
+        .locator(
+          '#folder-tree details[data-folder="' +
+            parentFolder.id +
+            '"] details[data-folder="' +
+            childFolder.id +
+            '"]',
+        )
+        .first(),
+    ).toBeVisible();
+    await page.locator("#view-folders").click();
+    await page.locator("#rename-folder").click();
+    await expect(page.locator("#folder-dialog-submit")).toBeEnabled();
+    await page.locator("#folder-name").fill(name + " Renamed");
+    await page.locator("#folder-dialog-submit").click();
+    await expect(page.locator("#folder-heading")).toContainText("Renamed");
+    await expect(page.locator("#find")).toBeEnabled();
+    await page.locator("#move-folder").click();
+    await expect(page.locator("#folder-dialog-submit")).toBeEnabled();
+    assert.equal(
+      await page
+        .locator('#folder-target option[value="' + childFolder.id + '"]')
+        .count(),
+      0,
+      "Cycle destination excluded",
+    );
+    await page.locator("#folder-target").selectOption("");
+    await page.locator("#folder-dialog-submit").click();
+    await expect(page.locator("#folder-dialog")).toBeHidden();
+    await expect(page.locator("#find")).toBeEnabled();
+    assert.equal(
+      (await api("folders")).folders.find((f) => f.id === childFolder.id)
+        .parent_id,
+      null,
+    );
+    await page.locator("#new").click();
+    await page.locator("[name=title]").fill(name + " Rich Markdown");
+    const rich =
+      "# Rich heading\n\nParagraph with *emphasis* and **bold**.\n\n1. first\n2. second\n\n- parent\n  - nested\n\n> quotation\n\n| A | B |\n|---|---|\n| x | y |\n\n```js\nconst x = 1;\nconst y = 2;\n```\n\n- [x] Read-only task";
+    await page.locator("[name=body]").fill(rich);
+    await page.locator("#mode-preview").click();
+    for (const selector of [
+      "h1",
+      "em",
+      "strong",
+      "ol",
+      "ul",
+      "blockquote",
+      "table",
+      "pre code",
+    ])
+      await expect(
+        page.locator("#editor-preview " + selector).first(),
+      ).toBeVisible();
+    assert.equal(await page.locator("#editor-preview pre").count(), 1);
+    await expect(
+      page.locator("#editor-preview input[type=checkbox]"),
+    ).toBeDisabled();
+    await page.locator("#mode-edit").click();
+    await expect(page.locator("[name=body]")).toHaveValue(rich);
+    await page
+      .locator("[name=body]")
+      .fill(
+        '<img src=x onerror="window.__wikiPayload=1">\n[x](javascript:alert(1))',
+      );
+    await page.locator("#mode-preview").click();
+    assert.equal(
+      await page
+        .locator(
+          '#editor-preview img,#editor-preview script,#editor-preview svg,#editor-preview a[href^="javascript:"]',
+        )
+        .count(),
+      0,
+    );
+    assert.equal(await page.evaluate(() => window.__wikiPayload), undefined);
+    await page.locator("#mode-edit").click();
+    await page.locator("[name=body]").fill(rich);
+    await page
+      .getByRole("button", { name: "本文として保存", exact: true })
+      .click();
+    await expect(page.locator("#title")).toHaveText(name + " Rich Markdown");
+    await expect(page.locator("#find")).toBeEnabled();
+    const richId = await page
+      .locator("#pages button")
+      .filter({ hasText: name + " Rich Markdown" })
+      .getAttribute("data-page");
+    assert.equal((await api("pages/" + richId)).page.folder_id, childFolder.id);
+    await page.locator("#move-page").click();
+    await expect(page.locator("#folder-dialog-submit")).toBeEnabled();
+    await page.locator("#folder-target").selectOption(parentFolder.id);
+    await page.locator("#folder-dialog-submit").click();
+    await expect(page.locator("#folder-dialog")).toBeHidden();
+    await expect(page.locator("#find")).toBeEnabled();
+    const moved = (await api("pages/" + richId)).page;
+    assert.equal(moved.folder_id, parentFolder.id);
+    assert.equal(moved.revision, 2);
+    assert.equal(moved.body, rich);
+    await page.locator("#move-page").click();
+    await expect(page.locator("#folder-dialog-submit")).toBeEnabled();
+    await page.locator("#folder-target").selectOption(childFolder.id);
+    const dest = (await api("folders")).folders.find(
+      (f) => f.id === childFolder.id,
+    );
+    await api("folders/" + dest.id, {
+      name: name + " Updated elsewhere",
+      parent_id: null,
+      revision: dest.revision,
+    });
+    await page.locator("#folder-dialog-submit").click();
+    await expect(page.locator("#folder-dialog-message")).toContainText(
+      "入力は保持",
+    );
+    await expect(page.locator("#folder-dialog")).toBeVisible();
+    assert.equal((await api("pages/" + richId)).page.revision, 2);
+    await page.locator("#folder-dialog-cancel").click();
+    await expect(page.locator("#folder-dialog")).toBeHidden();
+    await page.locator("#edit").click();
+    await page.locator("[name=body]").fill("unsaved navigation");
+    acceptDialogs = false;
+    await page.locator("#view-tree").click();
+    await expect(page.locator("#editor")).toBeVisible();
+    await expect(page.locator("[name=body]")).toHaveValue("unsaved navigation");
+    const beforeBack = page.url();
+    await page.goBack();
+    await expect(page.locator("[name=body]")).toHaveValue("unsaved navigation");
+    await expect(page).toHaveURL(beforeBack);
+    acceptDialogs = true;
+    await page.locator("#back-folders").click();
+    await expect(page.locator("#detail")).toBeHidden();
+    await expect(page.locator("#find")).toBeEnabled();
+    await page.goBack();
+    await expect(page.locator("#title")).toHaveText(name + " Rich Markdown");
+    await expect(page.locator("#find")).toBeEnabled();
+    await page.locator("#view-tree").click();
+    await expect(page.locator("#folder-sidebar")).toBeVisible();
+    await expect(
+      page.locator('#folder-tree [data-page="' + richId + '"]'),
+    ).toBeVisible();
+    await page.locator('#folder-tree [data-page="' + richId + '"]').click();
+    await expect(page.locator("#find")).toBeEnabled();
+    await page.locator("#new-folder").click();
+    await expect(page.locator("#folder-dialog-submit")).toBeEnabled();
+    await page.locator("#folder-name").fill("cancelled folder");
+    acceptDialogs = false;
+    await page.keyboard.press("Escape");
+    await expect(page.locator("#folder-dialog")).toBeVisible();
+    acceptDialogs = true;
+    await page.locator("#folder-dialog-cancel").click();
+    await expect(page.locator("#folder-dialog")).toBeHidden();
+    assert.ok(
+      !(await api("folders")).folders.some(
+        (f) => f.name === "cancelled folder",
+      ),
+    );
+    await checkTheme(page, selectedTheme);
+    await page.locator("#view-folders").click();
+    await expect(page.locator("#folder-sidebar")).toBeHidden();
     await page.screenshot({
       path: "test-artifacts/wiki-" + name + ".png",
       fullPage: true,
     });
+    // Linked page belongs to another folder; label must use global metadata.
+    const linked = await api("pages", {
+      title: name + " linked elsewhere",
+      body: "linked",
+      sources: [],
+      tags: [],
+      aliases: [],
+      links: [],
+      status: "draft",
+    });
+    const original = (await api("pages/" + richId)).page;
+    await api("pages/" + richId + "/save", {
+      revision: original.revision,
+      content: { ...original, links: [linked.page.id] },
+    });
+    await page.goto(origin + "/wiki/?page=" + richId);
+    await expect(page.locator("#links button")).toHaveText(
+      name + " linked elsewhere",
+    );
+    await expect(page.locator("#move-page")).toBeVisible();
+    // Sign-in stays on the registered callback, retaining only identifier queries.
+    const deepPath = "/wiki/?folder=" + original.folder_id + "&page=" + richId;
+    await page.evaluate(() => {
+      localStorage.fixtureSignedOut = "1";
+    });
+    await page.goto(origin + deepPath + "&redirect=https://external.test");
+    await page.locator("#sign-in").click();
+    assert.equal(
+      await page.evaluate(() => localStorage.works_pending_destination),
+      deepPath,
+    );
+    assert.equal(
+      await page.evaluate(() => window.fixtureSignInPath),
+      "/tutor/",
+    );
+    await page.evaluate(() => {
+      delete localStorage.fixtureSignedOut;
+    });
+    await page.goto(origin + deepPath);
+    await expect(page.locator("#title")).toHaveText(name + " Rich Markdown");
     assert.deepEqual(errors, []);
     await context.close();
   }
