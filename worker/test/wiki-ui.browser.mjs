@@ -4,6 +4,10 @@ import { createHmac } from "node:crypto";
 import { chromium, expect } from "@playwright/test";
 import { Miniflare } from "miniflare";
 import worker from "../src/index.js";
+const legacyMarkdown = await readFile(
+  new URL("./fixtures/wiki-legacy-markdown.js", import.meta.url),
+  "utf8",
+);
 const origin = "https://works-wiki.test",
   root = new URL("../../", import.meta.url);
 const mf = new Miniflare({
@@ -210,6 +214,12 @@ try {
         u = new URL(req.url());
       try {
         if (u.origin !== origin) return route.fulfill({ body: "" });
+        // Emulate a returning browser whose unversioned renderer is still cached.
+        if (u.pathname === "/wiki/markdown.js" && !u.search)
+          return route.fulfill({
+            contentType: "text/javascript",
+            body: legacyMarkdown,
+          });
         if (u.pathname === "/shared/auth.js")
           return route.fulfill({
             contentType: "text/javascript",
@@ -486,6 +496,8 @@ try {
       .click();
     await expect(page.locator("#title")).toHaveText(name + " Rich Markdown");
     await expect(page.locator("#find")).toBeEnabled();
+    await expect(page.locator("#body table td")).toHaveCount(2);
+    await expect(page.locator("#body em")).toHaveText("emphasis");
     const richId = await page
       .locator("#pages button")
       .filter({ hasText: name + " Rich Markdown" })

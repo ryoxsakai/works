@@ -1,4 +1,4 @@
-import { esc } from "./markdown.js";
+import { esc } from "./markdown.js?v=2";
 const $ = (id) => document.getElementById(id);
 export function createFolderBrowser(hooks) {
   const state = {

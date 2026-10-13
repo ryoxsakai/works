@@ -4,8 +4,8 @@ import {
   signIn,
   signOutUser,
 } from "../shared/auth.js?v=12";
-import { esc, renderMarkdown } from "./markdown.js";
-import { createFolderBrowser } from "./folders.js";
+import { esc, renderMarkdown } from "./markdown.js?v=2";
+import { createFolderBrowser } from "./folders.js?v=2";
 const $ = (id) => document.getElementById(id),
   state = {
     data: null,
