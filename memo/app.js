@@ -653,7 +653,7 @@ import { watchAuth, signIn, signOutUser as worksSignOut, getSessionToken } from 
 
     function signInWithGoogle() { localStorage.setItem('works_pending_destination', '/memo/'); signIn('/tutor/'); }
     async function signOutUser() {
-      if ((pendingSaves || saveFailed || !document.querySelector('#export-draft').hidden || !document.querySelector('#export-draft').hidden) && !confirm('未保存の変更があります。ログアウトしますか？')) return;
+      if ((pendingSaves || saveFailed || !document.querySelector('#export-draft').hidden) && !confirm('未保存の変更があります。ログアウトしますか？')) return;
       await worksSignOut(); location.reload();
     }
     watchAuth({
