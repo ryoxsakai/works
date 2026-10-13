@@ -653,7 +653,7 @@ import { watchAuth, signIn, signOutUser as worksSignOut, getSessionToken } from 
 
     function signInWithGoogle() { localStorage.setItem('works_pending_destination', '/memo/'); signIn('/tutor/'); }
     async function signOutUser() {
-      if ((pendingSaves || saveFailed) && !confirm('未保存の変更があります。ログアウトしますか？')) return;
+      if ((pendingSaves || saveFailed || !document.querySelector('#export-draft').hidden || !document.querySelector('#export-draft').hidden) && !confirm('未保存の変更があります。ログアウトしますか？')) return;
       await worksSignOut(); location.reload();
     }
     watchAuth({
@@ -682,7 +682,7 @@ import { watchAuth, signIn, signOutUser as worksSignOut, getSessionToken } from 
       });
     }
     document.querySelector('.works-home').onclick = event => {
-      if ((pendingSaves || saveFailed || !document.querySelector('#memo-modal').classList.contains('hidden')) && !confirm('未保存の変更がある可能性があります。移動しますか？')) event.preventDefault();
+      if ((pendingSaves || saveFailed || !document.querySelector('#export-draft').hidden || !document.querySelector('#memo-modal').classList.contains('hidden')) && !confirm('未保存の変更がある可能性があります。移動しますか？')) event.preventDefault();
     };
     // ─── Expose globals ───────────────────────────────────────
     Object.assign(window, {
