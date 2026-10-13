@@ -11,7 +11,7 @@ if (actions) {
   navigation.innerHTML = `<summary aria-label="サービス一覧">メニュー <span aria-hidden="true">▾</span></summary>
     <nav aria-label="Works サービス"><a href="/">ホーム</a>
     <span>授業・教材</span><a href="/tutor/">授業管理</a><a href="/material/">教材管理</a><a href="/admission/">入試管理</a>
-    <span>業務</span><a href="/wiki/">Wiki</a><a href="/todo/">ToDo管理</a>
+    <span>業務</span><a href="/wiki/">Wiki</a><a href="/todo/">ToDo管理</a><a href="/memo/">メモ</a>
     <span>制作</span><a href="/kdp/">KDP管理</a><a href="/ss/">SS管理</a></nav>`;
   const homeLink = header.querySelector(".works-home");
   navigation.querySelectorAll("a").forEach((link) => {

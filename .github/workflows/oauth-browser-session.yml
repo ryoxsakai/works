@@ -2,7 +2,7 @@ name: Test OAuth browser login
 on:
   pull_request:
     branches: [main]
-    paths: ['worker/**', 'wiki/**', 'kdp/**', 'ss/**', 'tutor/**', 'home.js', 'home.css', 'index.html', 'shared/**', '.github/workflows/oauth-browser-session.yml']
+    paths: ['worker/**', 'memo/**', 'todo/**', 'wiki/**', 'kdp/**', 'ss/**', 'tutor/**', 'home.js', 'home.css', 'index.html', 'shared/**', '.github/workflows/oauth-browser-session.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -28,6 +28,7 @@ jobs:
       - run: npm run test:ss:browser
       - run: npm run test:wiki:browser
       - run: npm run test:header:browser
+      - run: node test/memo-ui.browser.mjs
       - name: Upload synthetic screenshots
         if: always()
         uses: actions/upload-artifact@v4

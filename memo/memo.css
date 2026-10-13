@@ -1,0 +1,15 @@
+.memo-card { border-color: var(--border) !important; border-radius: .65rem !important; box-shadow: var(--card-shadow); }
+.memo-page .bg-slate-700 { background: var(--fg) !important; color: var(--bg) !important; }
+.memo-page .icon-btn { min-width: 32px; min-height: 32px; }
+.memo-page #save-status { color: var(--muted); font-size: .85rem; overflow-wrap: anywhere; }
+.memo-page #view-body-container > div { border-color: var(--border) !important; }
+.memo-page [id$="modal"] > div { width: min(100% - 2rem, 36rem); }
+@media (max-width: 640px) { .memo-page [id$="modal"] > div { max-height: 85dvh !important; } }
+
+.memo-page .tab-btn { background: transparent; border: 0; border-bottom: 2px solid transparent; }
+.memo-page .icon-btn { background: transparent; border: 0; }
+.memo-page .tab-btn.border-slate-700 { border-bottom-color: var(--accent); }
+
+.memo-page button.icon-btn.bg-slate-700 { background: var(--fg) !important; color: var(--bg) !important; }
+.memo-page button.icon-btn.bg-gray-50 { background: var(--bg-hover) !important; color: var(--fg) !important; }
+.memo-page button.icon-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
