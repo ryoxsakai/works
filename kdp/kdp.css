@@ -148,12 +148,12 @@ textarea {
 .save-bar span {
   font-size: 0.85rem;
 }
-details {
+main details {
   margin-top: 1rem;
   border-top: 1px solid var(--border);
   padding-top: 1rem;
 }
-summary {
+main summary {
   font-weight: 600;
   cursor: pointer;
   min-height: 44px;

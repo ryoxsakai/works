@@ -83,6 +83,9 @@ export function createFolderBrowser(hooks) {
           `<article class="material-folder-card"><button type="button" class="material-folder-open" data-folder-open="${esc(f.id)}"><span class="material-folder-icon" aria-hidden="true">▣</span><span class="material-folder-copy"><strong>${esc(f.name)}</strong></span><span aria-hidden="true">›</span></button></article>`,
       )
       .join("");
+    document.querySelectorAll('#folder-tree [data-page]').forEach((button) => {
+      if (button.dataset.page === hooks.page()?.id) button.setAttribute('aria-current', 'page');
+    });
   }
   async function refresh() {
     const data = await hooks.api("folders");

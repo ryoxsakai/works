@@ -5,7 +5,7 @@ import {
   signOutUser,
 } from "../shared/auth.js?v=12";
 import { esc, renderMarkdown } from "./markdown.js?v=2";
-import { createFolderBrowser } from "./folders.js?v=2";
+import { createFolderBrowser } from "./folders.js?v=3";
 const $ = (id) => document.getElementById(id),
   state = {
     data: null,
@@ -178,9 +178,17 @@ async function load(more = false, refresh = true) {
     state.pages
       .map(
         (p) =>
-          `<button data-page="${esc(p.id)}">${esc(p.title)}<br><small>${esc(folders.label(p.folder_id))} · ${p.status === "confirmed" ? "確認済み" : "下書き"} · r${p.revision}${p.archived ? " · アーカイブ" : ""}</small></button>`,
+          `<button data-page="${esc(p.id)}"><span class="wiki-page-title">${esc(p.title)}</span><small>${esc(folders.label(p.folder_id))} · ${p.status === "confirmed" ? "確認済み" : "下書き"} · r${p.revision}${p.archived ? " · アーカイブ" : ""}</small></button>`,
       )
-      .join("") || "<p>ページはまだありません。</p>";
+      .join("") || ($("search").value ? '<p class="wiki-empty">一致するページがありません。<br>別のキーワードで検索してください。</p>' : '<p class="wiki-empty">ページはまだありません。<br>「＋ 新規ページ」から知識をまとめましょう。</p>');
+  selectCurrentPage();
+}
+function selectCurrentPage() {
+  const id = state.data?.page.id;
+  document.querySelectorAll('#pages [data-page], #folder-tree [data-page]').forEach((button) => {
+    if (id && button.dataset.page === id) button.setAttribute('aria-current', 'page');
+    else button.removeAttribute('aria-current');
+  });
 }
 function compare(a, b, label) {
   const oldLines = a.body.split("\n"),
@@ -226,6 +234,7 @@ function render() {
     .join("");
   $("comparison").innerHTML = "";
   $("more-history").hidden = !state.data.history_has_more;
+  selectCurrentPage();
 }
 async function open(id, push = true) {
   state.data = await api("pages/" + path(id));
