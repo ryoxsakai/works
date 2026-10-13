@@ -13,6 +13,8 @@ const mf = new Miniflare({
   d1Databases: { DB: "wiki-browser-auth", WIKI_DB: "wiki-browser" },
 });
 async function checkTheme(page, theme) {
+  // OS changes arrive through matchMedia events; wait for the shared controller.
+  await page.waitForFunction((expected) => getComputedStyle(document.documentElement).colorScheme === expected, theme);
   let results;
   const measure = () =>
     page.evaluate(() => {

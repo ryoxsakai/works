@@ -7,20 +7,15 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <title>ToDo管理 | Works</title>
-  <script>
-    (function () {
-      var t = localStorage.getItem('works_theme');
-      if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
-    })();
-  </script>
+  <script src="/shared/theme-init.js?v=1"></script>
   <link rel="apple-touch-icon" href="/shared/logo.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Works ToDo管理">
   <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="/shared/styles.css?v=55">
+  <link rel="stylesheet" href="/shared/styles.css?v=56">
   <link rel="stylesheet" href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css">
-  <link rel="stylesheet" href="/todo/todo.css?v=1">
+  <link rel="stylesheet" href="/todo/todo.css?v=2">
   <style>
     body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
 
@@ -102,16 +97,20 @@
     }
     input[type="range"]::-webkit-slider-thumb:hover { background: #1e293b; }
   </style>
+  <link rel="stylesheet" href="/shared/header.css?v=1" />
+  <script type="module" src="/shared/header.js?v=1"></script>
 </head>
 <body class="todo-page min-h-screen">
 
   <!-- ── Header ─────────────────────────────────────────────── -->
-  <header class="page-header">
-    <h1><a href="/">ToDo管理</a></h1>
-    <div id="todo-user-bar" class="user-bar" hidden>
+  <header class="page-header works-header">
+    <h1><a class="works-home" href="/" aria-label="Works ホーム"><span class="page-header-icon" aria-hidden="true">W</span><span>Works</span></a><span class="works-page-title">ToDo管理</span></h1>
+    <div class="works-header-actions">
+      <div id="todo-user-bar" class="user-bar" hidden>
       <button id="sign-out" type="button" class="user-icon-btn" aria-label="ログアウト" title="ログアウト" onclick="signOutUser()">
         <i class="bx bx-user-circle" aria-hidden="true"></i>
       </button>
+    </div>
     </div>
   </header>
 
