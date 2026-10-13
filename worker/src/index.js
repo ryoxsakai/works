@@ -5442,6 +5442,11 @@ export default {
       }
 
       const browserSession = await verifySession(request, env);
+      if (url.pathname === "/api/memo") {
+        if (browserSession.aud || browserSession.scope || browserSession.fid) throw httpError(401, "browser session required for Memo API");
+        const { handleMemo } = await import("./memo.js");
+        return await handleMemo(request, env, headers);
+      }
       if (url.pathname.startsWith("/api/wiki/")) {
         if (browserSession.aud || browserSession.scope || browserSession.fid) throw httpError(401, "browser session required for Wiki API");
         return await handleWiki(request, env, url, headers);
