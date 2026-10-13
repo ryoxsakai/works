@@ -192,6 +192,7 @@ function compare(a, b, label) {
 function render() {
   const { page: p, proposals, history } = state.data;
   $("detail").hidden = false;
+  $("move-page").hidden = !!p.archived;
   $("title").textContent = p.title;
   $("meta").textContent =
     `${folders.label(p.folder_id)} · ${p.status === "confirmed" ? "確認済み" : "下書き"} · revision ${p.revision} · ${p.updated_at}${p.archived ? " · アーカイブ" : ""} · タグ: ${p.tags.join(", ")} · 別名: ${p.aliases.join(", ")}`;
@@ -207,7 +208,7 @@ function render() {
     p.links
       .map(
         (id) =>
-          `<button data-page="${esc(id)}">${esc(state.pages.find((p) => p.id === id)?.title || id)}</button>`,
+          `<button data-page="${esc(id)}">${esc(state.pages.find((p) => p.id === id)?.title || folders.pageTitle(id) || id)}</button>`,
       )
       .join("") || "<p>なし</p>";
   $("proposals").innerHTML =
@@ -468,7 +469,17 @@ $("workspace").onclick = (e) => {
     });
 };
 $("sign-in").onclick = () => {
-  localStorage.setItem("works_pending_destination", "/wiki/");
+  const destination = new URL("/wiki/", location.origin);
+  const routed = locationRoute();
+  for (const key of ["folder", "page"]) {
+    const value = routed[key];
+    if (value && /^[A-Za-z0-9_-]{1,100}$/.test(value))
+      destination.searchParams.set(key, value);
+  }
+  localStorage.setItem(
+    "works_pending_destination",
+    destination.pathname + destination.search,
+  );
   signIn("/tutor/");
 };
 $("sign-out").onclick = () => {

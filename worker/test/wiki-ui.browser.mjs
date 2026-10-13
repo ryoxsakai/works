@@ -14,7 +14,11 @@ const mf = new Miniflare({
 });
 async function checkTheme(page, theme) {
   // OS changes arrive through matchMedia events; wait for the shared controller.
-  await page.waitForFunction((expected) => getComputedStyle(document.documentElement).colorScheme === expected, theme);
+  await page.waitForFunction(
+    (expected) =>
+      getComputedStyle(document.documentElement).colorScheme === expected,
+    theme,
+  );
   let results;
   const measure = () =>
     page.evaluate(() => {
@@ -209,7 +213,7 @@ try {
         if (u.pathname === "/shared/auth.js")
           return route.fulfill({
             contentType: "text/javascript",
-            body: `export const getSessionToken=()=>${JSON.stringify(token)};export function watchAuth(o){queueMicrotask(()=>o.onSignedIn())}export function signIn(){}export async function signOutUser(){}`,
+            body: `export const getSessionToken=()=>${JSON.stringify(token)};export function watchAuth(o){queueMicrotask(()=>localStorage.fixtureSignedOut ? o.onSignedOut() : o.onSignedIn())}export function signIn(path){window.fixtureSignInPath=path}export async function signOutUser(){}`,
           });
         if (u.pathname.startsWith("/api/")) {
           const r = await worker.fetch(
@@ -358,6 +362,10 @@ try {
     assert.match((await download).suggestedFilename(), /\.json$/);
     await page.locator("#archive").click();
     await expect(page.locator("#meta")).toContainText("アーカイブ");
+    await expect(page.locator("#move-page")).toBeHidden();
+    await page.reload();
+    await expect(page.locator("#title")).toHaveText(name + " knowledge");
+    await expect(page.locator("#move-page")).toBeHidden();
     await page.locator("#archives").check();
     await page.locator("#search").fill("synthetic alias " + name);
     await page.locator("#find").click();
@@ -557,6 +565,46 @@ try {
       path: "test-artifacts/wiki-" + name + ".png",
       fullPage: true,
     });
+    // Linked page belongs to another folder; label must use global metadata.
+    const linked = await api("pages", {
+      title: name + " linked elsewhere",
+      body: "linked",
+      sources: [],
+      tags: [],
+      aliases: [],
+      links: [],
+      status: "draft",
+    });
+    const original = (await api("pages/" + richId)).page;
+    await api("pages/" + richId + "/save", {
+      revision: original.revision,
+      content: { ...original, links: [linked.page.id] },
+    });
+    await page.goto(origin + "/wiki/?page=" + richId);
+    await expect(page.locator("#links button")).toHaveText(
+      name + " linked elsewhere",
+    );
+    await expect(page.locator("#move-page")).toBeVisible();
+    // Sign-in stays on the registered callback, retaining only identifier queries.
+    const deepPath = "/wiki/?folder=" + original.folder_id + "&page=" + richId;
+    await page.evaluate(() => {
+      localStorage.fixtureSignedOut = "1";
+    });
+    await page.goto(origin + deepPath + "&redirect=https://external.test");
+    await page.locator("#sign-in").click();
+    assert.equal(
+      await page.evaluate(() => localStorage.works_pending_destination),
+      deepPath,
+    );
+    assert.equal(
+      await page.evaluate(() => window.fixtureSignInPath),
+      "/tutor/",
+    );
+    await page.evaluate(() => {
+      delete localStorage.fixtureSignedOut;
+    });
+    await page.goto(origin + deepPath);
+    await expect(page.locator("#title")).toHaveText(name + " Rich Markdown");
     assert.deepEqual(errors, []);
     await context.close();
   }

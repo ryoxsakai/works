@@ -149,6 +149,7 @@ export function createFolderBrowser(hooks) {
             ? null
             : folder(state.current);
       if (kind !== "create" && !source) return;
+      if (kind === "page" && source.archived) return;
       state.dialog = {
         kind,
         source: source ? { ...source } : null,
@@ -232,5 +233,6 @@ export function createFolderBrowser(hooks) {
     folder,
     label,
     current: () => state.current,
+    pageTitle: (id) => state.pages.find((p) => p.id === id)?.title,
   };
 }

@@ -33,7 +33,14 @@ test("KDP reuses registered tutor callback and consumes only safe pending destin
     "localStorage",
     constants + "\n" + consume + "\nreturn consumePendingDestination();",
   );
-  for (const path of ["/wiki/", "/kdp/", "/todo/", "/material-print/", "/tutor/", "/"]) {
+  for (const path of [
+    "/wiki/",
+    "/kdp/",
+    "/todo/",
+    "/material-print/",
+    "/tutor/",
+    "/",
+  ]) {
     let removed = false;
     assert.equal(
       run({
@@ -48,6 +55,18 @@ test("KDP reuses registered tutor callback and consumes only safe pending destin
     assert.equal(removed, true);
   }
   for (const path of [
+    "/wiki/?folder=folder-1",
+    "/wiki/?page=page_2",
+    "/wiki/?folder=f-1&page=p-2",
+    "/wiki/?page=p-2&folder=f-1",
+  ])
+    assert.equal(run({ getItem: () => path, removeItem: () => {} }), path);
+  for (const path of [
+    "/wiki/?page=p&page=q",
+    "/wiki/?folder=f&redirect=https://external.test",
+    "/wiki/?page=%2F%2Fexternal.test",
+    "/wiki/?folder=" + "a".repeat(101),
+    "/wiki/?page=p#hash",
     "https://external.test/",
     "//external.test/",
     "/kdp/?redirect=x",
