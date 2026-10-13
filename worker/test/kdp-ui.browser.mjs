@@ -155,14 +155,14 @@ try {
       await page.locator("#modal").waitFor({ state: "hidden" });
     };
     await page.goto(origin + "/");
-    assert.equal(await page.locator(".module-card").count(), 8);
+    assert.equal(await page.locator(".module-card").count(), 7);
     assert.equal(await page.locator(".module-section").count(), 3);
     await width();
     await page.screenshot({
       path: `test-artifacts/menu-${name}.png`,
       fullPage: true,
     });
-    await page.locator('a[href="/kdp/"]').click();
+    await page.locator('.module-card[href="/kdp/"]').click();
     await page.locator("#new-book").waitFor();
     await page.locator("#new-book").click();
     await page
@@ -387,12 +387,12 @@ try {
       localStorage.fixtureSignedOut = "1";
     });
     await page.reload();
-    await page.locator('a[href="/kdp/"]').click();
+    await page.locator('.module-card[href="/kdp/"]').click();
     assert.equal(
       await page.evaluate(() => localStorage.fixtureDestination),
       "/kdp/",
     );
-    await page.locator('a[href="/todo/"]').click();
+    await page.locator('.module-card[href="/todo/"]').click();
     assert.equal(
       await page.evaluate(() => localStorage.fixtureDestination),
       "/todo/",

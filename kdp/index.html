@@ -5,22 +5,20 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta http-equiv="Cache-Control" content="no-store" />
     <title>KDP管理 | Works</title>
-    <script>
-      try {
-        const t = localStorage.getItem("works_theme");
-        if (t === "light" || t === "dark")
-          document.documentElement.dataset.theme = t;
-      } catch {}
-    </script>
+    <script src="/shared/theme-init.js?v=1"></script>
     <link rel="apple-touch-icon" href="/shared/logo.png" />
-    <link rel="stylesheet" href="/shared/styles.css?v=55" />
+    <link rel="stylesheet" href="/shared/styles.css?v=56" />
     <link rel="stylesheet" href="/kdp/kdp.css?v=1" />
-  </head>
+    <link rel="stylesheet" href="/shared/header.css?v=1" />
+  <script type="module" src="/shared/header.js?v=1"></script>
+</head>
   <body>
-    <header class="page-header">
-      <h1><a href="/">Works</a><span aria-hidden="true"> / </span>KDP管理</h1>
-      <button id="sign-out" hidden>ログアウト</button>
-    </header>
+    <header class="page-header works-header">
+    <h1><a class="works-home" href="/" aria-label="Works ホーム"><span class="page-header-icon" aria-hidden="true">W</span><span>Works</span></a><span class="works-page-title">KDP管理</span></h1>
+    <div class="works-header-actions">
+      <button id="sign-out" type="button" class="user-icon-btn" aria-label="ログアウト" title="ログアウト" hidden><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="9" r="3"/><path d="M5.5 18c1-3 3-4.5 6.5-4.5s5.5 1.5 6.5 4.5"/></svg></button>
+    </div>
+  </header>
     <main class="kdp-main">
       <div id="message" role="status" aria-live="polite"></div>
       <section id="login" hidden class="panel">

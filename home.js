@@ -1,5 +1,5 @@
 import { signIn, signOutUser, watchAuth } from "./shared/auth.js?v=12";
-import { getTheme, setTheme } from "./shared/theme.js?v=5";
+import { getTheme, setTheme } from "./shared/theme.js?v=6";
 
 const els = {
   authAction: document.querySelector("#home-auth-action"),
@@ -115,11 +115,8 @@ els.authAction.addEventListener("click", async () => {
 
 els.openSettings.addEventListener("click", () => {
   const current = getTheme();
-  const selected = current === "system"
-    ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
-    : current;
   els.themeRadios.forEach((radio) => {
-    radio.checked = radio.value === selected;
+    radio.checked = radio.value === current;
   });
   els.settingsModal.showModal();
 });

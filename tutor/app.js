@@ -4,7 +4,7 @@ import {
   getGoogleAccessToken,
   getSessionToken,
 } from "../shared/auth.js?v=12";
-import { getTheme, setTheme } from "../shared/theme.js?v=5";
+import { getTheme, setTheme } from "../shared/theme.js?v=6";
 
 const PASTEL_FALLBACK_COLORS = [
   "#c8e6c9",
