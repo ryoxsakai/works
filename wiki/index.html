@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>個人Wiki | Works</title>
+    <title>Wiki | Works</title>
     <script>
       try {
         const t = localStorage.getItem("works_theme");
@@ -12,17 +12,17 @@
       } catch {}
     </script>
     <link rel="stylesheet" href="/shared/styles.css?v=55" />
-    <link rel="stylesheet" href="/wiki/wiki.css?v=2" />
+    <link rel="stylesheet" href="/wiki/wiki.css?v=3" />
   </head>
   <body>
     <header class="page-header">
-      <h1><a href="/">Works</a> / 個人Wiki</h1>
+      <h1><a href="/">Works</a> / Wiki</h1>
       <button id="sign-out" hidden>ログアウト</button>
     </header>
     <main>
       <p id="message" role="status" aria-live="polite"></p>
       <section id="login" hidden>
-        <h2>個人Wiki</h2>
+        <h2>Wiki</h2>
         <p>原本を残したまま、知識と出典を整理します。</p>
         <button id="sign-in">Worksにログイン</button>
       </section>
@@ -37,37 +37,114 @@
           ><button id="new">＋ 新規ページ</button>
         </div>
         <label><input id="archives" type="checkbox" /> アーカイブも表示</label>
-        <div class="layout">
-          <aside>
-            <div id="pages"></div>
-            <button id="more" hidden>続きを表示</button>
+        <div class="toolbar">
+          <div class="view-toggle" aria-label="表示方法">
+            <button
+              id="view-folders"
+              class="view-toggle-btn active"
+              type="button"
+              aria-pressed="true"
+            >
+              フォルダ</button
+            ><button
+              id="view-tree"
+              class="view-toggle-btn"
+              type="button"
+              aria-pressed="false"
+            >
+              ツリー
+            </button>
+          </div>
+          <button id="new-folder" type="button" class="btn-primary">
+            ＋ フォルダ
+          </button>
+        </div>
+        <div class="layout wiki-folder-view" id="wiki-layout">
+          <aside id="folder-sidebar" hidden>
+            <h2>Wikiツリー</h2>
+            <div id="folder-tree" class="material-tree"></div>
+            <p id="tree-limit" hidden>
+              ツリーのページ表示は直近2000件です。残りは検索・フォルダ表示から開けます。
+            </p>
           </aside>
-          <section id="detail" hidden>
-            <div class="toolbar">
-              <h2 id="title"></h2>
-              <button id="edit">編集</button
-              ><button id="archive">アーカイブ</button
-              ><button data-export="markdown">Markdown</button
-              ><button data-export="json">JSON</button>
-            </div>
-            <p id="meta"></p>
-            <article id="body"></article>
-            <h3>出典</h3>
-            <div id="sources"></div>
-            <h3>関連ページ</h3>
-            <div id="links"></div>
-            <h3>改稿案</h3>
-            <div id="proposals"></div>
-            <h3>履歴・比較・復元</h3>
-            <div id="history"></div>
-            <button id="more-history" hidden>さらに履歴を表示</button>
-            <div id="comparison"></div>
-          </section>
+          <div class="wiki-pane">
+            <section id="folder-browser">
+              <nav
+                id="folder-breadcrumb"
+                class="material-breadcrumb"
+                aria-label="Wikiフォルダ階層"
+              ></nav>
+              <div class="toolbar">
+                <h2 id="folder-heading">未分類</h2>
+                <button id="rename-folder" type="button" hidden>名称変更</button
+                ><button id="move-folder" type="button" hidden>
+                  フォルダ移動
+                </button>
+              </div>
+              <div id="folder-grid" class="material-folder-grid"></div>
+              <div id="pages" class="wiki-pages"></div>
+              <button id="more" hidden>続きを表示</button>
+            </section>
+            <section id="detail" hidden>
+              <div class="toolbar">
+                <button id="back-folders" type="button">← フォルダに戻る</button
+                ><button id="move-page" type="button">ページ移動</button>
+              </div>
+              <div class="toolbar">
+                <h2 id="title"></h2>
+                <button id="edit">編集</button
+                ><button id="archive">アーカイブ</button
+                ><button data-export="markdown">Markdown</button
+                ><button data-export="json">JSON</button>
+              </div>
+              <p id="meta"></p>
+              <article id="body"></article>
+              <h3>出典</h3>
+              <div id="sources"></div>
+              <h3>関連ページ</h3>
+              <div id="links"></div>
+              <h3>改稿案</h3>
+              <div id="proposals"></div>
+              <h3>履歴・比較・復元</h3>
+              <div id="history"></div>
+              <button id="more-history" hidden>さらに履歴を表示</button>
+              <div id="comparison"></div>
+            </section>
+          </div>
         </div>
         <form id="editor" hidden>
           <h2 id="editor-heading">ページ編集</h2>
-          <label>タイトル<input name="title" required maxlength="300" /></label
-          ><label
+          <label>タイトル<input name="title" required maxlength="300" /></label>
+          <div class="toolbar">
+            <span>Markdown</span>
+            <div class="view-toggle">
+              <button
+                id="mode-edit"
+                type="button"
+                class="view-toggle-btn active"
+                aria-pressed="true"
+              >
+                編集</button
+              ><button
+                id="mode-preview"
+                type="button"
+                class="view-toggle-btn"
+                aria-pressed="false"
+              >
+                プレビュー
+              </button>
+            </div>
+          </div>
+          <p class="wiki-help">
+            見出し・表・リスト・引用・コード・HTTP(S)リンクに対応。HTMLと外部画像は使用しません。
+          </p>
+          <article
+            id="editor-preview"
+            class="wiki-markdown"
+            hidden
+            aria-label="Markdownプレビュー"
+          ></article>
+          <label id="body-label"
             >本文（Markdown・HTML不可）<textarea
               name="body"
               rows="14"
@@ -97,7 +174,34 @@
         </form>
       </section>
     </main>
-    <script type="module" src="/wiki/app.js"></script>
+    <dialog id="folder-dialog" class="app-modal wiki-dialog">
+      <div class="modal-header">
+        <h2 id="folder-dialog-title"></h2>
+        <button
+          id="folder-dialog-close"
+          type="button"
+          class="modal-close"
+          aria-label="閉じる"
+        >
+          ×
+        </button>
+      </div>
+      <form id="folder-form" class="modal-tab-panel">
+        <label id="folder-name-label"
+          >フォルダ名<input id="folder-name" maxlength="200" required
+        /></label>
+        <label id="folder-target-label"
+          >移動先<select id="folder-target"></select
+        ></label>
+        <p id="folder-dialog-message" role="status"></p>
+        <div class="modal-actions">
+          <button id="folder-dialog-submit" type="submit" class="btn-primary">
+            保存</button
+          ><button id="folder-dialog-cancel" type="button">キャンセル</button>
+        </div>
+      </form>
+    </dialog>
+    <script type="module" src="/wiki/app.js?v=3"></script>
     <script type="module" src="/shared/theme.js"></script>
   </body>
 </html>

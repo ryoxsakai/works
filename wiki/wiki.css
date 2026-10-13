@@ -198,3 +198,137 @@ pre {
     overflow: auto;
   }
 }
+/* Reuse the material library's folder cards, breadcrumb, tree and view switch. */
+.wiki-folder-view {
+  grid-template-columns: minmax(0, 1fr);
+}
+.wiki-pane {
+  min-width: 0;
+}
+#folder-browser,
+#folder-sidebar {
+  background: var(--bg-elevated);
+  padding: 16px;
+  border-radius: 12px;
+  margin-bottom: 16px;
+}
+#folder-sidebar summary {
+  min-height: 44px;
+}
+#folder-sidebar summary button {
+  text-align: left;
+  justify-content: flex-start;
+  flex: 1;
+  border: 0;
+  overflow-wrap: anywhere;
+}
+#folder-sidebar button[aria-current="location"] {
+  background: var(--bg-hover);
+  font-weight: 600;
+}
+#folder-sidebar .material-tree-file {
+  font-size: 0.85rem;
+  justify-content: flex-start;
+}
+.wiki-pages {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.wiki-pages button {
+  text-align: left;
+  display: block;
+  overflow-wrap: anywhere;
+}
+.wiki-pages small,
+.wiki-help {
+  color: var(--wiki-muted);
+}
+#folder-breadcrumb {
+  flex-wrap: wrap;
+}
+#folder-breadcrumb button {
+  border: 0;
+}
+.wiki-dialog {
+  max-width: min(520px, calc(100vw - 24px));
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+  background: var(--bg-elevated);
+  color: var(--fg);
+  border: 1px solid var(--wiki-border);
+}
+.wiki-dialog input,
+.wiki-dialog select,
+.wiki-dialog input:focus,
+.wiki-dialog select:focus {
+  width: 100%;
+  background: var(--bg-elevated);
+  color: var(--fg);
+  border-color: var(--wiki-border);
+  box-shadow: none;
+}
+.wiki-dialog button {
+  background: var(--bg-elevated);
+  color: var(--fg);
+  border: 1px solid var(--wiki-border);
+}
+.wiki-dialog :focus-visible {
+  outline: 2px solid var(--fg);
+  outline-offset: 2px;
+}
+#folder-dialog-message {
+  color: var(--wiki-error);
+}
+#editor-preview {
+  padding: 12px;
+  border: 1px solid var(--wiki-border);
+  border-radius: 8px;
+  min-height: 180px;
+}
+:is(#body, #editor-preview) table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+}
+:is(#body, #editor-preview) :is(th, td) {
+  border: 1px solid var(--wiki-border);
+  padding: 8px;
+  text-align: left;
+}
+:is(#body, #editor-preview) :is(ul, ol) {
+  padding-left: 1.5em;
+}
+@media (max-width: 700px) {
+  .wiki-pages {
+    grid-template-columns: 1fr;
+  }
+  #folder-sidebar {
+    max-height: 320px;
+    overflow: auto;
+  }
+}
+#workspace .view-toggle-btn {
+  color: var(--fg);
+  background: var(--bg-elevated);
+}
+#workspace .view-toggle-btn.active {
+  color: var(--fg);
+  background: var(--bg-hover);
+  border: 1px solid var(--wiki-border);
+  font-weight: 600;
+}
+#folder-dialog input,
+#folder-dialog input:focus,
+#folder-dialog select,
+#folder-dialog select:focus {
+  background: var(--bg-elevated);
+  color: var(--fg);
+  border-color: var(--wiki-border);
+  box-shadow: none;
+}
+#folder-dialog :focus-visible {
+  outline: 2px solid var(--fg);
+  outline-offset: 2px;
+}

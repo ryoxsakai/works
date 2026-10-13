@@ -1,3 +1,9 @@
+import {
+  folderTarget,
+  listWikiFolders,
+  writeWikiFolder,
+  moveWikiPage,
+} from "./wiki-folders.js";
 // Wiki never falls back to the existing Works DB; schema is installed explicitly.
 const fail = (status, message) => {
   throw Object.assign(new Error(message), { status });
@@ -119,12 +125,18 @@ export async function searchWiki(env, args = {}) {
   )
     fail(400, "invalid pagination");
   const pattern = query;
+  const filtered = Object.hasOwn(args, "folder_id");
+  const folderId = filtered
+    ? await folderTarget(db(env), args.folder_id)
+    : null;
   const rows = await db(env)
     .prepare(
-      "SELECT id,title,revision,status,archived,updated_at,tags,aliases FROM wiki_pages WHERE (?=1 OR archived=0) AND (instr(lower(title),lower(?))>0 OR instr(lower(body),lower(?))>0 OR instr(lower(tags),lower(?))>0 OR instr(lower(aliases),lower(?))>0) ORDER BY updated_at DESC,id LIMIT ? OFFSET ?",
+      "SELECT id,title,revision,status,archived,updated_at,tags,aliases,folder_id FROM wiki_pages WHERE (?=1 OR archived=0) AND (?=0 OR folder_id IS ?) AND (instr(lower(title),lower(?))>0 OR instr(lower(body),lower(?))>0 OR instr(lower(tags),lower(?))>0 OR instr(lower(aliases),lower(?))>0) ORDER BY updated_at DESC,id LIMIT ? OFFSET ?",
     )
     .bind(
       args.archived === true ? 1 : 0,
+      filtered ? 1 : 0,
+      folderId,
       pattern,
       pattern,
       pattern,
@@ -237,12 +249,30 @@ export async function getWiki(env, id) {
 export async function createWiki(env, input, mcp = false) {
   const c = validateContent(input, mcp),
     id = crypto.randomUUID();
-  await db(env)
+  const folderId = mcp
+    ? null
+    : await folderTarget(
+        db(env),
+        input.folder_id ?? null,
+        input.folder_revision,
+      );
+  if (
+    folderId !== null &&
+    (!Number.isSafeInteger(input.folder_revision) || input.folder_revision < 1)
+  )
+    fail(400, "folder_revision is required");
+  const result = await db(env)
     .prepare(
-      "INSERT INTO wiki_pages(id,title,body,sources,tags,aliases,links,status) VALUES(?,?,?,?,?,?,?,?)",
+      `INSERT INTO wiki_pages(id,title,body,sources,tags,aliases,links,status,folder_id) SELECT ?,?,?,?,?,?,?,?,?${folderId === null ? "" : " WHERE EXISTS(SELECT 1 FROM wiki_folders WHERE id=? AND revision=?)"} RETURNING id`,
     )
-    .bind(id, ...encoded(c))
-    .run();
+    .bind(
+      id,
+      ...encoded(c),
+      folderId,
+      ...(folderId === null ? [] : [folderId, input.folder_revision]),
+    )
+    .first();
+  if (!result) fail(409, "作成先フォルダが変更されています。");
   return getWiki(env, id);
 }
 export async function proposeWiki(env, id, input) {
@@ -269,15 +299,24 @@ export async function proposeWiki(env, id, input) {
     status: "pending",
   };
 }
-async function save(env, id, expected, c, archived = 0, proposalId = null) {
+async function save(
+  env,
+  id,
+  expected,
+  c,
+  archived = 0,
+  proposalId = null,
+  folderId = undefined,
+) {
   const database = db(env),
     values = encoded(c);
-  const sql = `UPDATE wiki_pages SET ${fields.map((k) => k + "=?").join(",")}, archived=?,revision=revision+1,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=? AND revision=? ${proposalId ? "AND archived=0 AND EXISTS(SELECT 1 FROM wiki_proposals WHERE id=? AND page_id=wiki_pages.id AND base_revision=wiki_pages.revision AND status='pending')" : ""} RETURNING revision`;
+  const sql = `UPDATE wiki_pages SET ${fields.map((k) => k + "=?").join(",")}, archived=?${folderId === undefined ? "" : ",folder_id=?"},revision=revision+1,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=? AND revision=? ${proposalId ? "AND archived=0 AND EXISTS(SELECT 1 FROM wiki_proposals WHERE id=? AND page_id=wiki_pages.id AND base_revision=wiki_pages.revision AND status='pending')" : ""} RETURNING revision`;
   const statement = database
     .prepare(sql)
     .bind(
       ...values,
       archived,
+      ...(folderId === undefined ? [] : [folderId]),
       id,
       revision(expected),
       ...(proposalId ? [proposalId] : []),
@@ -299,6 +338,10 @@ export async function mutateWiki(env, id, action, input) {
   revision(input.revision);
   const { page } = await getWiki(env, id);
   if (page.revision !== input.revision) fail(409, "page changed");
+  if (action === "move") {
+    await moveWikiPage(db(env), id, input);
+    return getWiki(env, id);
+  }
   if (action === "save")
     return save(
       env,
@@ -324,6 +367,8 @@ export async function mutateWiki(env, id, action, input) {
       input.revision,
       validateContent(snapshot),
       snapshot.archived,
+      null,
+      await folderTarget(db(env), snapshot.folder_id ?? null),
     );
   }
   if (action === "accept" || action === "reject") {
@@ -356,11 +401,11 @@ export async function mutateWiki(env, id, action, input) {
   fail(404, "action not found");
 }
 export function markdownExport(page) {
-  return `# ${page.title}\n\n${page.body}\n\n## 出典\n${page.sources.map((s) => `- ${s.type}: ${s.id || s.url} / ${s.location} / 確認日 ${s.checked_at}${s.id && s.url ? " / " + s.url : ""}`).join("\n")}\n\n## メタ情報\n状態: ${page.status}\nrevision: ${page.revision}\nタグ: ${page.tags.join(", ")}\n別名: ${page.aliases.join(", ")}\n関連ページID: ${page.links.join(", ")}\n`;
+  return `# ${page.title}\n\n${page.body}\n\n## 出典\n${page.sources.map((s) => `- ${s.type}: ${s.id || s.url} / ${s.location} / 確認日 ${s.checked_at}${s.id && s.url ? " / " + s.url : ""}`).join("\n")}\n\n## メタ情報\n状態: ${page.status}\nrevision: ${page.revision}\nタグ: ${page.tags.join(", ")}\n別名: ${page.aliases.join(", ")}\n所属フォルダID: ${page.folder_id ?? "未分類"}\n関連ページID: ${page.links.join(", ")}\n`;
 }
 async function ready(env) {
   try {
-    await db(env).prepare("SELECT id FROM wiki_pages LIMIT 0").all();
+    await db(env).prepare("SELECT folder_id FROM wiki_pages LIMIT 0").all();
   } catch (e) {
     if (e.status === 503) throw e;
     fail(503, "Wiki専用D1のmigrationが未適用、またはDBを利用できません。");
@@ -404,11 +449,26 @@ export async function handleWiki(request, env, url, headers) {
     .split("/")
     .map(decodeURIComponent);
   let result;
-  if (request.method === "GET" && parts[0] === "pages" && !parts[1])
+  if (request.method === "GET" && parts[0] === "folders" && parts.length === 1)
+    result = await listWikiFolders(db(env));
+  else if (
+    request.method === "POST" &&
+    parts[0] === "folders" &&
+    parts.length <= 2
+  )
+    result = await writeWikiFolder(
+      db(env),
+      parts[1] || null,
+      await readInput(request),
+    );
+  else if (request.method === "GET" && parts[0] === "pages" && !parts[1])
     result = await searchWiki(env, {
       query: url.searchParams.get("q") ?? "",
       archived: url.searchParams.get("archived") === "true",
       offset: Number(url.searchParams.get("offset") ?? 0),
+      ...(url.searchParams.has("folder_id")
+        ? { folder_id: url.searchParams.get("folder_id") || null }
+        : {}),
     });
   else if (
     request.method === "GET" &&
