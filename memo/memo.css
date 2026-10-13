@@ -9,3 +9,7 @@
 .memo-page .tab-btn { background: transparent; border: 0; border-bottom: 2px solid transparent; }
 .memo-page .icon-btn { background: transparent; border: 0; }
 .memo-page .tab-btn.border-slate-700 { border-bottom-color: var(--accent); }
+
+.memo-page button.icon-btn.bg-slate-700 { background: var(--fg) !important; color: var(--bg) !important; }
+.memo-page button.icon-btn.bg-gray-50 { background: var(--bg-hover) !important; color: var(--fg) !important; }
+.memo-page button.icon-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
