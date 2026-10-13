@@ -1,10 +1,10 @@
 # Wiki: フォルダ階層とMarkdown
 
-最新main e27f12b（Wikiテーマ対応公開後）を基準とする。トップ分類と全サービス共通ヘッダーは別担当のため変更しない。Wiki内の表示名だけWikiに統一する。
+最新main e27f12b（Wikiテーマ対応公開後）を基準とする。トップ分類と全サービス共通ヘッダーは別担当PR #102（d5915d78）を統合済み。推奨merge順序は #102 → #103。Wiki機能側の表示名をWikiに統一する。
 
 ## 実装と再利用
 
-教材管理のshared/styles.cssにあるmaterial-folder-card/open/copy、material-folder-grid、material-breadcrumb、material-tree-folder/children/file、view-toggleをWikiで再利用。ネイティブdetails/summaryによる折り畳みとapp-modal/modal-header/modal-actionsを用いた名称変更・作成・移動dialogを同じパターンで実装する。教材側のドラッグ操作はスマホでも確実に操作できる選択式移動dialogに置き換える。共通CSS・トップ・他アプリの認証は変更しない。works_themeと共通paletteを維持し、独自theme保存キーを設けない。
+教材管理のshared/styles.cssにあるmaterial-folder-card/open/copy、material-folder-grid、material-breadcrumb、material-tree-folder/children/file、view-toggleをWikiで再利用。ネイティブdetails/summaryによる折り畳みとapp-modal/modal-header/modal-actionsを用いた名称変更・作成・移動dialogを同じパターンで実装する。教材側のドラッグ操作はスマホでも確実に操作できる選択式移動dialogに置き換える。Wiki機能側は共通CSS・トップ・他アプリの認証を変更しない。統合したPR #102は共通ヘッダー・テーマ・分類表示を更新する。works_themeと共通paletteを維持し、独自theme保存キーを設けない。
 
 フォルダ表示はパンくず、子フォルダカード、そのフォルダ内ページ。ルート所属ページは未分類。ツリー表示は左側の階層とページ、右側の内容。同名の兄弟フォルダを拒否。最大1000フォルダ・16階層。ツリーにページmetadataを直近2000件まで表示し、超過時は案内する。他のページも各フォルダの内容・全体検索から取得できる。検索は従来通り全フォルダ横断。フォルダ削除は今回追加しない。
 
