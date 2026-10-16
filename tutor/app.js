@@ -214,6 +214,7 @@ let selectingStudent = false;
 let navigatingStudent = false;
 let loadedPrefName = "";
 let prefRequest = 0;
+let studentGeneration = 0;
 
 let calendarColors = new Map(); // calendarId -> { raw, bg, fg }
 let years = [];
@@ -249,6 +250,7 @@ let goalTemplates = [];
 let editingTemplateId = null;
 
 function showActionError(err) {
+  if (err?.code === "STALE_STUDENT_RESPONSE") return;
   els.actionError.textContent = err instanceof Error ? err.message : String(err);
   els.actionError.classList.remove("info");
 }
@@ -675,19 +677,7 @@ watchAuth({
         showEventPlaceholder("授業予定を取得できませんでした。再読み込みしてください。");
         showActionError(err);
       }
-      try {
-        if (els.curriculumName.value && els.curriculumTermSelect.value) {
-          await loadCurriculumEvents();
-        }
-        if (els.curriculumName.value) {
-          await loadGoals();
-          await loadCandidateSchools();
-          await loadStudentPref();
-          await loadStudentMaterials();
-        }
-      } catch (err) {
-        showActionError(err);
-      }
+      if (els.curriculumName.value) await refreshStudentDetails();
       await loadRecordTable();
     } catch (err) {
       showActionError(err);
@@ -698,27 +688,38 @@ watchAuth({
   },
 });
 
-async function apiFetch(path, options = {}) {
-  const token = getSessionToken();
-  if (!token) throw new Error("not signed in");
-  const res = await fetch(API_BASE + path, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-      ...(options.headers || {}),
-    },
-  });
-  if (res.status === 401) {
-    // セッションが失効している場合は静かにログアウトさせ、サインイン画面に戻す。
-    await signOutUser();
-    window.location.reload();
-    throw new Error("セッションが切れました。再度ログインしてください。");
+// Student reads and writes retain their originating selection through response parsing.
+// A stale write response must not trigger follow-up reloads or errors on another student.
+async function apiFetch(path, options = {}, context = (/^\/(?:goals|schools|student-prefs|student-materials|chapter-progress)(?:[/?]|$)/.test(path) || (path.startsWith("/curriculum/") && options.method)) ? captureStudentContext() : null) {
+  if (context) assertStudentContext(context);
+  try {
+    const token = getSessionToken();
+    if (!token) throw new Error("not signed in");
+    const res = await fetch(API_BASE + path, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+        ...(options.headers || {}),
+      },
+    });
+    if (context) assertStudentContext(context);
+    if (res.status === 401) {
+      // セッションが失効している場合は静かにログアウトさせ、サインイン画面に戻す。
+      await signOutUser();
+      window.location.reload();
+      throw new Error("セッションが切れました。再度ログインしてください。");
+    }
+    if (!res.ok) {
+      throw new Error(`API error ${res.status}: ${await res.text()}`);
+    }
+    const result = res.status === 204 ? null : await res.json();
+    if (context) assertStudentContext(context);
+    return result;
+  } catch (err) {
+    if (context) assertStudentContext(context);
+    throw err;
   }
-  if (!res.ok) {
-    throw new Error(`API error ${res.status}: ${await res.text()}`);
-  }
-  return res.status === 204 ? null : res.json();
 }
 
 // 選択中の全カレンダーから指定期間の予定を横断取得する共通ヘルパー。
@@ -1488,15 +1489,18 @@ els.chapterList.addEventListener("submit", async (e) => {
 
 // --- 生徒情報タブ: 教材・提出物進捗(使用教材の登録とチャプター単位の進捗チェック) ---
 
-async function loadStudentMaterials() {
-  const name = els.curriculumName.value.trim();
+async function loadStudentMaterials(context = captureStudentContext()) {
+  assertStudentContext(context);
+  const name = context.name;
   if (!name) {
     studentMaterials = [];
     renderStudentMaterials();
     renderAddStudentMaterialOptions();
     return;
   }
-  studentMaterials = await apiFetch(`/student-materials?name=${encodeURIComponent(name)}`);
+  const result = await apiFetch(`/student-materials?name=${encodeURIComponent(name)}`, {}, context);
+  assertStudentContext(context);
+  studentMaterials = result;
   renderStudentMaterials();
   renderAddStudentMaterialOptions();
 }
@@ -2053,22 +2057,24 @@ function invalidateStudentPref() {
   els.studentMemoInput.value = "";
 }
 
-async function loadStudentPref() {
+async function loadStudentPref(context = captureStudentContext()) {
+  assertStudentContext(context);
   invalidateStudentPref();
   const request = prefRequest;
   const name = els.curriculumName.value.trim();
   if (!name) return;
-  const pref = await apiFetch(`/student-prefs?name=${encodeURIComponent(name)}`);
+  const pref = await apiFetch(`/student-prefs?name=${encodeURIComponent(name)}`, {}, context);
+  assertStudentContext(context);
   if (request !== prefRequest || name !== els.curriculumName.value.trim()) return;
   els.curriculumPrintNameInput.value = pref?.print_name || "";
   els.studentMemoInput.value = pref?.memo || "";
   loadedPrefName = name;
-  els.curriculumPrintNameInput.disabled = false;
+  els.curriculumPrintNameInput.disabled = navigatingStudent || selectingStudent;
 }
 
 els.curriculumPrintNameInput.addEventListener("change", async () => {
   const name = els.curriculumName.value.trim();
-  if (!name || loadedPrefName !== name) {
+  if (!name || loadedPrefName !== name || navigatingStudent || selectingStudent) {
     showActionError(new Error("生徒情報の取得が完了してから編集してください"));
     return;
   }
@@ -2084,7 +2090,7 @@ els.curriculumPrintNameInput.addEventListener("change", async () => {
 
 els.studentMemoInput.addEventListener("change", async () => {
   const name = els.curriculumName.value.trim();
-  if (!name || loadedPrefName !== name) {
+  if (!name || loadedPrefName !== name || navigatingStudent || selectingStudent) {
     showActionError(new Error("生徒情報の取得が完了してから編集してください"));
     return;
   }
@@ -2112,8 +2118,7 @@ function renderCurriculumSearchSummary() {
 }
 
 els.openCurriculumSearchModalBtn.addEventListener("click", () => {
-  if (navigatingStudent || selectingStudent) return;
-  els.curriculumPrintNameInput.disabled = !els.curriculumName.value || loadedPrefName !== els.curriculumName.value.trim();
+  els.curriculumPrintNameInput.disabled = !els.curriculumName.value || loadedPrefName !== els.curriculumName.value.trim() || navigatingStudent || selectingStudent;
   const choice = studentChoices.find((item) => item.name === els.curriculumName.value && item.group === studentGroup);
   const kindSelect = document.querySelector("#student-lesson-kind");
   kindSelect.disabled = !choice?.group.startsWith("代官山");
@@ -2146,6 +2151,7 @@ function curriculumSelectionName(title) {
 }
 
 function clearStudentDetails() {
+  studentGeneration++;
   invalidateStudentPref();
   document.querySelectorAll("[data-page-tab-panel=curriculum] .collapsible-section").forEach((section) => { section.inert = true; });
   els.curriculumTbody.innerHTML = "";
@@ -2201,53 +2207,86 @@ function renderStudentSelector() {
   els.studentSelector.querySelector('[aria-pressed="true"]')?.scrollIntoView({ block: "nearest", inline: "nearest" });
 }
 
+// Each refresh owns one generation. New navigation supersedes pending work, including
+// initialization, settings refreshes, errors and completion/enable callbacks.
+function captureStudentContext() {
+  return { generation: studentGeneration, name: els.curriculumName.value.trim(), group: studentGroup,
+    year: els.curriculumYearSelect.value, term: els.curriculumTermSelect.value,
+    calendars: [...selectedCalendarIds].sort().join("\n") };
+}
+function isCurrentStudentContext(context) {
+  const current = captureStudentContext();
+  return Object.keys(current).every((key) => current[key] === context[key]);
+}
+function assertStudentContext(context) {
+  if (isCurrentStudentContext(context)) return;
+  const error = new Error("Superseded student request");
+  error.code = "STALE_STUDENT_RESPONSE";
+  throw error;
+}
+function setStudentBusy(busy) {
+  navigatingStudent = busy;
+  selectingStudent = busy;
+  els.studentSelector.setAttribute("aria-busy", String(busy));
+}
+async function refreshStudentDetails({ closeSettings = false } = {}) {
+  clearStudentDetails();
+  const context = captureStudentContext();
+  setStudentBusy(true);
+  renderStudentSelector();
+  try {
+    for (const load of [loadCurriculumEvents, loadGoals, loadCandidateSchools, loadStudentPref, loadStudentMaterials]) {
+      assertStudentContext(context);
+      await load(context);
+    }
+    assertStudentContext(context);
+    renderCurriculumSearchSummary();
+    renderCurriculumNameSuggestions();
+    document.querySelectorAll("[data-page-tab-panel=curriculum] .collapsible-section").forEach((section) => { section.inert = false; });
+    if (closeSettings) els.curriculumSearchModal.close();
+  } catch (err) {
+    if (isCurrentStudentContext(context)) {
+      clearStudentDetails();
+      // The failed current operation remains the UI owner after clearing.
+      context.generation = studentGeneration;
+      showActionError(err);
+    }
+  } finally {
+    if (context.generation === studentGeneration) {
+      setStudentBusy(false);
+      els.curriculumPrintNameInput.disabled = !context.name || loadedPrefName !== context.name;
+      renderStudentSelector();
+    }
+  }
+}
+
 els.studentGroups.addEventListener("click", (event) => {
   const button = event.target.closest("[data-student-group]");
-  if (!button || selectingStudent || navigatingStudent) return;
+  if (!button) return;
   studentGroup = button.dataset.studentGroup;
   els.curriculumName.value = "";
   clearStudentDetails();
+  setStudentBusy(false);
   saveCurriculumState();
   renderCurriculumSearchSummary();
   renderStudentSelector();
 });
 els.studentSelector.addEventListener("click", async (event) => {
   const button = event.target.closest("[data-student-index]");
-  if (!button || selectingStudent || navigatingStudent) return;
+  if (!button) return;
   const item = studentChoices[Number(button.dataset.studentIndex)];
-  selectingStudent = true;
-  els.studentSelector.setAttribute("aria-busy", "true");
-  els.studentSelector.querySelectorAll("button").forEach((el) => { el.disabled = true; });
-  try {
-    await goToCurriculum(item.name);
-  } finally {
-    selectingStudent = false;
-    els.studentSelector.setAttribute("aria-busy", "false");
-    renderStudentSelector();
-  }
+  await goToCurriculum(item.name);
 });
 
 els.curriculumFilterForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   els.actionError.textContent = "";
   saveCurriculumState();
-  clearStudentDetails();
-  try {
-    await loadCurriculumEvents();
-    await loadGoals();
-    await loadCandidateSchools();
-    await loadStudentPref();
-    await loadStudentMaterials();
-    renderCurriculumSearchSummary();
-    document.querySelectorAll("[data-page-tab-panel=curriculum] .collapsible-section").forEach((section) => { section.inert = false; });
-    els.curriculumSearchModal.close();
-  } catch (err) {
-    clearStudentDetails();
-    showActionError(err);
-  }
+  await refreshStudentDetails({ closeSettings: true });
 });
 
-async function loadCurriculumEvents() {
+async function loadCurriculumEvents(context = captureStudentContext()) {
+  assertStudentContext(context);
   const token = getSessionToken();
   const name = els.curriculumName.value.trim();
   const term = terms.find((t) => t.id === Number(els.curriculumTermSelect.value));
@@ -2259,6 +2298,7 @@ async function loadCurriculumEvents() {
   const timeMin = new Date(`${term.start_date}T00:00:00`).toISOString();
   const timeMax = new Date(`${term.end_date}T23:59:59`).toISOString();
   const events = await fetchCalendarEvents(timeMin, timeMax, { withCalendarId: true });
+  assertStudentContext(context);
   const choice = studentChoices.find((item) => item.name === name && item.group === studentGroup);
 
   const matched = events
@@ -2269,16 +2309,18 @@ async function loadCurriculumEvents() {
       return aStart.localeCompare(bStart);
     });
 
-  await renderCurriculumTable(matched);
+  await renderCurriculumTable(matched, context);
 }
 
-async function renderCurriculumTable(events) {
+async function renderCurriculumTable(events, context = captureStudentContext()) {
+  assertStudentContext(context);
   if (events.length === 0) {
     els.curriculumTbody.innerHTML = `<tr><td colspan="7">該当する予定がありません</td></tr>`;
     return;
   }
 
-  const entries = await apiFetch("/curriculum");
+  const entries = await apiFetch("/curriculum", {}, context);
+  assertStudentContext(context);
   const entryMap = new Map(entries.map((entry) => [entry.calendar_event_id, entry]));
 
   els.curriculumTbody.innerHTML = events
@@ -2385,14 +2427,17 @@ function renderGoalEditLists() {
   });
 }
 
-async function loadGoals() {
-  const name = els.curriculumName.value.trim();
+async function loadGoals(context = captureStudentContext()) {
+  assertStudentContext(context);
+  const name = context.name;
   if (!name) {
     goals = [];
     renderGoalColumns();
     return;
   }
-  goals = await apiFetch(`/goals?name=${encodeURIComponent(name)}`);
+  const result = await apiFetch(`/goals?name=${encodeURIComponent(name)}`, {}, context);
+  assertStudentContext(context);
+  goals = result;
   renderGoalColumns();
 }
 
@@ -2718,14 +2763,17 @@ function renderSchoolsSummary() {
   els.schoolsSummary.textContent = parts.join("　|　") || "受験校が設定されています。";
 }
 
-async function loadCandidateSchools() {
-  const name = els.curriculumName.value.trim();
+async function loadCandidateSchools(context = captureStudentContext()) {
+  assertStudentContext(context);
+  const name = context.name;
   if (!name) {
     candidateSchools = [];
     renderSchoolsSummary();
     return;
   }
-  candidateSchools = await apiFetch(`/schools?name=${encodeURIComponent(name)}`);
+  const result = await apiFetch(`/schools?name=${encodeURIComponent(name)}`, {}, context);
+  assertStudentContext(context);
+  candidateSchools = result;
   renderSchoolsSummary();
 }
 
@@ -3202,12 +3250,8 @@ function applyNameFilter(token) {
 // 授業予定・授業記録の生徒名をクリックしたときの遷移先。
 // カリキュラムタブに切り替え、その名前(・分かればその学期)で検索を実行する。
 async function goToCurriculum(name, term) {
-  if (navigatingStudent) return;
-  navigatingStudent = true;
   const curriculumTabBtn = [...els.pageTabBtns].find((b) => b.dataset.pageTab === "curriculum");
   curriculumTabBtn?.click();
-  const sections = document.querySelectorAll("[data-page-tab-panel=curriculum] .collapsible-section");
-  sections.forEach((section) => { section.inert = true; });
   name = studentChoices.some((item) => item.name === name) ? name : curriculumSelectionName(name);
   if (!studentChoices.some((item) => item.name === name && item.group === studentGroup)) {
     studentGroup = studentChoices.find((item) => item.name === name)?.group || "";
@@ -3221,22 +3265,7 @@ async function goToCurriculum(name, term) {
   }
   els.actionError.textContent = "";
   saveCurriculumState();
-  clearStudentDetails();
-  try {
-    await loadCurriculumEvents();
-    await loadGoals();
-    await loadCandidateSchools();
-    await loadStudentPref();
-    await loadStudentMaterials();
-    renderCurriculumSearchSummary();
-    renderCurriculumNameSuggestions();
-    sections.forEach((section) => { section.inert = false; });
-  } catch (err) {
-    clearStudentDetails();
-    showActionError(err);
-  } finally {
-    navigatingStudent = false;
-  }
+  await refreshStudentDetails();
 }
 
 els.eventList.addEventListener("click", handleTokenClick);
