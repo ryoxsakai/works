@@ -1138,7 +1138,7 @@ const MCP_SCHEDULE_TOOLS = [
   {
     name: "search_materials",
     title: "教材を検索",
-    description: "教材ライブラリのファイル名とフォルダ名を部分一致で検索します。",
+    description: "教材ライブラリのファイル名・教材コードとフォルダ名を部分一致で検索します。",
     inputSchema: {
       type: "object",
       properties: {
@@ -3289,7 +3289,7 @@ async function searchMcpMaterials(env, args = {}) {
     return names.join(" / ") || null;
   };
   const fileResults = files
-    .filter((file) => String(file.name || "").toLocaleLowerCase("ja").includes(normalized))
+    .filter((file) => [file.name, file.material_code].some((value) => String(value || "").toLocaleLowerCase("ja").includes(normalized)))
     .slice(0, limit)
     .map((file) => ({ ...file, folder_path: pathFor(file.folder_id) }));
   const folderResults = folders
@@ -5019,6 +5019,9 @@ async function ensureMaterialSchema(env) {
       if (!folderInfo.results.some((column) => column.name === "sort_order")) {
         await db.prepare("ALTER TABLE material_folders ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0").run();
       }
+      if (!fileInfo.results.some((column) => column.name === "material_code")) {
+        await db.prepare("ALTER TABLE material_files ADD COLUMN material_code TEXT NOT NULL DEFAULT ''").run();
+      }
       if (!fileInfo.results.some((column) => column.name === "sort_order")) {
         await db.prepare("ALTER TABLE material_files ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0").run();
       }
@@ -5237,6 +5240,15 @@ async function updateMaterialFile(env, id, body) {
     if (name.length > 255) throw new Error("ファイル名は255文字以内にしてください");
     fields.push("name = ?");
     values.push(name);
+  }
+  if (body.material_code !== undefined) {
+    if (body.material_code !== null && typeof body.material_code !== "string") {
+      throw httpError(400, "教材コードは文字列で入力してください");
+    }
+    const code = (body.material_code || "").trim();
+    if (code.length > 64) throw httpError(400, "教材コードは64文字以内にしてください");
+    fields.push("material_code = ?");
+    values.push(code);
   }
   if (body.folder_id !== undefined) {
     const folderId = body.folder_id || null;
