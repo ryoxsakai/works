@@ -34,6 +34,10 @@ const els = {
   uploadDestination: document.querySelector("#material-upload-destination"),
   treeSearch: document.querySelector("#material-tree-search-input"),
   tree: document.querySelector("#material-tree"),
+  tags: document.querySelector("#material-tags"),
+  tagSearch: document.querySelector("#material-tag-search"),
+  tagCount: document.querySelector("#material-tag-count"),
+  tagsEmpty: document.querySelector("#material-tags-empty"),
   treeEmpty: document.querySelector("#material-tree-empty"),
   renameModal: document.querySelector("#rename-material-modal"),
   renameTitle: document.querySelector("#rename-material-title"),
@@ -80,7 +84,7 @@ async function api(path, options = {}) {
 }
 
 function switchTab(name) {
-  const next = name === "tree" ? "tree" : "library";
+  const next = ["tree", "tags"].includes(name) ? name : "library";
   localStorage.setItem(ACTIVE_TAB_KEY, next);
   els.tabButtons.forEach((button) => {
     button.setAttribute("aria-selected", String(button.dataset.materialTab === next));
@@ -88,7 +92,7 @@ function switchTab(name) {
   els.tabPanels.forEach((panel) => {
     panel.hidden = panel.dataset.materialTabPanel !== next;
   });
-  if (next === "tree" && getSessionToken()) loadTreeFiles();
+  if (next !== "library" && getSessionToken()) loadTreeFiles();
 }
 
 function folderById(id) {
@@ -585,11 +589,47 @@ function renderTree() {
   els.treeEmpty.hidden = topFolders.length > 0 || rootFiles.length > 0;
 }
 
+function groupMaterialTags(allFiles, query = "") {
+  const groups = new Map();
+  const needle = query.trim().toLocaleLowerCase("ja");
+  for (const file of allFiles) {
+    const code = String(file.material_code || "").trim();
+    if (!code || !matchesMaterialFile(file, needle)) continue;
+    const key = code.toLocaleLowerCase("ja");
+    if (!groups.has(key)) groups.set(key, { code, files: [] });
+    groups.get(key).files.push(file);
+  }
+  return [...groups.values()]
+    .sort((a, b) => a.code.localeCompare(b.code, "en", { sensitivity: "base", numeric: true }))
+    .map((group) => ({ ...group, files: group.files.sort((a, b) => a.name.localeCompare(b.name, "ja", { numeric: true })) }));
+}
+
+function renderTags() {
+  const groups = groupMaterialTags(treeFiles, els.tagSearch.value);
+  els.tags.replaceChildren();
+  els.tagCount.textContent = groups.length + "タグ";
+  els.tagsEmpty.hidden = groups.length > 0;
+  for (const group of groups) {
+    const section = document.createElement("section");
+    const heading = document.createElement("h3");
+    heading.className = "material-tree-root-heading";
+    heading.textContent = group.code + "（" + group.files.length + "件）";
+    section.append(heading);
+    for (const file of group.files) {
+      const button = makeTreeFile(file);
+      button.querySelector("small").textContent = folderPath(file.folder_id) || "すべての教材";
+      section.append(button);
+    }
+    els.tags.append(section);
+  }
+}
+
 async function loadTreeFiles() {
   try {
     setError();
     treeFiles = await api("/files?all=1");
     renderTree();
+    renderTags();
   } catch (err) {
     setError(err.message);
   }
@@ -897,7 +937,7 @@ async function uploadAll() {
     uploadItems = uploadItems.filter((item) => item.status !== "done");
     renderUploadQueue();
     await loadLibrary();
-    if (!els.tabPanels[1].hidden) await loadTreeFiles();
+    if ([...els.tabPanels].some((panel) => panel.dataset.materialTabPanel !== "library" && !panel.hidden)) await loadTreeFiles();
   }
 }
 
@@ -905,6 +945,7 @@ els.tabButtons.forEach((button) => {
   button.addEventListener("click", () => switchTab(button.dataset.materialTab));
 });
 els.search.addEventListener("input", renderLibrary);
+els.tagSearch.addEventListener("input", renderTags);
 els.treeSearch.addEventListener("input", renderTree);
 els.newFolder.addEventListener("click", () => {
   els.newFolderName.value = "";
@@ -998,7 +1039,7 @@ watchAuth({
       els.userAvatarFallback.hidden = false;
     }
     await loadLibrary();
-    if (!els.tabPanels[1].hidden) await loadTreeFiles();
+    if ([...els.tabPanels].some((panel) => panel.dataset.materialTabPanel !== "library" && !panel.hidden)) await loadTreeFiles();
   },
   onSignedOut: () => {
     window.location.replace("/");
