@@ -41,6 +41,9 @@
         <button type="button" class="page-tab-btn" data-material-tab="tree" aria-selected="false">
           <i class="bx bx-git-branch"></i> ツリー検索
         </button>
+        <button type="button" class="page-tab-btn" data-material-tab="tags" aria-selected="false">
+          <i class="bx bx-purchase-tag"></i> タグ一覧
+        </button>
       </div>
 
       <div data-material-tab-panel="library">
@@ -104,7 +107,7 @@
           </div>
           <label class="material-search material-tree-search">
             <i class="bx bx-search"></i>
-            <input id="material-tree-search-input" type="search" placeholder="フォルダ名・教材名を検索" />
+            <input id="material-tree-search-input" type="search" placeholder="フォルダ名・教材名・教材コードを検索" />
           </label>
           <p class="material-tree-help">フォルダを展開して階層を確認できます。教材名を押すと内容を閲覧します。</p>
           <div id="material-tree" class="material-tree" role="tree"></div>
@@ -112,6 +115,24 @@
             <i class="bx bx-search-alt"></i>
             <p>一致するフォルダや教材がありません。</p>
           </div>
+        </section>
+      </div>
+      <div data-material-tab-panel="tags" hidden>
+        <section class="panel material-panel" aria-labelledby="material-tags-title">
+          <div class="panel-header material-heading">
+            <div>
+              <p class="eyebrow">TAGS</p>
+              <h2 id="material-tags-title"><i class="bx bx-purchase-tag"></i> タグ一覧</h2>
+            </div>
+            <span id="material-tag-count" class="material-count"></span>
+          </div>
+          <label class="material-search material-tree-search">
+            <i class="bx bx-search"></i>
+            <input id="material-tag-search" type="search" placeholder="タグ・ファイル名を検索" />
+          </label>
+          <p class="material-tree-help">教材コードをタグとしてabc順に表示します。ファイル名を押すと教材を開きます。</p>
+          <div id="material-tags"></div>
+          <p id="material-tags-empty" class="material-empty" hidden>表示するタグがありません。教材の鉛筆ボタンから教材コードを設定してください。</p>
         </section>
       </div>
     </section>
@@ -173,6 +194,6 @@
     <div id="material-preview-body" class="material-preview-body"></div>
   </dialog>
 
-  <script type="module" src="./app.js?v=7"></script>
+  <script type="module" src="./app.js?v=8"></script>
 </body>
 </html>

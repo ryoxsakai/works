@@ -37,3 +37,15 @@ test('folder and tree search match names or codes, including legacy files', asyn
   assert.equal(context.matchesMaterialFile({name:'教材.pdf'},'p1w'),false);
   assert.equal(context.matchesMaterialFile({name:'教材.pdf'},''),true);
 });
+test('tag list groups codes across folders and sorts alphabetically', async()=>{
+  const source = await readFile(new URL('../../material/app.js',import.meta.url),'utf8');
+  const helpers = source.slice(source.indexOf('function matchesMaterialFile'),source.indexOf('\nfunction renderFiles')) + source.slice(source.indexOf('function groupMaterialTags'),source.indexOf('\nfunction renderTags'));
+  const context = vm.createContext({}); vm.runInContext(helpers,context);
+  const files = [{id:'1',name:'B.pdf',material_code:'z1'}, {id:'2',name:'C.pdf',material_code:'a1',folder_id:'one'}, {id:'3',name:'A.pdf',material_code:'A1',folder_id:'two'}, {id:'4',name:'No code.pdf'}];
+  const groups = context.groupMaterialTags(files);
+  assert.equal(groups.length,2); assert.equal(groups[0].code,'a1');
+  assert.deepEqual(Array.from(groups[0].files, f=>f.id),['3','2']);
+  assert.equal(context.groupMaterialTags(files,'A1')[0].files.length,2);
+  assert.equal(context.groupMaterialTags(files,'C.pdf')[0].files[0].id,'2');
+  assert.equal(context.groupMaterialTags(files,'missing').length,0);
+});
