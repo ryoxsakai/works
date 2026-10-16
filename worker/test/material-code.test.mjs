@@ -1,0 +1,39 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { readFile } from 'node:fs/promises';
+import vm from 'node:vm';
+import { Miniflare } from 'miniflare';
+
+test('legacy files migrate and codes persist, search, survive rename, and clear', async t => {
+  let source = await readFile(new URL('../src/index.js', import.meta.url), 'utf8');
+  source = source.replace(/from "(\.\/[^\"]+)"/g, (_, path) => `from "${new URL('../src/' + path.slice(2), import.meta.url).href}"`);
+  const f = await import(`data:text/javascript;base64,${Buffer.from(source + '\nexport { ensureMaterialSchema, updateMaterialFile, readAllMaterialFiles, searchMcpMaterials };').toString('base64')}`);
+  const mf = new Miniflare({modules:true,script:"export default {fetch(){return new Response('ok')}}",compatibilityDate:'2026-08-01',d1Databases:{MATERIALS_DB:'codes-test'}});
+  t.after(()=>mf.dispose());
+  const db = await mf.getD1Database('MATERIALS_DB');
+  await db.prepare("CREATE TABLE material_files (id TEXT PRIMARY KEY, folder_id TEXT, name TEXT NOT NULL, object_key TEXT NOT NULL UNIQUE, mime_type TEXT, size INTEGER DEFAULT 0, created_at TEXT)").run();
+  await db.prepare("INSERT INTO material_files (id,name,object_key) VALUES ('fixture','授業プリント.pdf','fixture.pdf')").run();
+  const env = {MATERIALS_DB:db};
+  await f.ensureMaterialSchema(env);
+  assert.equal((await f.readAllMaterialFiles(env))[0].material_code,'');
+  const saved = await f.updateMaterialFile(env,'fixture',{material_code:' p1w '});
+  assert.equal(saved.material_code,'p1w');
+  assert.equal(saved.name,'授業プリント.pdf');
+  assert.equal((await f.searchMcpMaterials(env,{query:'P1W'})).files[0].id,'fixture');
+  await f.updateMaterialFile(env,'fixture',{name:'新しい教材.pdf'});
+  assert.equal((await f.readAllMaterialFiles(env))[0].material_code,'p1w');
+  await assert.rejects(f.updateMaterialFile(env,'fixture',{material_code:'x'.repeat(65)}),/64/);
+  await assert.rejects(f.updateMaterialFile(env,'fixture',{material_code:{}}),/文字列/);
+  await f.updateMaterialFile(env,'fixture',{material_code:''});
+  assert.equal((await f.searchMcpMaterials(env,{query:'p1w'})).file_count,0);
+  assert.equal((await f.readAllMaterialFiles(env))[0].object_key,'fixture.pdf');
+});
+test('folder and tree search match names or codes, including legacy files', async()=>{
+  const source = await readFile(new URL('../../material/app.js',import.meta.url),'utf8');
+  const helper = source.slice(source.indexOf('function matchesMaterialFile'),source.indexOf('\nfunction renderFiles'));
+  const context = vm.createContext({}); vm.runInContext(helper,context);
+  assert.equal(context.matchesMaterialFile({name:'教材.pdf',material_code:'P1W'},'p1w'),true);
+  assert.equal(context.matchesMaterialFile({name:'教材.pdf'},'教材'),true);
+  assert.equal(context.matchesMaterialFile({name:'教材.pdf'},'p1w'),false);
+  assert.equal(context.matchesMaterialFile({name:'教材.pdf'},''),true);
+});

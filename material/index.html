@@ -60,7 +60,7 @@
           <div class="material-toolbar">
             <label class="material-search">
               <i class="bx bx-search"></i>
-              <input id="material-search-input" type="search" placeholder="このフォルダ内を検索" />
+              <input id="material-search-input" type="search" placeholder="このフォルダ内を検索（名前・教材コード）" />
             </label>
           </div>
 
@@ -147,6 +147,11 @@
         <span>新しい名前</span>
         <input id="rename-material-name" type="text" maxlength="255" required />
       </label>
+      <label id="material-code-field" class="material-dialog-field" hidden>
+        <span>教材コード</span>
+        <input id="material-code" type="text" maxlength="64" placeholder="例: p1w" autocomplete="off" />
+        <small>検索用の短いコードを設定できます。空欄で保存すると解除します。</small>
+      </label>
       <div class="edit-actions material-dialog-actions">
         <button type="submit" class="btn-primary"><i class="bx bx-check"></i> 保存</button>
       </div>
@@ -168,6 +173,6 @@
     <div id="material-preview-body" class="material-preview-body"></div>
   </dialog>
 
-  <script type="module" src="./app.js?v=6"></script>
+  <script type="module" src="./app.js?v=7"></script>
 </body>
 </html>

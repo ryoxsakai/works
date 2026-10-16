@@ -40,6 +40,8 @@ const els = {
   renameClose: document.querySelector("#rename-material-close"),
   renameForm: document.querySelector("#rename-material-form"),
   renameName: document.querySelector("#rename-material-name"),
+  codeField: document.querySelector("#material-code-field"),
+  code: document.querySelector("#material-code"),
   previewModal: document.querySelector("#material-preview-modal"),
   previewTitle: document.querySelector("#material-preview-title"),
   previewBody: document.querySelector("#material-preview-body"),
@@ -411,11 +413,17 @@ function renderFolders() {
   }
 }
 
+function matchesMaterialFile(file, query) {
+  return !query || [file.name, file.material_code].some(
+    (value) => String(value || "").toLocaleLowerCase("ja").includes(query)
+  );
+}
+
 function renderFiles() {
   els.fileList.replaceChildren();
   const query = els.search.value.trim().toLocaleLowerCase("ja");
   const visible = files.filter(
-    (file) => !query || file.name.toLocaleLowerCase("ja").includes(query)
+    (file) => matchesMaterialFile(file, query)
   );
   els.fileCount.textContent = visible.length + "件";
   els.empty.hidden = visible.length > 0 || els.folderGrid.childElementCount > 0;
@@ -442,7 +450,7 @@ function renderFiles() {
       '<span class="material-file-copy"><strong></strong><small></small></span>';
     info.querySelector("strong").textContent = escapeText(file.name);
     info.querySelector("small").textContent =
-      presentation.label + "・" + formatSize(file.size) + "・" + String(file.created_at || "").slice(0, 10);
+      (file.material_code ? "教材コード: " + file.material_code + "・" : "") + presentation.label + "・" + formatSize(file.size) + "・" + String(file.created_at || "").slice(0, 10);
 
     const actions = document.createElement("div");
     actions.className = "material-file-actions";
@@ -457,7 +465,7 @@ function renderFiles() {
     const rename = document.createElement("button");
     rename.type = "button";
     rename.className = "material-icon-btn";
-    rename.setAttribute("aria-label", file.name + "の名前を変更");
+    rename.setAttribute("aria-label", file.name + "の名前・教材コードを編集");
     rename.innerHTML = '<i class="bx bx-pencil"></i>';
     rename.addEventListener("click", () => openRename("file", file));
 
@@ -488,7 +496,7 @@ function filesInFolder(folderId) {
 function treeNodeMatches(folder, query) {
   if (!query) return true;
   if (folder.name.toLocaleLowerCase("ja").includes(query)) return true;
-  if (filesInFolder(folder.id).some((file) => file.name.toLocaleLowerCase("ja").includes(query))) return true;
+  if (filesInFolder(folder.id).some((file) => matchesMaterialFile(file, query))) return true;
   return folders
     .filter((child) => (child.parent_id || null) === folder.id)
     .some((child) => treeNodeMatches(child, query));
@@ -504,7 +512,7 @@ function makeTreeFile(file) {
     '<span class="material-tree-file-copy"><strong></strong><small></small></span>' +
     '<i class="bx bx-file-find"></i>';
   button.querySelector("strong").textContent = file.name;
-  button.querySelector("small").textContent = presentation.label + "・" + formatSize(file.size);
+  button.querySelector("small").textContent = (file.material_code ? "教材コード: " + file.material_code + "・" : "") + presentation.label + "・" + formatSize(file.size);
   button.addEventListener("click", () => viewFile(file));
   return button;
 }
@@ -536,7 +544,7 @@ function makeTreeFolder(folder, query, depth = 0) {
     (child) => (child.parent_id || null) === folder.id && treeNodeMatches(child, query)
   );
   const childFiles = filesInFolder(folder.id).filter(
-    (file) => !query || file.name.toLocaleLowerCase("ja").includes(query) ||
+    (file) => matchesMaterialFile(file, query) ||
       folder.name.toLocaleLowerCase("ja").includes(query)
   );
   childFolders.forEach((child) => children.append(makeTreeFolder(child, query, depth + 1)));
@@ -568,7 +576,7 @@ function renderTree() {
     (folder) => !folder.parent_id && treeNodeMatches(folder, query)
   );
   const rootFiles = filesInFolder(null).filter(
-    (file) => !query || file.name.toLocaleLowerCase("ja").includes(query)
+    (file) => matchesMaterialFile(file, query)
   );
   topFolders.forEach((folder) => rootChildren.append(makeTreeFolder(folder, query)));
   rootFiles.forEach((file) => rootChildren.append(makeTreeFile(file)));
@@ -627,9 +635,12 @@ async function openFolder(id) {
 
 function openRename(type, item) {
   renameTarget = { type, id: item.id };
-  els.renameTitle.textContent = type === "folder" ? "フォルダ名を変更" : "ファイル名を変更";
+  els.renameTitle.textContent = type === "folder" ? "フォルダ名を変更" : "教材情報を編集";
   els.renameName.maxLength = type === "folder" ? 120 : 255;
   els.renameName.value = item.name;
+  els.codeField.hidden = type !== "file";
+  els.code.disabled = type !== "file";
+  els.code.value = type === "file" ? item.material_code || "" : "";
   els.renameModal.showModal();
   requestAnimationFrame(() => {
     els.renameName.focus();
@@ -913,7 +924,10 @@ els.renameForm.addEventListener("submit", async (event) => {
         : "/files/" + encodeURIComponent(renameTarget.id);
     await api(path, {
       method: "PUT",
-      body: JSON.stringify({ name: els.renameName.value }),
+      body: JSON.stringify({
+        name: els.renameName.value,
+        ...(renameTarget.type === "file" ? { material_code: els.code.value } : {}),
+      }),
     });
     els.renameModal.close();
     renameTarget = null;
