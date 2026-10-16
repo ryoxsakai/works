@@ -32,7 +32,7 @@ const COLLAPSED_SECTIONS_KEY = "works_collapsed_sections";
 const PRINT_SECTIONS_KEY = "works_print_sections";
 const DEFAULT_PRINT_SECTIONS = ["goals", "schools", "progress", "materials"];
 const WEEKDAY_LABELS = ["日", "月", "火", "水", "木", "金", "土"];
-const TOKEN_DELIMITER_RE = /([\s　()()【】\[\]・/,、:：\-])/;
+const TOKEN_DELIMITER_RE = /([\s　()（）【】\[\]・/,、:：\-])/;
 
 // summary/descriptionを名前として区切れる単位(スペースや括弧などの区切り文字)に分解する。
 // 「田」のような部分一致で別の生徒(例: 田﨑)まで拾ってしまわないよう、
@@ -54,7 +54,8 @@ function normalizeCurriculumText(text) {
 
 function eventMatchesCurriculumName(event, name) {
   const query = normalizeCurriculumText(name);
-  const source = `${event.summary || ""} ${event.description || ""}`;
+  if ((event.summary || "").trim() === name.trim()) return true;
+  const source = normalizeCurriculumText(`${event.summary || ""} ${event.description || ""}`);
   if (!query) return false;
   if (query.includes(" ")) {
     const parts = tokenizeText(query).map(normalizeCurriculumText);
@@ -210,6 +211,9 @@ let studentDirectory = [];
 let studentChoices = [];
 let studentGroup = "";
 let selectingStudent = false;
+let navigatingStudent = false;
+let loadedPrefName = "";
+let prefRequest = 0;
 
 let calendarColors = new Map(); // calendarId -> { raw, bg, fg }
 let years = [];
@@ -2041,22 +2045,31 @@ function restoreCurriculumState() {
 }
 
 // 生徒(name)ごとの印刷名前(検索名とは別に、印刷時だけ自由な表記(例: 田﨑くん)を使える)。
+function invalidateStudentPref() {
+  prefRequest++;
+  loadedPrefName = "";
+  els.curriculumPrintNameInput.value = "";
+  els.curriculumPrintNameInput.disabled = true;
+  els.studentMemoInput.value = "";
+}
+
 async function loadStudentPref() {
+  invalidateStudentPref();
+  const request = prefRequest;
   const name = els.curriculumName.value.trim();
-  if (!name) {
-    els.curriculumPrintNameInput.value = "";
-    els.studentMemoInput.value = "";
-    return;
-  }
+  if (!name) return;
   const pref = await apiFetch(`/student-prefs?name=${encodeURIComponent(name)}`);
+  if (request !== prefRequest || name !== els.curriculumName.value.trim()) return;
   els.curriculumPrintNameInput.value = pref?.print_name || "";
   els.studentMemoInput.value = pref?.memo || "";
+  loadedPrefName = name;
+  els.curriculumPrintNameInput.disabled = false;
 }
 
 els.curriculumPrintNameInput.addEventListener("change", async () => {
   const name = els.curriculumName.value.trim();
-  if (!name) {
-    showActionError(new Error("先に生徒・授業を選択してください"));
+  if (!name || loadedPrefName !== name) {
+    showActionError(new Error("生徒情報の取得が完了してから編集してください"));
     return;
   }
   try {
@@ -2071,8 +2084,8 @@ els.curriculumPrintNameInput.addEventListener("change", async () => {
 
 els.studentMemoInput.addEventListener("change", async () => {
   const name = els.curriculumName.value.trim();
-  if (!name) {
-    showActionError(new Error("先に生徒・授業を選択してください"));
+  if (!name || loadedPrefName !== name) {
+    showActionError(new Error("生徒情報の取得が完了してから編集してください"));
     return;
   }
   try {
@@ -2099,7 +2112,8 @@ function renderCurriculumSearchSummary() {
 }
 
 els.openCurriculumSearchModalBtn.addEventListener("click", () => {
-  els.curriculumPrintNameInput.disabled = !els.curriculumName.value;
+  if (navigatingStudent || selectingStudent) return;
+  els.curriculumPrintNameInput.disabled = !els.curriculumName.value || loadedPrefName !== els.curriculumName.value.trim();
   const choice = studentChoices.find((item) => item.name === els.curriculumName.value && item.group === studentGroup);
   const kindSelect = document.querySelector("#student-lesson-kind");
   kindSelect.disabled = !choice?.group.startsWith("代官山");
@@ -2113,17 +2127,41 @@ document.querySelector("#student-lesson-kind").addEventListener("change", (event
   if (!key) return;
   studentKinds[key] = event.target.value;
   localStorage.setItem("works_student_kinds", JSON.stringify(studentKinds));
+  studentGroup = "";
   renderCurriculumNameSuggestions();
+  saveCurriculumState();
 });
 
 els.curriculumSearchModalCloseBtn.addEventListener("click", () => els.curriculumSearchModal.close());
 
-// カレンダーの予定名を保存キーとして保持し、実名は表示だけに使用する。
-// 記録の移行や、calendar_tag・異体字の置き換えは行わない。
+// Course codes are class identities; annotations on individual names are not.
+function isGroupLessonTitle(title) {
+  return /集団|グループ/.test(title) || /^(?:A|M)\d+(?:\s|$)/i.test(normalizeCurriculumText(title));
+}
+
+function curriculumSelectionName(title) {
+  const text = String(title || "").trim();
+  if (isGroupLessonTitle(text)) return text;
+  return text.split(/[（(【\[/／]/, 1)[0].trim();
+}
+
+function clearStudentDetails() {
+  invalidateStudentPref();
+  document.querySelectorAll("[data-page-tab-panel=curriculum] .collapsible-section").forEach((section) => { section.inert = true; });
+  els.curriculumTbody.innerHTML = "";
+  goals = [];
+  candidateSchools = [];
+  studentMaterials = [];
+  renderGoalColumns();
+  renderSchoolsSummary();
+  renderStudentMaterials();
+  renderAddStudentMaterialOptions();
+}
+
 function renderCurriculumNameSuggestions() {
   const choices = new Map();
   rawEvents.filter((ev) => !isExcludedScheduleEvent(ev)).forEach((ev) => {
-    const name = (ev.summary || "").trim();
+    const name = curriculumSelectionName(ev.summary);
     if (!name) return;
     const calendar = calendarColors.get(ev._calendarId)?.name || "";
     const registered = studentDirectory.filter((student) =>
@@ -2132,7 +2170,7 @@ function renderCurriculumNameSuggestions() {
     const kindKey = JSON.stringify([ev._calendarId, name]);
     const kind = studentKinds[kindKey];
     const group = /TOMAS/i.test(calendar) ? "TOMAS" :
-      /代官山/.test(calendar) ? ((kind === "group" || (!kind && /集団|グループ/.test(calendar + " " + name))) ? "代官山 · 集団" : "代官山 · 個別") :
+      /代官山/.test(calendar) ? ((kind === "group" || (!kind && (/集団|グループ/.test(calendar) || isGroupLessonTitle(name)))) ? "代官山 · 集団" : "代官山 · 個別") :
       calendar || "その他";
     const key = JSON.stringify([group, name]);
     const calendarIds = choices.get(key)?.calendarIds || [];
@@ -2142,12 +2180,14 @@ function renderCurriculumNameSuggestions() {
   // Restored legacy token selections remain accessible without migrating their keys.
   const current = els.curriculumName.value;
   if (current && ![...choices.values()].some((item) => item.name === current)) {
-    choices.set("current", { name: current, label: current, group: "保存中の選択" });
+    const group = studentGroup || "保存中の選択";
+    const allowedCalendarIds = [...choices.values()].filter((item) => item.group === group).flatMap((item) => item.calendarIds);
+    const calendarIds = [...new Set(rawEvents.filter((ev) =>
+      (!studentGroup || allowedCalendarIds.includes(ev._calendarId)) && eventMatchesCurriculumName(ev, current)).map((ev) => ev._calendarId))];
+    choices.set("current", { name: current, label: current, group, calendarIds });
   }
   studentChoices = [...choices.values()].sort((a, b) => a.label.localeCompare(b.label, "ja", { numeric: true }) || a.name.localeCompare(b.name, "ja"));
-  if (!studentChoices.some((item) => item.name === current && item.group === studentGroup)) {
-    studentGroup = studentChoices.find((item) => item.name === current)?.group || studentGroup;
-  }
+  if (!studentGroup) studentGroup = studentChoices.find((item) => item.name === current)?.group || "";
   renderStudentSelector();
 }
 
@@ -2163,13 +2203,17 @@ function renderStudentSelector() {
 
 els.studentGroups.addEventListener("click", (event) => {
   const button = event.target.closest("[data-student-group]");
-  if (!button || selectingStudent) return;
+  if (!button || selectingStudent || navigatingStudent) return;
   studentGroup = button.dataset.studentGroup;
+  els.curriculumName.value = "";
+  clearStudentDetails();
+  saveCurriculumState();
+  renderCurriculumSearchSummary();
   renderStudentSelector();
 });
 els.studentSelector.addEventListener("click", async (event) => {
   const button = event.target.closest("[data-student-index]");
-  if (!button || selectingStudent) return;
+  if (!button || selectingStudent || navigatingStudent) return;
   const item = studentChoices[Number(button.dataset.studentIndex)];
   selectingStudent = true;
   els.studentSelector.setAttribute("aria-busy", "true");
@@ -2187,6 +2231,7 @@ els.curriculumFilterForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   els.actionError.textContent = "";
   saveCurriculumState();
+  clearStudentDetails();
   try {
     await loadCurriculumEvents();
     await loadGoals();
@@ -2197,6 +2242,7 @@ els.curriculumFilterForm.addEventListener("submit", async (e) => {
     document.querySelectorAll("[data-page-tab-panel=curriculum] .collapsible-section").forEach((section) => { section.inert = false; });
     els.curriculumSearchModal.close();
   } catch (err) {
+    clearStudentDetails();
     showActionError(err);
   }
 });
@@ -2216,7 +2262,7 @@ async function loadCurriculumEvents() {
   const choice = studentChoices.find((item) => item.name === name && item.group === studentGroup);
 
   const matched = events
-    .filter((ev) => (!choice?.calendarIds || choice.calendarIds.includes(ev._calendarId)) && eventMatchesCurriculumName(ev, name))
+    .filter((ev) => choice?.calendarIds?.includes(ev._calendarId) && eventMatchesCurriculumName(ev, name))
     .sort((a, b) => {
       const aStart = a.start?.dateTime || a.start?.date || "";
       const bStart = b.start?.dateTime || b.start?.date || "";
@@ -3156,11 +3202,18 @@ function applyNameFilter(token) {
 // 授業予定・授業記録の生徒名をクリックしたときの遷移先。
 // カリキュラムタブに切り替え、その名前(・分かればその学期)で検索を実行する。
 async function goToCurriculum(name, term) {
+  if (navigatingStudent) return;
+  navigatingStudent = true;
   const curriculumTabBtn = [...els.pageTabBtns].find((b) => b.dataset.pageTab === "curriculum");
   curriculumTabBtn?.click();
   const sections = document.querySelectorAll("[data-page-tab-panel=curriculum] .collapsible-section");
   sections.forEach((section) => { section.inert = true; });
+  name = studentChoices.some((item) => item.name === name) ? name : curriculumSelectionName(name);
+  if (!studentChoices.some((item) => item.name === name && item.group === studentGroup)) {
+    studentGroup = studentChoices.find((item) => item.name === name)?.group || "";
+  }
   els.curriculumName.value = name;
+  renderCurriculumSearchSummary();
   if (term) {
     els.curriculumYearSelect.value = term.year_id;
     renderCurriculumTermOptions(term.year_id);
@@ -3168,6 +3221,7 @@ async function goToCurriculum(name, term) {
   }
   els.actionError.textContent = "";
   saveCurriculumState();
+  clearStudentDetails();
   try {
     await loadCurriculumEvents();
     await loadGoals();
@@ -3178,7 +3232,10 @@ async function goToCurriculum(name, term) {
     renderCurriculumNameSuggestions();
     sections.forEach((section) => { section.inert = false; });
   } catch (err) {
+    clearStudentDetails();
     showActionError(err);
+  } finally {
+    navigatingStudent = false;
   }
 }
 

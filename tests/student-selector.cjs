@@ -5,10 +5,10 @@ const fs = require('node:fs');
 (async () => {
   const browser = await chromium.launch({executablePath:'/usr/bin/chromium', args:['--no-sandbox']});
   const page = await browser.newPage({viewport:{width:390,height:844}});
-  const errors=[]; const writes=[];
+  const errors=[]; const writes=[]; let failPath = "";
   page.on('pageerror', e=>errors.push(e.message));
   const calendars=[{id:'d',summary:'代官山'},{id:'t',summary:'TOMAS'}];
-  const events={d:['田﨑','田崎','集団 英語'],t:['青木',...Array.from({length:12},(_,i)=>`生徒${i}`)]};
+  const events={d:['田﨑','田崎','田崎(振替)','田崎/英語','田崎（振替）','集団 英語','A6 Basic','M3 High'],t:['青木','田崎',...Array.from({length:12},(_,i)=>`生徒${i}`)]};
   await page.route('**/*', async route=>{
     const u=new URL(route.request().url());
     const json=body=>route.fulfill({json:body});
@@ -20,6 +20,7 @@ const fs = require('node:fs');
     }
     if(u.pathname.startsWith('/api/')) {
       if(route.request().method()!=='GET') writes.push(JSON.parse(route.request().postData()));
+      if (u.pathname === failPath) return route.fulfill({status:503,body:'fixture failure'});
       const data={'/api/settings':{selected_calendars:['d','t']},'/api/students':[{name:'田﨑 太郎',calendar_tag:'田﨑'}],'/api/years':[{id:1,label:'2026'}],'/api/terms':[{id:1,year_id:1,label:'後期',start_date:'2026-10-01',end_date:'2026-12-31'}],'/api/student-prefs':{print_name:'既存の印刷氏名',memo:'既存メモ'}};
       return json(data[u.pathname]||[]);
     }
@@ -60,16 +61,60 @@ const fs = require('node:fs');
   await page.locator('#student-lesson-kind').selectOption('');
   await page.locator('#curriculum-search-modal-close').click();
   await page.locator('[data-student-group="代官山 · 集団"]').click();
-  assert.equal(await page.locator('#student-selector button').innerText(),'集団 英語');
+  assert.deepEqual((await page.locator('#student-selector button').allTextContents()).sort(),['A6 Basic','M3 High','集団 英語'].sort());
+  await page.locator('#student-selector button').filter({hasText:/^A6 Basic$/}).click();
+  await page.waitForFunction(()=>document.querySelector('#student-selector').getAttribute('aria-busy')==='false');
+  assert.deepEqual(await page.locator('#curriculum-tbody tr[data-event-id]').evaluateAll(rows=>rows.map(row=>row.dataset.eventId)),['d6']);
+  await page.screenshot({path:'/tmp/works-students-group-mobile-light.png',fullPage:true});
+  await page.locator('[data-student-group="代官山 · 個別"]').click();
+  assert.equal(await page.locator('#curriculum-name').inputValue(),'');
+  assert.equal(await page.locator('#student-memo').inputValue(),'');
+  await page.locator('#student-selector button').filter({hasText:/^田崎$/}).click();
+  await page.waitForFunction(()=>document.querySelector('#student-selector').getAttribute('aria-busy')==='false');
+  assert.equal(await page.locator('#student-selector button').filter({hasText:/^田崎$/}).count(),1);
+  assert.deepEqual(await page.locator('#curriculum-tbody tr[data-event-id]').evaluateAll(rows=>rows.map(row=>row.dataset.eventId)),['d1','d2','d3','d4']);
   await page.locator('[data-student-group="TOMAS"]').click();
-  assert.equal(await page.locator('#student-selector button').count(),13);
+  assert.equal(await page.locator('#curriculum-name').inputValue(),'');
+  assert.equal(await page.locator('#curriculum-tbody tr').count(),0);
+  await page.locator('#open-curriculum-search-modal').click();
+  assert.equal(await page.locator('#curriculum-print-name').isDisabled(),true);
+  await page.locator('#curriculum-filter-form button[type="submit"]').click();
+  await page.waitForFunction(()=>!document.querySelector('#curriculum-search-modal').open);
+  assert.equal(await page.locator('#curriculum-tbody tr').count(),0);
+  assert.equal(await page.locator('[data-student-group="TOMAS"]').getAttribute('aria-pressed'),'true');
+  const select = async (name) => {
+    await page.locator('#student-selector button').filter({hasText:new RegExp(`^${name}$`)}).click();
+    await page.waitForFunction(()=>document.querySelector('#student-selector').getAttribute('aria-busy')==='false');
+  };
+  await select('田崎');
+  assert.deepEqual(await page.locator('#curriculum-tbody tr[data-event-id]').evaluateAll(rows=>rows.map(row=>row.dataset.eventId)),['t1']);
+  for (const path of ['/api/goals','/api/student-prefs','/api/student-materials']) {
+    failPath = path;
+    await select('青木');
+    await page.locator('#open-curriculum-search-modal').click();
+    assert.equal(await page.locator('#curriculum-print-name').inputValue(),'');
+    assert.equal(await page.locator('#curriculum-print-name').isDisabled(),true);
+    if (path === '/api/student-prefs') await page.screenshot({path:'/tmp/works-students-load-failure-mobile.png'});
+    await page.locator('#curriculum-print-name').evaluate(el=>{el.value='旧生徒の名前';el.dispatchEvent(new Event('change',{bubbles:true}));});
+    assert.equal(writes.length,1);
+    await page.locator('#curriculum-search-modal-close').click();
+    failPath = '';
+    await select('田崎');
+  }
+  assert.equal(await page.locator('#student-selector button').count(),14);
   assert(await page.locator('#student-selector').evaluate(el=>el.scrollWidth>el.clientWidth));
   await page.screenshot({path:'/tmp/works-students-mobile-light.png',fullPage:true});
   await page.evaluate(()=>document.documentElement.dataset.theme='dark');
   await page.screenshot({path:'/tmp/works-students-mobile-dark.png',fullPage:true});
   await page.setViewportSize({width:1280,height:900});
   await page.screenshot({path:'/tmp/works-students-desktop-dark.png',fullPage:true});
+  await page.evaluate(()=>localStorage.setItem('works_curriculum_state',JSON.stringify({name:'田崎(振替)',group:'代官山 · 個別',yearId:'1',termId:'1'})));
+  await page.reload();
+  await page.locator('#curriculum-tbody tr[data-event-id="d2"]').waitFor();
+  assert.equal(await page.locator('#curriculum-name').inputValue(),'田崎(振替)');
+  assert.equal(await page.locator('#student-selector button[aria-pressed="true"]').innerText(),'田崎(振替)');
+  assert.equal(await page.locator('#curriculum-tbody tr[data-event-id]').count(),1);
   assert.deepEqual(errors,[]);
   await browser.close();
-  console.log('PASS: grouping, exact glyph identity, calendar_tag label, stored memo/print name, write payload, term filter, mobile overflow, light/dark renders');
+  console.log('PASS: class codes, school reset/scope, annotated-name deduplication/matching, failed-fetch write guards, glyph identity, print persistence, mobile/light/dark');
 })().catch(e=>{console.error(e);process.exit(1)});
