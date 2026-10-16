@@ -647,16 +647,26 @@ watchAuth({
       renderCurriculumYearOptions();
       restoreCurriculumState();
       renderCurriculumSearchSummary();
-      if (els.curriculumName.value && els.curriculumTermSelect.value) {
-        await loadCurriculumEvents();
+      // Load the schedule independently of the restored student curriculum.
+      try {
+        await loadCalendarEvents();
+      } catch (err) {
+        showEventPlaceholder("授業予定を取得できませんでした。再読み込みしてください。");
+        showActionError(err);
       }
-      if (els.curriculumName.value) {
-        await loadGoals();
-        await loadCandidateSchools();
-        await loadStudentPref();
-        await loadStudentMaterials();
+      try {
+        if (els.curriculumName.value && els.curriculumTermSelect.value) {
+          await loadCurriculumEvents();
+        }
+        if (els.curriculumName.value) {
+          await loadGoals();
+          await loadCandidateSchools();
+          await loadStudentPref();
+          await loadStudentMaterials();
+        }
+      } catch (err) {
+        showActionError(err);
       }
-      await loadCalendarEvents();
       await loadRecordTable();
     } catch (err) {
       showActionError(err);
@@ -694,22 +704,32 @@ async function apiFetch(path, options = {}) {
 // withCalendarId=trueのときは各予定に_calendarId(色分け用)を付与する。
 async function fetchCalendarEvents(timeMin, timeMax, { withCalendarId = false, includeExcluded = false } = {}) {
   const token = await getGoogleAccessToken();
-  const params = new URLSearchParams({
-    timeMin,
-    timeMax,
-    singleEvents: "true",
-    orderBy: "startTime",
-    maxResults: "250",
-  });
   const results = await Promise.all(
     [...selectedCalendarIds].map(async (calendarId) => {
-      const res = await fetch(
-        `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?${params}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      if (!res.ok) return [];
-      const data = await res.json();
-      const items = data.items || [];
+      // Page tokens belong to one calendar; never share them between requests.
+      const params = new URLSearchParams({
+        timeMin,
+        timeMax,
+        singleEvents: "true",
+        orderBy: "startTime",
+        maxResults: "250",
+      });
+      const items = [];
+      let pageToken = "";
+      do {
+        if (pageToken) params.set("pageToken", pageToken);
+        const res = await fetch(
+          `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?${params}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (!res.ok) {
+          const detail = await extractGoogleErrorDetail(res);
+          throw new Error(`カレンダーの予定を取得できませんでした (${res.status})${detail ? `: ${detail}` : ""}`);
+        }
+        const data = await res.json();
+        items.push(...(data.items || []));
+        pageToken = data.nextPageToken || "";
+      } while (pageToken);
       return withCalendarId ? items.map((ev) => ({ ...ev, _calendarId: calendarId })) : items;
     })
   );
