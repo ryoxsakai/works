@@ -87,3 +87,25 @@ test("actual Worker revokes via form body without following redirect", async t =
   }
   assert.equal(externalRequests.length, 3);
 });
+test('actual Worker routes read and conditionally save the next lesson without copying other fields', async t => {
+  const {DB,fetchMock,call}=await setup(t);
+  const source={id:'a',summary:'サンプル生徒',etag:'"a-1"',start:{dateTime:'2026-10-17T10:00:00+09:00'},end:{dateTime:'2026-10-17T11:00:00+09:00'}};
+  const target={...source,id:'b',etag:'"b-1"',start:{dateTime:'2026-10-17T11:00:00+09:00'},end:{dateTime:'2026-10-17T12:00:00+09:00'}};
+  await DB.prepare("INSERT INTO curriculum_entries(calendar_event_id,lesson_plan,homework)VALUES('b','既存予定','既存宿題')").run();
+  fetchMock.get('https://oauth2.googleapis.com').intercept({path:'/token',method:'POST'}).reply(200,{access_token:'synthetic-google-access',expires_in:3600}).persist();
+  const google=fetchMock.get('https://www.googleapis.com');
+  google.intercept({path:'/calendar/v3/calendars/synthetic-calendar/events/a',method:'GET'}).reply(200,source).persist();
+  google.intercept({path:'/calendar/v3/calendars/synthetic-calendar/events/b',method:'GET'}).reply(200,target).persist();
+  google.intercept({path:/\/calendar\/v3\/calendars\/synthetic-calendar\/events\?/,method:'GET'}).reply(200,{items:[source,target]}).persist();
+  const apiPath='/api/next-lesson-plan?calendar_id=synthetic-calendar&event_id=a';
+  assert.equal((await call(apiPath)).status,401);
+  const headers={Authorization:'Bearer '+await browserToken(),'Content-Type':'application/json'};
+  const response=await call(apiPath,{headers});assert.equal(response.status,200);const linked=await response.json();
+  assert.equal(linked.target.id,'b');assert.equal(linked.lesson_plan,'既存予定');
+  const value={source:linked.source,target:linked.target,expected_lesson_plan:linked.lesson_plan,lesson_plan:'次回の準備'};
+  const saved=await call('/api/lesson-plan',{method:'PUT',headers,body:JSON.stringify(value)});assert.equal(saved.status,200);
+  assert.equal((await saved.json()).lesson_plan,'次回の準備');
+  assert.equal((await DB.prepare("SELECT homework FROM curriculum_entries WHERE calendar_event_id='b'").first()).homework,'既存宿題');
+  assert.equal(await DB.prepare("SELECT * FROM curriculum_entries WHERE calendar_event_id='a'").first(),null);
+  const conflict=await call('/api/lesson-plan',{method:'PUT',headers,body:JSON.stringify({...value,lesson_plan:'古い予定'})});assert.equal(conflict.status,409);assert.equal((await conflict.json()).code,'LESSON_PLAN_CONFLICT');
+});
