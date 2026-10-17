@@ -3396,6 +3396,8 @@ function applyNameFilter(token) {
 // 授業予定・授業記録の生徒名をクリックしたときの遷移先。
 // カリキュラムタブに切り替え、その名前(・分かればその学期)で検索を実行する。
 async function goToCurriculum(name, term, sourceCalendarId) {
+  // Inspect the original schedule title before annotations can hide an exclusion.
+  if (isNonLessonSelectionTitle(name)) return;
   const curriculumTabBtn = [...els.pageTabBtns].find((b) => b.dataset.pageTab === "curriculum");
   curriculumTabBtn?.click();
   name = studentChoices.some((item) => item.name === name) ? name : curriculumSelectionName(name);
