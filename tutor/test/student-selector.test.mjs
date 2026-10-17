@@ -63,6 +63,23 @@ test('circle-marked choices, restored selections and source records stay hidden 
   assert.equal(JSON.stringify(rawEvents),before);
   assert.equal(state.isNonLessonSelectionTitle('高1長文読解'),false);
 });
+test('schedule and record navigation filters the original title before annotation removal', async () => {
+  const state=setup({studentGroup:'代官山 · 個別',studentChoices:[{name:'山田',label:'山田',group:'代官山 · 個別',calendarIds:['daikanyama']}]});
+  state.els.curriculumName.value='山田';
+  state.tabClicks=0;state.refreshes=0;
+  state.els.pageTabBtns=[{dataset:{pageTab:'curriculum'},click(){state.tabClicks++;}}];
+  state.els.actionError={textContent:''};
+  state.refreshStudentDetails=async()=>{state.refreshes++;};
+  vm.runInContext(fn('goToCurriculum'),state);
+  const before=JSON.stringify(state.studentChoices);
+  for(const title of ['冬○','山田（○）','A1（○）','会議','WT作成']) await state.goToCurriculum(title,periods[1],'tomas');
+  assert.equal(state.tabClicks,0);assert.equal(state.refreshes,0);
+  assert.equal(state.els.curriculumName.value,'山田');assert.equal(state.studentGroup,'代官山 · 個別');
+  assert.equal(JSON.stringify(state.studentChoices),before);
+  await state.goToCurriculum('山田（授業）',periods[1],'tomas');
+  assert.equal(state.tabClicks,1);assert.equal(state.refreshes,1);
+  assert.equal(state.els.curriculumName.value,'山田');assert.equal(state.studentGroup,'TOMAS');
+});
 test('only selected term lessons appear; saved old names and administrative selections do not reappear', () => {
   const state=setup({rawEvents:[event('前期のみ','2026-05-01'),event('後期のみ'),event('隙間','2026-08-15'),event('会議') ]});
   state.els.curriculumName.value='前期のみ';state.studentGroup='代官山 · 個別';
