@@ -12,6 +12,7 @@
     "test:ss:browser": "node test/ss-ui.browser.mjs",
     "wiki:migrate": "node scripts-wiki-migrate.mjs",
     "test:wiki:browser": "node test/wiki-ui.browser.mjs",
+    "test:next-lesson:browser": "node test/next-lesson-plan.browser.mjs",
     "test:header:browser": "node test/header-theme.browser.mjs",
     "test:category:browser": "node test/category-ui.browser.mjs"
   },

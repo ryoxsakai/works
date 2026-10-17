@@ -4373,11 +4373,11 @@ async function upsertCurriculumEntry(env, eventId, body) {
     `INSERT INTO curriculum_entries (calendar_event_id, completed, lesson_plan, confirmation_test, homework, lesson_memo, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
      ON CONFLICT(calendar_event_id) DO UPDATE SET
-       completed = excluded.completed,
-       lesson_plan = excluded.lesson_plan,
-       confirmation_test = excluded.confirmation_test,
-       homework = excluded.homework,
-       lesson_memo = excluded.lesson_memo,
+       completed = CASE WHEN ? THEN excluded.completed ELSE curriculum_entries.completed END,
+       lesson_plan = CASE WHEN ? THEN excluded.lesson_plan ELSE curriculum_entries.lesson_plan END,
+       confirmation_test = CASE WHEN ? THEN excluded.confirmation_test ELSE curriculum_entries.confirmation_test END,
+       homework = CASE WHEN ? THEN excluded.homework ELSE curriculum_entries.homework END,
+       lesson_memo = CASE WHEN ? THEN excluded.lesson_memo ELSE curriculum_entries.lesson_memo END,
        updated_at = excluded.updated_at`
   )
     .bind(
@@ -4386,7 +4386,8 @@ async function upsertCurriculumEntry(env, eventId, body) {
       values.lesson_plan,
       values.confirmation_test,
       values.homework,
-      values.lesson_memo
+      values.lesson_memo,
+      ...["completed", ...SCHEDULE_TEXT_FIELDS].map((field) => body[field] !== undefined ? 1 : 0)
     )
     .run();
   return env.DB.prepare(
@@ -5677,6 +5678,28 @@ export default {
         if (!name) return json({ error: "name is required" }, headers, 400);
         await setChapterProgress(env, name, chapterProgressMatch[1], body.completed);
         return json({ ok: true }, headers);
+      }
+
+      if (url.pathname === "/api/lesson-plan" || url.pathname === "/api/next-lesson-plan") {
+        const { readLessonPlan, readNextLessonPlan, writeLessonPlan } = await import("./lesson-plan.js");
+        if (browserSession.aud || browserSession.scope || browserSession.fid) throw httpError(401, "browser session required");
+        const dependencies = {
+          settings: () => readSettings(env), token: () => mintGoogleAccessToken(env),
+          event: fetchCalendarEventWithToken, events: fetchCalendarEventsForSchedule,
+        };
+        try {
+          if (request.method === "GET") {
+            const reader = url.pathname === "/api/lesson-plan" ? readLessonPlan : readNextLessonPlan;
+            return json(await reader(env, url.searchParams.get("calendar_id"), url.searchParams.get("event_id"), dependencies), headers);
+          }
+          if (url.pathname === "/api/lesson-plan" && request.method === "PUT") {
+            return json(await writeLessonPlan(env, await request.json(), dependencies), headers);
+          }
+          return json({ error: "method not allowed" }, headers, 405);
+        } catch (error) {
+          if (error.status === 409) return json({ error: error.message, code: error.code, current: error.current }, headers, 409);
+          throw error;
+        }
       }
 
       if (url.pathname === "/api/curriculum" && request.method === "GET") {

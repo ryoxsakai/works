@@ -1,3 +1,4 @@
+import { lessonEventRef } from "../../shared/lesson-plan.js";
 import { chromium } from "@playwright/test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -66,7 +67,16 @@ async function selectedTheme(page) {
         if(url.pathname==='/api/years')result=[{id:1,label:'サンプル年度'}];
         if(url.pathname==='/api/terms')result=[{id:1,year_id:1,label:'サンプル学期',start_date:'2000-01-01',end_date:'2099-12-31'}];
         if(url.pathname.startsWith('/api/curriculum/') && r.request().method()==='PUT'){
-          recordSaves.set(decodeURIComponent(url.pathname.slice('/api/curriculum/'.length)),r.request().postDataJSON());result={ok:true};
+          const id=decodeURIComponent(url.pathname.slice('/api/curriculum/'.length));recordSaves.set(id,{...recordSaves.get(id),...r.request().postDataJSON()});result={ok:true};
+        }
+        if(url.pathname==='/api/next-lesson-plan'){
+          const id=url.searchParams.get('event_id'),day=id.slice(0,10);
+          const source=lessonEventRef({id,summary:'サンプル生徒',start:{dateTime:`${day}T10:00:00+09:00`},end:{dateTime:`${day}T11:00:00+09:00`}},'qa');
+          result={source,target:null,reason:'none',lesson_plan:''};
+        }
+        if(url.pathname==='/api/lesson-plan'&&r.request().method()==='PUT'){
+          const body=r.request().postDataJSON(),id=body.target.id;
+          recordSaves.set(id,{...recordSaves.get(id),lesson_plan:body.lesson_plan});result=recordSaves.get(id);
         }
         if(url.pathname==='/api/student-prefs'){
           const name=url.searchParams.get('name');
@@ -202,7 +212,7 @@ async function selectedTheme(page) {
     assert.equal(await field.evaluate(el=>el.offsetHeight),empty);
     const savedValue=`${width}pxで保存後に復元する日本語\n二行目\n三行目`;
     await field.fill(savedValue);
-    const response=page.waitForResponse(r=>r.url().includes('/api/curriculum/')&&r.request().method()==='PUT');
+    const response=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/lesson-plan'&&r.request().method()==='PUT');
     await field.press('Tab');await response;
     await page.reload();await field.waitFor();
     assert.equal(await field.inputValue(),savedValue);
