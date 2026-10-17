@@ -7,6 +7,8 @@ import {
 import { getTheme, setTheme } from "../shared/theme.js?v=6";
 import { tokyoDateKey, shiftRecordDate, recordDateRange } from "./record-date.js?v=1";
 import { createStudentMemoStore } from "./student-memo.js?v=1";
+import { createLessonPlanController } from "./lesson-plan.js?v=1";
+import { lessonEventRef, lessonEventKey } from "../shared/lesson-plan.js?v=1";
 
 const PASTEL_FALLBACK_COLORS = [
   "#c8e6c9",
@@ -227,6 +229,12 @@ const studentMemos = createStudentMemoStore({
   onChange: () => renderStudentMemos(),
 });
 
+const lessonPlans = createLessonPlanController({
+  readNext: (source) => apiFetch(`/next-lesson-plan?calendar_id=${encodeURIComponent(source.calendar_id)}&event_id=${encodeURIComponent(source.id)}`, {}, null),
+  write: (body) => apiFetch("/lesson-plan", { method: "PUT", body: JSON.stringify(body) }, null),
+  onChange: () => renderLessonPlans(),
+});
+
 let calendarColors = new Map(); // calendarId -> { raw, bg, fg }
 let years = [];
 let terms = [];
@@ -392,7 +400,7 @@ function setActivePageTab(tab) {
     panel.hidden = panel.dataset.pageTabPanel !== target;
   });
   localStorage.setItem(ACTIVE_PAGE_TAB_KEY, target);
-  requestAnimationFrame(() => { resizeRecordInputs(); renderStudentMemos(); });
+  requestAnimationFrame(() => { resizeRecordInputs(); renderStudentMemos(); renderLessonPlans(); });
 }
 
 setActivePageTab(localStorage.getItem(ACTIVE_PAGE_TAB_KEY) || "record");
@@ -470,10 +478,12 @@ async function loadRecordTable() {
     const [termStart, termEnd] = recordDateRange(rangeStart, rangeEnd);
     const rangeEvents = await fetchCalendarEvents(
       termStart,
-      termEnd
+      termEnd,
+      { withCalendarId: true }
     );
     if (!isCurrent()) return;
 
+    const planReadVersion = lessonPlans.version;
     const entries = await apiFetch("/curriculum");
     if (!isCurrent()) return;
     const entryMap = new Map(entries.map((entry) => [entry.calendar_event_id, entry]));
@@ -493,7 +503,7 @@ async function loadRecordTable() {
       }
 
       const sameLabelEvents = rangeEvents
-        .filter((e) => (e.summary || "").trim() === label)
+        .filter((e) => e._calendarId === ev._calendarId && (e.summary || "").trim() === label)
         .sort((a, b) => {
           const aStart = a.start?.dateTime || a.start?.date || "";
           const bStart = b.start?.dateTime || b.start?.date || "";
@@ -506,6 +516,8 @@ async function loadRecordTable() {
       const prevSaved = prevEvent ? entryMap.get(prevEvent.id) || {} : {};
       return {
         eventId: ev.id,
+        ref: lessonEventRef(ev),
+        planReadVersion,
         calendarId: ev._calendarId,
         label,
         termId: coveringTerm ? coveringTerm.id : "",
@@ -533,6 +545,7 @@ async function loadRecordTable() {
 }
 
 function renderRecordTable(rows) {
+  rows.filter((row) => !row.emptySlot).forEach((row) => lessonPlans.seed(row.ref, row.lessonPlan, row.planReadVersion));
   els.recordTbody.innerHTML = rows
     .map((r) => {
       if (r.emptySlot) {
@@ -558,10 +571,15 @@ function renderRecordTable(rows) {
         </td>
         <td data-label="回数">${r.n}/${r.m}回</td>
         <td data-label="時刻">${formatTimeOrPeriod(r.start, "Asia/Tokyo")}</td>
-        <td data-label="授業予定"><textarea class="record-plan" rows="1" aria-label="${escapeHtml(r.label)}の授業予定">${escapeHtml(r.lessonPlan)}</textarea></td>
+        <td data-label="授業予定">${lessonPlanEditor(r.ref, r.label, "record-plan")}</td>
         <td data-label="確認テスト"><textarea class="record-test" rows="1" aria-label="${escapeHtml(r.label)}の確認テスト">${escapeHtml(r.confirmationTest)}</textarea></td>
         <td data-label="宿題"><textarea class="record-homework" rows="1" aria-label="${escapeHtml(r.label)}の宿題">${escapeHtml(r.homework)}</textarea></td>
         <td data-label="授業メモ"><textarea class="record-memo" rows="1" aria-label="${escapeHtml(r.label)}の授業メモ">${escapeHtml(r.lessonMemo)}</textarea>
+          <div class="record-next-plan lesson-plan-editor" data-source-key="${escapeHtml(lessonEventKey(r.ref))}">
+            <label>次回授業予定<textarea class="linked-lesson-plan" rows="1" maxlength="5000" aria-label="${escapeHtml(r.label)}の次回授業予定" disabled></textarea></label>
+            <small class="lesson-plan-target"></small>
+            ${lessonPlanFeedback()}
+          </div>
           <div class="record-student-memo student-memo-editor" data-student-name="${escapeHtml(recordStudentPrefName(r.label))}">
             <label>生徒メモ<textarea class="student-memo-input" rows="1" aria-label="${escapeHtml(r.label)}の生徒メモ" placeholder="日付をまたいで共有" disabled></textarea></label>
             <div class="student-memo-feedback"><small class="student-memo-status" role="status" aria-live="polite"></small><button type="button" class="student-memo-retry" hidden>再試行</button></div>
@@ -571,10 +589,77 @@ function renderRecordTable(rows) {
     })
     .join("");
   renderStudentMemos();
+  renderLessonPlans();
+  rows.filter((row) => !row.emptySlot).forEach((row) => lessonPlans.loadNext(row.ref));
   const names = new Set([...els.recordTbody.querySelectorAll(".student-memo-editor")].map((editor) => editor.dataset.studentName));
   names.forEach((name) => studentMemos.load(name).catch(() => {}));
   requestAnimationFrame(resizeRecordInputs);
 }
+
+function lessonPlanFeedback() {
+  return '<div class="lesson-plan-feedback"><small class="lesson-plan-status" role="status" aria-live="polite"></small><button type="button" class="lesson-plan-action" hidden></button></div>';
+}
+function lessonPlanEditor(ref, title, className) {
+  return `<div class="lesson-plan-editor" data-plan-key="${escapeHtml(lessonEventKey(ref))}"><textarea class="${className} linked-lesson-plan" rows="1" maxlength="5000" aria-label="${escapeHtml(title)}の授業予定"></textarea>${lessonPlanFeedback()}</div>`;
+}
+function lessonPlanDate(ref) {
+  if (!ref) return "";
+  const start = new Intl.DateTimeFormat("ja-JP", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit", weekday: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(ref.start));
+  const end = new Intl.DateTimeFormat("ja-JP", { timeZone: "Asia/Tokyo", hour: "2-digit", minute: "2-digit" }).format(new Date(ref.end));
+  return `${start}–${end}`;
+}
+function renderLessonPlans() {
+  const states = { unsaved: "未保存・入力を終えると自動保存", saving: "保存中…", saved: "保存済み", error: "保存できませんでした。入力は残っています", conflict: "予定または内容が変更されています。入力を残して保存を停止しました" };
+  const reasons = { loading: "次回を確認中…", none: "366日先までに次回の授業が見つかりません", ineligible: "この予定は次回連動の対象外です", ambiguous: "同時刻に候補が複数あるため連動できません", error: "次回を取得できませんでした", conflict: states.conflict };
+  document.querySelectorAll(".lesson-plan-editor").forEach((editor) => {
+    const sourceKey = editor.dataset.sourceKey;
+    const link = sourceKey ? lessonPlans.getLink(sourceKey) : null;
+    if (sourceKey) editor.dataset.planKey = link?.targetKey || "";
+    const key = editor.dataset.planKey, state = lessonPlans.get(key);
+    const input = editor.querySelector("textarea"), status = editor.querySelector(".lesson-plan-status"), action = editor.querySelector(".lesson-plan-action");
+    const linkStatus = link?.status || "loading";
+    const conflict = state?.status === "conflict" || (sourceKey && linkStatus === "conflict");
+    input.disabled = !state;
+    input.readOnly = !!conflict || !!(sourceKey && linkStatus !== "ready");
+    input.hidden = !!sourceKey && !state;
+    if (input.value !== (state?.value || "")) input.value = state?.value || "";
+    const message = sourceKey && linkStatus !== "ready" ? reasons[linkStatus] : states[state?.pending ? "saving" : state?.status];
+    status.textContent = message || "";
+    status.dataset.error = String(!!conflict || state?.status === "error" || (sourceKey && linkStatus === "error"));
+    if (sourceKey) {
+      const target = conflict ? link?.current?.target || link?.target : link?.target;
+      editor.querySelector(".lesson-plan-target").textContent = target ? `${conflict ? "最新候補" : "連動先"}: ${lessonPlanDate(target)}` : "";
+    }
+    action.hidden = false; action.disabled = !!state?.pending || linkStatus === "loading" && !!sourceKey;
+    if (conflict) { action.dataset.action = "reload"; action.textContent = state?.dirty ? "入力を破棄して予定を再確認" : "予定を再読み込み"; }
+    else if (state?.status === "error") { action.dataset.action = "retry"; action.textContent = "再保存"; }
+    else if (sourceKey) { action.dataset.action = "recheck"; action.textContent = "予定を再確認"; }
+    else action.hidden = true;
+    resizeRecordInput(input);
+  });
+}
+
+document.addEventListener("input", (event) => {
+  if (!event.target.matches(".linked-lesson-plan") || event.target.disabled || event.target.readOnly) return;
+  lessonPlans.edit(event.target.closest(".lesson-plan-editor").dataset.planKey, event.target.value);
+});
+document.addEventListener("change", (event) => {
+  if (!event.target.matches(".linked-lesson-plan") || event.target.disabled || event.target.readOnly) return;
+  const editor = event.target.closest(".lesson-plan-editor");
+  lessonPlans.save(editor.dataset.planKey, editor.dataset.sourceKey).catch(() => {});
+});
+document.addEventListener("click", async (event) => {
+  const button = event.target.closest(".lesson-plan-action");
+  if (!button || button.disabled) return;
+  const editor = button.closest(".lesson-plan-editor");
+  const key = editor.dataset.planKey, sourceKey = editor.dataset.sourceKey;
+  if (button.dataset.action === "retry") { lessonPlans.save(key, sourceKey).catch(() => {}); return; }
+  if (button.dataset.action === "recheck") { await lessonPlans.loadNext(lessonPlans.getLink(sourceKey).source); return; }
+  lessonPlans.discard(key);
+  const context = captureStudentContext();
+  const results = await Promise.allSettled([loadRecordTable(), loadCurriculumEvents(context)]);
+  results.forEach((result) => { if (result.status === "rejected" && isCurrentStudentContext(context)) showActionError(result.reason); });
+});
 
 // Use exactly the name that opening this record in student information would use.
 function recordStudentPrefName(title) {
@@ -656,12 +741,11 @@ els.recordTbody.addEventListener("click", (e) => {
 });
 
 els.recordTbody.addEventListener("change", async (e) => {
-  if (e.target.matches(".student-memo-input")) return;
+  if (e.target.matches(".student-memo-input,.linked-lesson-plan")) return;
   const row = e.target.closest("tr[data-event-id]");
   if (!row) return;
   const eventId = row.dataset.eventId;
   const completed = row.dataset.completed === "1";
-  const lessonPlan = row.querySelector(".record-plan").value;
   const confirmationTest = row.querySelector(".record-test").value;
   const homework = row.querySelector(".record-homework").value;
   const lessonMemo = row.querySelector(".record-memo").value;
@@ -670,7 +754,6 @@ els.recordTbody.addEventListener("change", async (e) => {
       method: "PUT",
       body: JSON.stringify({
         completed,
-        lesson_plan: lessonPlan,
         confirmation_test: confirmationTest,
         homework,
         lesson_memo: lessonMemo,
@@ -815,7 +898,11 @@ async function apiFetch(path, options = {}, context = (/^\/(?:goals|schools|stud
       throw new Error("セッションが切れました。再度ログインしてください。");
     }
     if (!res.ok) {
-      throw new Error(`API error ${res.status}: ${await res.text()}`);
+      const detail = await res.text();
+      const error = new Error(`API error ${res.status}: ${detail}`);
+      error.status = res.status;
+      try { const data = JSON.parse(detail); error.code = data.code; error.current = data.current; } catch {}
+      throw error;
     }
     const result = res.status === 204 ? null : await res.json();
     if (context) assertStudentContext(context);
@@ -2518,6 +2605,7 @@ async function renderCurriculumTable(events, context = captureStudentContext()) 
     return;
   }
 
+  const planReadVersion = lessonPlans.version;
   const entries = await apiFetch("/curriculum", {}, context);
   assertStudentContext(context);
   const entryMap = new Map(entries.map((entry) => [entry.calendar_event_id, entry]));
@@ -2527,26 +2615,29 @@ async function renderCurriculumTable(events, context = captureStudentContext()) 
       const saved = entryMap.get(ev.id) || {};
       const start = ev.start?.dateTime || ev.start?.date || "";
       const checked = saved.completed ? "checked" : "";
+      const ref = lessonEventRef(ev);
+      lessonPlans.seed(ref, saved.lesson_plan || "", planReadVersion);
       return `<tr data-event-id="${escapeHtml(ev.id)}" data-completed="${saved.completed ? 1 : 0}">
         <td><input type="checkbox" class="curriculum-completed" ${checked} /></td>
         <td>第${i + 1}回</td>
         <td>${formatCurriculumDate(start)}</td>
-        <td><textarea class="curriculum-plan" rows="2">${escapeHtml(saved.lesson_plan || "")}</textarea></td>
+        <td>${lessonPlanEditor(ref, ev.summary || "授業", "curriculum-plan")}</td>
         <td><textarea class="curriculum-test" rows="2">${escapeHtml(saved.confirmation_test || "")}</textarea></td>
         <td><textarea class="curriculum-homework" rows="2">${escapeHtml(saved.homework || "")}</textarea></td>
         <td><textarea class="curriculum-memo" rows="2">${escapeHtml(saved.lesson_memo || "")}</textarea></td>
       </tr>`;
     })
     .join("");
+  renderLessonPlans();
 }
 
 els.curriculumTbody.addEventListener("change", async (e) => {
+  if (e.target.matches(".linked-lesson-plan")) return;
   const row = e.target.closest("tr[data-event-id]");
   if (!row) return;
   const eventId = row.dataset.eventId;
   const completed = row.querySelector(".curriculum-completed").checked;
   row.dataset.completed = completed ? "1" : "0";
-  const lessonPlan = row.querySelector(".curriculum-plan").value;
   const confirmationTest = row.querySelector(".curriculum-test").value;
   const homework = row.querySelector(".curriculum-homework").value;
   const lessonMemo = row.querySelector(".curriculum-memo").value;
@@ -2555,7 +2646,6 @@ els.curriculumTbody.addEventListener("change", async (e) => {
       method: "PUT",
       body: JSON.stringify({
         completed,
-        lesson_plan: lessonPlan,
         confirmation_test: confirmationTest,
         homework,
         lesson_memo: lessonMemo,
