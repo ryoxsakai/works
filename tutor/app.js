@@ -235,6 +235,7 @@ let touchDragState = null;
 let editingYearId = null;
 let editingTermId = null;
 let rawEvents = [];
+let calendarEventsRequest = 0;
 let eventDetails = new Map();
 let nameFilter = null;
 // 授業予定は日付一覧から選ぶ詳細リストを標準表示にする。
@@ -677,7 +678,6 @@ watchAuth({
         showEventPlaceholder("授業予定を取得できませんでした。再読み込みしてください。");
         showActionError(err);
       }
-      if (els.curriculumName.value) await refreshStudentDetails();
       await loadRecordTable();
     } catch (err) {
       showActionError(err);
@@ -865,6 +865,9 @@ els.calendarChecklist.addEventListener("change", async (e) => {
   } else {
     selectedCalendarIds.delete(checkbox.value);
   }
+  clearStudentDetails();
+  renderCurriculumNameSuggestions();
+  setStudentBusy(true);
   try {
     await saveSelectedCalendars();
     await loadCalendarEvents();
@@ -1862,6 +1865,9 @@ els.yearGroups.addEventListener("change", async (e) => {
   } else {
     selectedTermIds.delete(id);
   }
+  clearStudentDetails();
+  renderCurriculumNameSuggestions();
+  setStudentBusy(true);
   try {
     await saveSelectedTerms();
     await loadCalendarEvents();
@@ -2009,7 +2015,7 @@ function renderCurriculumYearOptions() {
 }
 
 function renderCurriculumTermOptions(yearId) {
-  const filtered = terms.filter((t) => t.year_id === yearId);
+  const filtered = terms.filter((t) => t.year_id === yearId && (!selectedTermIds.size || selectedTermIds.has(t.id)));
   els.curriculumTermSelect.innerHTML =
     `<option value="">学期を選択</option>` +
     filtered.map((t) => `<option value="${t.id}">${escapeHtml(t.label)}</option>`).join("");
@@ -2121,8 +2127,9 @@ els.openCurriculumSearchModalBtn.addEventListener("click", () => {
   els.curriculumPrintNameInput.disabled = !els.curriculumName.value || loadedPrefName !== els.curriculumName.value.trim() || navigatingStudent || selectingStudent;
   const choice = studentChoices.find((item) => item.name === els.curriculumName.value && item.group === studentGroup);
   const kindSelect = document.querySelector("#student-lesson-kind");
-  kindSelect.disabled = !choice?.group.startsWith("代官山");
-  kindSelect.value = studentKinds[choice?.kindKey] || "";
+  const automaticGroup = choice && isGroupLessonTitle(choice.name);
+  kindSelect.disabled = !choice?.group.startsWith("代官山") || automaticGroup;
+  kindSelect.value = automaticGroup ? "group" : studentKinds[choice?.kindKey] || "";
   kindSelect.dataset.kindKey = choice?.kindKey || "";
   els.curriculumSearchModal.showModal();
 });
@@ -2139,11 +2146,10 @@ document.querySelector("#student-lesson-kind").addEventListener("change", (event
 
 els.curriculumSearchModalCloseBtn.addEventListener("click", () => els.curriculumSearchModal.close());
 
-// Course codes are class identities; annotations on individual names are not.
+// A/M in the lesson name identifies a group class (including full-width codes).
 function isGroupLessonTitle(title) {
-  const normalized = normalizeCurriculumText(title);
-  return /集団|グループ/.test(title) || /^(?:A|M)\d+(?:\s|$)/i.test(normalized)
-    || /^(?:A|M)\d+(?:SuperBasic|Standard|Sta|Basic|Ba|High)(?=$|[\s(【\[/])/i.test(normalized);
+  const name = selectionTitleWithoutAnnotation(title).normalize("NFKC");
+  return /[AM]/.test(name) || /集団|グループ/.test(title);
 }
 
 function selectionTitleWithoutAnnotation(title) {
@@ -2159,8 +2165,7 @@ function curriculumSelectionName(title) {
 // These administrative appointments remain visible in schedules, but are not students.
 function isNonLessonSelectionTitle(title) {
   const name = normalizeCurriculumText(selectionTitleWithoutAnnotation(title));
-  return /^(?:会議|教科会|WT\s*作成)$/i.test(name)
-    || /^(?:英語|数学|国語|理科|社会|物理|化学|生物|地学|日本史|世界史|地理|公民)科?\s*(?:会議|教科会)$/.test(name);
+  return /会議|教科会|打ち?合[わ]?せ|ミーティング|WT\s*作成/i.test(name);
 }
 
 function isStudentSelectionEvent(event) {
@@ -2183,7 +2188,8 @@ function clearStudentDetails() {
 
 function renderCurriculumNameSuggestions() {
   const choices = new Map();
-  rawEvents.filter(isStudentSelectionEvent).forEach((ev) => {
+  const selectionEvents = rawEvents.filter((ev) => selectedCalendarIds.has(ev._calendarId) && isWithinSelectedTerms(ev)).filter(isStudentSelectionEvent);
+  selectionEvents.forEach((ev) => {
     const name = curriculumSelectionName(ev.summary);
     if (!name) return;
     const calendar = calendarColors.get(ev._calendarId)?.name || "";
@@ -2193,35 +2199,81 @@ function renderCurriculumNameSuggestions() {
     const kindKey = JSON.stringify([ev._calendarId, name]);
     const kind = studentKinds[kindKey];
     const group = /TOMAS/i.test(calendar) ? "TOMAS" :
-      /代官山/.test(calendar) ? ((kind === "group" || (!kind && (/集団|グループ/.test(calendar) || isGroupLessonTitle(name)))) ? "代官山 · 集団" : "代官山 · 個別") :
+      /代官山/.test(calendar) ? ((isGroupLessonTitle(name) || kind === "group" || (!kind && /集団|グループ/.test(calendar))) ? "代官山 · 集団" : "代官山 · 個別") :
       calendar || "その他";
     const key = JSON.stringify([group, name]);
     const calendarIds = choices.get(key)?.calendarIds || [];
-    calendarIds.push(ev._calendarId);
+    if (!calendarIds.includes(ev._calendarId)) calendarIds.push(ev._calendarId);
     choices.set(key, { name, label, group, kindKey, calendarIds });
   });
   // Restored legacy token selections remain accessible without migrating their keys.
   const current = els.curriculumName.value;
   if (current && !isNonLessonSelectionTitle(current) && ![...choices.values()].some((item) => item.name === current)) {
-    const group = studentGroup || "保存中の選択";
-    const allowedCalendarIds = [...choices.values()].filter((item) => item.group === group).flatMap((item) => item.calendarIds);
-    const calendarIds = [...new Set(rawEvents.filter(isStudentSelectionEvent).filter((ev) =>
-      (!studentGroup || allowedCalendarIds.includes(ev._calendarId)) && eventMatchesCurriculumName(ev, current)).map((ev) => ev._calendarId))];
-    choices.set("current", { name: current, label: current, group, calendarIds });
+    const matchingEvents = selectionEvents.filter((ev) => eventMatchesCurriculumName(ev, current));
+    const matchingChoices = [...choices.values()].filter((item) => matchingEvents.some((ev) =>
+      item.name === curriculumSelectionName(ev.summary) && item.calendarIds.includes(ev._calendarId)));
+    const group = matchingChoices.find((item) => item.group === studentGroup)?.group || matchingChoices[0]?.group;
+    const calendarIds = [...new Set(matchingChoices.filter((item) => item.group === group).flatMap((item) => item.calendarIds))];
+    if (group && calendarIds.length) choices.set("current", { name: current, label: current, group, calendarIds });
   }
   studentChoices = [...choices.values()].sort((a, b) => a.label.localeCompare(b.label, "ja", { numeric: true }) || a.name.localeCompare(b.name, "ja"));
-  if (!studentGroup) studentGroup = studentChoices.find((item) => item.name === current)?.group || "";
+  const selected = studentChoices.find((item) => item.name === current && item.group === studentGroup)
+    || studentChoices.find((item) => item.name === current);
+  if (current && !selected) {
+    els.curriculumName.value = "";
+    clearStudentDetails();
+    setStudentBusy(false);
+    saveCurriculumState();
+  }
+  if (selected) studentGroup = selected.group;
+  renderCurriculumSearchSummary();
   renderStudentSelector();
 }
 
+const STUDENT_GROUP_ORDER = ["代官山 · 個別", "代官山 · 集団", "TOMAS", "淑徳与野"];
+function studentGroupOrder(group) {
+  const index = STUDENT_GROUP_ORDER.indexOf(group);
+  return index < 0 ? STUDENT_GROUP_ORDER.length : index;
+}
+function studentGroupColor(group) {
+  const calendarIds = studentChoices.filter((item) => item.group === group).flatMap((item) => item.calendarIds);
+  return calendarIds.map((id) => calendarColors.get(id)?.raw).find((color) => /^#[0-9a-f]{6}$/i.test(color || "")) || "#64748b";
+}
+
 function renderStudentSelector() {
-  const groups = [...new Set(studentChoices.map((item) => item.group))].sort((a, b) => a.localeCompare(b, "ja"));
+  const groups = [...new Set(studentChoices.map((item) => item.group))].sort((a, b) => studentGroupOrder(a) - studentGroupOrder(b) || a.localeCompare(b, "ja"));
   if (!groups.includes(studentGroup)) studentGroup = groups[0] || "";
-  els.studentGroups.innerHTML = groups.map((group) => `<button type="button" data-student-group="${escapeHtml(group)}" aria-pressed="${group === studentGroup}">${escapeHtml(group)}</button>`).join("");
+  els.studentGroups.innerHTML = groups.map((group) => `<button type="button" data-student-group="${escapeHtml(group)}" style="--student-color:${studentGroupColor(group)}" aria-label="${escapeHtml(group)}" aria-pressed="${group === studentGroup}">${escapeHtml(group.replace("代官山 · ", ""))}<span class="student-group-count" aria-hidden="true">${studentChoices.filter((item) => item.group === group).length}</span></button>`).join("");
+  els.studentSelector.style.setProperty("--student-color", studentGroupColor(studentGroup));
   els.studentSelector.innerHTML = studentChoices.map((item, index) => ({ ...item, index }))
     .filter((item) => item.group === studentGroup)
     .map((item) => `<button type="button" data-student-index="${item.index}" aria-pressed="${item.name === els.curriculumName.value}">${escapeHtml(item.label)}${item.label !== item.name ? `<small>${escapeHtml(item.name)}</small>` : ""}</button>`).join("") || '<p class="hint">表示できる生徒・授業がありません。設定のカレンダー・期間を確認してください。</p>';
   els.studentSelector.querySelector('[aria-pressed="true"]')?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  const activeTerms = terms.filter((term) => selectedTermIds.has(term.id));
+  document.querySelector("#student-selector-context").textContent = activeTerms.length
+    ? activeTerms.map((term) => [years.find((year) => year.id === term.year_id)?.label, term.label].filter(Boolean).join(" ")).join("・")
+    : "直近の予定";
+}
+
+// The shared term settings also own the curriculum period, including restored selections.
+function alignCurriculumTermWithSettings() {
+  const activeTerms = terms.filter((term) => selectedTermIds.has(term.id));
+  if (!activeTerms.length) return;
+  const choice = studentChoices.find((item) => item.name === els.curriculumName.value && item.group === studentGroup);
+  const matchingTerms = choice ? activeTerms.filter((term) => rawEvents.some((ev) => {
+    const day = (ev.start?.dateTime || ev.start?.date || "").slice(0, 10);
+    return isStudentSelectionEvent(ev) && choice.calendarIds.includes(ev._calendarId)
+      && eventMatchesCurriculumName(ev, choice.name) && day >= term.start_date && day <= term.end_date;
+  })) : activeTerms;
+  const available = matchingTerms.length ? matchingTerms : activeTerms;
+  const today = formatDateOnly(new Date());
+  const term = available.find((item) => item.id === Number(els.curriculumTermSelect.value))
+    || available.find((item) => today >= item.start_date && today <= item.end_date)
+    || [...available].sort((a, b) => b.start_date.localeCompare(a.start_date))[0];
+  els.curriculumYearSelect.value = String(term.year_id);
+  renderCurriculumTermOptions(term.year_id);
+  els.curriculumTermSelect.value = String(term.id);
+  saveCurriculumState();
 }
 
 // Each refresh owns one generation. New navigation supersedes pending work, including
@@ -2229,6 +2281,7 @@ function renderStudentSelector() {
 function captureStudentContext() {
   return { generation: studentGeneration, name: els.curriculumName.value.trim(), group: studentGroup,
     year: els.curriculumYearSelect.value, term: els.curriculumTermSelect.value,
+    selectedTerms: [...selectedTermIds].sort().join(","),
     calendars: [...selectedCalendarIds].sort().join("\n") };
 }
 function isCurrentStudentContext(context) {
@@ -2247,6 +2300,7 @@ function setStudentBusy(busy) {
   els.studentSelector.setAttribute("aria-busy", String(busy));
 }
 async function refreshStudentDetails({ closeSettings = false } = {}) {
+  alignCurriculumTermWithSettings();
   clearStudentDetails();
   const context = captureStudentContext();
   setStudentBusy(true);
@@ -3005,12 +3059,16 @@ window.addEventListener("afterprint", () => {
 // --- 授業予定の取得・絞り込み・表示 ---
 
 async function loadCalendarEvents() {
+  const request = ++calendarEventsRequest;
   const token = getSessionToken();
   if (!token) {
     showEventPlaceholder("カレンダーへのアクセス許可を確認しています…");
     return;
   }
   if (selectedCalendarIds.size === 0) {
+    rawEvents = [];
+    renderCurriculumNameSuggestions();
+    setStudentBusy(false);
     showEventPlaceholder("設定からカレンダーを選択してください");
     return;
   }
@@ -3030,18 +3088,23 @@ async function loadCalendarEvents() {
   }
   // 授業予定だけは、設定で除外している「空き」枠も細いカードとして表示する。
   const events = await fetchCalendarEvents(timeMin, timeMax, { withCalendarId: true, includeExcluded: true });
-
-  rawEvents = events.sort((a, b) => {
+  if (request !== calendarEventsRequest) return;
+  const sortedEvents = events.sort((a, b) => {
     const aStart = a.start?.dateTime || a.start?.date || "";
     const bStart = b.start?.dateTime || b.start?.date || "";
     return aStart.localeCompare(bStart);
   });
   // カードに授業予定・宿題・授業メモを表示するため、既存の進行記録を対応付ける。
   const curriculumEntries = await apiFetch("/curriculum");
+  if (request !== calendarEventsRequest) return;
+  rawEvents = sortedEvents;
   eventDetails = new Map(curriculumEntries.map((entry) => [entry.calendar_event_id, entry]));
 
   renderCurriculumNameSuggestions();
+  alignCurriculumTermWithSettings();
   renderCurrentView();
+  if (els.curriculumName.value) await refreshStudentDetails();
+  else setStudentBusy(false);
 }
 
 function showEventPlaceholder(message) {
