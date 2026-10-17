@@ -6,6 +6,7 @@ import {
 } from "../shared/auth.js?v=12";
 import { getTheme, setTheme } from "../shared/theme.js?v=6";
 import { tokyoDateKey, shiftRecordDate, recordDateRange } from "./record-date.js?v=1";
+import { createStudentMemoStore } from "./student-memo.js?v=1";
 
 const PASTEL_FALLBACK_COLORS = [
   "#c8e6c9",
@@ -217,6 +218,14 @@ let loadedPrefName = "";
 let prefRequest = 0;
 let studentGeneration = 0;
 const studentPrefSaves = new Map();
+const studentMemos = createStudentMemoStore({
+  readProfile: async (name) => {
+    await studentPrefSaves.get(name);
+    return apiFetch(`/student-prefs?name=${encodeURIComponent(name)}`, {}, null);
+  },
+  writeMemo: (name, memo) => saveStudentPref(name, { memo }, { reportError: false }),
+  onChange: () => renderStudentMemos(),
+});
 
 let calendarColors = new Map(); // calendarId -> { raw, bg, fg }
 let years = [];
@@ -383,7 +392,7 @@ function setActivePageTab(tab) {
     panel.hidden = panel.dataset.pageTabPanel !== target;
   });
   localStorage.setItem(ACTIVE_PAGE_TAB_KEY, target);
-  if (target === "record") requestAnimationFrame(resizeRecordInputs);
+  requestAnimationFrame(() => { resizeRecordInputs(); renderStudentMemos(); });
 }
 
 setActivePageTab(localStorage.getItem(ACTIVE_PAGE_TAB_KEY) || "record");
@@ -552,12 +561,70 @@ function renderRecordTable(rows) {
         <td data-label="授業予定"><textarea class="record-plan" rows="1" aria-label="${escapeHtml(r.label)}の授業予定">${escapeHtml(r.lessonPlan)}</textarea></td>
         <td data-label="確認テスト"><textarea class="record-test" rows="1" aria-label="${escapeHtml(r.label)}の確認テスト">${escapeHtml(r.confirmationTest)}</textarea></td>
         <td data-label="宿題"><textarea class="record-homework" rows="1" aria-label="${escapeHtml(r.label)}の宿題">${escapeHtml(r.homework)}</textarea></td>
-        <td data-label="授業メモ"><textarea class="record-memo" rows="1" aria-label="${escapeHtml(r.label)}の授業メモ">${escapeHtml(r.lessonMemo)}</textarea></td>
+        <td data-label="授業メモ"><textarea class="record-memo" rows="1" aria-label="${escapeHtml(r.label)}の授業メモ">${escapeHtml(r.lessonMemo)}</textarea>
+          <div class="record-student-memo student-memo-editor" data-student-name="${escapeHtml(recordStudentPrefName(r.label))}">
+            <label>生徒メモ<textarea class="student-memo-input" rows="1" aria-label="${escapeHtml(r.label)}の生徒メモ" placeholder="日付をまたいで共有" disabled></textarea></label>
+            <div class="student-memo-feedback"><small class="student-memo-status" role="status" aria-live="polite"></small><button type="button" class="student-memo-retry" hidden>再試行</button></div>
+          </div>
+        </td>
       </tr>`;
     })
     .join("");
+  renderStudentMemos();
+  const names = new Set([...els.recordTbody.querySelectorAll(".student-memo-editor")].map((editor) => editor.dataset.studentName));
+  names.forEach((name) => studentMemos.load(name).catch(() => {}));
   requestAnimationFrame(resizeRecordInputs);
 }
+
+// Use exactly the name that opening this record in student information would use.
+function recordStudentPrefName(title) {
+  return studentChoices.some((item) => item.name === title) ? title : curriculumSelectionName(title);
+}
+
+function renderStudentMemos() {
+  const messages = { idle: "", loading: "読み込み中…", ready: "日付をまたいで共有・変更後に自動保存", unsaved: "未保存・入力を終えると自動保存", saving: "保存中…", saved: "保存済み", "load-error": "取得できませんでした", "save-error": "保存できませんでした・入力は保持しています" };
+  document.querySelectorAll(".student-memo-editor").forEach((editor) => {
+    const name = editor.dataset.studentName;
+    const input = editor.querySelector(".student-memo-input");
+    const status = editor.querySelector(".student-memo-status");
+    const retry = editor.querySelector(".student-memo-retry");
+    if (!name) {
+      input.value = "";
+      input.disabled = true;
+      status.textContent = "生徒を選択してください";
+      retry.hidden = true;
+      return;
+    }
+    const state = studentMemos.get(name);
+    if (input.value !== state.value) input.value = state.value;
+    input.disabled = !state.loaded || (input === els.studentMemoInput && (loadedPrefName !== name || navigatingStudent || selectingStudent));
+    status.textContent = messages[state.status];
+    status.dataset.error = String(state.status.endsWith("error"));
+    retry.hidden = !state.status.endsWith("error");
+    editor.dataset.status = state.status;
+    resizeRecordInput(input);
+  });
+}
+
+// The key belongs to the editor that received the event, never the later selection.
+document.addEventListener("input", (event) => {
+  if (!event.target.matches(".student-memo-input")) return;
+  const name = event.target.closest(".student-memo-editor").dataset.studentName;
+  if (name && !event.target.disabled) studentMemos.edit(name, event.target.value);
+});
+document.addEventListener("change", (event) => {
+  if (!event.target.matches(".student-memo-input")) return;
+  const name = event.target.closest(".student-memo-editor").dataset.studentName;
+  if (name && !event.target.disabled) studentMemos.save(name).catch(() => {});
+});
+document.addEventListener("click", (event) => {
+  const retry = event.target.closest(".student-memo-retry");
+  if (!retry) return;
+  const name = retry.closest(".student-memo-editor").dataset.studentName;
+  if (!name) return;
+  const state = studentMemos.get(name);
+  (state.loaded ? studentMemos.save(name) : studentMemos.load(name)).catch(() => {});
+});
 
 function resizeRecordInput(input) {
   if (!input.getClientRects().length) return;
@@ -589,6 +656,7 @@ els.recordTbody.addEventListener("click", (e) => {
 });
 
 els.recordTbody.addEventListener("change", async (e) => {
+  if (e.target.matches(".student-memo-input")) return;
   const row = e.target.closest("tr[data-event-id]");
   if (!row) return;
   const eventId = row.dataset.eventId;
@@ -2101,7 +2169,8 @@ function invalidateStudentPref() {
   loadedPrefName = "";
   els.curriculumPrintNameInput.value = "";
   els.curriculumPrintNameInput.disabled = true;
-  els.studentMemoInput.value = "";
+  document.querySelector("#student-memo-editor").dataset.studentName = "";
+  renderStudentMemos();
 }
 
 async function loadStudentPref(context = captureStudentContext()) {
@@ -2110,16 +2179,17 @@ async function loadStudentPref(context = captureStudentContext()) {
   const request = prefRequest;
   const name = els.curriculumName.value.trim();
   if (!name) return;
-  const pref = await apiFetch(`/student-prefs?name=${encodeURIComponent(name)}`, {}, context);
+  const pref = await studentMemos.load(name, { refresh: true });
   assertStudentContext(context);
   if (request !== prefRequest || name !== els.curriculumName.value.trim()) return;
   els.curriculumPrintNameInput.value = pref?.print_name || "";
-  els.studentMemoInput.value = pref?.memo || "";
+  document.querySelector("#student-memo-editor").dataset.studentName = name;
   loadedPrefName = name;
+  renderStudentMemos();
   els.curriculumPrintNameInput.disabled = navigatingStudent || selectingStudent;
 }
 
-function saveStudentPref(name, patch) {
+function saveStudentPref(name, patch, { reportError = true } = {}) {
   const context = captureStudentContext();
   const previous = studentPrefSaves.get(name) || Promise.resolve();
   const save = previous.catch(() => {}).then(() => apiFetch("/student-prefs", {
@@ -2130,7 +2200,7 @@ function saveStudentPref(name, patch) {
   save.then(cleanup, cleanup);
   // Only the originating screen reports standalone save errors. A refresh awaiting
   // the same write reports its failure under the newer generation instead.
-  save.catch((err) => { if (isCurrentStudentContext(context)) showActionError(err); });
+  save.catch((err) => { if (reportError && isCurrentStudentContext(context)) showActionError(err); });
   return save;
 }
 
@@ -2141,15 +2211,6 @@ els.curriculumPrintNameInput.addEventListener("change", async () => {
     return;
   }
   await saveStudentPref(name, { print_name: els.curriculumPrintNameInput.value.trim() || null }).catch(() => {});
-});
-
-els.studentMemoInput.addEventListener("change", async () => {
-  const name = els.curriculumName.value.trim();
-  if (!name || loadedPrefName !== name || navigatingStudent || selectingStudent) {
-    showActionError(new Error("生徒情報の取得が完了してから編集してください"));
-    return;
-  }
-  await saveStudentPref(name, { memo: els.studentMemoInput.value.trim() || null }).catch(() => {});
 });
 
 // ページ上部の検索バーに、現在絞り込み中の名前・年度・学期を表示する。
@@ -2391,6 +2452,7 @@ async function refreshStudentDetails({ closeSettings = false } = {}) {
   } finally {
     if (context.generation === studentGeneration) {
       setStudentBusy(false);
+      renderStudentMemos();
       els.curriculumPrintNameInput.disabled = !context.name || loadedPrefName !== context.name;
       renderStudentSelector();
     }

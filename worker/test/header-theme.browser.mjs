@@ -39,6 +39,9 @@ async function selectedTheme(page) {
   const context = await browser.newContext();
   let recordFixtures = false;
   const recordSaves = new Map();
+  let memoFixtures = false, failMemoRead = true, failMemoSave = true, releaseMemoSave;
+  const memoWrites = [];
+  const profiles = new Map([['サンプル生徒',{name:'サンプル生徒',memo:'既存の生徒メモ',print_name:'印刷サンプル'}],['別の生徒',{name:'別の生徒',memo:'別生徒のメモ'}]]);
   // Synthetic origin: no production credentials, data, or external requests.
   await context.route('**/*', async r => {
     const url = new URL(r.request().url());
@@ -48,7 +51,8 @@ async function selectedTheme(page) {
         if (url.pathname.endsWith('calendarList')) items=[{id:'qa',summary:'代官山',backgroundColor:'#8e24aa'}];
         else {
           const day=new Date(url.searchParams.get('timeMin')).toLocaleDateString('en-CA',{timeZone:'Asia/Tokyo'});
-          items=[{id:day,summary:'サンプル生徒',start:{dateTime:`${day}T10:00:00+09:00`},end:{dateTime:`${day}T11:00:00+09:00`}}];
+          const names=memoFixtures?['サンプル生徒','別の生徒','取得失敗','空メモ']:['サンプル生徒'];
+          items=names.map((summary,i)=>({id:day+(i?'-'+i:''),summary,start:{dateTime:`${day}T${10+i}:00:00+09:00`},end:{dateTime:`${day}T${11+i}:00:00+09:00`}}));
         }
       }
       return r.fulfill({contentType:'application/json',body:JSON.stringify({items})});
@@ -63,6 +67,18 @@ async function selectedTheme(page) {
         if(url.pathname==='/api/terms')result=[{id:1,year_id:1,label:'サンプル学期',start_date:'2000-01-01',end_date:'2099-12-31'}];
         if(url.pathname.startsWith('/api/curriculum/') && r.request().method()==='PUT'){
           recordSaves.set(decodeURIComponent(url.pathname.slice('/api/curriculum/'.length)),r.request().postDataJSON());result={ok:true};
+        }
+        if(url.pathname==='/api/student-prefs'){
+          const name=url.searchParams.get('name');
+          if(r.request().method()==='PUT'){
+            const body=r.request().postDataJSON();memoWrites.push(body);
+            if(body.memo==='保存失敗'&&failMemoSave){failMemoSave=false;return r.fulfill({status:500,body:'synthetic save failure'});}
+            if(body.memo==='遅延保存')await new Promise(resolve=>{releaseMemoSave=resolve;});
+            profiles.set(body.name,{...profiles.get(body.name),...body});result=profiles.get(body.name);
+          } else {
+            if(name==='取得失敗'&&failMemoRead){failMemoRead=false;return r.fulfill({status:500,body:'synthetic read failure'});}
+            result=profiles.get(name)||{name,memo:null,print_name:null};
+          }
         }
         if(url.pathname==='/api/curriculum')result=[...recordSaves].map(([calendar_event_id,record])=>({calendar_event_id,...record}));
         return r.fulfill({contentType:'application/json',body:JSON.stringify(result)});
@@ -204,6 +220,51 @@ async function selectedTheme(page) {
   await page.locator('.record-day-btn[data-day="next"]').click();
   assert.equal(await page.locator('#record-date-label').innerText(),initialDate);
   assert.equal(await page.locator('.record-day-btn').count(),2);
+  // Shared student memo: the existing profile API is the only persistence target.
+  memoFixtures=true;
+  await page.setViewportSize({width:390,height:900});await page.reload();
+  const editor=name=>page.locator(`.record-student-memo[data-student-name="${name}"]`);
+  const memo=editor('サンプル生徒').locator('textarea');
+  await page.waitForFunction(()=>document.querySelector('.record-student-memo textarea')?.value==='既存の生徒メモ');
+  assert.equal(memoWrites.length,0,'initial reads must not initialize or overwrite notes');
+  await page.waitForFunction(()=>document.querySelector('[data-student-name="取得失敗"]')?.dataset.status==='load-error');
+  assert.equal(await editor('取得失敗').locator('textarea').isDisabled(),true);
+  await editor('取得失敗').getByRole('button',{name:'再試行'}).click();
+  await page.waitForFunction(()=>document.querySelector('[data-student-name="取得失敗"]')?.dataset.status==='ready');
+  const empty=await editor('空メモ').locator('textarea').evaluate(el=>el.offsetHeight);
+  assert.ok(empty<50,'empty note starts as one line');
+  await memo.fill('共有するメモ\n二行目\n三行目');await memo.press('Tab');
+  await page.waitForFunction(()=>document.querySelector('.record-student-memo')?.dataset.status==='saved');
+  assert.ok(await memo.evaluate(el=>el.offsetHeight)>empty);
+  const notes='共有するメモ\n二行目\n三行目';
+  await page.locator('.record-day-btn[data-day="next"]').click();await memo.waitFor();
+  assert.equal(await memo.inputValue(),notes,'same student on another day shares the note');
+  await page.locator('.record-student-link').filter({hasText:'サンプル生徒'}).click();
+  const profileMemo=page.locator('#student-memo');
+  await page.waitForFunction(()=>document.querySelector('#student-memo')?.disabled===false);
+  assert.equal(await profileMemo.inputValue(),notes);
+  await profileMemo.fill('生徒情報から変更');await profileMemo.press('Tab');
+  await page.waitForFunction(()=>document.querySelector('#student-memo-editor')?.dataset.status==='saved');
+  await page.locator('[data-page-tab="record"]').click();assert.equal(await memo.inputValue(),'生徒情報から変更');
+  await page.reload();await memo.waitFor();
+  await page.waitForFunction(()=>document.querySelector('.record-student-memo textarea')?.value==='生徒情報から変更');
+  assert.equal(profiles.get('サンプル生徒').print_name,'印刷サンプル');
+  await memo.fill('保存失敗');await memo.press('Tab');
+  await page.waitForFunction(()=>document.querySelector('.record-student-memo')?.dataset.status==='save-error');
+  assert.equal(await memo.inputValue(),'保存失敗');await editor('サンプル生徒').getByRole('button',{name:'再試行'}).click();
+  await page.waitForFunction(()=>document.querySelector('.record-student-memo')?.dataset.status==='saved');
+  assert.equal(await editor('別の生徒').locator('textarea').inputValue(),'別生徒のメモ');
+  await memo.fill('遅延保存');await memo.press('Tab');
+  await page.waitForFunction(()=>document.querySelector('.record-student-memo')?.dataset.status==='saving');
+  await page.locator('.record-student-link').filter({hasText:'別の生徒'}).click();
+  await page.waitForFunction(()=>document.querySelector('#student-memo')?.value==='別生徒のメモ');
+  assert.equal(typeof releaseMemoSave,'function');releaseMemoSave();
+  await page.waitForFunction(()=>document.querySelector('.record-student-memo')?.dataset.status==='saved');
+  assert.equal(await profileMemo.inputValue(),'別生徒のメモ','old save response cannot replace the later student');
+  assert.ok(memoWrites.every(body=>Object.keys(body).sort().join(',')==='memo,name'));
+  await page.locator('[data-page-tab="record"]').click();
+  await page.screenshot({path:path.join(artifacts,'shared-student-memo-390.png'),fullPage:true});
+  console.log('Shared student memo: existing data, both views, day changes, reload, autosize, read/save failures and stale save isolation passed.');
   fs.writeFileSync(path.join(artifacts,'report.json'),JSON.stringify({matrix:report,themePersistence:'pass',navigation:'pass',crossTab:'pass',osFollow:'pass',print:'pass'},null,2));
   console.log(`Passed ${report.length} page/width/auth combinations, each light/dark + print; theme persistence, cross-tab, OS follow, navigation guard, home categories.`);
   await browser.close();

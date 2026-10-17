@@ -12,7 +12,7 @@
   <title>授業管理 | Works</title>
   <script src="/shared/theme-init.js?v=1"></script>
   <link rel="apple-touch-icon" href="../shared/logo.png" />
-  <link rel="stylesheet" href="../shared/styles.css?v=57" />
+  <link rel="stylesheet" href="../shared/styles.css?v=58" />
   <link rel="stylesheet" href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" />
   <link rel="stylesheet" href="/shared/header.css?v=2" />
   <script type="module" src="/shared/header.js?v=3"></script>
@@ -140,8 +140,9 @@
                 </h3>
               </div>
             </div>
-            <div class="accordion-body" data-section-body="memo">
-              <textarea id="student-memo" rows="3" placeholder="この生徒についてのメモ(印刷されません)"></textarea>
+            <div id="student-memo-editor" class="accordion-body student-memo-editor" data-section-body="memo" data-student-name="">
+              <textarea id="student-memo" class="student-memo-input" rows="1" aria-label="生徒メモ" placeholder="この生徒についてのメモ(印刷されません)" disabled></textarea>
+              <div class="student-memo-feedback"><small class="student-memo-status" role="status" aria-live="polite"></small><button type="button" class="student-memo-retry" hidden>再試行</button></div>
             </div>
           </div>
 
@@ -457,6 +458,6 @@
     </div>
   </dialog>
 
-  <script type="module" src="./app.js?v=74"></script>
+  <script type="module" src="./app.js?v=75"></script>
 </body>
 </html>

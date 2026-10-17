@@ -3653,6 +3653,16 @@ textarea,
 /* Record fields grow from one line; the desktop table keeps its column layout. */
 .record-panel #record-table textarea { box-sizing: border-box; min-height: 0; height: auto; overflow-y: hidden; resize: none; line-height: 1.5; background: var(--bg-elevated); color: var(--fg); border-color: var(--border); box-shadow: none; }
 .record-panel #record-table textarea:focus { background: var(--bg-elevated); border-color: var(--accent); }
+.record-student-memo { margin-top: .8rem; padding-top: .65rem; border-top: 1px solid var(--border); }
+.record-student-memo label { display: block; color: var(--muted); font-size: .72rem; font-weight: 600; }
+.record-student-memo textarea { margin-top: .3rem; font-weight: 400; }
+.curriculum-panel #student-memo { box-sizing: border-box; min-height: 0; overflow-y: hidden; resize: none; line-height: 1.5; }
+.student-memo-feedback { display: flex; align-items: center; flex-wrap: wrap; gap: .35rem .5rem; margin-top: .3rem; }
+.student-memo-status { color: var(--muted); font-size: .68rem; font-weight: 400; white-space: normal; }
+.student-memo-status[data-error="true"] { color: var(--danger, #b91c1c); }
+.student-memo-retry { padding: .15rem .45rem; font-size: .7rem; }
+.student-memo-retry[hidden] { display: none; }
+@media print { .student-memo-feedback { display: none; } }
 @media screen and (max-width: 640px) {
   [data-page-tab-panel="record"], .record-panel, .record-panel .table-scroll { min-width: 0; max-width: 100%; }
   .record-panel .table-scroll { overflow: visible; padding: 0; border: 0; background: transparent; box-shadow: none; }
