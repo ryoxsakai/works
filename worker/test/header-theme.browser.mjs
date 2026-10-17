@@ -17,16 +17,56 @@ export const watchAuth = ({onSignedIn,onSignedOut}) => {
   if (localStorage.getItem('qa_signed_in') === 'yes') onSignedIn?.({email:'qa@example.test',picture:''});
   else onSignedOut?.();
 };`;
+async function openThemeSettings(page) {
+  await page.locator('.works-header button[aria-label="設定"]').click();
+  const appearance = page.locator('dialog[open] [role="tab"][data-tab="appearance"]');
+  if (await appearance.count()) await appearance.click();
+  await page.locator('dialog[open] input[type="radio"][value="light"]').waitFor({state:'visible'});
+}
+async function selectTheme(page, value) {
+  await openThemeSettings(page);
+  await page.locator(`dialog[open] input[type="radio"][value="${value}"]`).check();
+  await page.locator('dialog[open] button[aria-label="閉じる"]').click();
+}
+async function selectedTheme(page) {
+  await openThemeSettings(page);
+  const value=await page.locator('dialog[open] input[type="radio"]:checked').inputValue();
+  await page.locator('dialog[open] button[aria-label="閉じる"]').click();
+  return value;
+}
 (async () => {
   const browser = await chromium.launch({headless:true,...(process.env.BROWSER_EXECUTABLE ? {executablePath:process.env.BROWSER_EXECUTABLE} : {})});
   const context = await browser.newContext();
+  let recordFixtures = false;
+  const recordSaves = new Map();
   // Synthetic origin: no production credentials, data, or external requests.
   await context.route('**/*', async r => {
     const url = new URL(r.request().url());
-    if (url.origin === 'https://www.googleapis.com') return r.fulfill({contentType:'application/json',body:'{"items":[]}'});
+    if (url.origin === 'https://www.googleapis.com') {
+      let items=[];
+      if (recordFixtures) {
+        if (url.pathname.endsWith('calendarList')) items=[{id:'qa',summary:'代官山',backgroundColor:'#8e24aa'}];
+        else {
+          const day=new Date(url.searchParams.get('timeMin')).toLocaleDateString('en-CA',{timeZone:'Asia/Tokyo'});
+          items=[{id:day,summary:'サンプル生徒',start:{dateTime:`${day}T10:00:00+09:00`},end:{dateTime:`${day}T11:00:00+09:00`}}];
+        }
+      }
+      return r.fulfill({contentType:'application/json',body:JSON.stringify({items})});
+    }
     if (url.origin !== base) return r.abort();
     if (url.pathname === '/shared/auth.js') return r.fulfill({contentType:'text/javascript',body:authStub});
     if (url.pathname.startsWith('/api/')) {
+      if (recordFixtures) {
+        let result=[];
+        if(url.pathname==='/api/settings')result={selected_calendars:['qa'],selected_term_ids:[1]};
+        if(url.pathname==='/api/years')result=[{id:1,label:'サンプル年度'}];
+        if(url.pathname==='/api/terms')result=[{id:1,year_id:1,label:'サンプル学期',start_date:'2000-01-01',end_date:'2099-12-31'}];
+        if(url.pathname.startsWith('/api/curriculum/') && r.request().method()==='PUT'){
+          recordSaves.set(decodeURIComponent(url.pathname.slice('/api/curriculum/'.length)),r.request().postDataJSON());result={ok:true};
+        }
+        if(url.pathname==='/api/curriculum')result=[...recordSaves].map(([calendar_event_id,record])=>({calendar_event_id,...record}));
+        return r.fulfill({contentType:'application/json',body:JSON.stringify(result)});
+      }
       const isList = /^\/api\/(goal-templates|students|materials|material-categories|periods|calendars|records|curriculum|schedules|schedule-names|ss-projects|admissions|material-library\/(folders|files))(\/|$)/.test(url.pathname);
       return r.fulfill({contentType:'application/json',body:JSON.stringify(isList ? [] : {items:[],books:[],pages:[],memos:[],tasks:[],categories:[],calendars:[],events:[],files:[],folders:[],students:[],schedules:[],materials:[]})});
     }
@@ -46,7 +86,8 @@ export const watchAuth = ({onSignedIn,onSignedOut}) => {
         await page.goto(base + path);
         if (!signedIn && ["/tutor/", "/material/", "/admission/", "/ss/", "/material-print/"].includes(path)) await page.waitForURL(base + "/");
         await page.waitForFunction(() => !!window.qaAuth);
-        await page.locator('.works-theme-control select').waitFor();
+        await page.locator('.works-header button[aria-label="設定"]').waitFor();
+        assert.equal(await page.locator('.works-header select').count(),0,'theme selector lives inside settings');
         if (new URL(page.url()).pathname === '/') {
           await page.waitForFunction(expected => document.querySelector('#home-auth-action').getAttribute('aria-label') === expected, signedIn ? 'ログアウト' : 'Googleでログイン');
         } else {
@@ -56,7 +97,7 @@ export const watchAuth = ({onSignedIn,onSignedOut}) => {
         // This harness isolates header geometry from memo's full-screen sign-in view.
         if (path === '/memo/') await page.locator('#login-screen').evaluate(el => el.style.display = 'none');
         for (const theme of ['light','dark']) {
-          await page.selectOption('.works-theme-control select', theme);
+          await selectTheme(page, theme);
           await page.waitForTimeout(180); // Let existing card/button color transitions settle.
           const geometry = await page.evaluate(() => {
             const h = document.querySelector('.works-header');
@@ -65,7 +106,7 @@ export const watchAuth = ({onSignedIn,onSignedOut}) => {
             const menu = h.querySelector('.works-navigation');
             const style = getComputedStyle(menu);
             const summary = menu.querySelector('summary').getBoundingClientRect();
-            const themeControl = h.querySelector('select').getBoundingClientRect();
+            const themeControl = h.querySelector('button[aria-label="設定"]').getBoundingClientRect();
             return {menuTop:style.marginTop,menuPadding:style.paddingTop,menuBorder:style.borderTopWidth,
               menuCenter:summary.y+summary.height/2,themeCenter:themeControl.y+themeControl.height/2,
               left:rect.left,right:rect.right,width:innerWidth,theme:document.documentElement.dataset.theme,bg:getComputedStyle(h).backgroundColor,
@@ -98,29 +139,70 @@ export const watchAuth = ({onSignedIn,onSignedOut}) => {
   assert.equal(await page.locator('.module-card[href="/material-print/"]').count(),0);
   assert.equal(await page.locator('#operations a[href="/wiki/"] h3').innerText(),'Wiki');
   assert.deepEqual(await page.locator('.module-section').evaluateAll(es=>es.map(e=>e.id)),['teaching','operations','creation']);
-  await page.selectOption('.works-theme-control select','dark');
+  await selectTheme(page,'dark');
   await page.reload();
-  assert.equal(await page.locator('.works-theme-control select').inputValue(),'dark');
+  assert.equal(await selectedTheme(page),'dark');
   await page.goto(base+'/kdp/');
-  assert.equal(await page.locator('.works-theme-control select').inputValue(),'dark');
+  assert.equal(await selectedTheme(page),'dark');
   const second = await context.newPage();
   await second.goto(base+'/ss/');
-  await second.locator('.works-theme-control select').waitFor();
-  await page.selectOption('.works-theme-control select','light');
+  await second.locator('.works-header button[aria-label="設定"]').waitFor();
+  await selectTheme(page,'light');
   await second.waitForFunction(()=>document.documentElement.dataset.theme==='light');
-  await second.selectOption('.works-theme-control select','system');
+  await selectTheme(second,'system');
   await second.emulateMedia({colorScheme:'dark'});
   await second.waitForFunction(()=>document.documentElement.dataset.theme==='dark');
   await second.emulateMedia({colorScheme:'light'});
   await second.waitForFunction(()=>document.documentElement.dataset.theme==='light');
   // Shared navigation must invoke the existing dirty/busy guard before navigating.
   await page.goto(base+'/wiki/');
-  await page.locator('.works-theme-control select').waitFor();
+  await page.locator('.works-header button[aria-label="設定"]').waitFor();
+        assert.equal(await page.locator('.works-header select').count(),0,'theme selector lives inside settings');
   await page.evaluate(()=>{document.querySelector('.works-home').onclick=e=>{window.qaGuard=true;e.preventDefault();};});
   await page.locator('.works-navigation summary').click();
   await page.locator('.works-navigation a[href="/kdp/"]').click();
   assert.equal(await page.evaluate(()=>window.qaGuard),true);
   assert.equal(new URL(page.url()).pathname,'/wiki/');
+  // Record saves stay inside the fixture; never touch production lessons.
+  recordFixtures=true;
+  await page.evaluate(()=>localStorage.setItem('qa_signed_in','yes'));
+  await page.goto(base+'/tutor/');
+  await page.locator('[data-page-tab="record"]').click();
+  const field=page.locator('#record-tbody .record-plan').first();
+  await field.waitFor();
+  for(const width of [320,390,1280]){
+    await page.setViewportSize({width,height:900});
+    await selectTheme(page,'light');
+    const geometry=await page.locator('#record-table').evaluate(el=>({display:getComputedStyle(el).display,width:el.getBoundingClientRect().width,body:document.body.scrollWidth,viewport:innerWidth}));
+    if(width<=640){assert.equal(geometry.display,'block');assert.ok(geometry.body<=width);assert.ok(geometry.width<=width);}
+    else assert.equal(geometry.display,'table');
+    await field.fill('');
+    const empty=await field.evaluate(el=>el.offsetHeight);
+    await field.fill('一行目\n日本語の二行目\n三行目');
+    assert.ok(await field.evaluate(el=>el.offsetHeight)>empty);
+    await field.fill('長い日本語の折り返しを検証します。'.repeat(40));
+    assert.ok(await field.evaluate(el=>el.scrollHeight<=el.clientHeight));
+    await field.fill('');
+    assert.equal(await field.evaluate(el=>el.offsetHeight),empty);
+    await field.fill('保存後に復元する日本語\n二行目\n三行目');
+    const response=page.waitForResponse(r=>r.url().includes('/api/curriculum/')&&r.request().method()==='PUT');
+    await field.press('Tab');await response;
+    await page.reload();await field.waitFor();
+    assert.equal(await field.inputValue(),'保存後に復元する日本語\n二行目\n三行目');
+    assert.ok(await field.evaluate(el=>el.offsetHeight)>empty);
+    await selectTheme(page,'dark');
+    assert.equal(await page.locator('.works-header select').count(),0);
+    if(width===390)await page.screenshot({path:path.join(artifacts,'records-390-dark.png'),fullPage:true});
+  }
+  const initialDate=await page.locator('#record-date-label').innerText();
+  await page.locator('.record-day-btn[data-day="prev"]').click();
+  await page.locator('.record-day-btn[data-day="prev"]').click();
+  const earlierDate=await page.locator('#record-date-label').innerText();
+  assert.notEqual(earlierDate,initialDate);
+  await page.locator('.record-day-btn[data-day="next"]').click();
+  await page.locator('.record-day-btn[data-day="next"]').click();
+  assert.equal(await page.locator('#record-date-label').innerText(),initialDate);
+  assert.equal(await page.locator('.record-day-btn').count(),2);
   fs.writeFileSync(path.join(artifacts,'report.json'),JSON.stringify({matrix:report,themePersistence:'pass',navigation:'pass',crossTab:'pass',osFollow:'pass',print:'pass'},null,2));
   console.log(`Passed ${report.length} page/width/auth combinations, each light/dark + print; theme persistence, cross-tab, OS follow, navigation guard, home categories.`);
   await browser.close();
