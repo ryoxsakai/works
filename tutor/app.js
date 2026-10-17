@@ -2146,15 +2146,19 @@ function isGroupLessonTitle(title) {
     || /^(?:A|M)\d+(?:SuperBasic|Standard|Sta|Basic|Ba|High)(?=$|[\s(【\[/])/i.test(normalized);
 }
 
+function selectionTitleWithoutAnnotation(title) {
+  return String(title || "").split(/[（(【\[/／]/, 1)[0].trim();
+}
+
 function curriculumSelectionName(title) {
   const text = String(title || "").trim();
   if (isGroupLessonTitle(text)) return text;
-  return text.split(/[（(【\[/／]/, 1)[0].trim();
+  return selectionTitleWithoutAnnotation(text);
 }
 
 // These administrative appointments remain visible in schedules, but are not students.
 function isNonLessonSelectionTitle(title) {
-  const name = normalizeCurriculumText(curriculumSelectionName(title));
+  const name = normalizeCurriculumText(selectionTitleWithoutAnnotation(title));
   return /^(?:会議|教科会|WT\s*作成)$/i.test(name)
     || /^(?:英語|数学|国語|理科|社会|物理|化学|生物|地学|日本史|世界史|地理|公民)科?\s*(?:会議|教科会)$/.test(name);
 }
