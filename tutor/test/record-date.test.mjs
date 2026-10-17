@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFileSync} from 'node:fs';
 import {tokyoDateKey,shiftRecordDate,recordDateRange} from '../record-date.js';
+import {lessonEventRef} from '../../shared/lesson-plan.js';
 const source=readFileSync(new URL('../app.js',import.meta.url),'utf8');
 function fn(name){const start=source.indexOf(`async function ${name}(`);return source.slice(start,source.indexOf('\n}',start)+2);}
 test('Tokyo date, civil day navigation and exclusive fetch boundaries',()=>{
@@ -22,7 +23,7 @@ test('two date buttons accumulate days from the displayed date',async()=>{
   assert.deepEqual(loaded,['2026-12-31','2026-12-30','2026-12-31']);
 });
 function setup(overrides={}){
-  const state=vm.createContext({recordTableRequest:0,selectedRecordDate:'2026-10-17',selectedCalendarIds:new Set(['qa']),selectedTermIds:new Set(),terms:[],calendarColors:new Map(),
+  const state=vm.createContext({lessonPlans:{version:0},lessonEventRef,recordTableRequest:0,selectedRecordDate:'2026-10-17',selectedCalendarIds:new Set(['qa']),selectedTermIds:new Set(),terms:[],calendarColors:new Map(),
     els:{recordTbody:{innerHTML:''}},getSessionToken:()=>true,renderRecordDateLabel(){},recordDateRange,shiftRecordDate,isExcludedScheduleEvent:()=>false,
     fetchCalendarEvents:async()=>[],apiFetch:async()=>[],renderRecordTable:rows=>{state.rendered=rows;},...overrides});
   vm.runInContext(fn('loadRecordTable'),state);return state;
