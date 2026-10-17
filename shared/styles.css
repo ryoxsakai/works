@@ -3630,15 +3630,22 @@ textarea,
   font-size: .7rem;
 }
 
-/* Student information: touch-friendly, native horizontal browsing. */
-.student-slider { display: flex; gap: .5rem; overflow-x: auto; max-width: 100%; padding: .5rem 0 .8rem; overscroll-behavior-x: contain; }
-.student-slider button { flex: 0 0 auto; min-height: 44px; border: 1px solid var(--border); border-radius: .52rem; background: var(--bg-elevated); color: var(--fg); padding: .65rem 1rem; }
-.student-slider button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+/* Compact category pills retain the source calendar's color in both themes. */
+.student-heading-actions { display: flex; align-items: center; gap: .35rem; }
+.student-slider { display: flex; gap: .35rem; overflow-x: auto; max-width: 100%; padding: .35rem .1rem .65rem; overscroll-behavior-x: contain; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+.student-slider button { flex: 0 0 auto; min-height: 36px; border: 1px solid var(--border); border-radius: .65rem; background: transparent; color: var(--fg); padding: .35rem .7rem; font-size: .78rem; line-height: 1.45; white-space: nowrap; transition: background-color .15s, border-color .15s; }
+.student-slider button:hover { background: color-mix(in srgb, var(--student-color, var(--accent)) 10%, var(--bg-elevated)); }
+.student-slider button[aria-pressed="true"] { border-color: color-mix(in srgb, var(--student-color, var(--accent)) 60%, var(--border)); background: color-mix(in srgb, var(--student-color, var(--accent)) 15%, var(--bg-elevated)); color: var(--fg); box-shadow: inset 0 -2px 0 var(--student-color, var(--accent)); font-weight: 700; }
 .student-slider button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.student-slider button small { display: block; color: var(--muted); margin-top: .2rem; }
-.student-slider-heading { display: flex; justify-content: space-between; gap: .5rem; margin-top: .5rem; }
-.student-slider-heading small { color: var(--muted); }
-@media print { .student-slider, .student-slider-heading { display: none !important; } }
+.student-slider button small { display: block; color: var(--muted); margin-top: .1rem; font-size: .67rem; font-weight: 400; }
+#student-groups { padding-bottom: .55rem; border-bottom: 1px solid var(--border); }
+#student-groups button { display: inline-flex; align-items: center; gap: .4rem; border-color: transparent; border-radius: 999px; background: color-mix(in srgb, var(--student-color) 10%, var(--bg-elevated)); }
+#student-groups button[aria-pressed="true"] { background: color-mix(in srgb, var(--student-color) 21%, var(--bg-elevated)); border-color: color-mix(in srgb, var(--student-color) 50%, var(--border)); box-shadow: none; }
+.student-group-count { font-size: .65rem; opacity: .65; font-variant-numeric: tabular-nums; }
+.student-slider-heading { display: flex; justify-content: space-between; flex-wrap: wrap; gap: .25rem .5rem; margin: .55rem .1rem .1rem; color: var(--muted); font-size: .72rem; }
+.student-slider-heading small { font-size: inherit; }
+@media (prefers-reduced-motion: reduce) { .student-slider button { transition: none; } }
+@media print { .student-slider, .student-slider-heading, .student-heading-actions { display: none !important; } }
 
 #curriculum-filter-form { display: grid; gap: .65rem; }
 #curriculum-filter-form input, #curriculum-filter-form select { width: 100%; min-width: 0; }
