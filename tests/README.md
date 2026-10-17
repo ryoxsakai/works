@@ -23,3 +23,5 @@ Legacy classification fixtures additionally cover A5Ba / M3High / A6Basic (witho
 Additional production-reported labels A1Sta / A7SuperBasic and 英語科会議 / 英語科教科会 are fixtures. Compact course suffixes are explicit (Ba, Basic, High, Sta, Standard, SuperBasic), with a suffix boundary to retain names such as A1Stanley. Subject meeting exclusions use an explicit subject list and an anchored 会議 / 教科会 ending; ordinary names such as 会田 and 田中 remain selectable. No production calendar was fetched for these tests; the exact reported names came from the review request.
 
 Administrative exclusion strips parenthetical/slash annotations independently of group-class classification. Fixtures include 会議（集団授業）, WT作成/グループ準備, 個別/集団/グループ annotations with ASCII/fullwidth delimiters, annotated subject meetings, and restoration of annotated administrative selections. Annotated actual student names and genuine group classes remain selectable.
+
+Run `node tests/student-context-unit.mjs` for 10 portable source regressions, including recovery of queued writes after a failed PUT and retention of still-selected source calendars when an existing name/group choice is rebuilt.
