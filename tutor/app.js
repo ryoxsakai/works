@@ -215,6 +215,7 @@ let navigatingStudent = false;
 let loadedPrefName = "";
 let prefRequest = 0;
 let studentGeneration = 0;
+const studentPrefSaves = new Map();
 
 let calendarColors = new Map(); // calendarId -> { raw, bg, fg }
 let years = [];
@@ -487,6 +488,7 @@ async function loadRecordTable() {
     const prevSaved = prevEvent ? entryMap.get(prevEvent.id) || {} : {};
     return {
       eventId: ev.id,
+      calendarId: ev._calendarId,
       label,
       termId: coveringTerm ? coveringTerm.id : "",
       n: n || 1,
@@ -520,7 +522,7 @@ function renderRecordTable(rows) {
       }
       return `<tr data-event-id="${escapeHtml(r.eventId)}" data-completed="${r.completed ? 1 : 0}">
         <td>
-          <button type="button" class="record-student-link" data-name="${escapeHtml(r.label)}" data-term-id="${r.termId}"><span class="record-avatar"${r.iconColor ? ` style="background-color:${escapeHtml(lightenHexColor(r.iconColor, 0.75))};color:${escapeHtml(r.iconColor)}"` : ""}><i class="bx bx-book-open"></i></span> ${escapeHtml(r.label)}</button>
+          <button type="button" class="record-student-link" data-calendar-id="${escapeHtml(r.calendarId || "")}" data-name="${escapeHtml(r.label)}" data-term-id="${r.termId}"><span class="record-avatar"${r.iconColor ? ` style="background-color:${escapeHtml(lightenHexColor(r.iconColor, 0.75))};color:${escapeHtml(r.iconColor)}"` : ""}><i class="bx bx-book-open"></i></span> ${escapeHtml(r.label)}</button>
           ${
             r.prevLessonPlan || r.prevHomework || r.prevLessonMemo
               ? `<div class="record-prev-info">
@@ -547,7 +549,7 @@ els.recordTbody.addEventListener("click", (e) => {
   if (!link) return;
   const termId = Number(link.dataset.termId);
   const term = termId ? terms.find((t) => t.id === termId) : undefined;
-  goToCurriculum(link.dataset.name, term);
+  goToCurriculum(link.dataset.name, term, link.dataset.calendarId);
 });
 
 els.recordTbody.addEventListener("change", async (e) => {
@@ -2072,20 +2074,28 @@ async function loadStudentPref(context = captureStudentContext()) {
   els.curriculumPrintNameInput.disabled = navigatingStudent || selectingStudent;
 }
 
+function saveStudentPref(name, patch) {
+  const context = captureStudentContext();
+  const previous = studentPrefSaves.get(name) || Promise.resolve();
+  const save = previous.catch(() => {}).then(() => apiFetch("/student-prefs", {
+    method: "PUT", body: JSON.stringify({ name, ...patch }),
+  }, null));
+  studentPrefSaves.set(name, save);
+  const cleanup = () => { if (studentPrefSaves.get(name) === save) studentPrefSaves.delete(name); };
+  save.then(cleanup, cleanup);
+  // Only the originating screen reports standalone save errors. A refresh awaiting
+  // the same write reports its failure under the newer generation instead.
+  save.catch((err) => { if (isCurrentStudentContext(context)) showActionError(err); });
+  return save;
+}
+
 els.curriculumPrintNameInput.addEventListener("change", async () => {
   const name = els.curriculumName.value.trim();
   if (!name || loadedPrefName !== name || navigatingStudent || selectingStudent) {
     showActionError(new Error("生徒情報の取得が完了してから編集してください"));
     return;
   }
-  try {
-    await apiFetch("/student-prefs", {
-      method: "PUT",
-      body: JSON.stringify({ name, print_name: els.curriculumPrintNameInput.value.trim() || null }),
-    });
-  } catch (err) {
-    showActionError(err);
-  }
+  await saveStudentPref(name, { print_name: els.curriculumPrintNameInput.value.trim() || null }).catch(() => {});
 });
 
 els.studentMemoInput.addEventListener("change", async () => {
@@ -2094,14 +2104,7 @@ els.studentMemoInput.addEventListener("change", async () => {
     showActionError(new Error("生徒情報の取得が完了してから編集してください"));
     return;
   }
-  try {
-    await apiFetch("/student-prefs", {
-      method: "PUT",
-      body: JSON.stringify({ name, memo: els.studentMemoInput.value.trim() || null }),
-    });
-  } catch (err) {
-    showActionError(err);
-  }
+  await saveStudentPref(name, { memo: els.studentMemoInput.value.trim() || null }).catch(() => {});
 });
 
 // ページ上部の検索バーに、現在絞り込み中の名前・年度・学期を表示する。
@@ -2181,32 +2184,44 @@ function clearStudentDetails() {
   renderAddStudentMaterialOptions();
 }
 
+function curriculumGroupForCalendar(name, calendarId) {
+  const calendar = calendarColors.get(calendarId)?.name || "";
+  const kind = studentKinds[JSON.stringify([calendarId, name])];
+  return /TOMAS/i.test(calendar) ? "TOMAS" :
+    /代官山/.test(calendar) ? ((kind === "group" || (!kind && (/集団|グループ/.test(calendar) || isGroupLessonTitle(name)))) ? "代官山 · 集団" : "代官山 · 個別") :
+    calendar || "その他";
+}
+
 function renderCurriculumNameSuggestions() {
+  const previous = studentChoices.find((item) => item.name === els.curriculumName.value && item.group === studentGroup);
+  const previousCalendarIds = (previous?.calendarIds || []).filter((id) => selectedCalendarIds.has(id));
   const choices = new Map();
   rawEvents.filter(isStudentSelectionEvent).forEach((ev) => {
     const name = curriculumSelectionName(ev.summary);
     if (!name) return;
-    const calendar = calendarColors.get(ev._calendarId)?.name || "";
     const registered = studentDirectory.filter((student) =>
       (student.calendar_tag || student.name || "").trim() === name);
     const label = registered.length === 1 ? registered[0].name : name;
     const kindKey = JSON.stringify([ev._calendarId, name]);
-    const kind = studentKinds[kindKey];
-    const group = /TOMAS/i.test(calendar) ? "TOMAS" :
-      /代官山/.test(calendar) ? ((kind === "group" || (!kind && (/集団|グループ/.test(calendar) || isGroupLessonTitle(name)))) ? "代官山 · 集団" : "代官山 · 個別") :
-      calendar || "その他";
+    const group = curriculumGroupForCalendar(name, ev._calendarId);
     const key = JSON.stringify([group, name]);
     const calendarIds = choices.get(key)?.calendarIds || [];
     calendarIds.push(ev._calendarId);
     choices.set(key, { name, label, group, kindKey, calendarIds });
   });
+  // A source calendar can be outside the loaded schedule period, even when
+  // another calendar already rebuilt the same name/group choice.
+  if (previous && !isNonLessonSelectionTitle(previous.name)) {
+    const rebuilt = choices.get(JSON.stringify([previous.group, previous.name]));
+    if (rebuilt) rebuilt.calendarIds = [...new Set([...rebuilt.calendarIds, ...previousCalendarIds])];
+  }
   // Restored legacy token selections remain accessible without migrating their keys.
   const current = els.curriculumName.value;
-  if (current && !isNonLessonSelectionTitle(current) && ![...choices.values()].some((item) => item.name === current)) {
+  if (current && !isNonLessonSelectionTitle(current) && ![...choices.values()].some((item) => item.name === current && (!studentGroup || item.group === studentGroup))) {
     const group = studentGroup || "保存中の選択";
     const allowedCalendarIds = [...choices.values()].filter((item) => item.group === group).flatMap((item) => item.calendarIds);
-    const calendarIds = [...new Set(rawEvents.filter(isStudentSelectionEvent).filter((ev) =>
-      (!studentGroup || allowedCalendarIds.includes(ev._calendarId)) && eventMatchesCurriculumName(ev, current)).map((ev) => ev._calendarId))];
+    const calendarIds = [...new Set([...previousCalendarIds, ...rawEvents.filter(isStudentSelectionEvent).filter((ev) =>
+      (!studentGroup || allowedCalendarIds.includes(ev._calendarId)) && eventMatchesCurriculumName(ev, current)).map((ev) => ev._calendarId)])];
     choices.set("current", { name: current, label: current, group, calendarIds });
   }
   studentChoices = [...choices.values()].sort((a, b) => a.label.localeCompare(b.label, "ja", { numeric: true }) || a.name.localeCompare(b.name, "ja"));
@@ -2247,11 +2262,14 @@ function setStudentBusy(busy) {
   els.studentSelector.setAttribute("aria-busy", String(busy));
 }
 async function refreshStudentDetails({ closeSettings = false } = {}) {
+  const pendingSave = studentPrefSaves.get(els.curriculumName.value.trim());
   clearStudentDetails();
   const context = captureStudentContext();
   setStudentBusy(true);
   renderStudentSelector();
   try {
+    await pendingSave;
+    assertStudentContext(context);
     for (const load of [loadCurriculumEvents, loadGoals, loadCandidateSchools, loadStudentPref, loadStudentMaterials]) {
       assertStudentContext(context);
       await load(context);
@@ -3113,7 +3131,7 @@ function handleTokenClick(e) {
   }
   const textEl = e.target.closest(".name-token-text");
   if (textEl) {
-    goToCurriculum(textEl.dataset.token);
+    goToCurriculum(textEl.dataset.token, undefined, textEl.dataset.calendarId);
   }
 }
 
@@ -3191,7 +3209,7 @@ function renderListView(events) {
     return `<li class="event-item"${eventColorStyle(ev)}>
       <div class="event-time"><span>${formatEventTime(ev)}</span><small>${period}</small></div>
       <div class="event-main">
-        <button type="button" class="event-student-name name-token-text" data-token="${escapeHtml(summary)}">${escapeHtml(summary)}</button>
+        <button type="button" class="event-student-name name-token-text" data-calendar-id="${escapeHtml(ev._calendarId || "")}" data-token="${escapeHtml(summary)}">${escapeHtml(summary)}</button>
         <dl class="event-details">
           <div><dt>授業予定</dt><dd>${escapeHtml(plan)}</dd></div>
           <div><dt>宿題</dt><dd>${escapeHtml(homework)}</dd></div>
@@ -3242,7 +3260,7 @@ function renderCalendarView(events) {
       const eventsHtml = dayEvents
         .map((ev) => {
           const summary = (ev.summary || "(無題)").trim();
-          return `<button type="button" class="cal-event name-token-text"${eventColorStyle(ev)} data-token="${escapeHtml(summary)}" aria-label="${escapeHtml(summary)}の生徒情報を開く">
+          return `<button type="button" class="cal-event name-token-text"${eventColorStyle(ev)} data-calendar-id="${escapeHtml(ev._calendarId || "")}" data-token="${escapeHtml(summary)}" aria-label="${escapeHtml(summary)}の生徒情報を開く">
             <span class="cal-event-time">${formatEventTime(ev)}</span><span>${escapeHtml(summary)}</span>
           </button>`;
         })
@@ -3266,11 +3284,20 @@ function applyNameFilter(token) {
 
 // 授業予定・授業記録の生徒名をクリックしたときの遷移先。
 // カリキュラムタブに切り替え、その名前(・分かればその学期)で検索を実行する。
-async function goToCurriculum(name, term) {
+async function goToCurriculum(name, term, sourceCalendarId) {
   const curriculumTabBtn = [...els.pageTabBtns].find((b) => b.dataset.pageTab === "curriculum");
   curriculumTabBtn?.click();
   name = studentChoices.some((item) => item.name === name) ? name : curriculumSelectionName(name);
-  if (!studentChoices.some((item) => item.name === name && item.group === studentGroup)) {
+  if (sourceCalendarId) {
+    studentGroup = curriculumGroupForCalendar(name, sourceCalendarId);
+    // A record can be outside the schedule's loaded period. Keep its known source scope.
+    const sourceChoice = studentChoices.find((item) => item.name === name && item.group === studentGroup);
+    if (sourceChoice) {
+      sourceChoice.calendarIds = [...new Set([...(sourceChoice.calendarIds || []), sourceCalendarId])];
+    } else {
+      studentChoices.push({ name, label: name, group: studentGroup, calendarIds: [sourceCalendarId], kindKey: JSON.stringify([sourceCalendarId, name]) });
+    }
+  } else if (!studentChoices.some((item) => item.name === name && item.group === studentGroup)) {
     studentGroup = studentChoices.find((item) => item.name === name)?.group || "";
   }
   els.curriculumName.value = name;
