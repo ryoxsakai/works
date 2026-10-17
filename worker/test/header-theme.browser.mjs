@@ -184,11 +184,12 @@ async function selectedTheme(page) {
     assert.ok(await field.evaluate(el=>el.scrollHeight<=el.clientHeight));
     await field.fill('');
     assert.equal(await field.evaluate(el=>el.offsetHeight),empty);
-    await field.fill('保存後に復元する日本語\n二行目\n三行目');
+    const savedValue=`${width}pxで保存後に復元する日本語\n二行目\n三行目`;
+    await field.fill(savedValue);
     const response=page.waitForResponse(r=>r.url().includes('/api/curriculum/')&&r.request().method()==='PUT');
     await field.press('Tab');await response;
     await page.reload();await field.waitFor();
-    assert.equal(await field.inputValue(),'保存後に復元する日本語\n二行目\n三行目');
+    assert.equal(await field.inputValue(),savedValue);
     assert.ok(await field.evaluate(el=>el.offsetHeight)>empty);
     await selectTheme(page,'dark');
     assert.equal(await page.locator('.works-header select').count(),0);
