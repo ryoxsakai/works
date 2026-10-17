@@ -45,7 +45,9 @@ try {
  for(const width of [320,375,768,1440]) {
   await page.setViewportSize({width,height:900});
   for(const theme of ['light','dark','system']) {
-   await page.selectOption('.works-theme-control select',theme);
+   await page.locator('.works-header .works-settings-toggle').click();
+   await page.locator(`.works-settings-dialog input[value="${theme}"]`).check();
+   await page.locator('.works-settings-dialog button[aria-label="閉じる"]').click();
    assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
    await page.screenshot({path:`test-artifacts/memo/${width}-${theme}.png`,fullPage:true});
   }
