@@ -8,7 +8,7 @@ const context=()=>{
  const state=vm.createContext({studentPrefSaves:new Map(),loadedPrefName:"田崎",studentGeneration:0,studentGroup:'代官山 · 個別',selectedTermIds:new Set(),terms:[],years:[],selectedCalendarIds:new Set(['d','t']),studentChoices:[{name:'田崎',group:'代官山 · 個別',calendarIds:['d']},{name:'田崎',group:'TOMAS',calendarIds:['t']}],studentKinds:{},calendarColors:new Map([['d',{name:'代官山'}],['t',{name:'TOMAS'}]]),
  els:{curriculumName:{value:'田崎'},curriculumYearSelect:{value:'1'},curriculumTermSelect:{value:'1'},pageTabBtns:[],curriculumPrintNameInput:{},actionError:{},curriculumSearchModal:{close(){}}},
  errors:[],loads:[],document:{querySelectorAll:()=>[]},alignCurriculumTermWithSettings(){},renderCurriculumSearchSummary(){},saveCurriculumState(){},renderCurriculumTermOptions(){},renderStudentSelector(){},renderCurriculumNameSuggestions(){},setStudentBusy(){},renderStudentMemos(){},clearStudentDetails(){},
- loadCurriculumEvents:async()=>{},loadGoals:async()=>{},loadCandidateSchools:async()=>{},loadStudentPref:async()=>{},loadStudentMaterials:async()=>{},curriculumSelectionName:n=>n,isGroupLessonTitle:()=>false,
+ loadCurriculumEvents:async()=>{},loadGoals:async()=>{},loadCandidateSchools:async()=>{},loadStudentPref:async()=>{},loadStudentMaterials:async()=>{},curriculumSelectionName:n=>n,isGroupLessonTitle:()=>false,isNonLessonSelectionTitle:()=>false,
  });
  state.clearStudentDetails=()=>{state.studentGeneration++;};state.showActionError=err=>state.errors.push(err.message);
  for(const name of ['captureStudentContext','isCurrentStudentContext','assertStudentContext','saveStudentPref','refreshStudentDetails','curriculumGroupForCalendar','goToCurriculum'])vm.runInContext(fn(name),state);

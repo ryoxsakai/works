@@ -2249,10 +2249,11 @@ document.querySelector("#student-lesson-kind").addEventListener("change", (event
 
 els.curriculumSearchModalCloseBtn.addEventListener("click", () => els.curriculumSearchModal.close());
 
-// A/M in the lesson name identifies a group class (including full-width codes).
+// A/M codes and the explicitly designated courses identify group classes.
 function isGroupLessonTitle(title) {
   const name = selectionTitleWithoutAnnotation(title).normalize("NFKC");
-  return /[AM]/.test(name) || /集団|グループ/.test(title);
+  return /[AM]/.test(name) || /集団|グループ/.test(title)
+    || /^(?:中堅大英語|英語中堅大|高1長文読解)$/.test(name.replace(/\s/g, ""));
 }
 
 function selectionTitleWithoutAnnotation(title) {
@@ -2265,8 +2266,9 @@ function curriculumSelectionName(title) {
   return selectionTitleWithoutAnnotation(text);
 }
 
-// These administrative appointments remain visible in schedules, but are not students.
+// Administrative and circle-marked slots remain in schedules, not student choices.
 function isNonLessonSelectionTitle(title) {
+  if (String(title || "").includes("○")) return true;
   const name = normalizeCurriculumText(selectionTitleWithoutAnnotation(title));
   return /会議|教科会|打ち?合[わ]?せ|ミーティング|WT\s*作成/i.test(name);
 }
@@ -3456,6 +3458,8 @@ function applyNameFilter(token) {
 // 授業予定・授業記録の生徒名をクリックしたときの遷移先。
 // カリキュラムタブに切り替え、その名前(・分かればその学期)で検索を実行する。
 async function goToCurriculum(name, term, sourceCalendarId) {
+  // Inspect the original schedule title before annotations can hide an exclusion.
+  if (isNonLessonSelectionTitle(name)) return;
   const curriculumTabBtn = [...els.pageTabBtns].find((b) => b.dataset.pageTab === "curriculum");
   curriculumTabBtn?.click();
   name = studentChoices.some((item) => item.name === name) ? name : curriculumSelectionName(name);
