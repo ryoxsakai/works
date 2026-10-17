@@ -2077,7 +2077,7 @@ async function loadStudentPref(context = captureStudentContext()) {
 function saveStudentPref(name, patch) {
   const context = captureStudentContext();
   const previous = studentPrefSaves.get(name) || Promise.resolve();
-  const save = previous.then(() => apiFetch("/student-prefs", {
+  const save = previous.catch(() => {}).then(() => apiFetch("/student-prefs", {
     method: "PUT", body: JSON.stringify({ name, ...patch }),
   }, null));
   studentPrefSaves.set(name, save);
@@ -2194,6 +2194,7 @@ function curriculumGroupForCalendar(name, calendarId) {
 
 function renderCurriculumNameSuggestions() {
   const previous = studentChoices.find((item) => item.name === els.curriculumName.value && item.group === studentGroup);
+  const previousCalendarIds = (previous?.calendarIds || []).filter((id) => selectedCalendarIds.has(id));
   const choices = new Map();
   rawEvents.filter(isStudentSelectionEvent).forEach((ev) => {
     const name = curriculumSelectionName(ev.summary);
@@ -2208,12 +2209,18 @@ function renderCurriculumNameSuggestions() {
     calendarIds.push(ev._calendarId);
     choices.set(key, { name, label, group, kindKey, calendarIds });
   });
+  // A source calendar can be outside the loaded schedule period, even when
+  // another calendar already rebuilt the same name/group choice.
+  if (previous && !isNonLessonSelectionTitle(previous.name)) {
+    const rebuilt = choices.get(JSON.stringify([previous.group, previous.name]));
+    if (rebuilt) rebuilt.calendarIds = [...new Set([...rebuilt.calendarIds, ...previousCalendarIds])];
+  }
   // Restored legacy token selections remain accessible without migrating their keys.
   const current = els.curriculumName.value;
   if (current && !isNonLessonSelectionTitle(current) && ![...choices.values()].some((item) => item.name === current && (!studentGroup || item.group === studentGroup))) {
     const group = studentGroup || "保存中の選択";
     const allowedCalendarIds = [...choices.values()].filter((item) => item.group === group).flatMap((item) => item.calendarIds);
-    const calendarIds = [...new Set([...(previous?.calendarIds || []), ...rawEvents.filter(isStudentSelectionEvent).filter((ev) =>
+    const calendarIds = [...new Set([...previousCalendarIds, ...rawEvents.filter(isStudentSelectionEvent).filter((ev) =>
       (!studentGroup || allowedCalendarIds.includes(ev._calendarId)) && eventMatchesCurriculumName(ev, current)).map((ev) => ev._calendarId)])];
     choices.set("current", { name: current, label: current, group, calendarIds });
   }
