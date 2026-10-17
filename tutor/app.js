@@ -5,6 +5,7 @@ import {
   getSessionToken,
 } from "../shared/auth.js?v=12";
 import { getTheme, setTheme } from "../shared/theme.js?v=6";
+import { tokyoDateKey, shiftRecordDate, recordDateRange } from "./record-date.js?v=1";
 
 const PASTEL_FALLBACK_COLORS = [
   "#c8e6c9",
@@ -244,7 +245,8 @@ let eventViewMode = localStorage.getItem(EVENT_VIEW_KEY) === "calendar" ? "calen
 let calendarCursor = startOfMonth(new Date());
 let listWeekCursor = startOfWeek(new Date());
 let selectedScheduleDate = formatDateOnly(new Date());
-let recordDayOffset = 0; // -1:前日 0:当日 1:翌日
+let selectedRecordDate = tokyoDateKey();
+let recordTableRequest = 0;
 let goals = [];
 let candidateSchools = [];
 let editingGoalId = null;
@@ -381,6 +383,7 @@ function setActivePageTab(tab) {
     panel.hidden = panel.dataset.pageTabPanel !== target;
   });
   localStorage.setItem(ACTIVE_PAGE_TAB_KEY, target);
+  if (target === "record") requestAnimationFrame(resizeRecordInputs);
 }
 
 setActivePageTab(localStorage.getItem(ACTIVE_PAGE_TAB_KEY) || "record");
@@ -394,16 +397,10 @@ els.pageTabBtns.forEach((btn) => {
 // 回数(N/M回)は、同じタイトルの予定を対象日を含む学期(選択中の学期の中から)の
 // 期間内で数えて算出する(該当する学期が無ければ前後90日をフォールバック範囲にする)。
 
-function computeRecordTargetDate() {
-  const d = new Date();
-  d.setDate(d.getDate() + recordDayOffset);
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
 function renderRecordDateLabel() {
-  const d = computeRecordTargetDate();
+  const d = new Date(`${selectedRecordDate}T12:00:00+09:00`);
   els.recordDateLabel.textContent = d.toLocaleDateString("ja-JP", {
+    timeZone: "Asia/Tokyo",
     year: "numeric",
     month: "long",
     day: "numeric",
@@ -412,102 +409,118 @@ function renderRecordDateLabel() {
 }
 
 async function loadRecordTable() {
+  const request = ++recordTableRequest;
+  const dayStr = selectedRecordDate;
+  const calendars = [...selectedCalendarIds].sort().join("\n");
+  const selectedTerms = [...selectedTermIds].sort().join(",");
+  const isCurrent = () => request === recordTableRequest && dayStr === selectedRecordDate
+    && calendars === [...selectedCalendarIds].sort().join("\n") && selectedTerms === [...selectedTermIds].sort().join(",");
   renderRecordDateLabel();
-  const token = getSessionToken();
-  if (!token) {
-    els.recordTbody.innerHTML = `<tr><td colspan="7">カレンダーへのアクセス許可を確認しています…</td></tr>`;
-    return;
-  }
-  if (selectedCalendarIds.size === 0) {
-    els.recordTbody.innerHTML = `<tr><td colspan="7">設定からカレンダーを選択してください</td></tr>`;
-    return;
-  }
-
-  const targetDate = computeRecordTargetDate();
-  const dayStr = formatDateOnly(targetDate);
-  const dayEvents = (
-    await fetchCalendarEvents(
-      new Date(`${dayStr}T00:00:00`).toISOString(),
-      new Date(`${dayStr}T23:59:59`).toISOString(),
-      { withCalendarId: true, includeExcluded: true }
-    )
-  ).sort((a, b) => {
-    const aStart = a.start?.dateTime || a.start?.date || "";
-    const bStart = b.start?.dateTime || b.start?.date || "";
-    return aStart.localeCompare(bStart);
-  });
-
-  if (dayEvents.length === 0) {
-    els.recordTbody.innerHTML = `<tr><td colspan="7">この日の予定はありません</td></tr>`;
-    return;
-  }
-
-  const coveringTerm = terms.find(
-    (t) => selectedTermIds.has(t.id) && dayStr >= t.start_date && dayStr <= t.end_date
-  );
-  let rangeStart, rangeEnd;
-  if (coveringTerm) {
-    rangeStart = coveringTerm.start_date;
-    rangeEnd = coveringTerm.end_date;
-  } else {
-    rangeStart = formatDateOnly(new Date(targetDate.getTime() - 90 * 86400000));
-    rangeEnd = formatDateOnly(new Date(targetDate.getTime() + 90 * 86400000));
-  }
-  const rangeEvents = await fetchCalendarEvents(
-    new Date(`${rangeStart}T00:00:00`).toISOString(),
-    new Date(`${rangeEnd}T23:59:59`).toISOString()
-  );
-
-  const entries = await apiFetch("/curriculum");
-  const entryMap = new Map(entries.map((entry) => [entry.calendar_event_id, entry]));
-
-  const rows = dayEvents.map((ev) => {
-    const label = (ev.summary || "(無題)").trim();
-    const start = ev.start?.dateTime || ev.start?.date || "";
-    const calendar = calendarColors.get(ev._calendarId);
-    if (isExcludedScheduleEvent(ev)) {
-      return {
-        eventId: ev.id,
-        emptySlot: true,
-        start,
-        iconColor: calendar?.raw || "",
-        calendarName: calendar?.name || "カレンダー",
-      };
+  els.recordTbody.innerHTML = `<tr><td colspan="7" role="status">授業記録を読み込んでいます…</td></tr>`;
+  try {
+    const token = getSessionToken();
+    if (!token) {
+      els.recordTbody.innerHTML = `<tr><td colspan="7">カレンダーへのアクセス許可を確認しています…</td></tr>`;
+      return;
+    }
+    if (selectedCalendarIds.size === 0) {
+      els.recordTbody.innerHTML = `<tr><td colspan="7">設定からカレンダーを選択してください</td></tr>`;
+      return;
     }
 
-    const sameLabelEvents = rangeEvents
-      .filter((e) => (e.summary || "").trim() === label)
-      .sort((a, b) => {
-        const aStart = a.start?.dateTime || a.start?.date || "";
-        const bStart = b.start?.dateTime || b.start?.date || "";
-        return aStart.localeCompare(bStart);
-      });
-    const n = sameLabelEvents.findIndex((e) => e.id === ev.id) + 1;
-    const m = sameLabelEvents.length;
-    const saved = entryMap.get(ev.id) || {};
-    const prevEvent = n > 1 ? sameLabelEvents[n - 2] : null;
-    const prevSaved = prevEvent ? entryMap.get(prevEvent.id) || {} : {};
-    return {
-      eventId: ev.id,
-      calendarId: ev._calendarId,
-      label,
-      termId: coveringTerm ? coveringTerm.id : "",
-      n: n || 1,
-      m: m || 1,
-      start,
-      iconColor: calendar?.raw || "",
-      completed: !!saved.completed,
-      lessonPlan: saved.lesson_plan || "",
-      confirmationTest: saved.confirmation_test || "",
-      homework: saved.homework || "",
-      lessonMemo: saved.lesson_memo || "",
-      prevLessonPlan: prevSaved.lesson_plan || "",
-      prevHomework: prevSaved.homework || "",
-      prevLessonMemo: prevSaved.lesson_memo || "",
-    };
-  });
+    const [dayStart, dayEnd] = recordDateRange(dayStr);
+    const dayEvents = (
+      await fetchCalendarEvents(
+        dayStart,
+        dayEnd,
+        { withCalendarId: true, includeExcluded: true }
+      )
+    ).sort((a, b) => {
+      const aStart = a.start?.dateTime || a.start?.date || "";
+      const bStart = b.start?.dateTime || b.start?.date || "";
+      return aStart.localeCompare(bStart);
+    });
+    if (!isCurrent()) return;
 
-  renderRecordTable(rows);
+    if (dayEvents.length === 0) {
+      els.recordTbody.innerHTML = `<tr><td colspan="7">この日の予定はありません</td></tr>`;
+      return;
+    }
+
+    const coveringTerm = terms.find(
+      (t) => selectedTermIds.has(t.id) && dayStr >= t.start_date && dayStr <= t.end_date
+    );
+    let rangeStart, rangeEnd;
+    if (coveringTerm) {
+      rangeStart = coveringTerm.start_date;
+      rangeEnd = coveringTerm.end_date;
+    } else {
+      rangeStart = shiftRecordDate(dayStr, -90);
+      rangeEnd = shiftRecordDate(dayStr, 90);
+    }
+    const [termStart, termEnd] = recordDateRange(rangeStart, rangeEnd);
+    const rangeEvents = await fetchCalendarEvents(
+      termStart,
+      termEnd
+    );
+    if (!isCurrent()) return;
+
+    const entries = await apiFetch("/curriculum");
+    if (!isCurrent()) return;
+    const entryMap = new Map(entries.map((entry) => [entry.calendar_event_id, entry]));
+
+    const rows = dayEvents.map((ev) => {
+      const label = (ev.summary || "(無題)").trim();
+      const start = ev.start?.dateTime || ev.start?.date || "";
+      const calendar = calendarColors.get(ev._calendarId);
+      if (isExcludedScheduleEvent(ev)) {
+        return {
+          eventId: ev.id,
+          emptySlot: true,
+          start,
+          iconColor: calendar?.raw || "",
+          calendarName: calendar?.name || "カレンダー",
+        };
+      }
+
+      const sameLabelEvents = rangeEvents
+        .filter((e) => (e.summary || "").trim() === label)
+        .sort((a, b) => {
+          const aStart = a.start?.dateTime || a.start?.date || "";
+          const bStart = b.start?.dateTime || b.start?.date || "";
+          return aStart.localeCompare(bStart);
+        });
+      const n = sameLabelEvents.findIndex((e) => e.id === ev.id) + 1;
+      const m = sameLabelEvents.length;
+      const saved = entryMap.get(ev.id) || {};
+      const prevEvent = n > 1 ? sameLabelEvents[n - 2] : null;
+      const prevSaved = prevEvent ? entryMap.get(prevEvent.id) || {} : {};
+      return {
+        eventId: ev.id,
+        calendarId: ev._calendarId,
+        label,
+        termId: coveringTerm ? coveringTerm.id : "",
+        n: n || 1,
+        m: m || 1,
+        start,
+        iconColor: calendar?.raw || "",
+        completed: !!saved.completed,
+        lessonPlan: saved.lesson_plan || "",
+        confirmationTest: saved.confirmation_test || "",
+        homework: saved.homework || "",
+        lessonMemo: saved.lesson_memo || "",
+        prevLessonPlan: prevSaved.lesson_plan || "",
+        prevHomework: prevSaved.homework || "",
+        prevLessonMemo: prevSaved.lesson_memo || "",
+      };
+    });
+
+    renderRecordTable(rows);
+  } catch (err) {
+    if (!isCurrent()) return;
+    els.recordTbody.innerHTML = `<tr><td colspan="7" role="status">授業記録を取得できませんでした。日付を切り替えて再試行してください。</td></tr>`;
+    throw err;
+  }
 }
 
 function renderRecordTable(rows) {
@@ -517,7 +530,7 @@ function renderRecordTable(rows) {
         const accent = r.iconColor ? ` style="--record-calendar-accent:${escapeHtml(r.iconColor)}"` : "";
         return `<tr class="record-empty-slot"${accent}>
           <td colspan="2"><span class="record-empty-label"><i class="bx bx-calendar"></i> 空き <small>${escapeHtml(r.calendarName)}</small></span></td>
-          <td class="record-empty-time">${formatTimeOrPeriod(r.start)}</td>
+          <td class="record-empty-time">${formatTimeOrPeriod(r.start, "Asia/Tokyo")}</td>
           <td colspan="4"></td>
         </tr>`;
       }
@@ -534,16 +547,38 @@ function renderRecordTable(rows) {
               : ""
           }
         </td>
-        <td>${r.n}/${r.m}回</td>
-        <td>${formatTimeOrPeriod(r.start)}</td>
-        <td><textarea class="record-plan" rows="2">${escapeHtml(r.lessonPlan)}</textarea></td>
-        <td><textarea class="record-test" rows="2">${escapeHtml(r.confirmationTest)}</textarea></td>
-        <td><textarea class="record-homework" rows="2">${escapeHtml(r.homework)}</textarea></td>
-        <td><textarea class="record-memo" rows="2">${escapeHtml(r.lessonMemo)}</textarea></td>
+        <td data-label="回数">${r.n}/${r.m}回</td>
+        <td data-label="時刻">${formatTimeOrPeriod(r.start, "Asia/Tokyo")}</td>
+        <td data-label="授業予定"><textarea class="record-plan" rows="1" aria-label="${escapeHtml(r.label)}の授業予定">${escapeHtml(r.lessonPlan)}</textarea></td>
+        <td data-label="確認テスト"><textarea class="record-test" rows="1" aria-label="${escapeHtml(r.label)}の確認テスト">${escapeHtml(r.confirmationTest)}</textarea></td>
+        <td data-label="宿題"><textarea class="record-homework" rows="1" aria-label="${escapeHtml(r.label)}の宿題">${escapeHtml(r.homework)}</textarea></td>
+        <td data-label="授業メモ"><textarea class="record-memo" rows="1" aria-label="${escapeHtml(r.label)}の授業メモ">${escapeHtml(r.lessonMemo)}</textarea></td>
       </tr>`;
     })
     .join("");
+  requestAnimationFrame(resizeRecordInputs);
 }
+
+function resizeRecordInput(input) {
+  if (!input.getClientRects().length) return;
+  input.style.height = "auto";
+  const style = getComputedStyle(input);
+  input.style.height = `${input.scrollHeight + parseFloat(style.borderTopWidth) + parseFloat(style.borderBottomWidth)}px`;
+}
+function resizeRecordInputs() {
+  els.recordTbody.querySelectorAll("textarea").forEach(resizeRecordInput);
+}
+els.recordTbody.addEventListener("input", (event) => {
+  if (event.target.matches("textarea")) resizeRecordInput(event.target);
+});
+let recordInputWidth = 0;
+new ResizeObserver(([entry]) => {
+  if (entry.contentRect.width > 0 && entry.contentRect.width !== recordInputWidth) {
+    recordInputWidth = entry.contentRect.width;
+    requestAnimationFrame(resizeRecordInputs);
+  }
+}).observe(els.recordTbody);
+document.fonts?.ready.then(resizeRecordInputs);
 
 els.recordTbody.addEventListener("click", (e) => {
   const link = e.target.closest(".record-student-link");
@@ -580,8 +615,7 @@ els.recordTbody.addEventListener("change", async (e) => {
 
 els.recordDayBtns.forEach((btn) => {
   btn.addEventListener("click", async () => {
-    recordDayOffset = { prev: -1, today: 0, next: 1 }[btn.dataset.day];
-    els.recordDayBtns.forEach((b) => b.setAttribute("aria-pressed", String(b === btn)));
+    selectedRecordDate = shiftRecordDate(selectedRecordDate, btn.dataset.day === "prev" ? -1 : 1);
     els.actionError.textContent = "";
     try {
       await loadRecordTable();
@@ -1730,13 +1764,12 @@ els.studentMaterialsGrid.addEventListener("touchend", async () => {
 // 時限は開始時刻だけを持ち、次の時限の開始時刻の直前までをその時限とみなす。
 // 並び順(sort_order)は設定画面の表示順のためだけのものなので、判定はstart_timeで
 // 都度ソートし直してから行う。
-function findPeriodLabel(iso) {
+function findPeriodLabel(iso, timeZone) {
   if (!iso) return null;
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
-  const hh = String(d.getHours()).padStart(2, "0");
-  const mm = String(d.getMinutes()).padStart(2, "0");
-  const t = `${hh}:${mm}`;
+  const t = timeZone ? d.toLocaleTimeString("en-GB", { timeZone, hour: "2-digit", minute: "2-digit" })
+    : `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
   const sorted = [...periods].sort((a, b) => a.start_time.localeCompare(b.start_time));
   let match = null;
   for (const p of sorted) {
@@ -1746,12 +1779,12 @@ function findPeriodLabel(iso) {
   return match ? match.label : null;
 }
 
-function formatTimeOrPeriod(iso) {
-  const periodLabel = findPeriodLabel(iso);
+function formatTimeOrPeriod(iso, timeZone) {
+  const periodLabel = findPeriodLabel(iso, timeZone);
   if (periodLabel) return periodLabel;
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit", ...(timeZone ? { timeZone } : {}) });
 }
 
 // カリキュラム表の日付欄用: mm/dd (曜) 時限(登録がなければ時刻)。

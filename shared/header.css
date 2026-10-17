@@ -4,11 +4,12 @@
   top: 0;
   z-index: 30;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   justify-content: space-between;
   gap: .25rem .75rem;
   width: 100%;
+  box-sizing: border-box;
   max-width: none;
   margin: 0;
   padding: .35rem 1rem;
@@ -23,7 +24,8 @@
 .works-header h1 {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  flex: 1 1 auto;
   gap: .65rem;
   min-width: 0;
   margin: 0;
@@ -31,17 +33,18 @@
   font-weight: 600;
   line-height: 1.4;
 }
-.works-header .works-home { gap: .4rem; color: var(--fg); text-decoration: none; }
+.works-header .works-home { flex-shrink: 0; gap: .4rem; color: var(--fg); text-decoration: none; }
 .works-header .page-header-icon { width: 1.8rem; height: 1.8rem; border-radius: .4rem; font: 700 1rem/1 system-ui, sans-serif; }
-.works-page-title { padding-left: .65rem; border-left: 1px solid var(--border); }
-.works-header-actions { display: flex; align-items: center; flex-wrap: wrap; gap: .25rem; }
-.works-header .user-bar { gap: .25rem; }
+.works-page-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-left: .65rem; border-left: 1px solid var(--border); }
+.works-header-actions { display: flex; flex: 0 0 auto; align-items: center; flex-wrap: nowrap; gap: .25rem; }
+.works-header .user-bar { flex-wrap: nowrap; gap: .25rem; }
 .works-header button,
-.works-header select,
 .works-header summary { min-height: 44px; font-size: .8rem; color: var(--fg); }
-.works-header button { min-width: 44px; }
-.works-header select { max-width: 6.5rem; padding: .35rem .5rem; border: 1px solid var(--border); border-radius: .4rem; background: var(--bg-elevated); }
-.works-navigation { position: relative; }
+.works-header button { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; flex-shrink: 0; }
+.works-header #open-settings, .works-header #open-home-settings { min-width: 44px; min-height: 44px; }
+.works-header [hidden] { display: none !important; }
+.works-header .works-navigation { position: relative; flex-shrink: 0; margin: 0; padding: 0; border: 0; background: transparent; box-shadow: none; }
+.works-menu-icon { display: none; }
 .works-navigation summary { display: flex; align-items: center; gap: .35rem; padding: .35rem .5rem; cursor: pointer; list-style: none; border-radius: .4rem; }
 .works-navigation summary::-webkit-details-marker { display: none; }
 .works-navigation summary:hover { background: var(--bg-hover); }
@@ -56,6 +59,10 @@
   .page-header.works-header { padding: .35rem .5rem; }
   .works-header h1 { font-size: .85rem; gap: .4rem; }
   .works-page-title { padding-left: .4rem; }
+  .works-header .works-home > span:last-child { display: none; }
+  .works-menu-label { display: none; }
+  .works-menu-icon { display: block; }
+  .works-navigation summary { width: 44px; justify-content: center; padding: 0; }
 }
 @media print { .page-header.works-header { display: none !important; } }
 .material-page-tabs,
@@ -64,3 +71,15 @@
 @media (max-width: 640px) {
   .works-navigation nav { position: fixed; right: .5rem; top: var(--works-header-height, 56px); width: min(16rem, calc(100vw - 1rem)); }
 }
+
+.works-settings-dialog { box-sizing: border-box; width: min(26rem, calc(100vw - 2rem)); max-height: calc(100dvh - 2rem); margin: auto; padding: 1rem; overflow-y: auto; border: 1px solid var(--border); border-radius: .65rem; background: var(--bg-elevated); color: var(--fg); }
+.works-settings-dialog::backdrop { background: rgb(0 0 0 / .4); }
+.works-settings-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.works-settings-heading h2 { margin: 0; font-size: 1rem; }
+.works-settings-heading button { display: grid; place-items: center; width: 44px; height: 44px; border: 0; background: transparent; color: var(--fg); font-size: 1.4rem; cursor: pointer; }
+.works-settings-dialog fieldset { min-width: 0; margin: .75rem 0; padding: 0; border: 0; }
+.works-settings-dialog legend { margin-bottom: .4rem; font-size: .85rem; font-weight: 600; }
+.works-settings-dialog label { display: flex; align-items: center; gap: .5rem; min-height: 44px; cursor: pointer; }
+.works-settings-dialog input { accent-color: var(--accent); }
+.works-settings-dialog p { color: var(--muted); font-size: .75rem; }
+.works-settings-dialog :is(button, input):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

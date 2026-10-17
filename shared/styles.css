@@ -3649,4 +3649,31 @@ textarea,
 
 #curriculum-filter-form { display: grid; gap: .65rem; }
 #curriculum-filter-form input, #curriculum-filter-form select { width: 100%; min-width: 0; }
+
+/* Record fields grow from one line; the desktop table keeps its column layout. */
+.record-panel #record-table textarea { box-sizing: border-box; min-height: 0; height: auto; overflow-y: hidden; resize: none; line-height: 1.5; background: var(--bg-elevated); color: var(--fg); border-color: var(--border); box-shadow: none; }
+.record-panel #record-table textarea:focus { background: var(--bg-elevated); border-color: var(--accent); }
+@media screen and (max-width: 640px) {
+  [data-page-tab-panel="record"], .record-panel, .record-panel .table-scroll { min-width: 0; max-width: 100%; }
+  .record-panel .table-scroll { overflow: visible; padding: 0; border: 0; background: transparent; box-shadow: none; }
+  .record-panel #record-table { display: block; min-width: 0; width: 100%; }
+  .record-panel #record-table thead { display: none; }
+  .record-panel #record-table tbody { display: grid; gap: .85rem; }
+  .record-panel #record-table tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .45rem .6rem; min-width: 0; padding: .8rem; border: 1px solid var(--border); border-radius: .6rem; background: var(--bg-elevated); }
+  .record-panel #record-table td { display: block; position: static; width: auto; min-width: 0; padding: 0; border: 0; box-shadow: none; white-space: normal; text-align: left; overflow-wrap: anywhere; }
+  .record-panel #record-table td:first-child { grid-column: 1 / -1; }
+  .record-panel #record-table td:nth-child(2), .record-panel #record-table td:nth-child(3) { color: var(--muted); font-size: .75rem; }
+  .record-panel #record-table td:nth-child(3) { text-align: right; }
+  .record-panel #record-table td:nth-child(n+4) { grid-column: 1 / -1; }
+  .record-panel #record-table td:nth-child(n+4)::before { display: block; content: attr(data-label); margin: .2rem 0 .3rem; color: var(--muted); font-size: .72rem; font-weight: 600; }
+  .record-panel #record-table textarea { width: 100%; min-width: 0; padding: .4rem .5rem; font-size: 16px; }
+  .record-panel .record-student-link { max-width: 100%; min-height: 44px; white-space: normal; text-align: left; overflow-wrap: anywhere; }
+  .record-panel .record-prev-info { margin: .2rem 0 0; }
+  .record-panel .record-prev-info p { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .record-panel .record-day-btn { min-height: 44px; }
+  .record-panel #record-table .record-empty-slot { align-items: center; }
+  .record-panel #record-table .record-empty-slot td:first-child { grid-column: 1; }
+  .record-panel #record-table .record-empty-slot td:nth-child(2) { grid-column: 2; text-align: right; }
+  .record-panel #record-table .record-empty-slot td:last-child { display: none; }
+}
 #curriculum-filter-form .hint { margin: 0 0 .5rem; }
