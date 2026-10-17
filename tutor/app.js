@@ -870,11 +870,13 @@ els.calendarChecklist.addEventListener("change", async (e) => {
   clearStudentDetails();
   renderCurriculumNameSuggestions();
   setStudentBusy(true);
+  const generation = studentGeneration;
   try {
     await saveSelectedCalendars();
     await loadCalendarEvents();
     await loadRecordTable();
   } catch (err) {
+    if (generation === studentGeneration) setStudentBusy(false);
     showActionError(err);
   }
 });
@@ -1772,6 +1774,8 @@ async function loadYears() {
 
 async function loadTerms() {
   terms = await apiFetch("/terms");
+  const validIds = new Set(terms.map((term) => term.id));
+  selectedTermIds = new Set([...selectedTermIds].filter((id) => validIds.has(id)));
 }
 
 function renderYearGroups() {
@@ -1870,11 +1874,13 @@ els.yearGroups.addEventListener("change", async (e) => {
   clearStudentDetails();
   renderCurriculumNameSuggestions();
   setStudentBusy(true);
+  const generation = studentGeneration;
   try {
     await saveSelectedTerms();
     await loadCalendarEvents();
     await loadRecordTable();
   } catch (err) {
+    if (generation === studentGeneration) setStudentBusy(false);
     showActionError(err);
   }
 });
