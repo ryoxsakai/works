@@ -26,7 +26,7 @@ function setup(extra = {}) {
     ...extra,
   });
   state.clearStudentDetails = () => { state.cleared = true; };
-  for (const name of ['normalizeCurriculumText','tokenizeText','eventMatchesCurriculumName','selectionTitleWithoutAnnotation','isGroupLessonTitle','curriculumSelectionName','isNonLessonSelectionTitle','isStudentSelectionEvent','isWithinSelectedTerms','renderCurriculumNameSuggestions','alignCurriculumTermWithSettings']) vm.runInContext(fn(name),state);
+  for (const name of ['normalizeCurriculumText','tokenizeText','eventMatchesCurriculumName','selectionTitleWithoutAnnotation','isGroupLessonTitle','curriculumSelectionName','isNonLessonSelectionTitle','isStudentSelectionEvent','isWithinSelectedTerms','curriculumGroupForCalendar','renderCurriculumNameSuggestions','alignCurriculumTermWithSettings']) vm.runInContext(fn(name),state);
   vm.runInContext('const TOKEN_DELIMITER_RE = /([\\s　()（）【】\\[\\]・/,、:：\\-])/;',state);
   return state;
 }
@@ -62,6 +62,14 @@ test('deselected calendars cannot retain students from their old response', () =
   state.els.curriculumName.value='山田';state.renderCurriculumNameSuggestions();
   assert.deepEqual(Array.from(state.studentChoices,item=>item.name),['佐藤']);
   assert.equal(state.els.curriculumName.value,'');
+});
+test('a current-term record retains its missing source choice until that term is deselected', () => {
+  const state=setup({rawEvents:[event('山田')],studentGroup:'TOMAS',studentChoices:[{name:'山田',label:'山田',group:'TOMAS',calendarIds:['tomas'],sourceTermId:2}]});
+  state.els.curriculumName.value='山田';state.renderCurriculumNameSuggestions();
+  assert.equal(state.studentGroup,'TOMAS');
+  assert.ok(state.studentChoices.some(item=>item.group==='TOMAS'));
+  state.selectedTermIds=new Set([1]);state.renderCurriculumNameSuggestions();
+  assert.equal(state.studentChoices.length,0);assert.equal(state.els.curriculumName.value,'');
 });
 test('legacy restored tokens follow the actual class group instead of restoring the old individual category', () => {
   const state=setup({rawEvents:[event('A1 Standard 英語構文'),event('山田')]});
