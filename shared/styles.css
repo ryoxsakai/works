@@ -3687,3 +3687,15 @@ textarea,
   .record-panel #record-table .record-empty-slot td:last-child { display: none; }
 }
 #curriculum-filter-form .hint { margin: 0 0 .5rem; }
+
+/* Linked plans retain a single curriculum value and show the destination beside the editor. */
+.record-next-plan { margin-top: .8rem; padding-top: .65rem; border-top: 1px solid var(--border); }
+.record-next-plan label { display: block; color: var(--muted); font-size: .72rem; font-weight: 600; }
+.record-next-plan textarea { margin-top: .3rem; font-weight: 400; }
+.lesson-plan-target { display: block; color: var(--muted); font-size: .7rem; margin-top: .35rem; white-space: normal; overflow-wrap: anywhere; }
+.lesson-plan-feedback { display: flex; align-items: center; flex-wrap: wrap; gap: .3rem .5rem; margin-top: .25rem; }
+.lesson-plan-status { color: var(--muted); font-size: .68rem; white-space: normal; }
+.lesson-plan-status[data-error="true"] { color: var(--danger, #b91c1c); }
+.lesson-plan-action { font-size: .68rem; padding: .15rem .45rem; white-space: normal; }
+.lesson-plan-action[hidden], .linked-lesson-plan[hidden] { display: none; }
+@media print { .lesson-plan-feedback { display: none; } }
