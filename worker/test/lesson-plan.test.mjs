@@ -28,6 +28,9 @@ test('exact title and calendar, consecutive same-day lessons and excluded slots'
   for(const e of skips.slice(0,9))assert.equal(isScheduledLesson(e),false,e.id);
   assert.equal(findNextLesson(a,[{...b,summary:'山田（英語）'}]).target,null,'annotations are not stripped into another class');
   assert.equal(findNextLesson(a,[{...b,summary:' 山田  '}]).target.id,'b');
+  assert.equal(isScheduledLesson({...b,summary:'山田（辞退）'}),false);
+  assert.equal(findNextLesson({...a,summary:'山田（辞退）'},[{...b,summary:'山田（辞退）'}]).reason,'ineligible');
+  assert.equal(findNextLesson(a,[{...b,summary:'山田（辞退）'}]).target,null);
 });
 test('equally early duplicate classes are ambiguous and an empty series stays empty',()=>{
   const a=event('a'),b=event('b','2026-10-17',11);
