@@ -105,3 +105,56 @@ test('an older calendar request cannot replace a later term refresh', async () =
   const old=state.loadCalendarEvents();await state.loadCalendarEvents();resolveOld([event('古い')]);await old;
   assert.equal(state.rawEvents[0].summary,'最新');
 });
+test('reloading terms removes deleted IDs and preserves valid selections', async () => {
+  const state=setup({selectedTermIds:new Set([1,2,99]),apiFetch:async()=>[periods[1]]});
+  vm.runInContext(fn('loadTerms'),state);
+  await state.loadTerms();
+  assert.deepEqual([...state.selectedTermIds],[2]);
+  state.apiFetch=async()=>[periods[0]];
+  await state.loadTerms();
+  assert.equal(state.selectedTermIds.size,0);
+  assert.equal(state.isWithinSelectedTerms(event('remaining year')),true);
+  state.els.curriculumTermSelect={innerHTML:''};state.escapeHtml=value=>value;
+  vm.runInContext(fn('renderCurriculumTermOptions'),state);
+  state.renderCurriculumTermOptions(1);
+  assert.match(state.els.curriculumTermSelect.innerHTML,/value="1"/);
+});
+for (const [target,save,selector] of [
+  ['calendarChecklist','saveSelectedCalendars','input[type=checkbox]'],
+  ['yearGroups','saveSelectedTerms','.term-checkbox'],
+]) {
+  function settingsHandler(overrides={}) {
+    let handler;
+    const state=setup({studentGeneration:0,busy:false,errors:[],
+      saveSelectedCalendars:async()=>{},saveSelectedTerms:async()=>{},loadCalendarEvents:async()=>{},loadRecordTable:async()=>{},
+      ...overrides,
+    });
+    state.els[target]={addEventListener(_event,callback){handler=callback;}};
+    state.clearStudentDetails=()=>{state.studentGeneration++;};
+    state.renderCurriculumNameSuggestions=()=>{};
+    state.setStudentBusy=busy=>{state.busy=busy;};
+    state.showActionError=error=>state.errors.push(error);
+    const start=source.indexOf(`els.${target}.addEventListener("change",`);
+    vm.runInContext(source.slice(start,source.indexOf('\n});',start)+4),state);
+    const change={target:{closest:query=>query===selector?{checked:true,value:target==='yearGroups'?'2':'tomas'}:null}};
+    return {state,run:()=>handler(change)};
+  }
+  test(`${target} releases busy state after save, calendar, or curriculum failure`,async()=>{
+    for(const step of [save,'loadCalendarEvents']) {
+      const error=new Error(`${step} unavailable`);
+      const {state,run}=settingsHandler({[step]:async()=>{throw error;}});
+      await run();
+      assert.equal(state.busy,false,step);
+      assert.equal(state.errors[0],error);
+    }
+  });
+  test(`${target} failure cannot clear a newer student's busy state`,async()=>{
+    let rejectOld;
+    const {state,run}=settingsHandler({[save]:()=>new Promise((_resolve,reject)=>{rejectOld=reject;})});
+    const pending=run();
+    state.studentGeneration++;
+    rejectOld(new Error('superseded settings refresh'));
+    await pending;
+    assert.equal(state.busy,true);
+  });
+}
