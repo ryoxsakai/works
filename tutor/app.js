@@ -2141,13 +2141,30 @@ els.curriculumSearchModalCloseBtn.addEventListener("click", () => els.curriculum
 
 // Course codes are class identities; annotations on individual names are not.
 function isGroupLessonTitle(title) {
-  return /集団|グループ/.test(title) || /^(?:A|M)\d+(?:\s|$)/i.test(normalizeCurriculumText(title));
+  const normalized = normalizeCurriculumText(title);
+  return /集団|グループ/.test(title) || /^(?:A|M)\d+(?:\s|$)/i.test(normalized)
+    || /^(?:A|M)\d+(?:SuperBasic|Standard|Sta|Basic|Ba|High)(?=$|[\s(【\[/])/i.test(normalized);
+}
+
+function selectionTitleWithoutAnnotation(title) {
+  return String(title || "").split(/[（(【\[/／]/, 1)[0].trim();
 }
 
 function curriculumSelectionName(title) {
   const text = String(title || "").trim();
   if (isGroupLessonTitle(text)) return text;
-  return text.split(/[（(【\[/／]/, 1)[0].trim();
+  return selectionTitleWithoutAnnotation(text);
+}
+
+// These administrative appointments remain visible in schedules, but are not students.
+function isNonLessonSelectionTitle(title) {
+  const name = normalizeCurriculumText(selectionTitleWithoutAnnotation(title));
+  return /^(?:会議|教科会|WT\s*作成)$/i.test(name)
+    || /^(?:英語|数学|国語|理科|社会|物理|化学|生物|地学|日本史|世界史|地理|公民)科?\s*(?:会議|教科会)$/.test(name);
+}
+
+function isStudentSelectionEvent(event) {
+  return !isExcludedScheduleEvent(event) && !isNonLessonSelectionTitle(event.summary);
 }
 
 function clearStudentDetails() {
@@ -2166,7 +2183,7 @@ function clearStudentDetails() {
 
 function renderCurriculumNameSuggestions() {
   const choices = new Map();
-  rawEvents.filter((ev) => !isExcludedScheduleEvent(ev)).forEach((ev) => {
+  rawEvents.filter(isStudentSelectionEvent).forEach((ev) => {
     const name = curriculumSelectionName(ev.summary);
     if (!name) return;
     const calendar = calendarColors.get(ev._calendarId)?.name || "";
@@ -2185,10 +2202,10 @@ function renderCurriculumNameSuggestions() {
   });
   // Restored legacy token selections remain accessible without migrating their keys.
   const current = els.curriculumName.value;
-  if (current && ![...choices.values()].some((item) => item.name === current)) {
+  if (current && !isNonLessonSelectionTitle(current) && ![...choices.values()].some((item) => item.name === current)) {
     const group = studentGroup || "保存中の選択";
     const allowedCalendarIds = [...choices.values()].filter((item) => item.group === group).flatMap((item) => item.calendarIds);
-    const calendarIds = [...new Set(rawEvents.filter((ev) =>
+    const calendarIds = [...new Set(rawEvents.filter(isStudentSelectionEvent).filter((ev) =>
       (!studentGroup || allowedCalendarIds.includes(ev._calendarId)) && eventMatchesCurriculumName(ev, current)).map((ev) => ev._calendarId))];
     choices.set("current", { name: current, label: current, group, calendarIds });
   }

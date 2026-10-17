@@ -8,7 +8,14 @@ const fs = require('node:fs');
   const errors=[]; const writes=[]; let failPath = ""; let pendingDelay = null; let raceProfiles = false;
   page.on('pageerror', e=>errors.push(e.message));
   const calendars=[{id:'d',summary:'代官山'},{id:'t',summary:'TOMAS'}];
-  const events={d:['田﨑','田崎','田崎(振替)','田崎/英語','田崎（振替）','集団 英語','A6 Basic','M3 High'],t:['青木','田崎',...Array.from({length:12},(_,i)=>`生徒${i}`)]};
+  const events={d:['田﨑','田崎','田崎(振替)','田崎/英語','田崎（振替）','集団 英語','A6 Basic','M3 High','A5Ba','M3High','A6Basic','会議','WT作成','会議（講師）','WT作成/準備','A1Sta','A1Standard','A7SuperBasic','A1 Standard','A7 SuperBasic','英語科会議','英語科教科会','数学科会議','英語科教科会（定例）','会田','田中','A1Stanley','A7SuperBasicson'],t:['青木','田崎',...Array.from({length:12},(_,i)=>`生徒${i}`),'会議','WT作成','英語科会議','英語科教科会']};
+  const annotatedAdministrativeTitles = [
+    '会議（集団授業）','会議(個別授業)','会議/グループ準備','会議／個別準備',
+    'WT作成/グループ準備','WT作成（集団）','WT作成(個別)','WT作成／個別準備',
+    '英語科会議（集団）','英語科教科会/グループ準備'
+  ];
+  events.d.push(...annotatedAdministrativeTitles, '田中（個別）', 'A2 Basic（集団）','A3Sta/グループ演習');
+  events.t.push(...annotatedAdministrativeTitles, '青木（個別）');
   await page.route('**/*', async route=>{
     const u=new URL(route.request().url());
     const json=body=>route.fulfill({json:body});
@@ -42,6 +49,7 @@ const fs = require('node:fs');
   await page.goto('http://localhost/tutor/index.html');
   await page.locator('[data-page-tab="curriculum"]').click();
   await page.locator('[data-student-group="代官山 · 個別"]').click();
+  assert.deepEqual((await page.locator('#student-selector button').allTextContents()).sort(),['田崎','田﨑 太郎田﨑','会田','田中','A1Stanley','A7SuperBasicson'].sort());
   await page.getByRole('button',{name:'田﨑 太郎 田﨑',exact:true}).click();
   await page.waitForFunction(()=>document.querySelector('#student-selector').getAttribute('aria-busy')==='false');
   assert.equal(await page.locator('#curriculum-name').inputValue(),'田﨑');
@@ -69,10 +77,15 @@ const fs = require('node:fs');
   await page.locator('#student-lesson-kind').selectOption('');
   await page.locator('#curriculum-search-modal-close').click();
   await page.locator('[data-student-group="代官山 · 集団"]').click();
-  assert.deepEqual((await page.locator('#student-selector button').allTextContents()).sort(),['A6 Basic','M3 High','集団 英語'].sort());
+  assert.deepEqual((await page.locator('#student-selector button').allTextContents()).sort(),['A5Ba','A6Basic','A6 Basic','M3High','M3 High','集団 英語','A1Sta','A1Standard','A7SuperBasic','A1 Standard','A7 SuperBasic','A2 Basic（集団）','A3Sta/グループ演習'].sort());
   await page.locator('#student-selector button').filter({hasText:/^A6 Basic$/}).click();
   await page.waitForFunction(()=>document.querySelector('#student-selector').getAttribute('aria-busy')==='false');
   assert.deepEqual(await page.locator('#curriculum-tbody tr[data-event-id]').evaluateAll(rows=>rows.map(row=>row.dataset.eventId)),['d6']);
+  for (const [title,eventId] of [['A5Ba','d8'],['M3High','d9'],['A1Sta','d15'],['A1Standard','d16'],['A7SuperBasic','d17'],...['A2 Basic（集団）','A3Sta/グループ演習'].map(title=>[title,`d${events.d.indexOf(title)}`])]) {
+    await page.locator('#student-selector button').filter({hasText:new RegExp(`^${title}$`)}).click();
+    await page.waitForFunction(()=>document.querySelector('#student-selector').getAttribute('aria-busy')==='false');
+    assert.deepEqual(await page.locator('#curriculum-tbody tr[data-event-id]').evaluateAll(rows=>rows.map(row=>row.dataset.eventId)),[eventId]);
+  }
   await page.screenshot({path:'/tmp/works-students-group-mobile-light.png',fullPage:true});
   await page.locator('[data-student-group="代官山 · 個別"]').click();
   assert.equal(await page.locator('#curriculum-name').inputValue(),'');
@@ -247,7 +260,14 @@ const fs = require('node:fs');
   assert.equal(await page.locator('#curriculum-name').inputValue(),'田崎(振替)');
   assert.equal(await page.locator('#student-selector button[aria-pressed="true"]').innerText(),'田崎(振替)');
   assert.equal(await page.locator('#curriculum-tbody tr[data-event-id]').count(),1);
+  for (const name of ['会議','会議（集団授業）','WT作成/グループ準備']) {
+    await page.evaluate(name=>localStorage.setItem('works_curriculum_state',JSON.stringify({name,group:'代官山 · 個別',yearId:'1',termId:'1'})), name);
+    await page.reload();
+    await page.waitForFunction(name=>document.querySelector('#curriculum-print-name').value===name && document.querySelector('#curriculum-print-name').disabled===false, name);
+    assert.equal(await page.locator('#student-selector button').filter({hasText:/会議|教科会|WT作成/}).count(),0);
+    assert.equal(await page.locator('#curriculum-tbody tr[data-event-id]').count(),0);
+  }
   assert.deepEqual(errors,[]);
   await browser.close();
-  console.log('PASS: standard UI regressions plus delayed success/failure at all six load boundaries, superseded busy ownership, consecutive switches, initial restore, delayed saves');
+  console.log('PASS: compact Ba/Basic/High/Sta/Standard/SuperBasic codes, subject meetings, negative name cases; standard UI regressions plus delayed success/failure at all six load boundaries, superseded busy ownership, consecutive switches, initial restore, delayed saves');
 })().catch(e=>{console.error(e);process.exit(1)});
