@@ -22,7 +22,7 @@ export function isScheduledLesson(event, excluded = []) {
     && ref.event_type === "default" && ref.transparency !== "transparent" && !ref.declined
     && Number.isFinite(Date.parse(ref.start)) && Date.parse(ref.end) > Date.parse(ref.start)
     && !!title && !excluded.some((value) => titleKey(value) === title)
-    && !/休講|欠席|キャンセル|中止|休み|会議|教科会|打ち?合[わ]?せ|ミーティング|WT\s*作成|空き|○/i.test(title);
+    && !/休講|欠席|辞退|キャンセル|中止|休み|会議|教科会|打ち?合[わ]?せ|ミーティング|WT\s*作成|空き|○/i.test(title);
 }
 export function findNextLesson(source, events, excluded = []) {
   const ref = lessonEventRef(source);
