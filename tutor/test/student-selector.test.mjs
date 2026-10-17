@@ -43,6 +43,43 @@ test('administrative titles are excluded even with class annotations, while stud
   for(const title of ['会議','英語科会議（集団授業）','教科会/グループ準備','英語科教科会','WT 作成【個別】','ＷＴ作成／準備','青葉先生と打ち合わせ','職員ミーティング']) assert.equal(state.isNonLessonSelectionTitle(title),true,title);
   for(const title of ['山田（会議後に面談）','A1Sta 英語構文','M3High 英語','田﨑']) assert.equal(state.isNonLessonSelectionTitle(title),false,title);
 });
+test('designated group courses include both intermediate-course spellings and override old individual settings', () => {
+  const state=setup({rawEvents:[event('中堅大英語'),event('英語中堅大'),event('高1長文読解'),event('高１ 長文読解（後期）'),event('高2小尾'),event('田崎'),event('A1 Standard 英語構文'),event('山田（A教室）'),event('高1長文読解',undefined,'tomas')]});
+  for(const ev of state.rawEvents) state.studentKinds[JSON.stringify([ev._calendarId,state.curriculumSelectionName(ev.summary)])]='individual';
+  state.renderCurriculumNameSuggestions();
+  for(const title of ['中堅大英語','英語中堅大','高1長文読解','高１ 長文読解（後期）','A1 Standard 英語構文']) assert.ok(state.studentChoices.some(item=>item.name===title&&item.group==='代官山 · 集団'),title);
+  for(const title of ['高2小尾','田崎','山田']) assert.ok(state.studentChoices.some(item=>item.name===title&&item.group==='代官山 · 個別'),title);
+  assert.ok(state.studentChoices.some(item=>item.name==='高1長文読解'&&item.group==='TOMAS'));
+  for(const title of ['高1長文読解対策','中堅大英語の個別相談','英語中堅大学生']) assert.equal(state.isGroupLessonTitle(title),false,title);
+});
+test('circle-marked choices, restored selections and source records stay hidden without altering events', () => {
+  const rawEvents=[event('冬○'),event('○'),event('高1長文読解○'),event('山田（○）'),event('会議'),event('教科会'),event('WT作成'),event('山田'),event('A1 Standard 英語構文')];
+  const before=JSON.stringify(rawEvents);
+  const state=setup({rawEvents,studentGroup:'代官山 · 個別',studentChoices:[{name:'冬○',label:'冬○',group:'代官山 · 個別',calendarIds:['daikanyama'],sourceTermId:2}]});
+  state.els.curriculumName.value='冬○';
+  state.renderCurriculumNameSuggestions();
+  assert.deepEqual(new Set(Array.from(state.studentChoices,item=>item.name)),new Set(['山田','A1 Standard 英語構文']));
+  assert.equal(state.els.curriculumName.value,'');assert.equal(state.cleared,true);
+  assert.equal(JSON.stringify(rawEvents),before);
+  assert.equal(state.isNonLessonSelectionTitle('高1長文読解'),false);
+});
+test('schedule and record navigation filters the original title before annotation removal', async () => {
+  const state=setup({studentGroup:'代官山 · 個別',studentChoices:[{name:'山田',label:'山田',group:'代官山 · 個別',calendarIds:['daikanyama']}]});
+  state.els.curriculumName.value='山田';
+  state.tabClicks=0;state.refreshes=0;
+  state.els.pageTabBtns=[{dataset:{pageTab:'curriculum'},click(){state.tabClicks++;}}];
+  state.els.actionError={textContent:''};
+  state.refreshStudentDetails=async()=>{state.refreshes++;};
+  vm.runInContext(fn('goToCurriculum'),state);
+  const before=JSON.stringify(state.studentChoices);
+  for(const title of ['冬○','山田（○）','A1（○）','会議','WT作成']) await state.goToCurriculum(title,periods[1],'tomas');
+  assert.equal(state.tabClicks,0);assert.equal(state.refreshes,0);
+  assert.equal(state.els.curriculumName.value,'山田');assert.equal(state.studentGroup,'代官山 · 個別');
+  assert.equal(JSON.stringify(state.studentChoices),before);
+  await state.goToCurriculum('山田（授業）',periods[1],'tomas');
+  assert.equal(state.tabClicks,1);assert.equal(state.refreshes,1);
+  assert.equal(state.els.curriculumName.value,'山田');assert.equal(state.studentGroup,'TOMAS');
+});
 test('only selected term lessons appear; saved old names and administrative selections do not reappear', () => {
   const state=setup({rawEvents:[event('前期のみ','2026-05-01'),event('後期のみ'),event('隙間','2026-08-15'),event('会議') ]});
   state.els.curriculumName.value='前期のみ';state.studentGroup='代官山 · 個別';
