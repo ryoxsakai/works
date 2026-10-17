@@ -36,10 +36,10 @@ test('later-page failure is reported instead of returning a partial schedule', a
 test('empty calendars produce an empty result', async () => {
   assert.equal((await setup(async()=>({ok:true,json:async()=>({})}))()).length, 0);
 });
-test('schedule and records still load when restored curriculum fails', async () => {
+test('records still load when the schedule fails', async () => {
   const calls = [];
   const section = source.slice(source.indexOf('      // Load the schedule independently'), source.indexOf('      await loadRecordTable();', source.indexOf('      // Load the schedule independently')) + '      await loadRecordTable();'.length);
-  const context = vm.createContext({els:{curriculumName:{value:'fixture'},curriculumTermSelect:{value:'1'}},loadCalendarEvents:async()=>calls.push('schedule'),loadCurriculumEvents:async()=>{throw Error('fixture curriculum error');},showEventPlaceholder:()=>{},showActionError:()=>calls.push('error'),loadRecordTable:async()=>calls.push('records')});
+  const context = vm.createContext({loadCalendarEvents:async()=>{calls.push('schedule');throw Error('fixture schedule error');},showEventPlaceholder:()=>{},showActionError:()=>calls.push('error'),loadRecordTable:async()=>calls.push('records')});
   await vm.runInContext(`(async()=>{${section}})()`, context);
   assert.deepEqual(calls, ['schedule','error','records']);
 });
