@@ -32,7 +32,7 @@ const COLLAPSED_SECTIONS_KEY = "works_collapsed_sections";
 const PRINT_SECTIONS_KEY = "works_print_sections";
 const DEFAULT_PRINT_SECTIONS = ["goals", "schools", "progress", "materials"];
 const WEEKDAY_LABELS = ["日", "月", "火", "水", "木", "金", "土"];
-const TOKEN_DELIMITER_RE = /([\s　()()【】\[\]・/,、:：\-])/;
+const TOKEN_DELIMITER_RE = /([\s　()（）【】\[\]・/,、:：\-])/;
 
 // summary/descriptionを名前として区切れる単位(スペースや括弧などの区切り文字)に分解する。
 // 「田」のような部分一致で別の生徒(例: 田﨑)まで拾ってしまわないよう、
@@ -47,16 +47,21 @@ function tokenizeText(text) {
 // 1語の名前は従来どおりトークン完全一致にし、似た名前の生徒を誤って拾わない。
 function normalizeCurriculumText(text) {
   return String(text || "")
-    .normalize("NFKC")
+    .replace(/[！-～]/g, (char) => String.fromCharCode(char.charCodeAt(0) - 0xfee0))
     .replace(/\s+/g, " ")
     .trim();
 }
 
 function eventMatchesCurriculumName(event, name) {
   const query = normalizeCurriculumText(name);
-  const source = `${event.summary || ""} ${event.description || ""}`;
+  if ((event.summary || "").trim() === name.trim()) return true;
+  const source = normalizeCurriculumText(`${event.summary || ""} ${event.description || ""}`);
   if (!query) return false;
-  if (query.includes(" ")) return normalizeCurriculumText(source).includes(query);
+  if (query.includes(" ")) {
+    const parts = tokenizeText(query).map(normalizeCurriculumText);
+    const tokens = tokenizeText(source).map(normalizeCurriculumText);
+    return tokens.some((_, i) => parts.every((part, j) => tokens[i + j] === part));
+  }
   return tokenizeText(source).some((token) => normalizeCurriculumText(token) === query);
 }
 
@@ -156,7 +161,8 @@ const els = {
   recordTbody: document.querySelector("#record-tbody"),
   curriculumFilterForm: document.querySelector("#curriculum-filter-form"),
   curriculumName: document.querySelector("#curriculum-name"),
-  curriculumNameList: document.querySelector("#curriculum-name-list"),
+  studentGroups: document.querySelector("#student-groups"),
+  studentSelector: document.querySelector("#student-selector"),
   curriculumYearSelect: document.querySelector("#curriculum-year-select"),
   curriculumTermSelect: document.querySelector("#curriculum-term-select"),
   curriculumTbody: document.querySelector("#curriculum-tbody"),
@@ -199,6 +205,17 @@ els.goalTabPanels = els.goalModal.querySelectorAll(".modal-tab-panel");
 els.schoolsTabBtns = els.schoolsModal.querySelectorAll(".tab-btn");
 
 let selectedCalendarIds = new Set();
+let studentKinds = {};
+try { studentKinds = JSON.parse(localStorage.getItem("works_student_kinds") || "{}") || {}; } catch {}
+let studentDirectory = [];
+let studentChoices = [];
+let studentGroup = "";
+let selectingStudent = false;
+let navigatingStudent = false;
+let loadedPrefName = "";
+let prefRequest = 0;
+let studentGeneration = 0;
+
 let calendarColors = new Map(); // calendarId -> { raw, bg, fg }
 let years = [];
 let terms = [];
@@ -233,6 +250,7 @@ let goalTemplates = [];
 let editingTemplateId = null;
 
 function showActionError(err) {
+  if (err?.code === "STALE_STUDENT_RESPONSE") return;
   els.actionError.textContent = err instanceof Error ? err.message : String(err);
   els.actionError.classList.remove("info");
 }
@@ -637,6 +655,11 @@ watchAuth({
       showActionError(err);
     }
     try {
+      try {
+        studentDirectory = await apiFetch("/students");
+      } catch (err) {
+        showActionError(err);
+      }
       await loadYears();
       await loadTerms();
       await loadGoalTemplates();
@@ -654,19 +677,7 @@ watchAuth({
         showEventPlaceholder("授業予定を取得できませんでした。再読み込みしてください。");
         showActionError(err);
       }
-      try {
-        if (els.curriculumName.value && els.curriculumTermSelect.value) {
-          await loadCurriculumEvents();
-        }
-        if (els.curriculumName.value) {
-          await loadGoals();
-          await loadCandidateSchools();
-          await loadStudentPref();
-          await loadStudentMaterials();
-        }
-      } catch (err) {
-        showActionError(err);
-      }
+      if (els.curriculumName.value) await refreshStudentDetails();
       await loadRecordTable();
     } catch (err) {
       showActionError(err);
@@ -677,27 +688,38 @@ watchAuth({
   },
 });
 
-async function apiFetch(path, options = {}) {
-  const token = getSessionToken();
-  if (!token) throw new Error("not signed in");
-  const res = await fetch(API_BASE + path, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-      ...(options.headers || {}),
-    },
-  });
-  if (res.status === 401) {
-    // セッションが失効している場合は静かにログアウトさせ、サインイン画面に戻す。
-    await signOutUser();
-    window.location.reload();
-    throw new Error("セッションが切れました。再度ログインしてください。");
+// Student reads and writes retain their originating selection through response parsing.
+// A stale write response must not trigger follow-up reloads or errors on another student.
+async function apiFetch(path, options = {}, context = (/^\/(?:goals|schools|student-prefs|student-materials|chapter-progress)(?:[/?]|$)/.test(path) || (path.startsWith("/curriculum/") && options.method)) ? captureStudentContext() : null) {
+  if (context) assertStudentContext(context);
+  try {
+    const token = getSessionToken();
+    if (!token) throw new Error("not signed in");
+    const res = await fetch(API_BASE + path, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+        ...(options.headers || {}),
+      },
+    });
+    if (context) assertStudentContext(context);
+    if (res.status === 401) {
+      // セッションが失効している場合は静かにログアウトさせ、サインイン画面に戻す。
+      await signOutUser();
+      window.location.reload();
+      throw new Error("セッションが切れました。再度ログインしてください。");
+    }
+    if (!res.ok) {
+      throw new Error(`API error ${res.status}: ${await res.text()}`);
+    }
+    const result = res.status === 204 ? null : await res.json();
+    if (context) assertStudentContext(context);
+    return result;
+  } catch (err) {
+    if (context) assertStudentContext(context);
+    throw err;
   }
-  if (!res.ok) {
-    throw new Error(`API error ${res.status}: ${await res.text()}`);
-  }
-  return res.status === 204 ? null : res.json();
 }
 
 // 選択中の全カレンダーから指定期間の予定を横断取得する共通ヘルパー。
@@ -1467,15 +1489,18 @@ els.chapterList.addEventListener("submit", async (e) => {
 
 // --- 生徒情報タブ: 教材・提出物進捗(使用教材の登録とチャプター単位の進捗チェック) ---
 
-async function loadStudentMaterials() {
-  const name = els.curriculumName.value.trim();
+async function loadStudentMaterials(context = captureStudentContext()) {
+  assertStudentContext(context);
+  const name = context.name;
   if (!name) {
     studentMaterials = [];
     renderStudentMaterials();
     renderAddStudentMaterialOptions();
     return;
   }
-  studentMaterials = await apiFetch(`/student-materials?name=${encodeURIComponent(name)}`);
+  const result = await apiFetch(`/student-materials?name=${encodeURIComponent(name)}`, {}, context);
+  assertStudentContext(context);
+  studentMaterials = result;
   renderStudentMaterials();
   renderAddStudentMaterialOptions();
 }
@@ -2001,6 +2026,7 @@ function saveCurriculumState() {
       name: els.curriculumName.value,
       yearId: els.curriculumYearSelect.value,
       termId: els.curriculumTermSelect.value,
+      group: studentGroup,
     })
   );
 }
@@ -2014,6 +2040,7 @@ function restoreCurriculumState() {
   }
   if (!saved) return;
   els.curriculumName.value = saved.name || "";
+  studentGroup = saved.group || "";
   if (saved.yearId) {
     els.curriculumYearSelect.value = saved.yearId;
     renderCurriculumTermOptions(Number(saved.yearId));
@@ -2022,22 +2049,33 @@ function restoreCurriculumState() {
 }
 
 // 生徒(name)ごとの印刷名前(検索名とは別に、印刷時だけ自由な表記(例: 田﨑くん)を使える)。
-async function loadStudentPref() {
+function invalidateStudentPref() {
+  prefRequest++;
+  loadedPrefName = "";
+  els.curriculumPrintNameInput.value = "";
+  els.curriculumPrintNameInput.disabled = true;
+  els.studentMemoInput.value = "";
+}
+
+async function loadStudentPref(context = captureStudentContext()) {
+  assertStudentContext(context);
+  invalidateStudentPref();
+  const request = prefRequest;
   const name = els.curriculumName.value.trim();
-  if (!name) {
-    els.curriculumPrintNameInput.value = "";
-    els.studentMemoInput.value = "";
-    return;
-  }
-  const pref = await apiFetch(`/student-prefs?name=${encodeURIComponent(name)}`);
+  if (!name) return;
+  const pref = await apiFetch(`/student-prefs?name=${encodeURIComponent(name)}`, {}, context);
+  assertStudentContext(context);
+  if (request !== prefRequest || name !== els.curriculumName.value.trim()) return;
   els.curriculumPrintNameInput.value = pref?.print_name || "";
   els.studentMemoInput.value = pref?.memo || "";
+  loadedPrefName = name;
+  els.curriculumPrintNameInput.disabled = navigatingStudent || selectingStudent;
 }
 
 els.curriculumPrintNameInput.addEventListener("change", async () => {
   const name = els.curriculumName.value.trim();
-  if (!name) {
-    showActionError(new Error("先に名前を検索してください"));
+  if (!name || loadedPrefName !== name || navigatingStudent || selectingStudent) {
+    showActionError(new Error("生徒情報の取得が完了してから編集してください"));
     return;
   }
   try {
@@ -2052,8 +2090,8 @@ els.curriculumPrintNameInput.addEventListener("change", async () => {
 
 els.studentMemoInput.addEventListener("change", async () => {
   const name = els.curriculumName.value.trim();
-  if (!name) {
-    showActionError(new Error("先に名前を検索してください"));
+  if (!name || loadedPrefName !== name || navigatingStudent || selectingStudent) {
+    showActionError(new Error("生徒情報の取得が完了してから編集してください"));
     return;
   }
   try {
@@ -2070,54 +2108,185 @@ els.studentMemoInput.addEventListener("change", async () => {
 function renderCurriculumSearchSummary() {
   const name = els.curriculumName.value.trim();
   if (!name) {
-    els.curriculumSearchSummary.textContent = "名前を検索してください。";
+    els.curriculumSearchSummary.textContent = "横にスライドして生徒・授業を選択してください。";
     return;
   }
+  const label = studentChoices.find((item) => item.name === name)?.label || name;
   const yearLabel = els.curriculumYearSelect.selectedOptions[0]?.textContent || "";
   const termLabel = els.curriculumTermSelect.selectedOptions[0]?.textContent || "";
-  els.curriculumSearchSummary.textContent = [name, yearLabel, termLabel].filter(Boolean).join("　/　");
+  els.curriculumSearchSummary.textContent = [label, yearLabel, termLabel].filter(Boolean).join("　/　");
 }
 
 els.openCurriculumSearchModalBtn.addEventListener("click", () => {
+  els.curriculumPrintNameInput.disabled = !els.curriculumName.value || loadedPrefName !== els.curriculumName.value.trim() || navigatingStudent || selectingStudent;
+  const choice = studentChoices.find((item) => item.name === els.curriculumName.value && item.group === studentGroup);
+  const kindSelect = document.querySelector("#student-lesson-kind");
+  kindSelect.disabled = !choice?.group.startsWith("代官山");
+  kindSelect.value = studentKinds[choice?.kindKey] || "";
+  kindSelect.dataset.kindKey = choice?.kindKey || "";
   els.curriculumSearchModal.showModal();
+});
+
+document.querySelector("#student-lesson-kind").addEventListener("change", (event) => {
+  const key = event.target.dataset.kindKey;
+  if (!key) return;
+  studentKinds[key] = event.target.value;
+  localStorage.setItem("works_student_kinds", JSON.stringify(studentKinds));
+  studentGroup = "";
+  renderCurriculumNameSuggestions();
+  saveCurriculumState();
 });
 
 els.curriculumSearchModalCloseBtn.addEventListener("click", () => els.curriculumSearchModal.close());
 
-// 名前入力欄の候補(datalist)を、現在読み込まれている授業予定(rawEvents)のタイトル・説明を
-// トークン化して作る。D1に別途登録する方式ではなく、カレンダーの内容から直接候補を出すことで、
-// カリキュラム側で一度も検索していない名前や、直近マッチが0件だった名前も候補に出せる。
-function renderCurriculumNameSuggestions() {
-  const tokens = new Set();
-  rawEvents.forEach((ev) => {
-    const summary = (ev.summary || "").trim();
-    if (summary) tokens.add(summary);
-    tokenizeText(`${ev.summary || ""} ${ev.description || ""}`).forEach((t) => tokens.add(t));
-  });
-  els.curriculumNameList.innerHTML = [...tokens]
-    .sort()
-    .map((t) => `<option value="${escapeHtml(t)}"></option>`)
-    .join("");
+// Course codes are class identities; annotations on individual names are not.
+function isGroupLessonTitle(title) {
+  return /集団|グループ/.test(title) || /^(?:A|M)\d+(?:\s|$)/i.test(normalizeCurriculumText(title));
 }
+
+function curriculumSelectionName(title) {
+  const text = String(title || "").trim();
+  if (isGroupLessonTitle(text)) return text;
+  return text.split(/[（(【\[/／]/, 1)[0].trim();
+}
+
+function clearStudentDetails() {
+  studentGeneration++;
+  invalidateStudentPref();
+  document.querySelectorAll("[data-page-tab-panel=curriculum] .collapsible-section").forEach((section) => { section.inert = true; });
+  els.curriculumTbody.innerHTML = "";
+  goals = [];
+  candidateSchools = [];
+  studentMaterials = [];
+  renderGoalColumns();
+  renderSchoolsSummary();
+  renderStudentMaterials();
+  renderAddStudentMaterialOptions();
+}
+
+function renderCurriculumNameSuggestions() {
+  const choices = new Map();
+  rawEvents.filter((ev) => !isExcludedScheduleEvent(ev)).forEach((ev) => {
+    const name = curriculumSelectionName(ev.summary);
+    if (!name) return;
+    const calendar = calendarColors.get(ev._calendarId)?.name || "";
+    const registered = studentDirectory.filter((student) =>
+      (student.calendar_tag || student.name || "").trim() === name);
+    const label = registered.length === 1 ? registered[0].name : name;
+    const kindKey = JSON.stringify([ev._calendarId, name]);
+    const kind = studentKinds[kindKey];
+    const group = /TOMAS/i.test(calendar) ? "TOMAS" :
+      /代官山/.test(calendar) ? ((kind === "group" || (!kind && (/集団|グループ/.test(calendar) || isGroupLessonTitle(name)))) ? "代官山 · 集団" : "代官山 · 個別") :
+      calendar || "その他";
+    const key = JSON.stringify([group, name]);
+    const calendarIds = choices.get(key)?.calendarIds || [];
+    calendarIds.push(ev._calendarId);
+    choices.set(key, { name, label, group, kindKey, calendarIds });
+  });
+  // Restored legacy token selections remain accessible without migrating their keys.
+  const current = els.curriculumName.value;
+  if (current && ![...choices.values()].some((item) => item.name === current)) {
+    const group = studentGroup || "保存中の選択";
+    const allowedCalendarIds = [...choices.values()].filter((item) => item.group === group).flatMap((item) => item.calendarIds);
+    const calendarIds = [...new Set(rawEvents.filter((ev) =>
+      (!studentGroup || allowedCalendarIds.includes(ev._calendarId)) && eventMatchesCurriculumName(ev, current)).map((ev) => ev._calendarId))];
+    choices.set("current", { name: current, label: current, group, calendarIds });
+  }
+  studentChoices = [...choices.values()].sort((a, b) => a.label.localeCompare(b.label, "ja", { numeric: true }) || a.name.localeCompare(b.name, "ja"));
+  if (!studentGroup) studentGroup = studentChoices.find((item) => item.name === current)?.group || "";
+  renderStudentSelector();
+}
+
+function renderStudentSelector() {
+  const groups = [...new Set(studentChoices.map((item) => item.group))].sort((a, b) => a.localeCompare(b, "ja"));
+  if (!groups.includes(studentGroup)) studentGroup = groups[0] || "";
+  els.studentGroups.innerHTML = groups.map((group) => `<button type="button" data-student-group="${escapeHtml(group)}" aria-pressed="${group === studentGroup}">${escapeHtml(group)}</button>`).join("");
+  els.studentSelector.innerHTML = studentChoices.map((item, index) => ({ ...item, index }))
+    .filter((item) => item.group === studentGroup)
+    .map((item) => `<button type="button" data-student-index="${item.index}" aria-pressed="${item.name === els.curriculumName.value}">${escapeHtml(item.label)}${item.label !== item.name ? `<small>${escapeHtml(item.name)}</small>` : ""}</button>`).join("") || '<p class="hint">表示できる生徒・授業がありません。設定のカレンダー・期間を確認してください。</p>';
+  els.studentSelector.querySelector('[aria-pressed="true"]')?.scrollIntoView({ block: "nearest", inline: "nearest" });
+}
+
+// Each refresh owns one generation. New navigation supersedes pending work, including
+// initialization, settings refreshes, errors and completion/enable callbacks.
+function captureStudentContext() {
+  return { generation: studentGeneration, name: els.curriculumName.value.trim(), group: studentGroup,
+    year: els.curriculumYearSelect.value, term: els.curriculumTermSelect.value,
+    calendars: [...selectedCalendarIds].sort().join("\n") };
+}
+function isCurrentStudentContext(context) {
+  const current = captureStudentContext();
+  return Object.keys(current).every((key) => current[key] === context[key]);
+}
+function assertStudentContext(context) {
+  if (isCurrentStudentContext(context)) return;
+  const error = new Error("Superseded student request");
+  error.code = "STALE_STUDENT_RESPONSE";
+  throw error;
+}
+function setStudentBusy(busy) {
+  navigatingStudent = busy;
+  selectingStudent = busy;
+  els.studentSelector.setAttribute("aria-busy", String(busy));
+}
+async function refreshStudentDetails({ closeSettings = false } = {}) {
+  clearStudentDetails();
+  const context = captureStudentContext();
+  setStudentBusy(true);
+  renderStudentSelector();
+  try {
+    for (const load of [loadCurriculumEvents, loadGoals, loadCandidateSchools, loadStudentPref, loadStudentMaterials]) {
+      assertStudentContext(context);
+      await load(context);
+    }
+    assertStudentContext(context);
+    renderCurriculumSearchSummary();
+    renderCurriculumNameSuggestions();
+    document.querySelectorAll("[data-page-tab-panel=curriculum] .collapsible-section").forEach((section) => { section.inert = false; });
+    if (closeSettings) els.curriculumSearchModal.close();
+  } catch (err) {
+    if (isCurrentStudentContext(context)) {
+      clearStudentDetails();
+      // The failed current operation remains the UI owner after clearing.
+      context.generation = studentGeneration;
+      showActionError(err);
+    }
+  } finally {
+    if (context.generation === studentGeneration) {
+      setStudentBusy(false);
+      els.curriculumPrintNameInput.disabled = !context.name || loadedPrefName !== context.name;
+      renderStudentSelector();
+    }
+  }
+}
+
+els.studentGroups.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-student-group]");
+  if (!button) return;
+  studentGroup = button.dataset.studentGroup;
+  els.curriculumName.value = "";
+  clearStudentDetails();
+  setStudentBusy(false);
+  saveCurriculumState();
+  renderCurriculumSearchSummary();
+  renderStudentSelector();
+});
+els.studentSelector.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-student-index]");
+  if (!button) return;
+  const item = studentChoices[Number(button.dataset.studentIndex)];
+  await goToCurriculum(item.name);
+});
 
 els.curriculumFilterForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   els.actionError.textContent = "";
   saveCurriculumState();
-  try {
-    await loadCurriculumEvents();
-    await loadGoals();
-    await loadCandidateSchools();
-    await loadStudentPref();
-    await loadStudentMaterials();
-    renderCurriculumSearchSummary();
-    els.curriculumSearchModal.close();
-  } catch (err) {
-    showActionError(err);
-  }
+  await refreshStudentDetails({ closeSettings: true });
 });
 
-async function loadCurriculumEvents() {
+async function loadCurriculumEvents(context = captureStudentContext()) {
+  assertStudentContext(context);
   const token = getSessionToken();
   const name = els.curriculumName.value.trim();
   const term = terms.find((t) => t.id === Number(els.curriculumTermSelect.value));
@@ -2128,26 +2297,30 @@ async function loadCurriculumEvents() {
 
   const timeMin = new Date(`${term.start_date}T00:00:00`).toISOString();
   const timeMax = new Date(`${term.end_date}T23:59:59`).toISOString();
-  const events = await fetchCalendarEvents(timeMin, timeMax);
+  const events = await fetchCalendarEvents(timeMin, timeMax, { withCalendarId: true });
+  assertStudentContext(context);
+  const choice = studentChoices.find((item) => item.name === name && item.group === studentGroup);
 
   const matched = events
-    .filter((ev) => eventMatchesCurriculumName(ev, name))
+    .filter((ev) => choice?.calendarIds?.includes(ev._calendarId) && eventMatchesCurriculumName(ev, name))
     .sort((a, b) => {
       const aStart = a.start?.dateTime || a.start?.date || "";
       const bStart = b.start?.dateTime || b.start?.date || "";
       return aStart.localeCompare(bStart);
     });
 
-  await renderCurriculumTable(matched);
+  await renderCurriculumTable(matched, context);
 }
 
-async function renderCurriculumTable(events) {
+async function renderCurriculumTable(events, context = captureStudentContext()) {
+  assertStudentContext(context);
   if (events.length === 0) {
     els.curriculumTbody.innerHTML = `<tr><td colspan="7">該当する予定がありません</td></tr>`;
     return;
   }
 
-  const entries = await apiFetch("/curriculum");
+  const entries = await apiFetch("/curriculum", {}, context);
+  assertStudentContext(context);
   const entryMap = new Map(entries.map((entry) => [entry.calendar_event_id, entry]));
 
   els.curriculumTbody.innerHTML = events
@@ -2254,14 +2427,17 @@ function renderGoalEditLists() {
   });
 }
 
-async function loadGoals() {
-  const name = els.curriculumName.value.trim();
+async function loadGoals(context = captureStudentContext()) {
+  assertStudentContext(context);
+  const name = context.name;
   if (!name) {
     goals = [];
     renderGoalColumns();
     return;
   }
-  goals = await apiFetch(`/goals?name=${encodeURIComponent(name)}`);
+  const result = await apiFetch(`/goals?name=${encodeURIComponent(name)}`, {}, context);
+  assertStudentContext(context);
+  goals = result;
   renderGoalColumns();
 }
 
@@ -2573,7 +2749,7 @@ function renderSchoolsSummary() {
   if (candidateSchools.length === 0) {
     els.schoolsSummary.textContent = name
       ? "まだ受験校が設定されていません。「設定」から登録してください。"
-      : "名前を入力して「表示」を押すと設定できます。";
+      : "生徒・授業を選択すると設定できます。";
     return;
   }
   const ranked = [1, 2, 3]
@@ -2587,14 +2763,17 @@ function renderSchoolsSummary() {
   els.schoolsSummary.textContent = parts.join("　|　") || "受験校が設定されています。";
 }
 
-async function loadCandidateSchools() {
-  const name = els.curriculumName.value.trim();
+async function loadCandidateSchools(context = captureStudentContext()) {
+  assertStudentContext(context);
+  const name = context.name;
   if (!name) {
     candidateSchools = [];
     renderSchoolsSummary();
     return;
   }
-  candidateSchools = await apiFetch(`/schools?name=${encodeURIComponent(name)}`);
+  const result = await apiFetch(`/schools?name=${encodeURIComponent(name)}`, {}, context);
+  assertStudentContext(context);
+  candidateSchools = result;
   renderSchoolsSummary();
 }
 
@@ -2784,6 +2963,7 @@ els.printScheduleBtn.addEventListener("click", () => triggerPrint());
 els.printCurriculumBtn.addEventListener("click", () => {
   const name = els.curriculumName.value.trim();
   const displayName = els.curriculumPrintNameInput.value.trim() || name;
+  const label = studentChoices.find((item) => item.name === name)?.label || name;
   const yearLabel = els.curriculumYearSelect.selectedOptions[0]?.textContent || "";
   const termLabel = els.curriculumTermSelect.selectedOptions[0]?.textContent || "";
   els.curriculumPrintHeader.textContent = [displayName, yearLabel, termLabel].filter(Boolean).join("　/　");
@@ -3072,7 +3252,12 @@ function applyNameFilter(token) {
 async function goToCurriculum(name, term) {
   const curriculumTabBtn = [...els.pageTabBtns].find((b) => b.dataset.pageTab === "curriculum");
   curriculumTabBtn?.click();
+  name = studentChoices.some((item) => item.name === name) ? name : curriculumSelectionName(name);
+  if (!studentChoices.some((item) => item.name === name && item.group === studentGroup)) {
+    studentGroup = studentChoices.find((item) => item.name === name)?.group || "";
+  }
   els.curriculumName.value = name;
+  renderCurriculumSearchSummary();
   if (term) {
     els.curriculumYearSelect.value = term.year_id;
     renderCurriculumTermOptions(term.year_id);
@@ -3080,16 +3265,7 @@ async function goToCurriculum(name, term) {
   }
   els.actionError.textContent = "";
   saveCurriculumState();
-  try {
-    await loadCurriculumEvents();
-    await loadGoals();
-    await loadCandidateSchools();
-    await loadStudentPref();
-    await loadStudentMaterials();
-    renderCurriculumSearchSummary();
-  } catch (err) {
-    showActionError(err);
-  }
+  await refreshStudentDetails();
 }
 
 els.eventList.addEventListener("click", handleTokenClick);

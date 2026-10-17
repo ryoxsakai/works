@@ -12,7 +12,7 @@
   <title>授業管理 | Works</title>
   <script src="/shared/theme-init.js?v=1"></script>
   <link rel="apple-touch-icon" href="../shared/logo.png" />
-  <link rel="stylesheet" href="../shared/styles.css?v=54" />
+  <link rel="stylesheet" href="../shared/styles.css?v=55" />
   <link rel="stylesheet" href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" />
   <link rel="stylesheet" href="/shared/header.css?v=1" />
   <script type="module" src="/shared/header.js?v=2"></script>
@@ -122,13 +122,13 @@
             <button type="button" id="print-curriculum" class="print-btn" aria-label="印刷"><i class="bx bx-printer"></i></button>
           </div>
           <div class="panel-header curriculum-search-bar">
-            <p id="curriculum-search-summary" class="hint">名前を検索してください。</p>
-            <button type="button" id="open-curriculum-search-modal" aria-label="検索"><i class="bx bx-search"></i></button>
+            <p id="curriculum-search-summary" class="hint">横にスライドして生徒・授業を選択してください。</p>
+            <button type="button" id="open-curriculum-search-modal" aria-label="生徒情報の表示・印刷設定"><i class="bx bx-cog"></i> 表示・印刷設定</button>
           </div>
-          <div class="curriculum-print-name-row">
-            <label for="curriculum-print-name">印刷名前</label>
-            <input id="curriculum-print-name" type="text" placeholder="未設定の場合は検索名をそのまま使用" />
-          </div>
+          <nav id="student-groups" class="student-slider" aria-label="教室・授業区分"></nav>
+          <div class="student-slider-heading"><span>生徒・授業を選択</span><small>名前順 · 横にスライド</small></div>
+          <div id="student-selector" class="student-slider" aria-label="生徒・授業の選択" aria-busy="false"></div>
+          <input id="curriculum-name" type="hidden" />
           <p id="curriculum-print-header" class="print-only"></p>
 
           <div class="memo-section collapsible-section">
@@ -345,21 +345,26 @@
 
   <dialog id="curriculum-search-modal" class="app-modal">
     <div class="modal-header">
-      <h2><i class="bx bx-search"></i> カリキュラムを検索</h2>
-      <button type="button" id="curriculum-search-modal-close" class="modal-close" aria-label="閉じる"><i class="bx bx-x"></i></button>
+      <h2><i class="bx bx-cog"></i> 表示・印刷設定</h2>
+      <button type="button" id="curriculum-search-modal-close" class="modal-close" aria-label="閉じる"><i class="bx bx-x"></i> 閉じる</button>
     </div>
     <form id="curriculum-filter-form" class="modal-tab-panel">
-      <p class="hint">名前・年度・学期を選ぶと、その名前を含む予定が期間内から自動で第1回・第2回…と並びます。</p>
-      <input id="curriculum-name" type="text" placeholder="生徒名など" required list="curriculum-name-list" autocomplete="off" />
-      <datalist id="curriculum-name-list"></datalist>
+      <p class="hint">選択中の生徒・授業の表示期間と印刷氏名を設定します。</p>
+      <label for="student-lesson-kind">代官山の授業区分</label>
+      <select id="student-lesson-kind"><option value="">予定名から自動判定</option><option value="individual">個別</option><option value="group">集団</option></select>
+      <p class="hint">区分の変更はこの端末に保存されます。生徒情報・授業記録は変更しません。</p>
+      <label for="curriculum-print-name">印刷氏名（変更すると自動保存）</label>
+      <input id="curriculum-print-name" type="text" placeholder="未設定の場合は選択名を使用" />
+      <label for="curriculum-year-select">年度</label>
       <select id="curriculum-year-select">
         <option value="">年度を選択</option>
       </select>
+      <label for="curriculum-term-select">学期</label>
       <select id="curriculum-term-select">
         <option value="">学期を選択</option>
       </select>
       <div class="edit-actions">
-        <button type="submit" class="btn-primary" aria-label="表示"><i class="bx bx-search"></i></button>
+        <button type="submit" class="btn-primary" aria-label="表示"><i class="bx bx-check"></i> 表示</button>
       </div>
     </form>
   </dialog>
@@ -453,6 +458,6 @@
     </div>
   </dialog>
 
-  <script type="module" src="./app.js?v=62"></script>
+  <script type="module" src="./app.js?v=65"></script>
 </body>
 </html>
