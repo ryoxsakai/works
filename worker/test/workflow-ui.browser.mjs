@@ -159,6 +159,23 @@ try {
   );
   await page.locator("[data-close=run-dialog]").click();
   await expect(page.locator("#active-runs .wf-run")).toHaveCount(1);
+  await page.locator("#workflow-search").fill("一致しない検索");
+  await expect(page.locator("#active-runs .wf-run")).toHaveCount(0);
+  await page.locator("#workflow-search").fill("");
+  await expect(page.locator("#active-runs .wf-run")).toHaveCount(1);
+  await page.locator('[data-active="review"]').click();
+  await expect(page.locator("#active-runs .wf-run")).toHaveCount(0);
+  await page.locator('[data-active="all"]').click();
+  await page.locator('[data-view="agenda"]').click();
+  await expect(page.locator("#calendar")).toHaveClass(/wf-agenda/);
+  await page.locator('[data-view="calendar"]').click();
+  assert.equal(
+    await page
+      .locator("#refresh")
+      .evaluate((el) => el.getBoundingClientRect().height),
+    40,
+  );
+
   await page.locator("#day").fill("2026-12-01");
   await page.locator("#day").dispatchEvent("change");
   await expect(page.locator("#active-runs .wf-run")).toHaveCount(1);

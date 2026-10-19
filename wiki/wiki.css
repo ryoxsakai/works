@@ -344,10 +344,7 @@ main { max-width: 1120px; padding: 24px 16px; }
 #workspace > .toolbar:first-child { padding: 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-elevated); box-shadow: var(--card-shadow); }
 main button, .wiki-dialog button { padding: 10px 14px; border-radius: 8px; font-weight: 500; transition: background-color .15s; }
 main button:disabled, .wiki-dialog button:disabled { opacity: .55; cursor: wait; }
-#workspace :is(#new, #edit, #editor button[type="submit"], #sign-in), #login #sign-in,
-#folder-dialog #folder-dialog-submit {
-  background: var(--fg); color: var(--bg-elevated); border-color: var(--fg); font-weight: 600;
-}
+
 #workspace > label { margin: 12px 4px 16px; font-size: .85rem; color: var(--wiki-muted); }
 #workspace > .toolbar + .layout { margin-top: 16px; }
 #folder-browser, #folder-sidebar, #detail, #editor, #login { border: 1px solid var(--border); box-shadow: var(--card-shadow); padding: 24px; }

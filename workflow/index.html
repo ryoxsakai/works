@@ -7,15 +7,16 @@
     <script src="/shared/theme-init.js?v=1"></script>
     <link rel="stylesheet" href="/shared/styles.css?v=56" />
     <link rel="stylesheet" href="/shared/header.css?v=2" />
-    <link rel="stylesheet" href="./workflow.css?v=2" />
+    <link rel="stylesheet" href="./workflow.css?v=3" />
+    <link rel="stylesheet" href="/shared/workspace-ui.css?v=1" />
     <script type="module" src="/shared/header.js?v=4"></script>
   </head>
-  <body>
+  <body class="works-workspace workflow-workspace">
     <header class="page-header works-header">
       <h1>
         <a class="works-home" href="/"
           ><span class="page-header-icon">W</span><span>Works</span></a
-        ><span class="wf-heading">ワークフロー</span>
+        ><span class="works-page-title">ワークフロー</span>
       </h1>
       <div class="works-header-actions">
         <button id="auth">ログイン</button>
@@ -23,13 +24,17 @@
     </header>
     <main>
       <p id="error" role="alert"></p>
+      <p id="workflow-feedback" role="status" aria-live="polite"></p>
       <div id="workspace" hidden>
         <div class="wf-title">
           <div>
             <p>自動実行 / ワークフロー</p>
             <h2>仕事の進み具合を確認する</h2>
           </div>
-          <button id="new">＋ ワークフローを作成</button>
+          <div class="workspace-actions">
+            <button id="refresh">更新</button
+            ><button id="new" class="ui-primary">＋ ワークフローを作成</button>
+          </div>
         </div>
         <section class="wf-focus" aria-labelledby="focus-heading">
           <div class="wf-title">
@@ -38,6 +43,27 @@
               <p>日付をまたいだ未完了の実行も、ここから開けます。</p>
             </div>
             <a href="/wiki/">Wikiでルールを確認 →</a>
+          </div>
+          <div class="workspace-search">
+            <label for="workflow-search">ワークフローを検索</label
+            ><input
+              id="workflow-search"
+              type="search"
+              placeholder="名前・目的で検索"
+            />
+            <div
+              id="active-filters"
+              class="ui-segmented"
+              aria-label="未完了の実行を絞り込み"
+            >
+              <button data-active="all" aria-pressed="true">すべて</button
+              ><button data-active="review" aria-pressed="false">
+                確認待ち</button
+              ><button data-active="running" aria-pressed="false">
+                進行中
+              </button>
+            </div>
+            <p id="active-count" class="ui-caption" role="status"></p>
           </div>
           <div id="active-runs" class="wf-active-runs"></div>
         </section>
@@ -53,13 +79,22 @@
               </select></label
             ><button id="save-interval">希望を保存</button
             ><button id="global-stop">全体停止</button
-            ><button id="refresh">更新</button
             ><small
               >巡回は外部の定期実行で設定します。希望の保存だけでは時刻表は変更されません。</small
             >
           </section>
         </details>
-        <h2 class="wf-section-title">実行カレンダー</h2>
+        <div class="workspace-section-heading">
+          <h2 class="wf-section-title">実行予定と履歴</h2>
+          <div
+            id="calendar-view"
+            class="ui-segmented"
+            aria-label="実行予定の表示"
+          >
+            <button data-view="calendar" aria-pressed="true">カレンダー</button
+            ><button data-view="agenda" aria-pressed="false">一覧</button>
+          </div>
+        </div>
         <p class="wf-note">
           件数は取得済みの Run が対象です。未来の予定は巡回時に Run
           へ変わります。同一定義に未完了の Run がある間は次回を作成しません。
@@ -204,6 +239,6 @@
         <div id="run-history"></div>
       </details>
     </dialog>
-    <script type="module" src="./app.js?v=3"></script>
+    <script type="module" src="./app.js?v=4"></script>
   </body>
 </html>

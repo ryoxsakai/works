@@ -6,11 +6,12 @@
     <title>Wiki | Works</title>
     <script src="/shared/theme-init.js?v=1"></script>
     <link rel="stylesheet" href="/shared/styles.css?v=56" />
-    <link rel="stylesheet" href="/wiki/wiki.css?v=5" />
+    <link rel="stylesheet" href="/wiki/wiki.css?v=6" />
     <link rel="stylesheet" href="/shared/header.css?v=2" />
+    <link rel="stylesheet" href="/shared/workspace-ui.css?v=1" />
     <script type="module" src="/shared/header.js?v=4"></script>
   </head>
-  <body>
+  <body class="works-workspace wiki-workspace">
     <header class="page-header works-header">
       <h1>
         <a class="works-home" href="/" aria-label="Works ホーム"
@@ -63,7 +64,7 @@
             placeholder="本文・タイトル・タグ・別名を検索"
             aria-label="Wiki検索"
           /><button id="find">検索</button
-          ><button id="new">＋ 新規ページ</button>
+          ><button id="new" class="ui-primary">＋ 新規ページ</button>
         </div>
         <p id="page-count" class="wiki-help" role="status"></p>
         <label><input id="archives" type="checkbox" /> アーカイブも表示</label>
@@ -122,7 +123,9 @@
               </div>
               <div class="toolbar">
                 <h2 id="title"></h2>
-                <button id="edit">編集</button
+                <button id="focus-reading" type="button" aria-pressed="false">
+                  集中表示</button
+                ><button id="edit" class="ui-primary">編集</button
                 ><button id="archive">アーカイブ</button
                 ><button data-export="markdown">Markdown</button
                 ><button data-export="json">JSON</button>
@@ -200,8 +203,9 @@
           <p>原本を確認し、種別・IDまたはURL・箇所・確認日を入力します。</p>
           <div id="source-fields"></div>
           <button id="add-source" type="button">＋ 出典</button>
-          <div class="toolbar">
-            <button type="submit">本文として保存</button
+          <div class="toolbar editor-actions" id="editor-actions">
+            <span id="save-state" role="status">保存済み</span
+            ><button type="submit" class="ui-primary">本文として保存</button
             ><button id="propose" type="button">改稿案として保存</button
             ><button id="cancel" type="button">キャンセル</button>
           </div>
@@ -239,7 +243,7 @@
         </div>
       </form>
     </dialog>
-    <script type="module" src="/wiki/app.js?v=8"></script>
+    <script type="module" src="/wiki/app.js?v=9"></script>
     <script type="module" src="/shared/theme.js?v=6"></script>
   </body>
 </html>
