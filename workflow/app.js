@@ -103,6 +103,23 @@ function shift(n) {
 }
 function render() {
   $("#day").value = selected;
+  const active = state.runs.filter(
+    (r) => !["completed", "cancelled"].includes(r.status),
+  );
+  active.sort(
+    (a, b) => (a.status === "review" ? 0 : 1) - (b.status === "review" ? 0 : 1),
+  );
+  $("#active-runs").replaceChildren(
+    ...(active.length
+      ? active.map((r) => runCard(r))
+      : [
+          node(
+            "p",
+            "未完了の実行はありません。下のワークフローから開始できます。",
+            "wf-empty",
+          ),
+        ]),
+  );
   const cfg = state.settings;
   $("#patrol-status").replaceChildren(
     node("strong", cfg.stopped ? "全体停止中" : "巡回状態"),
@@ -175,9 +192,12 @@ function render() {
             ["unfinished", "queued"].includes(filter),
         )
         .flatMap((d) => {
-          const period = { once: 0, hourly: d.data.interval_hours * 3600000, daily: 86400000, weekly: 604800000 }[
-            d.data.repeat
-          ];
+          const period = {
+            once: 0,
+            hourly: d.data.interval_hours * 3600000,
+            daily: 86400000,
+            weekly: 604800000,
+          }[d.data.repeat];
           let at = d.next_due;
           if (period) {
             const gap =
@@ -188,7 +208,11 @@ function render() {
           }
           const slots = [{ d, at }];
           if (d.data.repeat === "hourly") {
-            for (let next = Date.parse(at) + period; dateJP(next) === day && slots.length < 24; next += period)
+            for (
+              let next = Date.parse(at) + period;
+              dateJP(next) === day && slots.length < 24;
+              next += period
+            )
               slots.push({ d, at: new Date(next).toISOString() });
           }
           return slots;
@@ -208,6 +232,7 @@ function render() {
       for (const r of runs) {
         const b = button(r.data.definition.title, () => openRun(r.id));
         b.className = "wf-run";
+        b.dataset.status = r.status;
         b.append(
           node(
             "small",
@@ -309,6 +334,33 @@ function render() {
       return el;
     }),
   );
+}
+function runCard(r) {
+  const b = button(r.data.definition.title, () => openRun(r.id));
+  b.className = "wf-run wf-active-card";
+  b.dataset.status = r.status;
+  const done = r.data.tasks.filter((t) => t.status === "completed").length;
+  const status = node("span", states[r.status] || r.status, "wf-status");
+  b.prepend(status);
+  const progress = node("progress");
+  progress.max = Math.max(1, r.data.tasks.length);
+  progress.value = done;
+  progress.setAttribute(
+    "aria-label",
+    `完了 ${done} / ${r.data.tasks.length}工程`,
+  );
+  b.append(
+    node(
+      "small",
+      `${done} / ${r.data.tasks.length}工程完了 · 開始 ${stamp(r.data.created_at || r.scheduled_for)}`,
+    ),
+    progress,
+    node(
+      "small",
+      r.data.stop_reason || r.data.next_work || "詳細を開いて次の作業を確認",
+    ),
+  );
+  return b;
 }
 function taskEditor(
   t = { title: "", completion: "", assignee: "dot", gate: true },
@@ -489,12 +541,16 @@ function renderRun(detail) {
   );
 }
 function updateHoursInput() {
-  const f = $("#definition-form"), hourly = f.elements.repeat.value === "hourly";
+  const f = $("#definition-form"),
+    hourly = f.elements.repeat.value === "hourly";
   $("#hours-label").hidden = !hourly;
   f.elements.interval_hours.disabled = !hourly;
   f.elements.interval_hours.required = hourly;
 }
-$("#definition-form").elements.repeat.addEventListener("change", updateHoursInput);
+$("#definition-form").elements.repeat.addEventListener(
+  "change",
+  updateHoursInput,
+);
 $("#definition-form").addEventListener("submit", (event) => {
   event.preventDefault();
   guard(async () => {
@@ -509,7 +565,8 @@ $("#definition-form").addEventListener("submit", (event) => {
       "repeat",
     ])
       content[k] = f.elements[k].value;
-    if (content.repeat === "hourly") content.interval_hours = Number(f.elements.interval_hours.value);
+    if (content.repeat === "hourly")
+      content.interval_hours = Number(f.elements.interval_hours.value);
     content.priority = Number(f.elements.priority.value);
     content.start = new Date(
       f.elements.start.value + ":00+09:00",
@@ -563,6 +620,24 @@ $("#save-interval").onclick = () =>
   });
 $("#global-stop").onclick = () =>
   guard(async () => {
+    const active = state.runs.filter(
+      (r) => !["completed", "cancelled"].includes(r.status),
+    );
+    active.sort(
+      (a, b) =>
+        (a.status === "review" ? 0 : 1) - (b.status === "review" ? 0 : 1),
+    );
+    $("#active-runs").replaceChildren(
+      ...(active.length
+        ? active.map((r) => runCard(r))
+        : [
+            node(
+              "p",
+              "未完了の実行はありません。下のワークフローから開始できます。",
+              "wf-empty",
+            ),
+          ]),
+    );
     const cfg = state.settings;
     if (
       !confirm(

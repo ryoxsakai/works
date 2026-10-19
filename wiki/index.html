@@ -6,7 +6,7 @@
     <title>Wiki | Works</title>
     <script src="/shared/theme-init.js?v=1"></script>
     <link rel="stylesheet" href="/shared/styles.css?v=56" />
-    <link rel="stylesheet" href="/wiki/wiki.css?v=4" />
+    <link rel="stylesheet" href="/wiki/wiki.css?v=5" />
     <link rel="stylesheet" href="/shared/header.css?v=2" />
     <script type="module" src="/shared/header.js?v=4"></script>
   </head>
@@ -44,7 +44,11 @@
       </div>
     </header>
     <main>
-      <div class="wiki-heading"><p class="eyebrow">WIKI</p><h2>知識を整理する</h2><p>フォルダで探す、ページにまとめる、出典を確かめる。</p></div>
+      <div class="wiki-heading">
+        <p class="eyebrow">WIKI</p>
+        <h2>知識を整理する</h2>
+        <p>フォルダで探す、ページにまとめる、出典を確かめる。</p>
+      </div>
       <p id="message" role="status" aria-live="polite"></p>
       <section id="login" hidden>
         <h2>Wiki</h2>
@@ -52,7 +56,7 @@
         <button id="sign-in">Worksにログイン</button>
       </section>
       <section id="workspace" hidden>
-        <div class="toolbar">
+        <div class="toolbar wiki-searchbar">
           <input
             id="search"
             type="search"
@@ -61,6 +65,7 @@
           /><button id="find">検索</button
           ><button id="new">＋ 新規ページ</button>
         </div>
+        <p id="page-count" class="wiki-help" role="status"></p>
         <label><input id="archives" type="checkbox" /> アーカイブも表示</label>
         <div class="toolbar">
           <div class="view-toggle" aria-label="表示方法">
@@ -123,12 +128,16 @@
                 ><button data-export="json">JSON</button>
               </div>
               <p id="meta"></p>
+              <details id="page-outline" class="wiki-outline" hidden>
+                <summary>このページの目次</summary>
+                <nav id="page-toc" aria-label="ページ内の見出し"></nav>
+              </details>
               <article id="body"></article>
               <h3>出典</h3>
               <div id="sources"></div>
               <h3>関連ページ</h3>
               <div id="links"></div>
-              <h3>改稿案</h3>
+              <h3 id="proposal-heading">改稿案</h3>
               <div id="proposals"></div>
               <h3>履歴・比較・復元</h3>
               <div id="history"></div>
@@ -199,7 +208,11 @@
         </form>
       </section>
     </main>
-    <dialog id="folder-dialog" class="app-modal wiki-dialog" aria-labelledby="folder-dialog-title">
+    <dialog
+      id="folder-dialog"
+      class="app-modal wiki-dialog"
+      aria-labelledby="folder-dialog-title"
+    >
       <div class="modal-header">
         <h2 id="folder-dialog-title"></h2>
         <button
@@ -226,7 +239,7 @@
         </div>
       </form>
     </dialog>
-    <script type="module" src="/wiki/app.js?v=7"></script>
+    <script type="module" src="/wiki/app.js?v=8"></script>
     <script type="module" src="/shared/theme.js?v=6"></script>
   </body>
 </html>

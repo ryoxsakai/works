@@ -278,3 +278,139 @@ body {
   margin-top: 8px;
   font-size: 11px;
 }
+
+/* Overview keeps work visible across calendar dates. */
+.wf-focus {
+  margin: 12px 0 24px;
+}
+.wf-focus h2,
+.wf-section-title {
+  font-size: 18px;
+  margin: 0 0 8px;
+}
+.wf-focus .wf-title {
+  margin-bottom: 16px;
+}
+.wf-focus a {
+  color: var(--fg);
+  text-underline-offset: 4px;
+  font-size: 13px;
+}
+.wf-active-runs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: 12px;
+}
+#workspace .wf-active-card {
+  margin: 0;
+  padding: 18px;
+  border-left: 4px solid var(--accent);
+  line-height: 1.7;
+}
+#workspace .wf-run[data-status="review"] {
+  border-left: 4px solid #b7791f;
+}
+#workspace .wf-run[data-status="paused"],
+#workspace .wf-run[data-status="waiting"] {
+  border-left: 4px solid var(--muted);
+}
+.wf-status {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.wf-active-card progress {
+  display: block;
+  width: 100%;
+  height: 6px;
+  margin: 12px 0;
+  accent-color: var(--accent);
+}
+.wf-empty {
+  padding: 20px;
+  margin: 0;
+  color: var(--muted);
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+}
+.wf-settings {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin: 20px 0 28px;
+  background: var(--bg-elevated);
+}
+.wf-settings > summary,
+.wf-definitions > summary {
+  padding: 14px 16px;
+  cursor: pointer;
+  font-weight: 600;
+}
+.wf-settings .wf-patrol {
+  margin: 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+}
+.wf-definitions {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-elevated);
+}
+#definitions {
+  padding: 0 20px 12px;
+}
+.wf-definition:last-child {
+  border-bottom: 0;
+}
+.wf-definition > p {
+  line-height: 1.8;
+  max-width: 90ch;
+}
+.wf-definition h3 {
+  font-size: 16px;
+}
+#workspace :is(button, input, select, a):focus-visible,
+.wf-dialog :is(button, input, select, textarea, a):focus-visible {
+  outline: 2px solid var(--fg);
+  outline-offset: 3px;
+}
+.wf-dialog {
+  overscroll-behavior: contain;
+}
+@media (min-width: 761px) and (max-width: 1100px) {
+  .wf-week {
+    overflow-x: auto;
+    grid-template-columns: repeat(7, minmax(160px, 1fr));
+    padding-bottom: 12px;
+  }
+}
+@media (max-width: 760px) {
+  #workspace button {
+    min-height: 44px;
+  }
+  .wf-title h2 {
+    font-size: 22px;
+  }
+  .wf-filters {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding: 4px 2px 12px;
+  }
+  .wf-filters button {
+    flex-shrink: 0;
+  }
+  .wf-calendar-bar {
+    gap: 8px;
+  }
+  .wf-calendar-bar input {
+    min-width: 0;
+    flex: 1;
+  }
+  #definitions {
+    padding: 0 14px 12px;
+  }
+}
+body {
+  background: var(--bg);
+}
