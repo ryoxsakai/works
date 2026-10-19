@@ -14,7 +14,8 @@
     "test:wiki:browser": "node test/wiki-ui.browser.mjs",
     "test:next-lesson:browser": "node test/next-lesson-plan.browser.mjs",
     "test:header:browser": "node test/header-theme.browser.mjs",
-    "test:category:browser": "node test/category-ui.browser.mjs"
+    "test:category:browser": "node test/category-ui.browser.mjs",
+    "test:workflow:browser": "node test/workflow-ui.browser.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",

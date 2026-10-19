@@ -16,7 +16,7 @@
   <link rel="stylesheet" href="/home.css?v=2" />
   <link rel="stylesheet" href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" />
   <link rel="stylesheet" href="/shared/header.css?v=2" />
-  <script type="module" src="/shared/header.js?v=3"></script>
+  <script type="module" src="/shared/header.js?v=4"></script>
 </head>
 <body>
   <header class="page-header works-header">
@@ -43,7 +43,8 @@
     </div>
     <nav class="category-nav" aria-label="メニューのカテゴリ">
       <a href="#teaching">授業・教材 <span>3</span></a>
-      <a href="#operations">業務 <span>3</span></a>
+      <a href="#operations">業務 <span>2</span></a>
+      <a href="#automation">自動実行 <span>2</span></a>
       <a href="#creation">制作 <span>2</span></a>
     </nav>
     <section class="module-section" id="teaching" aria-labelledby="teaching-title">
@@ -57,9 +58,15 @@
     <section class="module-section" id="operations" aria-labelledby="operations-title">
       <h2 id="operations-title" class="category-title"><i class="bx bx-list-check" aria-hidden="true"></i> 業務</h2>
       <ul class="module-grid">
-        <li><a class="module-card" href="/wiki/"><h3><i class="bx bx-library" aria-hidden="true"></i> Wiki</h3><p>知識と出典、改稿案、履歴を管理します</p></a></li>
         <li><a class="module-card" href="/memo/"><h3><i class="bx bx-note" aria-hidden="true"></i> メモ</h3><p>本文、補足、タグを整理して記録します</p></a></li>
         <li><a class="module-card" href="/todo/"><h3><i class="bx bx-list-check" aria-hidden="true"></i> ToDo管理</h3><p>タスクの優先度、締切、進捗を管理します</p></a></li>
+      </ul>
+    </section>
+    <section class="module-section" id="automation" aria-labelledby="automation-title">
+      <h2 id="automation-title" class="category-title"><i class="bx bx-git-branch" aria-hidden="true"></i> 自動実行</h2>
+      <ul class="module-grid">
+        <li><a class="module-card" href="/workflow/"><h3><i class="bx bx-git-branch" aria-hidden="true"></i> ワークフロー</h3><p>許可した仕事を順番に進め、成果物と履歴を確認します</p></a></li>
+        <li><a class="module-card" href="/wiki/"><h3><i class="bx bx-library" aria-hidden="true"></i> Wiki</h3><p>知識と出典、改稿案、履歴を管理します</p></a></li>
       </ul>
     </section>
     <section class="module-section" id="creation" aria-labelledby="creation-title">
@@ -85,6 +92,6 @@
     </div>
   </dialog>
 
-  <script type="module" src="/home.js?v=7"></script>
+  <script type="module" src="/home.js?v=8"></script>
 </body>
 </html>
