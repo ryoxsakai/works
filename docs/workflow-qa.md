@@ -25,3 +25,11 @@
 発見・修正: 既存テストの新 import 解決と Wiki の新カテゴリへの期待値を更新。新画面のログイン戻り先を許可。非同期で Run を再取得中に閉じたダイアログが再表示される競合を防ぎ、ブラウザテストは本文全体の「未着手」ではなく Run 自身の状態を検証するよう修正。最終ブラウザ再実行成功。
 
 未確認: Cloudflare 本番マイグレーション・Worker 実配信、GitHub Pages の配信設定／実配信、公開 MCP の親側ツール反映・実呼び出し、実 automation の稼働、実外部サービスへの送信。Cloudflare 未認証のため公開段階は保留。設定手順と制限は `workflow-management.md` を参照。
+
+
+## 追加の安全修正
+
+- `external_result` と `reconcile` の両方で、外部操作の completed → unknown／not_started を409で拒否。拒否後に版番号や保存内容が変わらないこと、待機・本人再開後にも同じ完了済み参照を再送できないことを検証。
+- cancel → stop_all → reconcile の completed／not_started の両経路で requested_stop=cancelled を維持し、Run が cancelled に確定することを検証。
+- 追加3本は修正前にすべて失敗。修正後のワークフローテストは8/8成功、Worker の dry-run ビルドも成功。追加マイグレーションは不要。
+- 親からの現状報告では初版の Worker と追加 SQL だけが本番に入り、静的画面・定期実行は未公開。この安全修正のマージ・配信はクラウド側では実施せず、Mac 再接続後の担当へ引き継ぐ。

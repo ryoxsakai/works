@@ -294,7 +294,7 @@ export async function workflowWrite(env, a, browser = false) {
       ...(action === "stop_all"
         ? [
             env.DB.prepare(
-              `UPDATE wf_runs SET status=CASE WHEN json_extract(data,'$.external.state') IN ('in_flight','unknown') THEN 'waiting' ELSE 'paused' END,data=json_set(data,'$.stop_reason','全体停止。外部操作は取り消していません','$.requested_stop','paused'),generation=generation+1,revision=revision+1,lease_token=NULL,lease_until=NULL WHERE owner=? AND status IN ('queued','running','waiting','review') AND changes()=1`,
+              `UPDATE wf_runs SET status=CASE WHEN json_extract(data,'$.external.state') IN ('in_flight','unknown') THEN 'waiting' WHEN json_extract(data,'$.requested_stop')='cancelled' THEN 'cancelled' ELSE 'paused' END,data=json_set(data,'$.stop_reason','全体停止。外部操作は取り消していません','$.requested_stop',CASE WHEN json_extract(data,'$.requested_stop')='cancelled' THEN 'cancelled' ELSE 'paused' END),generation=generation+1,revision=revision+1,lease_token=NULL,lease_until=NULL WHERE owner=? AND status IN ('queued','running','waiting','review') AND changes()=1`,
             ).bind(owner(env)),
           ]
         : []),
@@ -415,6 +415,11 @@ async function advance(env, r, a, confirmed = false) {
     confirmed ? { fence: true } : { fenced: a },
   );
 }
+// Completion is terminal: a late observation must never reopen a sent operation.
+function guardExternalOutcome(external, outcome) {
+  if (external.state === "completed" && outcome !== "completed")
+    fail(409, "completed external operation cannot regress");
+}
 export async function workflowExecute(env, a) {
   await ready(env);
   if (
@@ -505,6 +510,7 @@ export async function workflowExecute(env, a) {
       !["completed", "not_started", "unknown"].includes(a.outcome)
     )
       fail(409, "matching unresolved external reference required");
+    guardExternalOutcome(r.data.external, a.outcome);
     const data = structuredClone(r.data);
     data.external.state = a.outcome;
     data.external.observation = s(a.result, 4000, true);
@@ -557,6 +563,7 @@ export async function workflowExecute(env, a) {
       !["completed", "unknown"].includes(a.outcome)
     )
       fail(409, "matching external operation required");
+    guardExternalOutcome(data.external, a.outcome);
     data.external.state = a.outcome;
     data.external.observation = s(a.result, 4000, true);
     data.external.evidence = (a.evidence || []).map(link);

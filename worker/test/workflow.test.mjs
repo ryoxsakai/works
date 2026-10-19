@@ -665,3 +665,166 @@ test("execution HTTP API requires MCP auth; safe retry only after proved non-dis
   });
   assert.equal(r.status, "completed");
 });
+
+test("completed external operations cannot regress or be dispatched again", async (t) => {
+  const { env, create } = await fixture(t);
+  await create({ ...content, tasks: [{ ...content.tasks[0], gate: false }] });
+  await exec(env, { action: "patrol" });
+  let r = (await workflowRead(env)).runs[0];
+  let lease = await exec(env, {
+    action: "claim",
+    run_id: r.id,
+    revision: r.revision,
+  });
+  const fenced = () => ({
+    run_id: r.id,
+    revision: r.revision,
+    generation: lease.generation,
+    token: lease.token,
+  });
+  r = lease;
+  r = await exec(env, {
+    action: "external_begin",
+    ...fenced(),
+    external_ref: "completed-job",
+    result: "synthetic dispatch",
+  });
+  r = await exec(env, {
+    action: "external_result",
+    ...fenced(),
+    external_ref: "completed-job",
+    outcome: "completed",
+    result: "verified external completion",
+    evidence,
+  });
+  const completed = structuredClone(r);
+  for (const outcome of ["unknown", "not_started"]) {
+    await assert.rejects(
+      () =>
+        exec(env, {
+          action: "external_result",
+          ...fenced(),
+          external_ref: "completed-job",
+          outcome,
+          result: "late conflicting observation",
+          evidence,
+        }),
+      { status: 409 },
+    );
+    assert.deepEqual(
+      (await workflowRead(env, { run_id: r.id })).run,
+      completed,
+    );
+  }
+  r = await exec(env, {
+    action: "wait",
+    ...fenced(),
+    reason: "await owner review after external completion",
+  });
+  const waiting = structuredClone(r);
+  for (const outcome of ["unknown", "not_started"]) {
+    await assert.rejects(
+      () =>
+        exec(env, {
+          action: "reconcile",
+          run_id: r.id,
+          revision: r.revision,
+          external_ref: "completed-job",
+          outcome,
+          result: "late conflicting observation",
+          evidence,
+        }),
+      { status: 409 },
+    );
+    assert.deepEqual((await workflowRead(env, { run_id: r.id })).run, waiting);
+  }
+  r = await exec(env, {
+    action: "reconcile",
+    run_id: r.id,
+    revision: r.revision,
+    external_ref: "completed-job",
+    outcome: "completed",
+    result: "same completed job verified again",
+    evidence,
+  });
+  r = await write(
+    env,
+    { action: "resume", run_id: r.id, revision: r.revision },
+    true,
+  );
+  lease = await exec(env, {
+    action: "claim",
+    run_id: r.id,
+    revision: r.revision,
+  });
+  r = lease;
+  await assert.rejects(
+    () =>
+      exec(env, {
+        action: "external_begin",
+        ...fenced(),
+        external_ref: "completed-job",
+        result: "must never resend completed operation",
+      }),
+    { status: 409 },
+  );
+  assert.equal(
+    (await workflowRead(env, { run_id: r.id })).run.data.external.state,
+    "completed",
+  );
+});
+
+for (const outcome of ["completed", "not_started"]) {
+  test(`global stop preserves pending cancellation until external ${outcome} is reconciled`, async (t) => {
+    const { env, create } = await fixture(t);
+    await create({ ...content, tasks: [{ ...content.tasks[0], gate: false }] });
+    await exec(env, { action: "patrol" });
+    let r = (await workflowRead(env)).runs[0];
+    const lease = await exec(env, {
+      action: "claim",
+      run_id: r.id,
+      revision: r.revision,
+    });
+    r = await exec(env, {
+      action: "external_begin",
+      run_id: r.id,
+      revision: lease.revision,
+      generation: lease.generation,
+      token: lease.token,
+      external_ref: "cancelled-job",
+      result: "synthetic operation",
+    });
+    r = await write(
+      env,
+      { action: "cancel", run_id: r.id, revision: r.revision },
+      true,
+    );
+    assert.equal(r.status, "waiting");
+    assert.equal(r.data.requested_stop, "cancelled");
+    const cfg = (await workflowRead(env)).settings;
+    await write(env, { action: "stop_all", revision: cfg.revision }, true);
+    r = (await workflowRead(env, { run_id: r.id })).run;
+    assert.equal(r.status, "waiting");
+    assert.equal(r.data.requested_stop, "cancelled");
+    r = await exec(env, {
+      action: "reconcile",
+      run_id: r.id,
+      revision: r.revision,
+      external_ref: "cancelled-job",
+      outcome,
+      result: "verified same external operation",
+      evidence,
+    });
+    assert.equal(r.status, "cancelled");
+    assert.equal(r.data.external.state, outcome);
+    await assert.rejects(
+      () =>
+        write(
+          env,
+          { action: "resume", run_id: r.id, revision: r.revision },
+          true,
+        ),
+      { status: 409 },
+    );
+  });
+}
