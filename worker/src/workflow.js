@@ -29,7 +29,8 @@ const due = (x) => {
   if (!Number.isFinite(t)) fail(400, "valid date/time required");
   return new Date(t).toISOString();
 };
-const periods = { once: 0, daily: 86400000, weekly: 604800000 };
+const periods = { once: 0, hourly: 3600000, daily: 86400000, weekly: 604800000 };
+const periodOf = (d) => periods[d.repeat] * (d.repeat === "hourly" ? d.interval_hours : 1);
 function link(x) {
   const u = new URL(s(x, 2000, true));
   if (!["https:", "http:"].includes(u.protocol) || u.username || u.password)
@@ -50,6 +51,8 @@ export function validateWorkflow(d) {
     !Object.hasOwn(periods, d.repeat)
   )
     fail(400, "invalid kind/repeat");
+  if (d.repeat === "hourly" && (!Number.isSafeInteger(d.interval_hours) || d.interval_hours < 1 || d.interval_hours > 8760))
+    fail(400, "interval_hours must be an integer from 1 to 8760");
   if (![1, 2, 3].includes(d.priority)) fail(400, "invalid priority");
   return {
     title: s(d.title, 200, true),
@@ -61,6 +64,7 @@ export function validateWorkflow(d) {
     deadline: d.deadline ? due(d.deadline) : null,
     start: due(d.start),
     repeat: d.repeat,
+    ...(d.repeat === "hourly" ? { interval_hours: d.interval_hours } : {}),
     tasks: d.tasks.map((t) => {
       if (!["self", "dot"].includes(t.assignee) || typeof t.gate !== "boolean")
         fail(400, "invalid task");
@@ -130,7 +134,7 @@ async function saveRun(env, r, data, status, extra = {}) {
   if (!row) fail(409, "run changed or lease expired; read current state");
   return publicRun(decode(row));
 }
-async function instantiate(env, d, scheduled) {
+async function instantiate(env, d, scheduled, scheduledOnly = false) {
   const snapshot = {
     created_at: iso(),
     definition: d.data,
@@ -147,7 +151,7 @@ async function instantiate(env, d, scheduled) {
     requested_stop: null,
   };
   await env.DB.prepare(
-    `INSERT OR IGNORE INTO wf_runs(id,owner,definition_id,definition_revision,scheduled_for,data) SELECT ?,owner,id,revision,?,? FROM wf_definitions WHERE id=? AND owner=? AND revision=? AND enabled=1 AND NOT EXISTS(SELECT 1 FROM wf_settings WHERE owner=? AND stopped=1)`,
+    `INSERT OR IGNORE INTO wf_runs(id,owner,definition_id,definition_revision,scheduled_for,data) SELECT ?,owner,id,revision,?,? FROM wf_definitions WHERE id=? AND owner=? AND revision=? AND enabled=1 AND NOT EXISTS(SELECT 1 FROM wf_settings WHERE owner=? AND stopped=1) AND (?=0 OR NOT EXISTS(SELECT 1 FROM wf_runs WHERE definition_id=wf_definitions.id AND owner=wf_definitions.owner AND status NOT IN ('completed','cancelled')))`,
   )
     .bind(
       crypto.randomUUID(),
@@ -157,6 +161,7 @@ async function instantiate(env, d, scheduled) {
       owner(env),
       d.revision,
       owner(env),
+      scheduledOnly ? 1 : 0,
     )
     .run();
   const created = decode(
@@ -166,6 +171,7 @@ async function instantiate(env, d, scheduled) {
       .bind(d.id, scheduled, owner(env))
       .first(),
   );
+  if (!created && scheduledOnly) return null;
   if (!created) fail(409, "definition changed or execution disabled");
   return publicRun(created);
 }
@@ -458,19 +464,20 @@ export async function workflowExecute(env, a) {
     if (!(await settings(env)).stopped) {
       const defs = (
         await env.DB.prepare(
-          "SELECT * FROM wf_definitions WHERE owner=? AND enabled=1 AND next_due<=? ORDER BY next_due LIMIT 20",
+          "SELECT * FROM wf_definitions WHERE owner=? AND enabled=1 AND next_due<=? AND NOT EXISTS(SELECT 1 FROM wf_runs WHERE definition_id=wf_definitions.id AND owner=wf_definitions.owner AND status NOT IN ('completed','cancelled')) ORDER BY next_due LIMIT 20",
         )
           .bind(owner(env), iso())
           .all()
       ).results.map(decode);
       for (const d of defs) {
-        await instantiate(env, d, d.next_due);
+        if (!(await instantiate(env, d, d.next_due, true))) continue;
         // Only move a due slot after its unique Run exists. Concurrent patrols use CAS.
-        const next = periods[d.data.repeat]
-          ? new Date(
-              Date.parse(d.next_due) + periods[d.data.repeat],
-            ).toISOString()
-          : null;
+        const period = periodOf(d.data);
+        // Hourly schedules coalesce missed slots into one Run, anchored to start.
+        const steps = d.data.repeat === "hourly"
+          ? Math.max(1, Math.floor((Date.now() - Date.parse(d.next_due)) / period) + 1)
+          : 1;
+        const next = period ? new Date(Date.parse(d.next_due) + steps * period).toISOString() : null;
         await env.DB.prepare(
           "UPDATE wf_definitions SET next_due=?,revision=revision+1,updated_at=? WHERE id=? AND owner=? AND revision=? AND EXISTS(SELECT 1 FROM wf_runs WHERE definition_id=? AND scheduled_for=?)",
         )
@@ -655,7 +662,8 @@ export const workflowTools = [
           priority: { enum: [1, 2, 3], description: "1=高、2=中、3=低" },
           start: { type: "string", description: "ISO 8601、タイムゾーン必須" },
           deadline: { type: ["string", "null"] },
-          repeat: { enum: ["once", "daily", "weekly"] },
+          repeat: { enum: ["once", "hourly", "daily", "weekly"] },
+          interval_hours: { type: "integer", minimum: 1, maximum: 8760, description: "repeat=hourly のとき必須。開始日時からの整数時間間隔" },
           tasks: {
             type: "array",
             minItems: 1,

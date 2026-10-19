@@ -110,6 +110,15 @@ try {
   await f.locator("[name=purpose]").fill("合成データだけで動作確認");
   await f.locator("[name=completion]").fill("成果物を本人が確認");
   await f.locator("[name=permissions]").fill("example.test の読み取りのみ");
+  await f.locator("[name=repeat]").selectOption("hourly");
+  const hoursInput = f.locator("[name=interval_hours]");
+  await expect(hoursInput).toBeVisible();
+  for (const value of ["", "0", "-1", "1.5", "8761"]) {
+    await hoursInput.fill(value);
+    assert.equal(await hoursInput.evaluate(el => el.checkValidity()), false);
+  }
+  await hoursInput.fill("3");
+  await f.locator("[name=start]").fill("2026-10-20T09:15");
   await f.locator("[name=task-title]").fill("根拠を整理");
   await f.locator("[name=task-completion]").fill("資料URLを確認");
   await f.getByRole("button", { name: "下書きを保存" }).click();
@@ -117,11 +126,20 @@ try {
   await expect(page.locator("#definitions")).toContainText("合成フロー <img");
   assert.equal(await page.locator("#definitions img").count(), 0);
   await page.getByRole("button", { name: "編集", exact: true }).click();
+  await expect(hoursInput).toHaveValue("3");
+  await expect(f.locator("[name=start]")).toHaveValue("2026-10-20T09:15");
   await f.locator("[name=title]").fill("週次レポートの作成（合成データ）");
   await f.getByRole("button", { name: "下書きを保存" }).click();
   await expect(page.locator("#editor")).not.toBeVisible();
   await page.getByRole("button", { name: "内容を確認・実行を許可" }).click();
   await expect(page.locator("#definitions")).toContainText("実行許可済み");
+  await expect(page.locator("#definitions")).toContainText("3時間ごと");
+  await page.locator("#day").fill("2026-10-21");
+  await page.locator("#day").dispatchEvent("change");
+  await expect(page.locator(".wf-day").filter({has: page.getByRole("heading", {name:"10月21日(水)"})}).locator(".wf-upcoming")).toHaveCount(8);
+  const stored = await env.DB.prepare("SELECT data FROM wf_definitions LIMIT 1").first();
+  assert.equal(JSON.parse(stored.data).start, "2026-10-20T00:15:00.000Z");
+  await page.locator("#today").click();
   await page.getByRole("button", { name: "手動実行", exact: true }).click();
   await expect(page.locator("#run-dialog")).toBeVisible();
   await page.getByRole("button", { name: "一時停止", exact: true }).click();

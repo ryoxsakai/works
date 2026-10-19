@@ -5,6 +5,8 @@ import { readFile } from "node:fs/promises";
 import { createHmac } from "node:crypto";
 import worker from "../src/index.js";
 import {
+  validateWorkflow,
+  workflowTools,
   workflowRead,
   workflowWrite as write,
   workflowExecute as exec,
@@ -828,3 +830,70 @@ for (const outcome of ["completed", "not_started"]) {
     );
   });
 }
+
+test("hour intervals validate integer bounds without changing legacy definitions", () => {
+  const schema = workflowTools.find(t => t.name === "draft_workflow").inputSchema.properties.content.properties;
+  assert.deepEqual(schema.repeat.enum, ["once", "hourly", "daily", "weekly"]);
+  assert.equal(schema.interval_hours.minimum, 1);
+  assert.equal(schema.interval_hours.maximum, 8760);
+  for (const interval_hours of [undefined, null, "3", 0, -1, 1.5, 8761, Infinity, NaN])
+    assert.throws(() => validateWorkflow({ ...content, repeat: "hourly", interval_hours }), /interval_hours/);
+  for (const interval_hours of [1, 3, 24, 8760])
+    assert.equal(validateWorkflow({ ...content, repeat: "hourly", interval_hours }).interval_hours, interval_hours);
+  for (const repeat of ["once", "daily", "weekly"])
+    assert.equal(Object.hasOwn(validateWorkflow({ ...content, repeat }), "interval_hours"), false);
+});
+
+test("hourly schedules keep JST anchor, snapshots, unique slots and coalesce overdue work", async (t) => {
+  const { env, create } = await fixture(t);
+  for (const hours of [1, 3, 24]) {
+    const start = "2020-01-01T09:15:00+09:00";
+    const d = await create({ ...content, start, repeat: "hourly", interval_hours: hours });
+    const before = Date.now();
+    await Promise.all([exec(env, { action: "patrol" }), exec(env, { action: "patrol" })]);
+    await exec(env, { action: "patrol" });
+    const state = await workflowRead(env), runs = state.runs.filter(r => r.definition_id === d.id);
+    assert.equal(runs.length, 1);
+    assert.equal(runs[0].scheduled_for, "2020-01-01T00:15:00.000Z");
+    assert.equal(runs[0].data.definition.interval_hours, hours);
+    const detail = await workflowRead(env, { definition_id: d.id });
+    assert.ok(detail.versions.every(v => v.data.interval_hours === hours));
+    const next = Date.parse(detail.definition.next_due), period = hours * 3600000;
+    assert.ok(next > before && next <= Date.now() + period);
+    assert.equal((next - Date.parse(start)) % period, 0);
+    // Even after terminal completion, missed slots do not become a backlog.
+    await env.DB.prepare("UPDATE wf_runs SET status='completed',revision=revision+1 WHERE id=?").bind(runs[0].id).run();
+    await exec(env, { action: "patrol" });
+    assert.equal((await workflowRead(env)).runs.filter(r => r.definition_id === d.id).length, 1);
+  }
+  for (const repeat of ["daily", "weekly"]) {
+    const d = await create({ ...content, repeat });
+    await exec(env, { action: "patrol" });
+    const got = (await workflowRead(env, { definition_id: d.id })).definition;
+    assert.equal(Date.parse(got.next_due) - Date.parse(content.start), repeat === "daily" ? 86400000 : 604800000);
+  }
+});
+
+test("scheduled repeats never overlap unfinished runs, respect global/definition stops and future start", async (t) => {
+  const { env, create } = await fixture(t);
+  const future = await create({ ...content, repeat: "hourly", interval_hours: 3, start: new Date(Date.now()+3600000).toISOString() });
+  await exec(env, { action: "patrol" });
+  assert.equal((await workflowRead(env)).runs.length, 0);
+  for (const status of ["queued", "running", "review", "waiting", "paused"]) {
+    const d = await create({ ...content, repeat: "hourly", interval_hours: 3 });
+    const r = await write(env, { action: "start", definition_id: d.id, revision: d.revision, request_id: status }, true);
+    await env.DB.prepare("UPDATE wf_runs SET status=?,data=json_set(data,'$.external',json(?)),lease_until=?,revision=revision+1 WHERE id=?")
+      .bind(status, JSON.stringify({ref:"synthetic-job",state:"unknown"}), Date.now()+3600000, r.id).run();
+    await Promise.all([exec(env, {action:"patrol"}), exec(env, {action:"patrol"})]);
+    const runs = (await workflowRead(env)).runs.filter(r => r.definition_id === d.id);
+    assert.equal(runs.length, 1, status);
+    assert.equal(runs[0].status, status);
+    assert.equal(runs[0].data.external.state, "unknown");
+    assert.equal((await workflowRead(env, {definition_id:d.id})).definition.next_due, d.next_due);
+    await write(env, {action:"schedule_stop", definition_id:d.id, revision:d.revision});
+  }
+  const d = await create({ ...content, repeat:"hourly", interval_hours:1 });
+  await write(env, { action:"stop_all", revision:(await workflowRead(env)).settings.revision }, true);
+  await exec(env, {action:"patrol"});
+  assert.equal((await workflowRead(env)).runs.filter(r=>r.definition_id===d.id || r.definition_id===future.id).length, 0);
+});

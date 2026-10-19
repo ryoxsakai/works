@@ -174,8 +174,8 @@ function render() {
             d.data.kind === kind &&
             ["unfinished", "queued"].includes(filter),
         )
-        .map((d) => {
-          const period = { once: 0, daily: 86400000, weekly: 604800000 }[
+        .flatMap((d) => {
+          const period = { once: 0, hourly: d.data.interval_hours * 3600000, daily: 86400000, weekly: 604800000 }[
             d.data.repeat
           ];
           let at = d.next_due;
@@ -186,7 +186,12 @@ function render() {
               Date.parse(at) + Math.max(0, Math.ceil(gap / period)) * period,
             ).toISOString();
           }
-          return { d, at };
+          const slots = [{ d, at }];
+          if (d.data.repeat === "hourly") {
+            for (let next = Date.parse(at) + period; dateJP(next) === day && slots.length < 24; next += period)
+              slots.push({ d, at: new Date(next).toISOString() });
+          }
+          return slots;
         })
         .filter(
           ({ d, at }) =>
@@ -242,7 +247,7 @@ function render() {
         node("h3", d.data.title),
         node(
           "p",
-          `${d.enabled ? "実行許可済み" : "停止・下書き"} · v${d.revision} · ${{ once: "単発", daily: "毎日", weekly: "毎週" }[d.data.repeat]} · 次回 ${stamp(d.next_due)}`,
+          `${d.enabled ? "実行許可済み" : "停止・下書き"} · v${d.revision} · ${d.data.repeat === "hourly" ? `${d.data.interval_hours}時間ごと` : { once: "単発", daily: "毎日", weekly: "毎週" }[d.data.repeat]} · 次回 ${stamp(d.next_due)}`,
         ),
         node("p", d.data.purpose),
       );
@@ -365,6 +370,7 @@ function openEditor(d = null) {
           ? localTime(v)
           : v;
   } else form.elements.start.value = localTime(Date.now() + 3600000);
+  updateHoursInput();
   $("#task-editor").replaceChildren(
     ...(d?.data.tasks || [undefined]).map(taskEditor),
   );
@@ -482,6 +488,13 @@ function renderRun(detail) {
     }),
   );
 }
+function updateHoursInput() {
+  const f = $("#definition-form"), hourly = f.elements.repeat.value === "hourly";
+  $("#hours-label").hidden = !hourly;
+  f.elements.interval_hours.disabled = !hourly;
+  f.elements.interval_hours.required = hourly;
+}
+$("#definition-form").elements.repeat.addEventListener("change", updateHoursInput);
 $("#definition-form").addEventListener("submit", (event) => {
   event.preventDefault();
   guard(async () => {
@@ -496,6 +509,7 @@ $("#definition-form").addEventListener("submit", (event) => {
       "repeat",
     ])
       content[k] = f.elements[k].value;
+    if (content.repeat === "hourly") content.interval_hours = Number(f.elements.interval_hours.value);
     content.priority = Number(f.elements.priority.value);
     content.start = new Date(
       f.elements.start.value + ":00+09:00",

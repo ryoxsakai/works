@@ -48,7 +48,7 @@
         </section>
         <p class="wf-note">
           件数は取得済みの Run が対象です。未来の予定は巡回時に Run
-          へ変わります。
+          へ変わります。同一定義に未完了の Run がある間は次回を作成しません。
         </p>
         <p id="coverage" class="wf-note"></p>
         <nav id="filters" class="wf-filters" aria-label="状態で絞り込み"></nav>
@@ -129,9 +129,12 @@
           ><label
             >繰り返し<select name="repeat">
               <option value="once">単発</option>
+              <option value="hourly">○時間ごと</option>
               <option value="daily">毎日</option>
               <option value="weekly">毎週</option>
             </select></label
+          ><label
+            id="hours-label" hidden>間隔（時間・1〜8760の整数）<input type="number" name="interval_hours" min="1" max="8760" step="1" disabled /></label
           ><label
             >期限（日本時間）<input type="datetime-local" name="deadline"
           /></label>
