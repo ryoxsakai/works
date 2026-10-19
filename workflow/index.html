@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>ワークフロー | Works</title>
+    <script src="/shared/theme-init.js?v=1"></script>
+    <link rel="stylesheet" href="/shared/styles.css?v=56" />
+    <link rel="stylesheet" href="/shared/header.css?v=2" />
+    <link rel="stylesheet" href="./workflow.css?v=1" />
+    <script type="module" src="/shared/header.js?v=4"></script>
+  </head>
+  <body>
+    <header class="page-header works-header">
+      <h1>
+        <a class="works-home" href="/"
+          ><span class="page-header-icon">W</span><span>Works</span></a
+        ><span class="wf-heading">ワークフロー</span>
+      </h1>
+      <div class="works-header-actions">
+        <button id="auth">ログイン</button>
+      </div>
+    </header>
+    <main>
+      <p id="error" role="alert"></p>
+      <div id="workspace" hidden>
+        <div class="wf-title">
+          <div>
+            <p>自動実行 / ワークフロー</p>
+            <h2>日々の仕事を、順番に。</h2>
+          </div>
+          <button id="new">＋ 定義を作成</button>
+        </div>
+        <section class="wf-patrol" aria-label="定期巡回の設定">
+          <div id="patrol-status"></div>
+          <label
+            >希望の巡回間隔
+            <select id="interval">
+              <option value="60">1時間</option>
+              <option value="30">30分</option>
+            </select></label
+          ><button id="save-interval">希望を保存</button
+          ><button id="global-stop">全体停止</button
+          ><button id="refresh">更新</button
+          ><small
+            >巡回は外部の定期実行で設定します。希望の保存だけでは時刻表は変更されません。</small
+          >
+        </section>
+        <p class="wf-note">
+          件数は取得済みの Run が対象です。未来の予定は巡回時に Run
+          へ変わります。
+        </p>
+        <p id="coverage" class="wf-note"></p>
+        <nav id="filters" class="wf-filters" aria-label="状態で絞り込み"></nav>
+        <div class="wf-calendar-bar">
+          <button id="prev" aria-label="前日">← 前日</button
+          ><input id="day" type="date" aria-label="表示日" /><button
+            id="next"
+            aria-label="翌日"
+          >
+            翌日 →</button
+          ><button id="today">今日</button
+          ><span>PC：週表示 / モバイル：1日・日本時間</span>
+        </div>
+        <section
+          id="calendar"
+          class="wf-week"
+          aria-label="日付別の実行一覧"
+        ></section>
+        <details class="wf-definitions" open>
+          <summary>ワークフロー定義・実行許可</summary>
+          <div id="definitions"></div>
+        </details>
+        <p class="wf-note">
+          本文や記事、メール、dot
+          の提案は実行許可になりません。プラットフォームで必要な承認・接続はその都度確認します。停止は完了済みの外部操作を取り消しません。認証情報や秘密は記録しないでください。
+        </p>
+      </div>
+    </main>
+    <dialog id="editor" class="wf-dialog">
+      <form id="definition-form">
+        <div class="wf-title">
+          <h2 id="editor-title">定義を作成</h2>
+          <button type="button" data-close="editor" aria-label="閉じる">
+            ×
+          </button>
+        </div>
+        <label>名前<input name="title" maxlength="200" required /></label>
+        <div class="wf-row">
+          <label
+            >種類<select name="kind">
+              <option value="workflow">ワークフロー</option>
+              <option value="automation">自動実行</option>
+            </select></label
+          ><label
+            >優先順位<select name="priority">
+              <option value="1">高</option>
+              <option value="2" selected>中</option>
+              <option value="3">低</option>
+            </select></label
+          >
+        </div>
+        <label
+          >目的<textarea
+            name="purpose"
+            required
+            maxlength="4000"
+          ></textarea></label
+        ><label
+          >全体の完了条件<textarea
+            name="completion"
+            required
+            maxlength="4000"
+          ></textarea></label
+        ><label
+          >許可範囲・確認が必要な操作<textarea
+            name="permissions"
+            required
+            maxlength="4000"
+            placeholder="例：指定したリポジトリの読み取り。公開や送信は確認を求める"
+          ></textarea>
+        </label>
+        <div class="wf-row">
+          <label
+            >初回予定（日本時間）<input
+              type="datetime-local"
+              name="start"
+              required /></label
+          ><label
+            >繰り返し<select name="repeat">
+              <option value="once">単発</option>
+              <option value="daily">毎日</option>
+              <option value="weekly">毎週</option>
+            </select></label
+          ><label
+            >期限（日本時間）<input type="datetime-local" name="deadline"
+          /></label>
+        </div>
+        <h3>直列工程</h3>
+        <div id="task-editor"></div>
+        <button type="button" id="add-task">＋ 工程</button>
+        <p>
+          保存時点では実行不可です。内容を確認してから「実行を許可」で公開してください。
+        </p>
+        <p id="editor-error" role="alert"></p>
+        <button type="submit">下書きを保存</button>
+      </form>
+    </dialog>
+    <dialog id="run-dialog" class="wf-dialog">
+      <div class="wf-title">
+        <h2>今回の実行</h2>
+        <button data-close="run-dialog" aria-label="閉じる">×</button>
+      </div>
+      <div id="run-detail"></div>
+      <form id="run-action">
+        <label
+          >結果・確認内容<textarea
+            name="result"
+            maxlength="4000"
+          ></textarea></label
+        ><label
+          >成果物・確認証拠の URL（1行1件）<textarea
+            name="evidence"
+          ></textarea></label
+        ><label class="wf-check"
+          ><input
+            type="checkbox"
+            name="criteria_verified"
+          />工程の完了条件と成果物を確認した</label
+        ><label class="wf-check"
+          ><input
+            type="checkbox"
+            name="workflow_criteria_verified"
+          />全体の完了条件も確認した</label
+        >
+        <div id="run-controls" class="wf-row"></div>
+        <p id="run-error" role="alert"></p>
+      </form>
+      <details>
+        <summary>変更・実行履歴</summary>
+        <div id="run-history"></div>
+      </details>
+    </dialog>
+    <script type="module" src="./app.js?v=1"></script>
+  </body>
+</html>

@@ -35,6 +35,7 @@ test("KDP reuses registered tutor callback and consumes only safe pending destin
   );
   for (const path of [
     "/wiki/",
+    "/workflow/",
     "/kdp/",
     "/todo/",
     "/material-print/",

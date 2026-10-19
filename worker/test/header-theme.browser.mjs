@@ -163,8 +163,8 @@ async function selectedTheme(page) {
   }
   await page.goto(base + '/');
   assert.equal(await page.locator('.module-card[href="/material-print/"]').count(),0);
-  assert.equal(await page.locator('#operations a[href="/wiki/"] h3').innerText(),'Wiki');
-  assert.deepEqual(await page.locator('.module-section').evaluateAll(es=>es.map(e=>e.id)),['teaching','operations','creation']);
+  assert.equal(await page.locator('#automation a[href="/wiki/"] h3').innerText(),'Wiki');
+  assert.deepEqual(await page.locator('.module-section').evaluateAll(es=>es.map(e=>e.id)),['teaching','operations','automation','creation']);
   await selectTheme(page,'dark');
   await page.reload();
   assert.equal(await selectedTheme(page),'dark');

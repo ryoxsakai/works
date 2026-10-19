@@ -155,8 +155,8 @@ try {
       await page.locator("#modal").waitFor({ state: "hidden" });
     };
     await page.goto(origin + "/");
-    assert.equal(await page.locator(".module-card").count(), 8);
-    assert.equal(await page.locator(".module-section").count(), 3);
+    assert.equal(await page.locator(".module-card").count(), 9);
+    assert.equal(await page.locator(".module-section").count(), 4);
     await width();
     await page.screenshot({
       path: `test-artifacts/menu-${name}.png`,
