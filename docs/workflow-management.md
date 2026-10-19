@@ -70,9 +70,9 @@ Works の `main` (`38578e537d57ab8ee810362b298819435e10dde1`) から作成。ト
    - `npm run test:workflow:browser`（ローカルのシステム Chromium 利用時は `BROWSER_EXECUTABLE=/usr/bin/chromium`。CI は Playwright の Chromium を利用）
    - `npm run test:wiki:browser`、`npm run test:header:browser` を必要に応じて実行。既存サーバーテストにも Wiki の CAS／履歴検証が含まれる。
    - `npx wrangler deploy --dry-run --outdir /tmp/works-worker-build`
-3. draft を ready にし、必要な CI／レビュー確認後に main へマージ。GitHub の既定ブランチが古い別ブランチを指しているため、base は必ず **main** を明示する。main の先端と本番配信元を確認する。
+3. 必要な CI／レビューを確認する。GitHub の既定ブランチが古い別ブランチを指しているため、base は必ず **main** を明示する。main の先端と静的サイトの本番配信元を確認する。クラウド側は draft のまま Mac 側へ引き継ぎ、マージ・配信を行わない。静的画面だけが先行しないよう、バックエンド反映までマージを保留する。
 4. 認証済み Cloudflare から **追加 SQL だけ**を適用する: `cd worker && npx wrangler d1 execute tutor-db --remote --file=workflow-migrations/0001-workflow.sql`。既存の `db:migrate` や Wiki マイグレーションは今回実行しない。既存テーブルや実データをテスト編集しない。
-5. マージ済み main から Worker を `npm run deploy`。既存の静的サイト配信方式（GitHub Pages の配信元・ビルド状態）を GitHub の認証後に確認し、同じ main の `workflow/` とナビ変更を反映する。現在の環境では Pages 設定の認証付き確認ができていない。認証拡張が必要なら停止して報告する。
+5. Mac 側でレビュー済み PR の正確な head を取得し、Worker を `npm run deploy`。API／MCP の認証済み読み取りを確認する。バックエンドを確認してから Mac 側の担当が ready・マージを行い、既存の静的サイト配信方式（GitHub Pages の配信元・ビルド状態）に従って同じソースの `workflow/` とナビ変更を反映する。クラウド側はこれらを実行しない。認証拡張が必要なら停止して報告する。
 6. 公開 `/workflow/` の PC／モバイル、共通メニュー、既存 `/wiki/` を確認。認証なしの API が拒否されることを確認。本人の既存データに対するテスト作成／編集は行わず、認証済みの読み取りで空のワークフロー一覧と設定を確認する。
 7. `https://works.lrnr.jp/mcp` の `initialize` は `works-schedule` v1.14.0。`tools/list` で上記3ツールと Wiki 4ツールを確認。親側の Works 接続でツール一覧を更新し、必要なら同じ接続を再接続する。独自プラグインが固定のツール定義を持つ場合は、その定義もこの MCP の `tools/list` に合わせて更新する。新たな権限付与が要求される場合は本人に報告して停止する。
 8. **親自身が実際の公開ツールで** `read_workflows {}` と `search_wiki_pages {"query":""}` を読み取り確認する。`get_wiki_page` も検索応答の実 ID で読めることを確認。Wiki にテスト編集をしない。ツールが利用できなければ automation を先に作らない。
