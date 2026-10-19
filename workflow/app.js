@@ -50,6 +50,13 @@ let state,
   busy = false,
   signedIn = false;
 let runViewGeneration = 0;
+let activeFilter = "all",
+  calendarView = "calendar";
+const searchMatches = (d) =>
+  !$("#workflow-search").value.trim() ||
+  (d.title + " " + d.purpose)
+    .toLocaleLowerCase()
+    .includes($("#workflow-search").value.trim().toLocaleLowerCase());
 const manualKeys = new Map();
 async function api(body, query = "") {
   const r = await fetch("/api/workflow" + query, {
@@ -72,6 +79,8 @@ async function api(body, query = "") {
 async function guard(fn, target = "#error") {
   if (busy) return;
   busy = true;
+  $("#workspace").setAttribute("aria-busy", "true");
+  $("#workflow-feedback").textContent = "処理しています…";
   $(target).textContent = "";
   try {
     await fn();
@@ -79,6 +88,8 @@ async function guard(fn, target = "#error") {
     $(target).textContent = e.message;
   } finally {
     busy = false;
+    $("#workspace").setAttribute("aria-busy", "false");
+    $("#workflow-feedback").textContent = "";
   }
 }
 async function load() {
@@ -106,16 +117,23 @@ function render() {
   const active = state.runs.filter(
     (r) => !["completed", "cancelled"].includes(r.status),
   );
-  active.sort(
+  const visibleActive = active.filter(
+    (r) =>
+      searchMatches(r.data.definition) &&
+      (activeFilter === "all" || r.status === activeFilter),
+  );
+  $("#active-count").textContent =
+    `${visibleActive.length}件表示 / 未完了 ${active.length}件`;
+  visibleActive.sort(
     (a, b) => (a.status === "review" ? 0 : 1) - (b.status === "review" ? 0 : 1),
   );
   $("#active-runs").replaceChildren(
-    ...(active.length
-      ? active.map((r) => runCard(r))
+    ...(visibleActive.length
+      ? visibleActive.map((r) => runCard(r))
       : [
           node(
             "p",
-            "未完了の実行はありません。下のワークフローから開始できます。",
+            "条件に合う未完了の実行はありません。検索や絞り込みを変更するか、下のワークフローから開始できます。",
             "wf-empty",
           ),
         ]),
@@ -266,73 +284,75 @@ function render() {
   }
   $("#calendar").replaceChildren(...days);
   $("#definitions").replaceChildren(
-    ...state.definitions.map((d) => {
-      const el = node("article", undefined, "wf-definition");
-      el.append(
-        node("h3", d.data.title),
-        node(
-          "p",
-          `${d.enabled ? "実行許可済み" : "停止・下書き"} · v${d.revision} · ${d.data.repeat === "hourly" ? `${d.data.interval_hours}時間ごと` : { once: "単発", daily: "毎日", weekly: "毎週" }[d.data.repeat]} · 次回 ${stamp(d.next_due)}`,
-        ),
-        node("p", d.data.purpose),
-      );
-      const row = node("div", undefined, "wf-row");
-      if (d.enabled) {
-        row.append(
-          button("今後の定期実行を停止", async () => {
-            await api({
-              action: "schedule_stop",
-              definition_id: d.id,
-              revision: d.revision,
-            });
-            await load();
-          }),
-          button("手動実行", async () => {
-            if (!manualKeys.has(d.id))
-              manualKeys.set(d.id, crypto.randomUUID());
-            const r = await api({
-              action: "start",
-              definition_id: d.id,
-              revision: d.revision,
-              request_id: manualKeys.get(d.id),
-            });
-            manualKeys.delete(d.id);
-            await load();
-            await openRun(r.id);
-          }),
+    ...state.definitions
+      .filter((d) => searchMatches(d.data))
+      .map((d) => {
+        const el = node("article", undefined, "wf-definition");
+        el.append(
+          node("h3", d.data.title),
+          node(
+            "p",
+            `${d.enabled ? "実行許可済み" : "停止・下書き"} · v${d.revision} · ${d.data.repeat === "hourly" ? `${d.data.interval_hours}時間ごと` : { once: "単発", daily: "毎日", weekly: "毎週" }[d.data.repeat]} · 次回 ${stamp(d.next_due)}`,
+          ),
+          node("p", d.data.purpose),
         );
-      } else
-        row.append(
-          button("アーカイブ", async () => {
-            if (
-              !confirm(
-                "定義をアーカイブします。既存の Run と履歴は保持します。",
+        const row = node("div", undefined, "wf-row");
+        if (d.enabled) {
+          row.append(
+            button("今後の定期実行を停止", async () => {
+              await api({
+                action: "schedule_stop",
+                definition_id: d.id,
+                revision: d.revision,
+              });
+              await load();
+            }),
+            button("手動実行", async () => {
+              if (!manualKeys.has(d.id))
+                manualKeys.set(d.id, crypto.randomUUID());
+              const r = await api({
+                action: "start",
+                definition_id: d.id,
+                revision: d.revision,
+                request_id: manualKeys.get(d.id),
+              });
+              manualKeys.delete(d.id);
+              await load();
+              await openRun(r.id);
+            }),
+          );
+        } else
+          row.append(
+            button("アーカイブ", async () => {
+              if (
+                !confirm(
+                  "定義をアーカイブします。既存の Run と履歴は保持します。",
+                )
               )
-            )
-              return;
-            await api({
-              action: "archive",
-              definition_id: d.id,
-              revision: d.revision,
-            });
-            await load();
-          }),
-          button("編集", () => openEditor(d)),
-          button("内容を確認・実行を許可", async () => {
-            const details = `${d.data.title}\n目的: ${d.data.purpose}\n完了条件: ${d.data.completion}\n許可範囲: ${d.data.permissions}\n工程:\n${d.data.tasks.map((t, i) => `${i + 1}. ${t.title} (${t.assignee === "dot" ? "dot" : "自分"}${t.gate ? "・確認ゲート" : ""})\n完了条件: ${t.completion}`).join("\n")}\nこの本人の仕事を実行可能にしますか？`;
-            if (!confirm(details)) return;
-            await api({
-              action: "publish",
-              definition_id: d.id,
-              revision: d.revision,
-              authorized: true,
-            });
-            await load();
-          }),
-        );
-      el.append(row);
-      return el;
-    }),
+                return;
+              await api({
+                action: "archive",
+                definition_id: d.id,
+                revision: d.revision,
+              });
+              await load();
+            }),
+            button("編集", () => openEditor(d)),
+            button("内容を確認・実行を許可", async () => {
+              const details = `${d.data.title}\n目的: ${d.data.purpose}\n完了条件: ${d.data.completion}\n許可範囲: ${d.data.permissions}\n工程:\n${d.data.tasks.map((t, i) => `${i + 1}. ${t.title} (${t.assignee === "dot" ? "dot" : "自分"}${t.gate ? "・確認ゲート" : ""})\n完了条件: ${t.completion}`).join("\n")}\nこの本人の仕事を実行可能にしますか？`;
+              if (!confirm(details)) return;
+              await api({
+                action: "publish",
+                definition_id: d.id,
+                revision: d.revision,
+                authorized: true,
+              });
+              await load();
+            }),
+          );
+        el.append(row);
+        return el;
+      }),
   );
 }
 function runCard(r) {
@@ -620,24 +640,6 @@ $("#save-interval").onclick = () =>
   });
 $("#global-stop").onclick = () =>
   guard(async () => {
-    const active = state.runs.filter(
-      (r) => !["completed", "cancelled"].includes(r.status),
-    );
-    active.sort(
-      (a, b) =>
-        (a.status === "review" ? 0 : 1) - (b.status === "review" ? 0 : 1),
-    );
-    $("#active-runs").replaceChildren(
-      ...(active.length
-        ? active.map((r) => runCard(r))
-        : [
-            node(
-              "p",
-              "未完了の実行はありません。下のワークフローから開始できます。",
-              "wf-empty",
-            ),
-          ]),
-    );
     const cfg = state.settings;
     if (
       !confirm(
@@ -679,4 +681,24 @@ watchAuth({
 
 $("#run-dialog").addEventListener("close", () => {
   runViewGeneration++;
+});
+
+$("#workflow-search").addEventListener("input", () => {
+  if (state) render();
+});
+$("#active-filters").addEventListener("click", (event) => {
+  const b = event.target.closest("[data-active]");
+  if (!b) return;
+  activeFilter = b.dataset.active;
+  for (const item of $("#active-filters").querySelectorAll("button"))
+    item.setAttribute("aria-pressed", String(item === b));
+  if (state) render();
+});
+$("#calendar-view").addEventListener("click", (event) => {
+  const b = event.target.closest("[data-view]");
+  if (!b) return;
+  calendarView = b.dataset.view;
+  $("#calendar").classList.toggle("wf-agenda", calendarView === "agenda");
+  for (const item of $("#calendar-view").querySelectorAll("button"))
+    item.setAttribute("aria-pressed", String(item === b));
 });

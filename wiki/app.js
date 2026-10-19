@@ -17,6 +17,10 @@ const $ = (id) => document.getElementById(id),
     dialogDirty: false,
   };
 const path = (id) => encodeURIComponent(id);
+function markEditorDirty() {
+  state.dirty = true;
+  $("save-state").textContent = "未保存の変更があります";
+}
 function notify(s, error = false) {
   $("message").textContent = s;
   $("message").classList.toggle("error", error);
@@ -42,6 +46,7 @@ async function api(p, body) {
 async function run(fn) {
   if (state.busy) return;
   state.busy = true;
+  $("workspace").setAttribute("aria-busy", "true");
   notify("");
   document
     .querySelectorAll(
@@ -54,6 +59,7 @@ async function run(fn) {
     notify(e.message, true);
   } finally {
     state.busy = false;
+    $("workspace").setAttribute("aria-busy", "false");
     document
       .querySelectorAll(
         "button, #editor input:not([type=checkbox]), #editor textarea, #editor select, #folder-form input, #folder-form select",
@@ -77,6 +83,7 @@ function beforeNavigate() {
   state.editing = false;
   state.dialogDirty = false;
   $("editor").hidden = true;
+  document.body.classList.remove("wiki-editing");
   $("folder-dialog").close();
   return true;
 }
@@ -117,6 +124,9 @@ async function chooseFolder(id, push = true) {
   folders.setCurrent(id);
   $("search").value = "";
   $("detail").hidden = true;
+  document.body.classList.remove("wiki-focused");
+  $("focus-reading").setAttribute("aria-pressed", "false");
+  $("focus-reading").textContent = "集中表示";
   state.data = null;
   await load();
   route(folders.current(), null, push);
@@ -211,7 +221,7 @@ function render() {
   $("move-page").hidden = !!p.archived;
   $("title").textContent = p.title;
   $("meta").textContent =
-    `${folders.label(p.folder_id)} · ${p.status === "confirmed" ? "確認済み" : "下書き"} · revision ${p.revision} · ${p.updated_at}${p.archived ? " · アーカイブ" : ""} · タグ: ${p.tags.join(", ")} · 別名: ${p.aliases.join(", ")}`;
+    `${folders.label(p.folder_id)} · ${p.status === "confirmed" ? "確認済み" : "下書き"} · revision ${p.revision} · ${new Intl.DateTimeFormat("ja-JP", { timeZone: "Asia/Tokyo", dateStyle: "medium", timeStyle: "short" }).format(new Date(p.updated_at))}${p.archived ? " · アーカイブ" : ""} · タグ: ${p.tags.join(", ")} · 別名: ${p.aliases.join(", ")}`;
   $("body").innerHTML = renderMarkdown(p.body);
   const headings = [...$("body").querySelectorAll("h1,h2,h3")];
   $("page-outline").hidden = headings.length < 2;
@@ -271,6 +281,7 @@ async function open(id, push = true) {
   state.dirty = false;
   state.editing = false;
   $("editor").hidden = true;
+  document.body.classList.remove("wiki-editing");
   await folders.refresh();
   folders.setCurrent(state.data.page.folder_id);
   await load(false, false);
@@ -303,12 +314,13 @@ function addSource(
     )}<button type="button" class="remove-source">この出典を削除</button>`;
   div.querySelector("button").onclick = () => {
     div.remove();
-    state.dirty = true;
+    markEditorDirty();
   };
   $("source-fields").append(div);
 }
 function edit(isNew = false) {
   state.editing = true;
+  $("save-state").textContent = "編集中 · 保存すると反映されます";
   state.new = isNew;
   state.editId = isNew ? null : state.data.page.id;
   state.editRevision = isNew ? null : state.data.page.revision;
@@ -337,6 +349,7 @@ function edit(isNew = false) {
   state.createFolderRevision = folders.folder(state.createFolder)?.revision;
   previewMode("edit");
   $("editor").hidden = false;
+  document.body.classList.add("wiki-editing");
   $("editor").scrollIntoView({ block: "start" });
   $("editor").elements.title.focus({ preventScroll: true });
 }
@@ -360,7 +373,7 @@ function content() {
   return c;
 }
 $("editor").oninput = () => {
-  state.dirty = true;
+  markEditorDirty();
   if (!$("editor-preview").hidden)
     $("editor-preview").innerHTML = renderMarkdown(
       $("editor").elements.body.value,
@@ -383,6 +396,7 @@ $("editor").onsubmit = (e) => {
     state.dirty = false;
     state.editing = false;
     $("editor").hidden = true;
+    document.body.classList.remove("wiki-editing");
     render();
     await load();
     route(state.data.page.folder_id, state.data.page.id);
@@ -403,13 +417,14 @@ $("propose").onclick = () =>
   });
 $("add-source").onclick = () => {
   addSource();
-  state.dirty = true;
+  markEditorDirty();
 };
 $("cancel").onclick = () => {
   if (guard()) {
     state.dirty = false;
     state.editing = false;
     $("editor").hidden = true;
+    document.body.classList.remove("wiki-editing");
   }
 };
 $("more-history").onclick = () =>
@@ -442,6 +457,7 @@ $("archive").onclick = () => {
       state.dirty = false;
       state.editing = false;
       $("editor").hidden = true;
+      document.body.classList.remove("wiki-editing");
       state.data = await api("pages/" + path(state.data.page.id) + "/archive", {
         revision: state.data.page.revision,
       });
@@ -481,6 +497,7 @@ $("workspace").onclick = (e) => {
           state.dirty = false;
           state.editing = false;
           $("editor").hidden = true;
+          document.body.classList.remove("wiki-editing");
           state.data = await api("pages/" + path(p.id) + "/" + action, {
             revision: p.revision,
             ...(action === "restore"
@@ -558,3 +575,10 @@ watchAuth({
     if (err) notify(err, true);
   },
 });
+
+$("focus-reading").onclick = () => {
+  const focused = document.body.classList.toggle("wiki-focused");
+  $("focus-reading").setAttribute("aria-pressed", String(focused));
+  $("focus-reading").textContent = focused ? "一覧も表示" : "集中表示";
+  $("detail").scrollIntoView({ block: "start" });
+};

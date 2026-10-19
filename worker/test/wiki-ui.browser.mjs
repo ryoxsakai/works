@@ -283,6 +283,25 @@ try {
       .click();
     await expect(page.locator("#title")).toHaveText(name + " knowledge");
     await expect(page.locator("#body h1")).toHaveText("Heading");
+    const editHeight = await page
+      .locator("#edit")
+      .evaluate((el) => el.getBoundingClientRect().height);
+    await expect
+      .poll(async () =>
+        page.evaluate(
+          () =>
+            getComputedStyle(document.querySelector("#edit"))
+              .backgroundColor ===
+            getComputedStyle(document.querySelector("#new")).backgroundColor,
+        ),
+      )
+      .toBe(true);
+    assert.equal(editHeight, name.startsWith("mobile") ? 44 : 40);
+    await page.locator("#focus-reading").click();
+    await expect(page.locator("#folder-browser")).not.toBeVisible();
+    await page.locator("#focus-reading").click();
+    await expect(page.locator("#folder-browser")).toBeVisible();
+
     await page.locator("#page-outline summary").click();
     await expect(page.locator("#page-toc a")).toHaveCount(2);
     await page.locator("#page-toc a").last().click();
@@ -381,9 +400,11 @@ try {
     await page.locator("#cancel").click();
     await page.locator('#pages [data-page="' + id + '"]').click();
     await expect(page.locator("#body")).toContainText("external change");
-    // Discarding editor for restore must close it, preventing an old-form save.
+    // Editing is a focused workspace: cancel before returning to history.
     await page.locator("#edit").click();
     await page.locator("[name=body]").fill("old form");
+    await expect(page.locator("#wiki-layout")).not.toBeVisible();
+    await page.locator("#cancel").click();
     await page.locator('[data-restore="1"]').click();
     await expect(page.locator("#editor")).toBeHidden();
     await expect(page.locator("#body")).toContainText("Safe knowledge");
@@ -567,6 +588,7 @@ try {
     await expect(page.locator("[name=body]")).toHaveValue("unsaved navigation");
     await expect(page).toHaveURL(beforeBack);
     acceptDialogs = true;
+    await page.locator("#cancel").click();
     await page.locator("#back-folders").click();
     await expect(page.locator("#detail")).toBeHidden();
     await expect(page.locator("#find")).toBeEnabled();
