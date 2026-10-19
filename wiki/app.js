@@ -180,15 +180,23 @@ async function load(more = false, refresh = true) {
         (p) =>
           `<button data-page="${esc(p.id)}"><span class="wiki-page-title">${esc(p.title)}</span><small>${esc(folders.label(p.folder_id))} · ${p.status === "confirmed" ? "確認済み" : "下書き"} · r${p.revision}${p.archived ? " · アーカイブ" : ""}</small></button>`,
       )
-      .join("") || ($("search").value ? '<p class="wiki-empty">一致するページがありません。<br>別のキーワードで検索してください。</p>' : '<p class="wiki-empty">ページはまだありません。<br>「＋ 新規ページ」から知識をまとめましょう。</p>');
+      .join("") ||
+    ($("search").value
+      ? '<p class="wiki-empty">一致するページがありません。<br>別のキーワードで検索してください。</p>'
+      : '<p class="wiki-empty">ページはまだありません。<br>「＋ 新規ページ」から知識をまとめましょう。</p>');
+  $("page-count").textContent =
+    `${state.pages.length}件${data.has_more ? "以上" : ""}のページ${$("search").value ? " · 全フォルダから検索" : ""}`;
   selectCurrentPage();
 }
 function selectCurrentPage() {
   const id = state.data?.page.id;
-  document.querySelectorAll('#pages [data-page], #folder-tree [data-page]').forEach((button) => {
-    if (id && button.dataset.page === id) button.setAttribute('aria-current', 'page');
-    else button.removeAttribute('aria-current');
-  });
+  document
+    .querySelectorAll("#pages [data-page], #folder-tree [data-page]")
+    .forEach((button) => {
+      if (id && button.dataset.page === id)
+        button.setAttribute("aria-current", "page");
+      else button.removeAttribute("aria-current");
+    });
 }
 function compare(a, b, label) {
   const oldLines = a.body.split("\n"),
@@ -205,6 +213,28 @@ function render() {
   $("meta").textContent =
     `${folders.label(p.folder_id)} · ${p.status === "confirmed" ? "確認済み" : "下書き"} · revision ${p.revision} · ${p.updated_at}${p.archived ? " · アーカイブ" : ""} · タグ: ${p.tags.join(", ")} · 別名: ${p.aliases.join(", ")}`;
   $("body").innerHTML = renderMarkdown(p.body);
+  const headings = [...$("body").querySelectorAll("h1,h2,h3")];
+  $("page-outline").hidden = headings.length < 2;
+  $("page-toc").replaceChildren(
+    ...headings.map((heading, index) => {
+      heading.id = "wiki-section-" + index;
+      const link = document.createElement("a");
+      link.href = "#" + heading.id;
+      link.textContent = heading.textContent;
+      link.className = "toc-level-" + heading.tagName.toLowerCase();
+      link.addEventListener("click", (event) => {
+        event.preventDefault();
+        heading.tabIndex = -1;
+        heading.focus({ preventScroll: true });
+        heading.scrollIntoView({ block: "start" });
+      });
+      return link;
+    }),
+  );
+  const pending = proposals.filter((v) => v.status === "pending").length;
+  $("proposal-heading").textContent = pending
+    ? `改稿案 · 確認待ち ${pending}件`
+    : "改稿案";
   $("sources").innerHTML =
     p.sources
       .map(
@@ -307,7 +337,8 @@ function edit(isNew = false) {
   state.createFolderRevision = folders.folder(state.createFolder)?.revision;
   previewMode("edit");
   $("editor").hidden = false;
-  $("editor").scrollIntoView();
+  $("editor").scrollIntoView({ block: "start" });
+  $("editor").elements.title.focus({ preventScroll: true });
 }
 function content() {
   const form = $("editor"),

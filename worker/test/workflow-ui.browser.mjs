@@ -115,7 +115,7 @@ try {
   await expect(hoursInput).toBeVisible();
   for (const value of ["", "0", "-1", "1.5", "8761"]) {
     await hoursInput.fill(value);
-    assert.equal(await hoursInput.evaluate(el => el.checkValidity()), false);
+    assert.equal(await hoursInput.evaluate((el) => el.checkValidity()), false);
   }
   await hoursInput.fill("3");
   await f.locator("[name=start]").fill("2026-10-20T09:15");
@@ -136,8 +136,15 @@ try {
   await expect(page.locator("#definitions")).toContainText("3時間ごと");
   await page.locator("#day").fill("2026-10-21");
   await page.locator("#day").dispatchEvent("change");
-  await expect(page.locator(".wf-day").filter({has: page.getByRole("heading", {name:"10月21日(水)"})}).locator(".wf-upcoming")).toHaveCount(8);
-  const stored = await env.DB.prepare("SELECT data FROM wf_definitions LIMIT 1").first();
+  await expect(
+    page
+      .locator(".wf-day")
+      .filter({ has: page.getByRole("heading", { name: "10月21日(水)" }) })
+      .locator(".wf-upcoming"),
+  ).toHaveCount(8);
+  const stored = await env.DB.prepare(
+    "SELECT data FROM wf_definitions LIMIT 1",
+  ).first();
   assert.equal(JSON.parse(stored.data).start, "2026-10-20T00:15:00.000Z");
   await page.locator("#today").click();
   await page.getByRole("button", { name: "手動実行", exact: true }).click();
@@ -151,6 +158,12 @@ try {
     "未着手 · 定義",
   );
   await page.locator("[data-close=run-dialog]").click();
+  await expect(page.locator("#active-runs .wf-run")).toHaveCount(1);
+  await page.locator("#day").fill("2026-12-01");
+  await page.locator("#day").dispatchEvent("change");
+  await expect(page.locator("#active-runs .wf-run")).toHaveCount(1);
+  await page.locator("#today").click();
+  await page.locator(".wf-settings > summary").click();
   await page.locator("#interval").selectOption("30");
   await page.locator("#save-interval").click();
   await expect(page.locator("#patrol-status")).toContainText("設定未反映");

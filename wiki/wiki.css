@@ -411,3 +411,96 @@ main button:disabled, .wiki-dialog button:disabled { opacity: .55; cursor: wait;
   .wiki-pages button { padding: 16px; }
   #folder-heading { flex-basis: 100%; }
 }
+
+/* Reading and navigation tools share the existing Works palette. */
+.wiki-searchbar {
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-elevated);
+}
+.wiki-searchbar #search {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+.wiki-searchbar #new {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+#page-count {
+  margin: 10px 0;
+  color: var(--wiki-muted);
+}
+#detail > .toolbar:first-child {
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+#detail #title {
+  flex: 1 1 100%;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+#body {
+  line-height: 1.9;
+  overflow-wrap: anywhere;
+}
+#body :is(h1, h2, h3) {
+  scroll-margin-top: 100px;
+}
+.wiki-outline {
+  margin: 20px 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 16px;
+  background: var(--bg-hover);
+}
+.wiki-outline summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+#page-toc {
+  display: grid;
+  gap: 8px;
+  padding-top: 12px;
+}
+#page-toc a {
+  line-height: 1.6;
+  text-underline-offset: 3px;
+}
+#page-toc .toc-level-h3 {
+  padding-left: 16px;
+}
+#proposal-heading {
+  border-top: 1px solid var(--border);
+  padding-top: 24px;
+}
+#editor {
+  scroll-margin-top: 90px;
+}
+@media (max-width: 600px) {
+  .wiki-searchbar {
+    gap: 8px;
+  }
+  .wiki-searchbar #search {
+    flex-basis: 100%;
+  }
+  .wiki-searchbar button {
+    flex: 1;
+  }
+  #detail {
+    padding: 16px;
+  }
+  #detail .toolbar {
+    gap: 8px;
+  }
+  #detail .toolbar button {
+    flex: 1 1 auto;
+  }
+  #body {
+    font-size: 15px;
+  }
+}
+body {
+  background: var(--bg);
+}

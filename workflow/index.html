@@ -7,7 +7,7 @@
     <script src="/shared/theme-init.js?v=1"></script>
     <link rel="stylesheet" href="/shared/styles.css?v=56" />
     <link rel="stylesheet" href="/shared/header.css?v=2" />
-    <link rel="stylesheet" href="./workflow.css?v=1" />
+    <link rel="stylesheet" href="./workflow.css?v=2" />
     <script type="module" src="/shared/header.js?v=4"></script>
   </head>
   <body>
@@ -27,25 +27,39 @@
         <div class="wf-title">
           <div>
             <p>自動実行 / ワークフロー</p>
-            <h2>日々の仕事を、順番に。</h2>
+            <h2>仕事の進み具合を確認する</h2>
           </div>
-          <button id="new">＋ 定義を作成</button>
+          <button id="new">＋ ワークフローを作成</button>
         </div>
-        <section class="wf-patrol" aria-label="定期巡回の設定">
-          <div id="patrol-status"></div>
-          <label
-            >希望の巡回間隔
-            <select id="interval">
-              <option value="60">1時間</option>
-              <option value="30">30分</option>
-            </select></label
-          ><button id="save-interval">希望を保存</button
-          ><button id="global-stop">全体停止</button
-          ><button id="refresh">更新</button
-          ><small
-            >巡回は外部の定期実行で設定します。希望の保存だけでは時刻表は変更されません。</small
-          >
+        <section class="wf-focus" aria-labelledby="focus-heading">
+          <div class="wf-title">
+            <div>
+              <h2 id="focus-heading">いま確認すること</h2>
+              <p>日付をまたいだ未完了の実行も、ここから開けます。</p>
+            </div>
+            <a href="/wiki/">Wikiでルールを確認 →</a>
+          </div>
+          <div id="active-runs" class="wf-active-runs"></div>
         </section>
+        <details class="wf-settings">
+          <summary>巡回の状態・設定</summary>
+          <section class="wf-patrol" aria-label="定期巡回の設定">
+            <div id="patrol-status"></div>
+            <label
+              >希望の巡回間隔
+              <select id="interval">
+                <option value="60">1時間</option>
+                <option value="30">30分</option>
+              </select></label
+            ><button id="save-interval">希望を保存</button
+            ><button id="global-stop">全体停止</button
+            ><button id="refresh">更新</button
+            ><small
+              >巡回は外部の定期実行で設定します。希望の保存だけでは時刻表は変更されません。</small
+            >
+          </section>
+        </details>
+        <h2 class="wf-section-title">実行カレンダー</h2>
         <p class="wf-note">
           件数は取得済みの Run が対象です。未来の予定は巡回時に Run
           へ変わります。同一定義に未完了の Run がある間は次回を作成しません。
@@ -133,8 +147,14 @@
               <option value="daily">毎日</option>
               <option value="weekly">毎週</option>
             </select></label
-          ><label
-            id="hours-label" hidden>間隔（時間・1〜8760の整数）<input type="number" name="interval_hours" min="1" max="8760" step="1" disabled /></label
+          ><label id="hours-label" hidden
+            >間隔（時間・1〜8760の整数）<input
+              type="number"
+              name="interval_hours"
+              min="1"
+              max="8760"
+              step="1"
+              disabled /></label
           ><label
             >期限（日本時間）<input type="datetime-local" name="deadline"
           /></label>
@@ -184,6 +204,6 @@
         <div id="run-history"></div>
       </details>
     </dialog>
-    <script type="module" src="./app.js?v=2"></script>
+    <script type="module" src="./app.js?v=3"></script>
   </body>
 </html>
