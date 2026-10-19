@@ -200,8 +200,13 @@ async function selectedTheme(page) {
     await page.setViewportSize({width,height:900});
     await selectTheme(page,'light');
     const geometry=await page.locator('#record-table').evaluate(el=>({display:getComputedStyle(el).display,width:el.getBoundingClientRect().width,body:document.body.scrollWidth,viewport:innerWidth}));
-    if(width<=640){assert.equal(geometry.display,'block');assert.ok(geometry.body<=width);assert.ok(geometry.width<=width);}
-    else assert.equal(geometry.display,'table');
+    assert.equal(geometry.display,'block');assert.ok(geometry.body<=width);assert.ok(geometry.width<=width);
+    const fields=await page.locator('#record-tbody tr').first().locator('textarea').evaluateAll(es=>es.map(el=>{const r=el.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,bottom:r.bottom};}));
+    for(let i=1;i<fields.length;i++){
+      assert.equal(fields[i].x,fields[0].x,`${width}px record fields align vertically`);
+      assert.equal(fields[i].width,fields[0].width,`${width}px record fields share full width`);
+      assert.ok(fields[i].y>=fields[i-1].bottom,`${width}px record fields do not overlap`);
+    }
     await field.fill('');
     const empty=await field.evaluate(el=>el.offsetHeight);
     await field.fill('一行目\n日本語の二行目\n三行目');
