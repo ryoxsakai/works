@@ -932,7 +932,7 @@ test("30 minute slots keep timezone anchor, history, snapshots and unique nonove
     // Force the next slot due while every possible unfinished status is present.
     for (const status of ["queued", "running", "review", "waiting", "paused"]) {
       await env.DB.prepare("UPDATE wf_runs SET status=?,lease_until=?,revision=revision+1 WHERE id=?").bind(status, Date.now()+3600000, runs[0].id).run();
-      await env.DB.prepare("UPDATE wf_definitions SET next_due=? WHERE id=?").bind("2020-01-01T00:45:00.000Z", d.id).run();
+      await env.DB.prepare("UPDATE wf_definitions SET next_due=?,revision=revision+1 WHERE id=?").bind("2020-01-01T00:45:00.000Z", d.id).run();
       await Promise.all([exec(env, { action: "patrol" }), exec(env, { action: "patrol" })]);
       assert.equal((await workflowRead(env)).runs.filter(r => r.definition_id === d.id).length, 1, status);
     }
