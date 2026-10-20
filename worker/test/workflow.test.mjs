@@ -833,7 +833,7 @@ for (const outcome of ["completed", "not_started"]) {
 
 test("hour intervals validate integer bounds without changing legacy definitions", () => {
   const schema = workflowTools.find(t => t.name === "draft_workflow").inputSchema.properties.content.properties;
-  assert.deepEqual(schema.repeat.enum, ["once", "hourly", "daily", "weekly"]);
+  assert.deepEqual(schema.repeat.enum, ["once", "minutely", "hourly", "daily", "weekly"]);
   assert.equal(schema.interval_hours.minimum, 1);
   assert.equal(schema.interval_hours.maximum, 8760);
   for (const interval_hours of [undefined, null, "3", 0, -1, 1.5, 8761, Infinity, NaN])
@@ -896,4 +896,51 @@ test("scheduled repeats never overlap unfinished runs, respect global/definition
   await write(env, { action:"stop_all", revision:(await workflowRead(env)).settings.revision }, true);
   await exec(env, {action:"patrol"});
   assert.equal((await workflowRead(env)).runs.filter(r=>r.definition_id===d.id || r.definition_id===future.id).length, 0);
+});
+
+test("minute intervals validate bounds and preserve hourly/legacy formats", () => {
+  const schema = workflowTools.find(t => t.name === "draft_workflow").inputSchema.properties.content.properties;
+  assert.equal(schema.interval_minutes.minimum, 1);
+  assert.equal(schema.interval_minutes.maximum, 525600);
+  for (const interval_minutes of [undefined, null, "30", 0, -1, 0.5, 525601, Infinity, NaN])
+    assert.throws(() => validateWorkflow({ ...content, repeat: "minutely", interval_minutes }), /interval_minutes/);
+  for (const interval_minutes of [1, 30, 60, 525600]) {
+    const value = validateWorkflow({ ...content, repeat: "minutely", interval_minutes, interval_hours: 1 });
+    assert.equal(value.interval_minutes, interval_minutes);
+    assert.equal(Object.hasOwn(value, "interval_hours"), false);
+  }
+  assert.throws(() => validateWorkflow({ ...content, start: "2026-10-20T09:15", repeat: "minutely", interval_minutes: 30 }), /timezone/);
+  for (const repeat of ["once", "hourly", "daily", "weekly"])
+    assert.equal(Object.hasOwn(validateWorkflow({ ...content, repeat, interval_hours: 1, interval_minutes: 30 }), "interval_minutes"), false);
+});
+
+test("30 minute slots keep timezone anchor, history, snapshots and unique nonoverlapping runs", async (t) => {
+  const { env, create } = await fixture(t);
+  for (const start of ["2020-01-01T09:15:00+09:00", "2020-01-01T01:15:00+01:00", "2020-01-01T00:15:00Z"]) {
+    const d = await create({ ...content, start, repeat: "minutely", interval_minutes: 30 });
+    const before = Date.now();
+    await Promise.all([exec(env, { action: "patrol" }), exec(env, { action: "patrol" })]);
+    const detail = await workflowRead(env, { definition_id: d.id });
+    const next = Date.parse(detail.definition.next_due);
+    assert.ok(next > before && next <= Date.now() + 1800000);
+    assert.equal((next - Date.parse(start)) % 1800000, 0);
+    assert.ok(detail.versions.every(v => v.data.interval_minutes === 30));
+    const runs = (await workflowRead(env)).runs.filter(r => r.definition_id === d.id);
+    assert.equal(runs.length, 1);
+    assert.equal(runs[0].scheduled_for, "2020-01-01T00:15:00.000Z");
+    assert.equal(runs[0].data.definition.interval_minutes, 30);
+    // Force the next slot due while every possible unfinished status is present.
+    for (const status of ["queued", "running", "review", "waiting", "paused"]) {
+      await env.DB.prepare("UPDATE wf_runs SET status=?,lease_until=?,revision=revision+1 WHERE id=?").bind(status, Date.now()+3600000, runs[0].id).run();
+      await env.DB.prepare("UPDATE wf_definitions SET next_due=? WHERE id=?").bind("2020-01-01T00:45:00.000Z", d.id).run();
+      await Promise.all([exec(env, { action: "patrol" }), exec(env, { action: "patrol" })]);
+      assert.equal((await workflowRead(env)).runs.filter(r => r.definition_id === d.id).length, 1, status);
+    }
+    await env.DB.prepare("UPDATE wf_runs SET status='completed',revision=revision+1 WHERE id=?").bind(runs[0].id).run();
+    await Promise.all([exec(env, { action: "patrol" }), exec(env, { action: "patrol" })]);
+    assert.equal((await workflowRead(env)).runs.filter(r => r.definition_id === d.id).length, 2);
+    const nextAfter = Date.parse((await workflowRead(env, { definition_id: d.id })).definition.next_due);
+    assert.ok(nextAfter > Date.now());
+    assert.equal((nextAfter - Date.parse(start)) % 1800000, 0);
+  }
 });

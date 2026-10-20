@@ -29,8 +29,8 @@ const due = (x) => {
   if (!Number.isFinite(t)) fail(400, "valid date/time required");
   return new Date(t).toISOString();
 };
-const periods = { once: 0, hourly: 3600000, daily: 86400000, weekly: 604800000 };
-const periodOf = (d) => periods[d.repeat] * (d.repeat === "hourly" ? d.interval_hours : 1);
+const periods = { once: 0, minutely: 60000, hourly: 3600000, daily: 86400000, weekly: 604800000 };
+const periodOf = (d) => periods[d.repeat] * (d.repeat === "minutely" ? d.interval_minutes : d.repeat === "hourly" ? d.interval_hours : 1);
 function link(x) {
   const u = new URL(s(x, 2000, true));
   if (!["https:", "http:"].includes(u.protocol) || u.username || u.password)
@@ -51,6 +51,8 @@ export function validateWorkflow(d) {
     !Object.hasOwn(periods, d.repeat)
   )
     fail(400, "invalid kind/repeat");
+  if (d.repeat === "minutely" && (!Number.isSafeInteger(d.interval_minutes) || d.interval_minutes < 1 || d.interval_minutes > 525600))
+    fail(400, "interval_minutes must be an integer from 1 to 525600");
   if (d.repeat === "hourly" && (!Number.isSafeInteger(d.interval_hours) || d.interval_hours < 1 || d.interval_hours > 8760))
     fail(400, "interval_hours must be an integer from 1 to 8760");
   if (![1, 2, 3].includes(d.priority)) fail(400, "invalid priority");
@@ -64,6 +66,7 @@ export function validateWorkflow(d) {
     deadline: d.deadline ? due(d.deadline) : null,
     start: due(d.start),
     repeat: d.repeat,
+    ...(d.repeat === "minutely" ? { interval_minutes: d.interval_minutes } : {}),
     ...(d.repeat === "hourly" ? { interval_hours: d.interval_hours } : {}),
     tasks: d.tasks.map((t) => {
       if (!["self", "dot"].includes(t.assignee) || typeof t.gate !== "boolean")
@@ -473,8 +476,8 @@ export async function workflowExecute(env, a) {
         if (!(await instantiate(env, d, d.next_due, true))) continue;
         // Only move a due slot after its unique Run exists. Concurrent patrols use CAS.
         const period = periodOf(d.data);
-        // Hourly schedules coalesce missed slots into one Run, anchored to start.
-        const steps = d.data.repeat === "hourly"
+        // Minute and hour schedules coalesce missed slots into one Run, anchored to start.
+        const steps = ["minutely", "hourly"].includes(d.data.repeat)
           ? Math.max(1, Math.floor((Date.now() - Date.parse(d.next_due)) / period) + 1)
           : 1;
         const next = period ? new Date(Date.parse(d.next_due) + steps * period).toISOString() : null;
@@ -662,7 +665,8 @@ export const workflowTools = [
           priority: { enum: [1, 2, 3], description: "1=高、2=中、3=低" },
           start: { type: "string", description: "ISO 8601、タイムゾーン必須" },
           deadline: { type: ["string", "null"] },
-          repeat: { enum: ["once", "hourly", "daily", "weekly"] },
+          repeat: { enum: ["once", "minutely", "hourly", "daily", "weekly"] },
+          interval_minutes: { type: "integer", minimum: 1, maximum: 525600, description: "repeat=minutely のとき必須。開始日時からの整数分間隔（30分なら30）。既存 hourly/interval_hours は変更不要" },
           interval_hours: { type: "integer", minimum: 1, maximum: 8760, description: "repeat=hourly のとき必須。開始日時からの整数時間間隔" },
           tasks: {
             type: "array",

@@ -178,10 +178,19 @@
           ><label
             >繰り返し<select name="repeat">
               <option value="once">単発</option>
+              <option value="minutely">○分ごと</option>
               <option value="hourly">○時間ごと</option>
               <option value="daily">毎日</option>
               <option value="weekly">毎週</option>
             </select></label
+          ><label id="minutes-label" hidden
+            >間隔（分・1〜525600の整数）<input
+              type="number"
+              name="interval_minutes"
+              min="1"
+              max="525600"
+              step="1"
+              disabled /></label
           ><label id="hours-label" hidden
             >間隔（時間・1〜8760の整数）<input
               type="number"
@@ -239,6 +248,6 @@
         <div id="run-history"></div>
       </details>
     </dialog>
-    <script type="module" src="./app.js?v=4"></script>
+    <script type="module" src="./app.js?v=5"></script>
   </body>
 </html>
