@@ -212,6 +212,7 @@ function render() {
         .flatMap((d) => {
           const period = {
             once: 0,
+            minutely: d.data.interval_minutes * 60000,
             hourly: d.data.interval_hours * 3600000,
             daily: 86400000,
             weekly: 604800000,
@@ -225,10 +226,10 @@ function render() {
             ).toISOString();
           }
           const slots = [{ d, at }];
-          if (d.data.repeat === "hourly") {
+          if (["minutely", "hourly"].includes(d.data.repeat)) {
             for (
               let next = Date.parse(at) + period;
-              dateJP(next) === day && slots.length < 24;
+              dateJP(next) === day && slots.length < 1440;
               next += period
             )
               slots.push({ d, at: new Date(next).toISOString() });
@@ -292,7 +293,7 @@ function render() {
           node("h3", d.data.title),
           node(
             "p",
-            `${d.enabled ? "実行許可済み" : "停止・下書き"} · v${d.revision} · ${d.data.repeat === "hourly" ? `${d.data.interval_hours}時間ごと` : { once: "単発", daily: "毎日", weekly: "毎週" }[d.data.repeat]} · 次回 ${stamp(d.next_due)}`,
+            `${d.enabled ? "実行許可済み" : "停止・下書き"} · v${d.revision} · ${d.data.repeat === "minutely" ? `${d.data.interval_minutes}分ごと` : d.data.repeat === "hourly" ? `${d.data.interval_hours}時間ごと` : { once: "単発", daily: "毎日", weekly: "毎週" }[d.data.repeat]} · 次回 ${stamp(d.next_due)}`,
           ),
           node("p", d.data.purpose),
         );
@@ -442,7 +443,7 @@ function openEditor(d = null) {
           ? localTime(v)
           : v;
   } else form.elements.start.value = localTime(Date.now() + 3600000);
-  updateHoursInput();
+  updateIntervalInputs();
   $("#task-editor").replaceChildren(
     ...(d?.data.tasks || [undefined]).map(taskEditor),
   );
@@ -560,16 +561,20 @@ function renderRun(detail) {
     }),
   );
 }
-function updateHoursInput() {
+function updateIntervalInputs() {
   const f = $("#definition-form"),
     hourly = f.elements.repeat.value === "hourly";
   $("#hours-label").hidden = !hourly;
   f.elements.interval_hours.disabled = !hourly;
   f.elements.interval_hours.required = hourly;
+  const minutely = f.elements.repeat.value === "minutely";
+  $("#minutes-label").hidden = !minutely;
+  f.elements.interval_minutes.disabled = !minutely;
+  f.elements.interval_minutes.required = minutely;
 }
 $("#definition-form").elements.repeat.addEventListener(
   "change",
-  updateHoursInput,
+  updateIntervalInputs,
 );
 $("#definition-form").addEventListener("submit", (event) => {
   event.preventDefault();
@@ -585,6 +590,8 @@ $("#definition-form").addEventListener("submit", (event) => {
       "repeat",
     ])
       content[k] = f.elements[k].value;
+    if (content.repeat === "minutely")
+      content.interval_minutes = Number(f.elements.interval_minutes.value);
     if (content.repeat === "hourly")
       content.interval_hours = Number(f.elements.interval_hours.value);
     content.priority = Number(f.elements.priority.value);
