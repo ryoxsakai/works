@@ -5,7 +5,8 @@ import {
   signOutUser,
 } from "../shared/auth.js?v=12";
 import { esc, renderMarkdown } from "./markdown.js?v=2";
-import { createFolderBrowser } from "./folders.js?v=3";
+import { createFolderBrowser } from "./folders.js?v=4";
+import { compare, closeReview, selectPanel } from "./review.js?v=1";
 const $ = (id) => document.getElementById(id),
   state = {
     data: null,
@@ -45,6 +46,7 @@ async function api(p, body) {
 }
 async function run(fn) {
   if (state.busy) return;
+  const returnFocus = document.activeElement;
   state.busy = true;
   $("workspace").setAttribute("aria-busy", "true");
   notify("");
@@ -57,6 +59,7 @@ async function run(fn) {
     await fn();
   } catch (e) {
     notify(e.message, true);
+    if ($("review-dialog").open) $("review-message").textContent = e.message;
   } finally {
     state.busy = false;
     $("workspace").setAttribute("aria-busy", "false");
@@ -65,6 +68,16 @@ async function run(fn) {
         "button, #editor input:not([type=checkbox]), #editor textarea, #editor select, #folder-form input, #folder-form select",
       )
       .forEach((b) => (b.disabled = false));
+    const dialog = document.querySelector("dialog[open]");
+    if (dialog && document.activeElement === dialog)
+      dialog
+        .querySelector("input:not([disabled]), button:not([disabled])")
+        ?.focus();
+    else if (document.activeElement === document.body) {
+      if (returnFocus?.isConnected && returnFocus.getClientRects().length)
+        returnFocus.focus();
+      else if (!$("detail").hidden) $("title").focus({ preventScroll: true });
+    }
   }
 }
 function guard() {
@@ -85,6 +98,7 @@ function beforeNavigate() {
   $("editor").hidden = true;
   document.body.classList.remove("wiki-editing");
   $("folder-dialog").close();
+  closeReview();
   return true;
 }
 const folders = createFolderBrowser({
@@ -208,13 +222,6 @@ function selectCurrentPage() {
       else button.removeAttribute("aria-current");
     });
 }
-function compare(a, b, label) {
-  const oldLines = a.body.split("\n"),
-    newLines = b.body.split("\n");
-  $("comparison").innerHTML =
-    `<h4>${esc(label)}</h4><p>タイトル: ${esc(a.title)} → ${esc(b.title)}</p><div class="diff"><div><h4>変更前</h4>${oldLines.map((l, i) => `<pre class="${l === newLines[i] ? "" : "removed"}">${esc(l) || " "}</pre>`).join("")}</div><div><h4>変更後</h4>${newLines.map((l, i) => `<pre class="${l === oldLines[i] ? "" : "added"}">${esc(l) || " "}</pre>`).join("")}</div></div><p>出典・タグ・別名・関連ページ・状態</p><div class="diff"><pre>${esc(JSON.stringify({ ...a, body: undefined }, null, 2))}</pre><pre>${esc(JSON.stringify({ ...b, body: undefined }, null, 2))}</pre></div>`;
-  $("comparison").scrollIntoView({ block: "nearest" });
-}
 function render() {
   const { page: p, proposals, history } = state.data;
   $("detail").hidden = false;
@@ -222,6 +229,8 @@ function render() {
   $("title").textContent = p.title;
   $("meta").textContent =
     `${folders.label(p.folder_id)} · ${p.status === "confirmed" ? "確認済み" : "下書き"} · revision ${p.revision} · ${new Intl.DateTimeFormat("ja-JP", { timeZone: "Asia/Tokyo", dateStyle: "medium", timeStyle: "short" }).format(new Date(p.updated_at))}${p.archived ? " · アーカイブ" : ""} · タグ: ${p.tags.join(", ")} · 別名: ${p.aliases.join(", ")}`;
+  $("current-version").textContent =
+    `▤ 現在の本文 · r${p.revision} · ${p.status === "confirmed" ? "✓ 確認済み" : "✎ 下書き（未確認）"}${p.archived ? " · アーカイブ" : ""}`;
   $("body").innerHTML = renderMarkdown(p.body);
   const headings = [...$("body").querySelectorAll("h1,h2,h3")];
   $("page-outline").hidden = headings.length < 2;
@@ -242,6 +251,8 @@ function render() {
     }),
   );
   const pending = proposals.filter((v) => v.status === "pending").length;
+  $("tab-proposals").textContent =
+    `✎ 改稿案${pending ? `（確認待ち ${pending}）` : ""}`;
   $("proposal-heading").textContent = pending
     ? `改稿案 · 確認待ち ${pending}件`
     : "改稿案";
@@ -263,7 +274,7 @@ function render() {
     proposals
       .map(
         (v) =>
-          `<div class="proposal"><p>${esc(v.notes)} · 元r${v.base_revision} · ${esc(v.status)}</p><button data-compare-proposal="${esc(v.id)}">差分を確認</button>${v.status === "pending" ? `<button data-accept="${esc(v.id)}">採用</button><button data-reject="${esc(v.id)}">却下</button>` : ""}</div>`,
+          `<div class="proposal"><p>${esc(v.notes)} · 元r${v.base_revision} · ${{ pending: "確認待ち", accepted: "採用済み", rejected: "却下済み" }[v.status] || esc(v.status)}</p><button data-compare-proposal="${esc(v.id)}">差分を確認</button>${v.status === "pending" ? `<button data-accept="${esc(v.id)}">採用</button><button data-reject="${esc(v.id)}">却下</button>` : ""}</div>`,
       )
       .join("") || "<p>なし</p>";
   $("history").innerHTML = history
@@ -286,7 +297,10 @@ async function open(id, push = true) {
   folders.setCurrent(state.data.page.folder_id);
   await load(false, false);
   render();
+  selectPanel("content");
   route(folders.current(), id, push);
+  $("title").focus({ preventScroll: true });
+  $("detail").scrollIntoView({ block: "start" });
 }
 function addSource(
   s = {
@@ -399,7 +413,10 @@ $("editor").onsubmit = (e) => {
     document.body.classList.remove("wiki-editing");
     render();
     await load();
+    selectPanel("content");
     route(state.data.page.folder_id, state.data.page.id);
+    $("title").focus({ preventScroll: true });
+    $("detail").scrollIntoView({ block: "start" });
     notify("保存しました。");
   });
 };
@@ -413,6 +430,7 @@ $("propose").onclick = () =>
     });
     state.dirty = false;
     await open(state.editId);
+    selectPanel("proposals");
     notify("改稿案を保存しました。本文は採用時に更新されます。");
   });
 $("add-source").onclick = () => {
@@ -425,6 +443,7 @@ $("cancel").onclick = () => {
     state.editing = false;
     $("editor").hidden = true;
     document.body.classList.remove("wiki-editing");
+    (state.data ? $("edit") : $("new")).focus();
   }
 };
 $("more-history").onclick = () =>
@@ -474,16 +493,25 @@ $("workspace").onclick = (e) => {
   const p = state.data.page;
   if (d.compareProposal) {
     const v = state.data.proposals.find((v) => v.id === d.compareProposal);
-    compare(p, v.content, "現在の本文と改稿案");
+    compare(
+      p,
+      v.content,
+      "現在の本文と改稿案",
+      v.status === "pending" ? v.id : null,
+    );
   }
   if (d.history) {
     const h = state.data.history.find((h) => h.revision === Number(d.history));
     compare(h.snapshot, p, `r${h.revision} と現在`);
   }
+  if (d.accept) {
+    const v = state.data.proposals.find((v) => v.id === d.accept);
+    compare(p, v.content, "採用前に変更を確認", v.id);
+    return;
+  }
   for (const action of ["accept", "reject", "restore"])
-    if (d[action] && guard()) {
-      const v = state.data.proposals.find((v) => v.id === d[action]);
-      if (action === "accept") compare(p, v.content, "採用する改稿案");
+    if ((action === "accept" ? d.acceptReviewed : d[action]) && guard()) {
+      const actionId = action === "accept" ? d.acceptReviewed : d[action];
       if (
         confirm(
           action === "accept"
@@ -501,9 +529,10 @@ $("workspace").onclick = (e) => {
           state.data = await api("pages/" + path(p.id) + "/" + action, {
             revision: p.revision,
             ...(action === "restore"
-              ? { target_revision: Number(d[action]) }
-              : { proposal_id: d[action] }),
+              ? { target_revision: Number(actionId) }
+              : { proposal_id: actionId }),
           });
+          closeReview();
           folders.setCurrent(state.data.page.folder_id);
           render();
           await load();

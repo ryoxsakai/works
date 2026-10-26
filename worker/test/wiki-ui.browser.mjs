@@ -46,7 +46,7 @@ async function checkTheme(page, theme) {
       );
       const checks = [
         ...document.querySelectorAll(
-          ".source,.proposal,#history > div,#pages small,#detail p,#detail h1,#detail h2,#detail h3,#detail h4,#detail a,#detail button,#detail pre,#editor input,#editor select,#editor textarea,#editor label,#editor button,#message,#search,#folder-dialog input,#folder-dialog select,#folder-dialog button,#folder-dialog h2,#folder-dialog-message",
+          ".source,.proposal,#history > div,#pages small,#detail p,#detail h1,#detail h2,#detail h3,#detail h4,#detail a,#detail button,#detail pre,#editor input,#editor select,#editor textarea,#editor label,#editor button,#message,#search,#folder-dialog input,#folder-dialog select,#folder-dialog button,#folder-dialog h2,#folder-dialog-message,#review-dialog h2,#review-dialog h3,#review-dialog h4,#review-dialog pre,#review-dialog dt,#review-dialog dd,#review-dialog button,#review-message",
         ),
       ]
         .filter((e) => e.getClientRects().length && !e.disabled)
@@ -283,6 +283,20 @@ try {
       .click();
     await expect(page.locator("#title")).toHaveText(name + " knowledge");
     await expect(page.locator("#body h1")).toHaveText("Heading");
+    await expect(page.locator("#current-version")).toContainText(
+      "下書き（未確認）",
+    );
+    await expect(page.locator("#page-breadcrumb")).toContainText(
+      name + " knowledge",
+    );
+    await page.locator("#tab-content").focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(page.locator("#tab-proposals")).toBeFocused();
+    await expect(page.locator("#panel-content")).toBeHidden();
+    await page.keyboard.press("End");
+    await expect(page.locator("#tab-history")).toBeFocused();
+    await page.keyboard.press("Home");
+    await expect(page.locator("#panel-content")).toBeVisible();
     const editHeight = await page
       .locator("#edit")
       .evaluate((el) => el.getBoundingClientRect().height);
@@ -309,6 +323,13 @@ try {
       "id",
       "wiki-section-1",
     );
+    await page
+      .locator("#detail")
+      .evaluate((el) => el.scrollIntoView({ block: "start" }));
+    await page.screenshot({
+      path: "test-artifacts/wiki-reading-" + name + ".png",
+      fullPage: false,
+    });
     await page.locator("#edit").click();
     await page.locator("[name=body]").fill("proposed knowledge");
     await page.locator("#proposal-notes").fill("synthetic proposal");
@@ -324,6 +345,13 @@ try {
     await expect(page.locator("#comparison")).toContainText(
       "proposed knowledge",
     );
+    await expect(page.locator("#review-dialog")).toBeVisible();
+    await page.screenshot({
+      path: "test-artifacts/wiki-review-" + name + ".png",
+      fullPage: false,
+    });
+    await page.keyboard.press("Escape");
+    await expect(page.locator("[data-compare-proposal]")).toBeFocused();
     const themePageId = await page
       .locator("#pages button")
       .filter({ hasText: name + " knowledge" })
@@ -362,6 +390,7 @@ try {
       opposite,
     );
     await page.locator('#pages [data-page="' + themePageId + '"]').click();
+    await page.locator("#tab-proposals").click();
     await page.locator("[data-compare-proposal]").click();
     await checkTheme(page, opposite);
     await setTheme(page, "system");
@@ -376,7 +405,32 @@ try {
     await setTheme(page, selectedTheme);
     let acceptDialogs = true;
     page.on("dialog", (d) => (acceptDialogs ? d.accept() : d.dismiss()));
+    await expect(page.locator("#body")).toContainText("Safe knowledge");
+    await page.locator("#review-done").click();
     await page.locator("[data-accept]").click();
+    await expect(page.locator("#review-dialog")).toBeVisible();
+    await expect(page.locator("#body")).toContainText("Safe knowledge");
+    await page.route(
+      "**/api/wiki/pages/*/accept",
+      (route) =>
+        route.fulfill({ status: 409, json: { error: "synthetic conflict" } }),
+      { times: 1 },
+    );
+    await page.locator("#review-adopt").click();
+    await expect(page.locator("#review-message")).toContainText(
+      "別の画面で更新",
+    );
+    await expect(page.locator("#review-dialog")).toBeVisible();
+    await expect(page.locator("#body")).toContainText("Safe knowledge");
+    await checkTheme(page, selectedTheme);
+    acceptDialogs = false;
+    await page.locator("#review-adopt").click();
+    await expect(page.locator("#review-dialog")).toBeVisible();
+    await expect(page.locator("#body")).toContainText("Safe knowledge");
+    acceptDialogs = true;
+    await page.locator("#review-adopt").click();
+    await expect(page.locator("#review-dialog")).toBeHidden();
+    await page.locator("#tab-content").click();
     await expect(page.locator("#body")).toContainText("proposed knowledge");
     await expect(page.locator("#meta")).toContainText("revision 2");
     // An external write during editing must conflict and preserve the old input.
@@ -405,7 +459,14 @@ try {
     await page.locator("[name=body]").fill("old form");
     await expect(page.locator("#wiki-layout")).not.toBeVisible();
     await page.locator("#cancel").click();
+    await page.locator("#tab-history").click();
+    await page.locator('[data-history="1"]').click();
+    await expect(page.locator("#review-adopt")).toBeHidden();
+    await expect(page.locator("#comparison")).toContainText("出典・ページ情報");
+    await page.keyboard.press("Escape");
+    await expect(page.locator('[data-history="1"]')).toBeFocused();
     await page.locator('[data-restore="1"]').click();
+    await page.locator("#tab-content").click();
     await expect(page.locator("#editor")).toBeHidden();
     await expect(page.locator("#body")).toContainText("Safe knowledge");
     const download = page.waitForEvent("download");
@@ -617,6 +678,7 @@ try {
     acceptDialogs = true;
     await page.locator("#folder-dialog-cancel").click();
     await expect(page.locator("#folder-dialog")).toBeHidden();
+    await expect(page.locator("#new-folder")).toBeFocused();
     assert.ok(
       !(await api("folders")).folders.some(
         (f) => f.name === "cancelled folder",
@@ -690,6 +752,32 @@ try {
     await expect(page.locator("#pages .wiki-empty")).toContainText(
       "一致するページがありません",
     );
+    await checkTheme(page, selectedTheme);
+    // Corrupt legacy hierarchy is projected safely without issuing writes.
+    const navigationFixture = {
+      folders: [
+        { id: "cycle-a", name: "Cycle A", parent_id: "cycle-b" },
+        { id: "cycle-b", name: "Cycle B", parent_id: "cycle-a" },
+        { id: "orphan-folder", name: "Orphan folder", parent_id: "missing" },
+      ],
+      pages: [
+        { id: "orphan-page", title: "Orphan page", folder_id: "missing" },
+      ],
+    };
+    await page.route("**/api/wiki/folders", (route) =>
+      route.fulfill({ json: navigationFixture }),
+    );
+    await page.goto(origin + "/wiki/");
+    await expect(page.locator("#find")).toBeEnabled();
+    await page.locator("#view-tree").click();
+    await expect(page.locator("#hierarchy-warning")).toBeVisible();
+    for (const id of ["cycle-a", "cycle-b", "orphan-folder"])
+      await expect(
+        page.locator('#folder-tree [data-folder-open="' + id + '"]'),
+      ).toHaveCount(1);
+    await expect(
+      page.locator('#folder-tree [data-page="orphan-page"]'),
+    ).toBeVisible();
     await checkTheme(page, selectedTheme);
     assert.deepEqual(errors, []);
     await context.close();
