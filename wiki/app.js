@@ -5,8 +5,8 @@ import {
   signOutUser,
 } from "../shared/auth.js?v=12";
 import { esc, renderMarkdown } from "./markdown.js?v=2";
-import { createFolderBrowser } from "./folders.js?v=4";
-import { compare, closeReview, selectPanel } from "./review.js?v=1";
+import { createFolderBrowser } from "./folders.js?v=5";
+import { compare, closeReview, selectPanel } from "./review.js?v=2";
 const $ = (id) => document.getElementById(id),
   state = {
     data: null,
@@ -495,18 +495,25 @@ $("workspace").onclick = (e) => {
     const v = state.data.proposals.find((v) => v.id === d.compareProposal);
     compare(
       p,
-      v.content,
+      { ...p, ...v.content },
       "現在の本文と改稿案",
       v.status === "pending" ? v.id : null,
+      folders.label,
     );
   }
   if (d.history) {
     const h = state.data.history.find((h) => h.revision === Number(d.history));
-    compare(h.snapshot, p, `r${h.revision} と現在`);
+    compare(h.snapshot, p, `r${h.revision} と現在`, null, folders.label);
   }
   if (d.accept) {
     const v = state.data.proposals.find((v) => v.id === d.accept);
-    compare(p, v.content, "採用前に変更を確認", v.id);
+    compare(
+      p,
+      { ...p, ...v.content },
+      "採用前に変更を確認",
+      v.id,
+      folders.label,
+    );
     return;
   }
   for (const action of ["accept", "reject", "restore"])

@@ -4,20 +4,21 @@ const $ = (id) => document.getElementById(id);
 export function createFolderBrowser(hooks) {
   const state = {
     folders: [],
+    parents: new Map(),
     pages: [],
     current: null,
     view: "folders",
     dialog: null,
   };
   const folder = (id) => state.folders.find((f) => f.id === id);
-  const ancestors = (id) => {
+  const ancestors = (id, raw = false) => {
     const result = [],
       seen = new Set();
     let f = folder(id);
     while (f && !seen.has(f.id)) {
       seen.add(f.id);
       result.unshift(f);
-      f = folder(f.parent_id);
+      f = folder(raw ? f.parent_id : state.parents.get(f.id));
     }
     return result;
   };
@@ -38,7 +39,7 @@ export function createFolderBrowser(hooks) {
       ),
     );
     ancestors(state.current).forEach((f) => open.add(f.id));
-    const parents = navigationParents(state.folders);
+    const parents = state.parents;
     $("hierarchy-warning").hidden = !state.folders.some(
       (f) => parents.get(f.id) !== (f.parent_id ?? null),
     );
@@ -104,6 +105,7 @@ export function createFolderBrowser(hooks) {
   async function refresh() {
     const data = await hooks.api("folders");
     state.folders = data.folders;
+    state.parents = navigationParents(state.folders);
     state.pages = data.pages;
     $("tree-limit").hidden = !data.pages_truncated;
     if (state.current && !folder(state.current)) state.current = null;
@@ -136,7 +138,7 @@ export function createFolderBrowser(hooks) {
     return (
       '<option value="">Wiki / 未分類</option>' +
       state.folders
-        .filter((f) => !ancestors(f.id).some((a) => a.id === excluded))
+        .filter((f) => !ancestors(f.id, true).some((a) => a.id === excluded))
         .map((f) => `<option value="${esc(f.id)}">${esc(label(f.id))}</option>`)
         .join("")
     );

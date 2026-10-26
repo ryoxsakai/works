@@ -110,6 +110,36 @@ async function checkTheme(page, theme) {
         .join(", ");
     })
     .toBe("");
+  // Wiki selection must survive the later shared workspace button styles.
+  if (await page.locator('.wiki-tabs [aria-selected="true"]').isVisible()) {
+    await page.mouse.move(0, 0);
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const active = document.querySelector(
+            '.wiki-tabs [aria-selected="true"]',
+          );
+          const inactive = document.querySelector(
+            '.wiki-tabs [aria-selected="false"]',
+          );
+          const probe = document.createElement("div");
+          probe.style.background = "var(--bg-hover)";
+          document.body.append(probe);
+          const expected = getComputedStyle(probe).backgroundColor;
+          probe.remove();
+          const selected = getComputedStyle(active),
+            other = getComputedStyle(inactive);
+          return (
+            selected.backgroundColor === expected &&
+            selected.backgroundColor !== other.backgroundColor &&
+            selected.boxShadow.includes("inset") &&
+            selected.boxShadow.includes("-3px") &&
+            other.boxShadow === "none"
+          );
+        }),
+      )
+      .toBe(true);
+  }
   // Visible controls vary between listing, viewing, editing and dialogs.
   await expect(page.locator("#search")).toBeVisible();
   if (await page.locator("#folder-dialog").isVisible()) {
@@ -472,8 +502,24 @@ try {
     const download = page.waitForEvent("download");
     await page.locator("[data-export=json]").click();
     assert.match((await download).suggestedFilename(), /\.json$/);
+    const beforeArchive = (await api("pages/" + id)).page.revision;
     await page.locator("#archive").click();
     await expect(page.locator("#meta")).toContainText("アーカイブ");
+    await page.locator("#tab-history").click();
+    await page.locator('[data-history="' + beforeArchive + '"]').click();
+    await expect(
+      page.locator("#comparison .diff > section").first(),
+    ).toContainText("通常表示（未アーカイブ）");
+    await expect(
+      page.locator("#comparison .diff > section").last(),
+    ).toContainText("アーカイブ済み");
+    await expect(page.locator("#review-adopt")).toBeHidden();
+    await page.locator("#review-done").click();
+    assert.equal(
+      (await api("pages/" + id)).page.revision,
+      beforeArchive + 1,
+      "Comparison does not restore archived state",
+    );
     await expect(page.locator("#move-page")).toBeHidden();
     await page.reload();
     await expect(page.locator("#title")).toHaveText(name + " knowledge");
@@ -619,6 +665,28 @@ try {
     assert.equal(moved.folder_id, parentFolder.id);
     assert.equal(moved.revision, 2);
     assert.equal(moved.body, rich);
+    await page.locator("#tab-history").click();
+    await page.locator('[data-history="1"]').click();
+    await expect(
+      page.locator("#comparison .diff > section").first(),
+    ).toContainText(childFolder.id);
+    await expect(
+      page.locator("#comparison .diff > section").first(),
+    ).toContainText(name + " Renamed");
+    await expect(
+      page.locator("#comparison .diff > section").last(),
+    ).toContainText(parentFolder.id);
+    await expect(
+      page.locator("#comparison .diff > section").last(),
+    ).toContainText(name + " Parent");
+    await expect(page.locator("#review-adopt")).toBeHidden();
+    await page.locator("#review-done").click();
+    assert.equal(
+      (await api("pages/" + richId)).page.revision,
+      2,
+      "Comparison does not restore folder membership",
+    );
+    await page.locator("#tab-content").click();
     await page.locator("#move-page").click();
     await expect(page.locator("#folder-dialog-submit")).toBeEnabled();
     await page.locator("#folder-target").selectOption(childFolder.id);
@@ -778,6 +846,42 @@ try {
     await expect(
       page.locator('#folder-tree [data-page="orphan-page"]'),
     ).toBeVisible();
+    await page.route("**/api/wiki/pages?*", (route) =>
+      route.fulfill({ json: { pages: [], has_more: false } }),
+    );
+    await page.locator('#folder-tree [data-folder-open="cycle-a"]').click();
+    await expect(page.locator("#find")).toBeEnabled();
+    await expect(page.locator("#folder-breadcrumb button")).toHaveText([
+      "Wiki",
+      "Cycle A",
+    ]);
+    await expect(page.locator("#folder-heading")).toHaveText("Cycle A");
+    await expect(
+      page.locator('#folder-grid [data-folder-open="cycle-b"]'),
+    ).toBeVisible();
+    await page.locator('#folder-tree [data-folder-open="cycle-b"]').click();
+    await expect(page.locator("#find")).toBeEnabled();
+    await expect(page.locator("#folder-breadcrumb button")).toHaveText([
+      "Wiki",
+      "Cycle A",
+      "Cycle B",
+    ]);
+    await expect(page.locator("#folder-heading")).toHaveText(
+      "Cycle A / Cycle B",
+    );
+    await page
+      .locator('#folder-tree [data-folder-open="orphan-folder"]')
+      .click();
+    await expect(page.locator("#find")).toBeEnabled();
+    await expect(page.locator("#folder-breadcrumb button")).toHaveText([
+      "Wiki",
+      "Orphan folder",
+    ]);
+    await expect(page.locator("#folder-heading")).toHaveText("Orphan folder");
+    assert.deepEqual(
+      navigationFixture.folders.map((f) => f.parent_id),
+      ["cycle-b", "cycle-a", "missing"],
+    );
     await checkTheme(page, selectedTheme);
     assert.deepEqual(errors, []);
     await context.close();
