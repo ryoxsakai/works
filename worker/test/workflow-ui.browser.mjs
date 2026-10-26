@@ -31,6 +31,17 @@ await env.DB.batch(
     .filter((s) => s.trim())
     .map((s) => env.DB.prepare(s)),
 );
+const roleSql = await readFile(
+  new URL("../workflow-migrations/0002-roles.sql", import.meta.url),
+  "utf8",
+);
+await env.DB.batch(
+  roleSql
+    .replace(/^--.*$/gm, "")
+    .split(/(?=^CREATE )/m)
+    .filter((s) => s.trim())
+    .map((s) => env.DB.prepare(s)),
+);
 const payload = Buffer.from(
     JSON.stringify({ email: env.ALLOWED_EMAIL, exp: Date.now() + 3600000 }),
   ).toString("base64url"),
@@ -84,11 +95,12 @@ await context.route("**/*", async (route) => {
     : url.pathname;
   try {
     return route.fulfill({
-      contentType: path.endsWith(".js")
-        ? "text/javascript"
-        : path.endsWith(".css")
-          ? "text/css"
-          : "text/html",
+      contentType:
+        path.endsWith(".js") || path.endsWith(".mjs")
+          ? "text/javascript"
+          : path.endsWith(".css")
+            ? "text/css"
+            : "text/html",
       body: await readFile(new URL("." + path, root)),
     });
   } catch {
@@ -97,13 +109,53 @@ await context.route("**/*", async (route) => {
 });
 const page = await context.newPage(),
   errors = [];
-page.on("pageerror", (e) => errors.push(e.message));
+page.on("pageerror", (e) => {
+  errors.push(e.message);
+  console.error("Browser error:", e.message);
+});
 page.on("dialog", (d) => d.accept());
 try {
+  await mkdir(new URL("../test-artifacts/workflow/", import.meta.url), {
+    recursive: true,
+  });
+  await page.goto(origin + "/workflow/roles.html");
+  await expect(page.locator("#workspace")).toBeVisible();
+  await page.locator("#new-role").click();
+  const roleForm = page.locator("#role-form");
+  for (const [name, value] of Object.entries({
+    name: "調査担当",
+    responsibilities: "原典を確認",
+    operations: "読み取りのみ",
+    completion: "根拠を確認",
+  }))
+    await roleForm.locator(`[name=${name}]`).fill(value);
+  await roleForm.locator("[name=color]").selectOption("sky");
+  await roleForm.getByRole("button", { name: "保存", exact: true }).click();
+  await expect(page.locator("#role-editor")).not.toBeVisible();
+  await expect(page.locator("#roles")).toContainText("調査担当");
+  await page.screenshot({
+    path: new URL(
+      "../test-artifacts/workflow/roles-desktop.png",
+      import.meta.url,
+    ).pathname,
+    fullPage: true,
+  });
+  await page.getByRole("button", { name: "編集", exact: true }).click();
+  await page.keyboard.press("Escape");
+  await expect(
+    page.getByRole("button", { name: "編集", exact: true }),
+  ).toBeFocused();
+  await page.getByRole("button", { name: "編集", exact: true }).click();
+  await page.goBack();
+  await expect(page.locator("#role-editor")).not.toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "編集", exact: true }),
+  ).toBeFocused();
   await page.goto(origin + "/workflow/");
   await expect(page.locator("#workspace")).toBeVisible();
   await page.locator("#new").click();
   const f = page.locator("#definition-form");
+  await f.locator("[name=task-role]").selectOption({ label: "● 調査担当" });
   await f
     .locator("[name=title]")
     .fill("合成フロー <img src=x onerror=alert(1)>");
@@ -149,6 +201,29 @@ try {
   await page.locator("#today").click();
   await page.getByRole("button", { name: "手動実行", exact: true }).click();
   await expect(page.locator("#run-dialog")).toBeVisible();
+  await page.getByText("配分案・未着手指示の改稿", { exact: true }).click();
+  await page
+    .getByLabel("指示案", { exact: true })
+    .fill("原典を確認し出典を記録する");
+  await page
+    .getByLabel("理由・優先順位・期限・依存の確認", { exact: true })
+    .fill("優先順位と期限を確認、現在工程なので前工程なし");
+  await page.getByRole("button", { name: "配分案を保存", exact: true }).click();
+  await expect(page.locator("#run-detail")).toContainText(
+    "原典を確認し出典を記録する",
+  );
+  await page.getByText("配分案・未着手指示の改稿", { exact: true }).click();
+  await page
+    .getByRole("button", { name: "この案を確認・採用", exact: true })
+    .click();
+  await expect(page.locator("#run-detail")).toContainText(
+    "採用済み指示：原典を確認し出典を記録する",
+  );
+  await page.screenshot({
+    path: new URL("../test-artifacts/workflow/plan-modal.png", import.meta.url)
+      .pathname,
+    fullPage: true,
+  });
   await page.getByRole("button", { name: "一時停止", exact: true }).click();
   await expect(page.locator("#run-detail > p").first()).toContainText(
     "一時停止 · 定義",
@@ -158,6 +233,13 @@ try {
     "未着手 · 定義",
   );
   await page.locator("[data-close=run-dialog]").click();
+  await page.screenshot({
+    path: new URL(
+      "../test-artifacts/workflow/board-planned.png",
+      import.meta.url,
+    ).pathname,
+    fullPage: true,
+  });
   await expect(page.locator("#active-runs .wf-run")).toHaveCount(1);
   await page.locator("#workflow-search").fill("一致しない検索");
   await expect(page.locator("#active-runs .wf-run")).toHaveCount(0);
@@ -227,7 +309,7 @@ try {
       .pathname,
     fullPage: true,
   });
-  assert.equal(await page.locator(".wf-day:visible").count(), 7);
+  assert.equal(await page.locator(".wf-day:visible").count(), 4);
   await page.setViewportSize({ width: 390, height: 844 });
   assert.equal(await page.locator(".wf-day:visible").count(), 1);
   const day = await page.locator("#day").inputValue();

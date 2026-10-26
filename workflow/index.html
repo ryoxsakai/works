@@ -7,7 +7,7 @@
     <script src="/shared/theme-init.js?v=1"></script>
     <link rel="stylesheet" href="/shared/styles.css?v=56" />
     <link rel="stylesheet" href="/shared/header.css?v=2" />
-    <link rel="stylesheet" href="./workflow.css?v=3" />
+    <link rel="stylesheet" href="./workflow.css?v=4" />
     <link rel="stylesheet" href="/shared/workspace-ui.css?v=1" />
     <script type="module" src="/shared/header.js?v=4"></script>
   </head>
@@ -29,20 +29,58 @@
         <div class="wf-title">
           <div>
             <p>自動実行 / ワークフロー</p>
-            <h2>仕事の進み具合を確認する</h2>
+            <h2>今日から3日先の仕事</h2>
           </div>
           <div class="workspace-actions">
-            <button id="refresh">更新</button
+            <a href="./roles.html">◆ 担当の登録・編集</a
+            ><button id="refresh">更新</button
             ><button id="new" class="ui-primary">＋ ワークフローを作成</button>
           </div>
         </div>
+        <div class="workspace-section-heading">
+          <h2 class="wf-section-title">実行予定と履歴</h2>
+          <div
+            id="calendar-view"
+            class="ui-segmented"
+            aria-label="実行予定の表示"
+          >
+            <button data-view="calendar" aria-pressed="true">カレンダー</button
+            ><button data-view="agenda" aria-pressed="false">一覧</button>
+          </div>
+        </div>
+        <p class="wf-note">
+          件数は取得済みの Run が対象です。未来の予定は巡回時に Run
+          へ変わります。同一定義に未完了の Run がある間は次回を作成しません。
+        </p>
+        <p id="coverage" class="wf-note"></p>
+        <label
+          >担当で絞り込み<select id="role-filter">
+            <option value="">担当すべて</option>
+          </select></label
+        >
+        <nav id="filters" class="wf-filters" aria-label="状態で絞り込み"></nav>
+        <div class="wf-calendar-bar">
+          <button id="prev" aria-label="前日">← 前日</button
+          ><input id="day" type="date" aria-label="表示日" /><button
+            id="next"
+            aria-label="翌日"
+          >
+            翌日 →</button
+          ><button id="today">今日</button
+          ><span>PC：選択日から3日先まで / モバイル：1日・日本時間</span>
+        </div>
+        <section
+          id="calendar"
+          class="wf-week"
+          aria-label="日付別の実行一覧"
+        ></section>
         <section class="wf-focus" aria-labelledby="focus-heading">
           <div class="wf-title">
             <div>
               <h2 id="focus-heading">いま確認すること</h2>
-              <p>日付をまたいだ未完了の実行も、ここから開けます。</p>
+              <p>日付未定・過去予定・期限超過を含む未完了の実行です。</p>
             </div>
-            <a href="/wiki/">Wikiでルールを確認 →</a>
+            <a href="/wiki/">Wiki参考資料を見る →</a>
           </div>
           <div class="workspace-search">
             <label for="workflow-search">ワークフローを検索</label
@@ -84,38 +122,6 @@
             >
           </section>
         </details>
-        <div class="workspace-section-heading">
-          <h2 class="wf-section-title">実行予定と履歴</h2>
-          <div
-            id="calendar-view"
-            class="ui-segmented"
-            aria-label="実行予定の表示"
-          >
-            <button data-view="calendar" aria-pressed="true">カレンダー</button
-            ><button data-view="agenda" aria-pressed="false">一覧</button>
-          </div>
-        </div>
-        <p class="wf-note">
-          件数は取得済みの Run が対象です。未来の予定は巡回時に Run
-          へ変わります。同一定義に未完了の Run がある間は次回を作成しません。
-        </p>
-        <p id="coverage" class="wf-note"></p>
-        <nav id="filters" class="wf-filters" aria-label="状態で絞り込み"></nav>
-        <div class="wf-calendar-bar">
-          <button id="prev" aria-label="前日">← 前日</button
-          ><input id="day" type="date" aria-label="表示日" /><button
-            id="next"
-            aria-label="翌日"
-          >
-            翌日 →</button
-          ><button id="today">今日</button
-          ><span>PC：週表示 / モバイル：1日・日本時間</span>
-        </div>
-        <section
-          id="calendar"
-          class="wf-week"
-          aria-label="日付別の実行一覧"
-        ></section>
         <details class="wf-definitions" open>
           <summary>ワークフロー定義・実行許可</summary>
           <div id="definitions"></div>
@@ -239,6 +245,6 @@
         <div id="run-history"></div>
       </details>
     </dialog>
-    <script type="module" src="./app.js?v=4"></script>
+    <script type="module" src="./app.js?v=5"></script>
   </body>
 </html>

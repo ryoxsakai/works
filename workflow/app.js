@@ -1,3 +1,5 @@
+import { showDialog } from "./dialogs.mjs";
+import { runTime, orderRuns, roleOf } from "./planning.mjs";
 import {
   watchAuth,
   signIn,
@@ -102,6 +104,9 @@ async function load() {
     (state.definitions_truncated ? "定義は先頭200件を表示しています。" : "");
 }
 function matched(r) {
+  if (!searchMatches(r.data.definition)) return false;
+  if ($("#role-filter").value && roleOf(r)?.id !== $("#role-filter").value)
+    return false;
   return filter === "unfinished"
     ? !["completed", "cancelled"].includes(r.status)
     : filter === r.status;
@@ -113,6 +118,20 @@ function shift(n) {
   render();
 }
 function render() {
+  const roleFilter = $("#role-filter"),
+    previousRole = roleFilter.value;
+  roleFilter.replaceChildren(node("option", "担当すべて"));
+  roleFilter.firstChild.value = "";
+  for (const r of state.roles || []) {
+    const o = node(
+      "option",
+      r.data.icon + " " + r.data.name + (r.archived ? "（アーカイブ）" : ""),
+    );
+    o.value = r.id;
+    roleFilter.append(o);
+  }
+  roleFilter.value = previousRole;
+
   $("#day").value = selected;
   const active = state.runs.filter(
     (r) => !["completed", "cancelled"].includes(r.status),
@@ -120,13 +139,12 @@ function render() {
   const visibleActive = active.filter(
     (r) =>
       searchMatches(r.data.definition) &&
+      matched(r) &&
       (activeFilter === "all" || r.status === activeFilter),
   );
   $("#active-count").textContent =
     `${visibleActive.length}件表示 / 未完了 ${active.length}件`;
-  visibleActive.sort(
-    (a, b) => (a.status === "review" ? 0 : 1) - (b.status === "review" ? 0 : 1),
-  );
+  visibleActive.sort(orderRuns);
   $("#active-runs").replaceChildren(
     ...(visibleActive.length
       ? visibleActive.map((r) => runCard(r))
@@ -165,9 +183,8 @@ function render() {
     }),
   );
   const anchor = new Date(selected + "T00:00:00Z");
-  anchor.setUTCDate(anchor.getUTCDate() - ((anchor.getUTCDay() + 6) % 7));
   const days = [];
-  for (let i = 0; i < 7; i++) {
+  for (let i = 0; i < 4; i++) {
     const day = anchor.toISOString().slice(0, 10),
       el = node(
         "section",
@@ -191,19 +208,23 @@ function render() {
       ["automation", "自動実行"],
       ["workflow", "ワークフロー"],
     ]) {
-      const runs = state.runs.filter(
-        (r) =>
-          dateJP(
-            r.scheduled_for.startsWith("manual:")
-              ? r.data.created_at
-              : r.scheduled_for,
-          ) === day &&
-          r.data.definition.kind === kind &&
-          matched(r),
-      );
+      const runs = state.runs
+        .filter(
+          (r) =>
+            runTime(r) &&
+            dateJP(runTime(r)) === day &&
+            r.data.definition.kind === kind &&
+            matched(r),
+        )
+        .sort(orderRuns);
       const upcoming = state.definitions
         .filter(
           (d) =>
+            searchMatches(d.data) &&
+            (!$("#role-filter").value ||
+              d.data.tasks.some(
+                (t) => t.role_id === $("#role-filter").value,
+              )) &&
             d.enabled &&
             d.next_due &&
             d.data.kind === kind &&
@@ -247,32 +268,35 @@ function render() {
       group.append(
         node("summary", `${label} ${runs.length + upcoming.length}`),
       );
-      for (const r of runs) {
-        const b = button(r.data.definition.title, () => openRun(r.id));
-        b.className = "wf-run";
-        b.dataset.status = r.status;
-        b.append(
-          node(
-            "small",
-            `${states[r.status]} · ${r.data.current}/${r.data.tasks.length}`,
-          ),
-          node(
-            "small",
-            r.data.next_work || r.data.stop_reason || "成果物を確認済み",
-          ),
-        );
-        group.append(b);
-      }
-      for (const { d, at } of upcoming) {
-        const card = node("div", undefined, "wf-upcoming");
+      const entries = [
+        ...runs.map((r) => ({ r, at: runTime(r) })),
+        ...upcoming,
+      ];
+      entries.sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+      for (const entry of entries) {
+        if (entry.r) {
+          group.append(runCard(entry.r));
+          continue;
+        }
+        const { d, at } = entry,
+          card = node("div", undefined, "wf-upcoming");
         card.append(
           node("strong", d.data.title),
           node(
             "small",
-            `${stamp(at)} · 予定${state.settings.stopped ? "（全体停止中）" : ""}`,
+            `${stamp(at)} · 許可済み定義の予定${state.settings.stopped ? "（全体停止中）" : ""}`,
           ),
           node("small", "巡回時に Run を作成"),
         );
+        const role = d.data.tasks[0]?.role_snapshot;
+        if (role)
+          card.append(
+            node(
+              "span",
+              role.icon + " " + role.name,
+              "wf-role role-" + role.color,
+            ),
+          );
         group.append(card);
       }
       if (!runs.length && !upcoming.length)
@@ -362,6 +386,30 @@ function runCard(r) {
   const done = r.data.tasks.filter((t) => t.status === "completed").length;
   const status = node("span", states[r.status] || r.status, "wf-status");
   b.prepend(status);
+  const role = roleOf(r);
+  if (role)
+    b.append(
+      node("span", role.icon + " " + role.name, "wf-role role-" + role.color),
+    );
+  if (
+    r.data.definition.deadline &&
+    Date.parse(r.data.definition.deadline) < Date.now() &&
+    !["completed", "cancelled"].includes(r.status)
+  )
+    b.append(node("strong", "期限超過：" + stamp(r.data.definition.deadline)));
+  const time = runTime(r);
+  b.append(
+    node(
+      "small",
+      time
+        ? stamp(time) +
+            (dateJP(time) < dateJP(Date.now()) &&
+            !["completed", "cancelled"].includes(r.status)
+              ? " ・期限超過/過去予定"
+              : "")
+        : "日付未定",
+    ),
+  );
   const progress = node("progress");
   progress.max = Math.max(1, r.data.tasks.length);
   progress.value = done;
@@ -399,7 +447,37 @@ function taskEditor(
     l.append(input);
     row.append(l);
   }
-  const l = node("label", "担当"),
+  const roleLabel = node("label", "担当（役割）"),
+    roleSelect = node("select");
+  roleSelect.name = "task-role";
+  roleSelect.append(node("option", "担当なし"));
+  roleSelect.firstChild.value = "";
+  for (const role of state.roles || []) {
+    if (role.archived && role.id !== t.role_id) continue;
+    const option = node("option", role.data.icon + " " + role.data.name);
+    option.value = role.id;
+    roleSelect.append(option);
+  }
+  roleSelect.value = t.role_id || "";
+  roleLabel.append(roleSelect);
+  row.append(roleLabel);
+  const fixedLabel = node("label", "本人固定（dotの配分変更不可）", "wf-check"),
+    fixed = node("input");
+  fixed.type = "checkbox";
+  fixed.name = "task-fixed";
+  fixed.checked = t.fixed === true;
+  fixedLabel.prepend(fixed);
+  row.append(fixedLabel);
+  const refsLabel = node(
+      "label",
+      "Wiki参考URL（1行1件・実行許可にはなりません）",
+    ),
+    refs = node("textarea");
+  refs.name = "task-wiki";
+  refs.value = (t.wiki_refs || []).join("\n");
+  refsLabel.append(refs);
+  row.append(refsLabel);
+  const l = node("label", "実行者"),
     select = node("select");
   select.name = "task-assignee";
   for (const [v, text] of [
@@ -446,7 +524,7 @@ function openEditor(d = null) {
   $("#task-editor").replaceChildren(
     ...(d?.data.tasks || [undefined]).map(taskEditor),
   );
-  $("#editor").showModal();
+  showDialog($("#editor"));
 }
 async function openRun(id) {
   const viewGeneration = ++runViewGeneration;
@@ -454,7 +532,7 @@ async function openRun(id) {
   if (viewGeneration !== runViewGeneration) return;
   viewing = detail.run;
   renderRun(detail);
-  if (!$("#run-dialog").open) $("#run-dialog").showModal();
+  if (!$("#run-dialog").open) showDialog($("#run-dialog"));
 }
 function renderRun(detail) {
   const r = detail.run,
@@ -473,6 +551,101 @@ function renderRun(detail) {
     node("p", "次の作業：" + d.next_work),
     node("p", "停止理由：" + (d.stop_reason || "なし")),
   );
+  const task = d.tasks[d.current];
+  if (task && !task.fixed && !["completed", "cancelled"].includes(r.status)) {
+    const planning = node("details");
+    planning.append(node("summary", "配分案・未着手指示の改稿"));
+    planning.append(
+      node(
+        "p",
+        "案の保存では指示・権限は変わりません。本人の採用は実行権未取得の未着手工程だけ。直列依存・実行者・確認ゲート・許可範囲を維持します。",
+      ),
+    );
+    const fields = {};
+    for (const [key, label, type] of [
+      ["role_id", "担当", "select"],
+      ["planned_for", "予定（日本時間）", "input"],
+      ["instruction", "指示案", "textarea"],
+      ["rationale", "理由・優先順位・期限・依存の確認", "textarea"],
+    ]) {
+      const l = node("label", label),
+        input = node(type);
+      fields[key] = input;
+      if (key === "role_id") {
+        const none = node("option", "担当なし");
+        none.value = "";
+        input.append(none);
+        for (const role of state.roles || [])
+          if (!role.archived) {
+            const o = node("option", role.data.name);
+            o.value = role.id;
+            input.append(o);
+          }
+      }
+      if (key === "planned_for") input.type = "datetime-local";
+      const proposal = d.plan_suggestion || d.plan || {};
+      input.value =
+        key === "planned_for"
+          ? localTime(proposal[key])
+          : proposal[key] ||
+            (key === "instruction"
+              ? task.instruction || task.title
+              : key === "role_id"
+                ? task.role_id || ""
+                : "");
+      l.append(input);
+      planning.append(l);
+    }
+    planning.append(
+      button(
+        "配分案を保存",
+        async () => {
+          const plan = Object.fromEntries(
+            Object.entries(fields).map(([k, input]) => [k, input.value]),
+          );
+          plan.planned_for = plan.planned_for
+            ? new Date(plan.planned_for + ":00+09:00").toISOString()
+            : null;
+          await api({
+            action: "plan_suggest",
+            run_id: r.id,
+            revision: r.revision,
+            plan,
+          });
+          await load();
+          await openRun(r.id);
+        },
+        "#run-error",
+      ),
+    );
+    if (d.plan_suggestion) {
+      planning.append(node("pre", JSON.stringify(d.plan_suggestion, null, 2)));
+      if (r.status === "queued")
+        planning.append(
+          button(
+            "この案を確認・採用",
+            async () => {
+              if (
+                !confirm(
+                  "表示中の案を現在工程へ採用します。実行者・許可範囲・確認ゲートは維持されます。",
+                )
+              )
+                return;
+              await api({
+                action: "plan_apply",
+                run_id: r.id,
+                revision: r.revision,
+                authorized: true,
+              });
+              await load();
+              await openRun(r.id);
+            },
+            "#run-error",
+          ),
+        );
+    }
+    body.append(planning);
+  }
   const ol = node("ol");
   for (const t of d.tasks) {
     const li = node(
@@ -480,6 +653,23 @@ function renderRun(detail) {
       `${t.title} · ${t.assignee === "dot" ? "dot" : "自分"} · ${{ pending: "未着手", running: "進行中", review: "確認待ち", completed: "完了" }[t.status] || t.status}${t.gate ? " · 確認ゲート" : ""}`,
     );
     li.append(node("p", "完了条件：" + t.completion), node("p", t.result));
+    if (t.role_snapshot)
+      li.append(
+        node(
+          "span",
+          t.role_snapshot.icon + " " + t.role_snapshot.name,
+          "wf-role role-" + t.role_snapshot.color,
+        ),
+      );
+    if (t.fixed) li.append(node("p", "本人固定"));
+    if (t.instruction) li.append(node("p", "採用済み指示：" + t.instruction));
+    for (const href of t.wiki_refs || []) {
+      const a = node("a", "Wiki参考資料（権限ではありません）");
+      a.href = href;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      li.append(a);
+    }
     for (const href of t.evidence || []) {
       const a = node("a", href);
       a.href = href;
@@ -500,7 +690,6 @@ function renderRun(detail) {
     );
   $("#run-action").reset();
   $("#run-error").textContent = "";
-  const task = d.tasks[d.current];
   if (r.status === "review") {
     const f = $("#run-action");
     f.elements.result.value = task.result;
@@ -599,6 +788,12 @@ $("#definition-form").addEventListener("submit", (event) => {
       completion: row.querySelector("[name=task-completion]").value,
       assignee: row.querySelector("[name=task-assignee]").value,
       gate: row.querySelector("[name=task-gate]").checked,
+      role_id: row.querySelector("[name=task-role]").value || null,
+      fixed: row.querySelector("[name=task-fixed]").checked,
+      wiki_refs: row
+        .querySelector("[name=task-wiki]")
+        .value.split(/\n/)
+        .filter(Boolean),
     }));
     await api({
       action: editing ? "edit" : "create",
@@ -702,3 +897,5 @@ $("#calendar-view").addEventListener("click", (event) => {
   for (const item of $("#calendar-view").querySelectorAll("button"))
     item.setAttribute("aria-pressed", String(item === b));
 });
+
+$("#role-filter").onchange = render;

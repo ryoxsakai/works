@@ -897,3 +897,75 @@ test("scheduled repeats never overlap unfinished runs, respect global/definition
   await exec(env, {action:"patrol"});
   assert.equal((await workflowRead(env)).runs.filter(r=>r.definition_id===d.id || r.definition_id===future.id).length, 0);
 });
+
+async function installRoles(env) {
+  const sql = await readFile(new URL('../workflow-migrations/0002-roles.sql',import.meta.url),'utf8');
+  await env.DB.batch(sql.replace(/^--.*$/gm,'').split(/(?=^CREATE )/m).filter(x=>x.trim()).map(x=>env.DB.prepare(x)));
+}
+const roleContent={name:'調査',responsibilities:'原典を確認',operations:'指定資料の読み取りのみ',completion:'根拠URLを確認',icon:'◆',color:'sky'};
+const planContent={role_id:null,instruction:'資料を確認する',rationale:'期限と優先順位を確認、前工程の完了後',planned_for:null};
+test('role migration is additive, owner isolated, CAS protected and historical labels survive archival',async t=>{
+  const {env,create}=await fixture(t);
+  await create();
+  const before=await workflowRead(env);
+  assert.equal(before.roles,null);
+  await installRoles(env);
+  assert.deepEqual((await workflowRead(env)).runs,before.runs);
+  assert.deepEqual((await workflowRead(env)).definitions,before.definitions);
+  await assert.rejects(()=>write(env,{action:'role_create',content:roleContent}),{status:403});
+  const role=await write(env,{action:'role_create',content:roleContent},true);
+  await assert.rejects(()=>write({...env,ALLOWED_EMAIL:'other@example.test'},{action:'role_edit',role_id:role.id,revision:1,content:roleContent},true),{status:404});
+  const edits=await Promise.allSettled([1,2].map(i=>write(env,{action:'role_edit',role_id:role.id,revision:1,content:{...roleContent,name:'調査'+i}},true)));
+  assert.equal(edits.filter(x=>x.status==='fulfilled').length,1);
+  const d=await create({...content,tasks:[{...content.tasks[0],role_id:role.id}]});
+  let r=await write(env,{action:'start',definition_id:d.id,revision:d.revision,request_id:'role-history'},true);
+  assert.equal(r.data.tasks[0].role_snapshot.id,role.id);
+  await assert.rejects(()=>write(env,{action:'role_archive',role_id:role.id,revision:2},true),{status:409});
+  r=await write(env,{action:'plan_suggest',run_id:r.id,revision:r.revision,plan:planContent});
+  r=await write(env,{action:'plan_apply',run_id:r.id,revision:r.revision,authorized:true},true);
+  assert.equal(r.data.tasks[0].role_id,null);
+  await write(env,{action:'archive',definition_id:d.id,revision:d.revision},true);
+  await write(env,{action:'role_archive',role_id:role.id,revision:2},true);
+  assert.equal((await workflowRead(env)).roles[0].archived,1);
+  const history=(await workflowRead(env,{run_id:r.id})).history;
+  assert(history.some(h=>JSON.parse(h.snapshot).tasks[0].role_snapshot?.id===role.id));
+  await assert.rejects(()=>create({...content,tasks:[{...content.tasks[0],role_id:role.id}]}),{status:409});
+  // SQLite guards reject a stale concurrent assignment after archival too.
+  await assert.rejects(()=>env.DB.prepare('INSERT INTO wf_definitions(id,owner,data) VALUES(?,?,?)').bind('stale',env.ALLOWED_EMAIL,JSON.stringify({...content,tasks:[{...content.tasks[0],role_id:role.id}]})).run(),/role unavailable/);
+});
+test('planning proposals preserve execution authorization, fixed assignments, running instructions and concurrency fences',async t=>{
+  const {env,create}=await fixture(t);await installRoles(env);
+  let d=await create(),r=await write(env,{action:'start',definition_id:d.id,revision:d.revision,request_id:'plan'},true);
+  const original=structuredClone(r.data);
+  const suggestions=await Promise.allSettled([1,2].map(()=>write(env,{action:'plan_suggest',run_id:r.id,revision:r.revision,plan:planContent})));
+  assert.equal(suggestions.filter(x=>x.status==='fulfilled').length,1);
+  r=(await workflowRead(env,{run_id:r.id})).run;
+  assert.deepEqual(r.data.tasks,original.tasks);
+  await assert.rejects(()=>write(env,{action:'plan_apply',run_id:r.id,revision:r.revision,authorized:true}),{status:403});
+  r=await write(env,{action:'plan_apply',run_id:r.id,revision:r.revision,authorized:true},true);
+  assert.equal(r.data.tasks[0].assignee,original.tasks[0].assignee);
+  assert.equal(r.data.tasks[0].gate,true);
+  assert.equal(r.data.definition.permissions,original.definition.permissions);
+  r=await exec(env,{action:'claim',run_id:r.id,revision:r.revision});
+  const claimed=r;
+  r=await write(env,{action:'plan_suggest',run_id:r.id,revision:r.revision,plan:{...planContent,instruction:'実行中への新しい案'}});
+  assert.equal(r.data.tasks[0].instruction,planContent.instruction);
+  assert.equal(r.generation,claimed.generation);
+  await assert.rejects(()=>write(env,{action:'plan_apply',run_id:r.id,revision:r.revision,authorized:true},true),{status:409});
+  // Existing executor must reread after proposal revision; external effects still use original instructions.
+  await assert.rejects(()=>exec(env,{action:'external_begin',run_id:r.id,revision:claimed.revision,generation:claimed.generation,token:claimed.token,external_ref:'synthetic-key',result:'read'}),{status:409});
+  d=await create({...content,tasks:[{...content.tasks[0],fixed:true}]});
+  const fixed=await write(env,{action:'start',definition_id:d.id,revision:d.revision,request_id:'fixed'},true);
+  await assert.rejects(()=>write(env,{action:'plan_suggest',run_id:fixed.id,revision:fixed.revision,plan:planContent}),{status:409});
+});
+test('approved future plans cannot be claimed early; terminal work and external settings stay untouched',async t=>{
+  const {env,create}=await fixture(t);await installRoles(env);
+  const d=await create();let r=await write(env,{action:'start',definition_id:d.id,revision:d.revision,request_id:'future-plan'},true);
+  const cfg=(await workflowRead(env)).settings;
+  r=await write(env,{action:'plan_suggest',run_id:r.id,revision:r.revision,plan:{...planContent,planned_for:'2099-01-01T09:00:00+09:00'}});
+  r=await write(env,{action:'plan_apply',run_id:r.id,revision:r.revision,authorized:true},true);
+  await assert.rejects(()=>exec(env,{action:'claim',run_id:r.id,revision:r.revision}),{status:409});
+  r=await write(env,{action:'cancel',run_id:r.id,revision:r.revision},true);
+  await assert.rejects(()=>write(env,{action:'plan_suggest',run_id:r.id,revision:r.revision,plan:planContent}),{status:409});
+  assert.deepEqual((await workflowRead(env)).settings,cfg);
+});
