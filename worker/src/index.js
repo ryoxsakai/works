@@ -5501,17 +5501,34 @@ async function cloneTodo(env, args) {
       createdAt: todoToday(),
       cloneSourceId: source.id,
     };
-    // References stay inside the same authenticated owner document.
+    // Copy only references; reject embedded data in string and object forms.
+    const validReference = (value, urlOnly = false) => {
+      if (
+        typeof value !== "string" ||
+        !value ||
+        value.length > (urlOnly ? 2048 : 512) ||
+        /[\u0000-\u001f]/.test(value) ||
+        /^(data|blob|javascript):/i.test(value.trim())
+      )
+        return false;
+      if (!urlOnly) return true;
+      try {
+        return ["http:", "https:"].includes(new URL(value).protocol);
+      } catch {
+        return false;
+      }
+    };
     for (const key of ["links", "attachments"])
       if (Array.isArray(source[key]))
         task[key] = source[key]
           .map((ref) => {
-            if (typeof ref === "string") return /^(https?:\/\/|[a-zA-Z0-9_./-]{1,512}$)/.test(ref) && !/^(data|blob):/i.test(ref) ? ref : null;
+            if (typeof ref === "string")
+              return validReference(ref, /^https?:/i.test(ref)) ? ref : null;
             if (!ref || typeof ref !== "object") return null;
             const clean = Object.fromEntries(
               ["id", "url", "object_key"]
-                .filter((k) => typeof ref[k] === "string")
-                .map((k) => [k, ref[k]]),
+                .filter((key) => validReference(ref[key], key === "url"))
+                .map((key) => [key, ref[key]]),
             );
             return Object.keys(clean).length ? clean : null;
           })
@@ -5743,6 +5760,13 @@ async function callTodoTool(env, name, args = {}) {
   const task = state.tasks.find((t) => t.id === args.id);
   if (!task) throw Object.assign(new Error("task not found"), { status: 404 });
   if (name === "update_todo") {
+    const previousStatus =
+      task.status ??
+      (task.progress === 100
+        ? "done"
+        : task.progress > 0
+          ? "doing"
+          : "pending");
     for (const key of Object.keys(todoFields))
       if (Object.hasOwn(args, key)) task[key] = args[key];
     if (args.status !== undefined) {
@@ -5752,8 +5776,6 @@ async function callTodoTool(env, name, args = {}) {
           : task.progress === 100
             ? 0
             : task.progress;
-      task.completedAt =
-        args.status === "done" ? new Date().toISOString() : null;
     } else if (args.progress !== undefined)
       task.status =
         args.progress === 100
@@ -5761,6 +5783,11 @@ async function callTodoTool(env, name, args = {}) {
           : args.progress > 0
             ? "doing"
             : "pending";
+    if (args.status !== undefined || args.progress !== undefined) {
+      if (task.status !== "done") task.completedAt = null;
+      else if (previousStatus !== "done")
+        task.completedAt = new Date().toISOString();
+    }
     const saved = await writeTodo(env, state);
     return { ...task, revision: saved.revision };
   }

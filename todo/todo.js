@@ -35,10 +35,51 @@ let state,
   cloneSource,
   cloneBase,
   dialogEpoch = 0;
-let pending = {};
-try {
-  pending = JSON.parse(localStorage.getItem(pendingKey) || "{}");
-} catch {}
+const pendingPrefix = pendingKey + ":";
+function validPending(args) {
+  return (
+    args &&
+    typeof args.id === "string" &&
+    typeof args.request_id === "string" &&
+    /^[a-zA-Z0-9_-]{16,100}$/.test(args.request_id) &&
+    typeof args.base_day === "string" &&
+    /^\d{4}-\d{2}-\d{2}$/.test(args.base_day) &&
+    Number.isInteger(args.offset_days) &&
+    args.offset_days >= 1 &&
+    args.offset_days <= 3650
+  );
+}
+function readPending() {
+  const result = {};
+  try {
+    // Migrate the original map to independent keys without erasing other tabs.
+    const legacy = JSON.parse(localStorage.getItem(pendingKey) || "{}");
+    for (const args of Object.values(legacy || {}))
+      if (validPending(args))
+        localStorage.setItem(
+          pendingPrefix + args.request_id,
+          JSON.stringify(args),
+        );
+    localStorage.removeItem(pendingKey);
+    for (let index = 0; index < localStorage.length; index++) {
+      const key = localStorage.key(index);
+      if (!key?.startsWith(pendingPrefix)) continue;
+      try {
+        const args = JSON.parse(localStorage.getItem(key));
+        if (validPending(args) && key === pendingPrefix + args.request_id)
+          result[args.request_id] = args;
+      } catch {}
+    }
+  } catch {}
+  return result;
+}
+let pending = readPending();
+window.addEventListener("storage", (event) => {
+  if (event.key === pendingKey || event.key?.startsWith(pendingPrefix)) {
+    pending = readPending();
+    if (state) renderRecovery();
+  }
+});
 async function api(path = "", options = {}) {
   const response = await fetch("/api/todo" + path, {
     ...options,
@@ -64,9 +105,13 @@ function setBusy(value) {
     .querySelectorAll(
       "#app button,#app input,#app select,dialog button:not([data-close]),dialog input,dialog select,dialog textarea",
     )
-    .forEach(
-      (el) => (el.disabled = value || el.hasAttribute("data-fixed-disabled")),
-    );
+    .forEach((el) => {
+      const stale = el.closest("dialog")?.dataset.stale === "true";
+      el.disabled =
+        value ||
+        el.hasAttribute("data-fixed-disabled") ||
+        (stale && !el.hasAttribute("data-dialog-reload"));
+    });
 }
 async function reload() {
   state = await api();
@@ -75,10 +120,16 @@ async function reload() {
 async function save(next, success = "保存しました") {
   if (busy) return false;
   const focusOrigin = document.activeElement;
+  const dialog = document.querySelector("dialog[open]"),
+    epoch = dialogEpoch;
+  // Every form stays bound to the revision it originally displayed.
+  if (dialog) next.revision = Number(dialog.dataset.baseRevision);
   setBusy(true);
   try {
     state = await api("", { method: "PUT", body: JSON.stringify(next) });
     render();
+    if (dialog?.open && epoch === dialogEpoch)
+      dialog.dataset.baseRevision = String(state.revision);
     message(success);
     return true;
   } catch (error) {
@@ -90,6 +141,16 @@ async function save(next, success = "保存しました") {
     try {
       await reload();
     } catch {}
+    if (
+      dialog?.open &&
+      epoch === dialogEpoch &&
+      (error.status === 409 ||
+        !error.status ||
+        Number(dialog.dataset.baseRevision) !== state.revision)
+    ) {
+      dialog.dataset.stale = "true";
+      dialog.querySelector("[data-dialog-conflict]").hidden = false;
+    }
     return false;
   } finally {
     setBusy(false);
@@ -129,7 +190,7 @@ function group(title, tasks, note = "") {
   return `<section class="group"><div class="group-heading"><h3>${esc(title)}</h3><span class="count">${tasks.length}件</span></div>${note ? `<p class="hint">${esc(note)}</p>` : ""}${tasks.length ? tasks.map(card).join("") : '<p class="empty">ここにはタスクがありません。</p>'}</section>`;
 }
 function render() {
-  const role = $("role-filter").value,
+  let role = $("role-filter").value,
     category = $("category-filter").value;
   $("role-filter").innerHTML =
     '<option value="">すべて</option>' +
@@ -146,6 +207,8 @@ function render() {
   $("category-filter").value = state.categories.includes(category)
     ? category
     : "";
+  role = $("role-filter").value;
+  category = $("category-filter").value;
   const list = state.tasks.filter(
       (t) =>
         (!role || t.roleId === role) && (!category || t.category === category),
@@ -231,6 +294,10 @@ function render() {
 function openDialog(dialog) {
   dialogEpoch++;
   dialog.returnFocus = document.activeElement;
+  dialog.dataset.baseRevision = String(state.revision);
+  dialog.dataset.stale = "false";
+  dialog.querySelector("[data-dialog-conflict]").hidden = true;
+  setBusy(busy);
   dialog.showModal();
   history.pushState({ todoDialog: dialog.id }, "");
 }
@@ -260,6 +327,36 @@ window.addEventListener("popstate", () =>
     .forEach((d) => closeDialog(d, true)),
 );
 for (const dialog of document.querySelectorAll("dialog")) {
+  const conflict = document.createElement("div");
+  conflict.dataset.dialogConflict = "";
+  conflict.hidden = true;
+  conflict.innerHTML =
+    '<p role="alert">別の更新があるか、保存結果を確認できません。古い内容で上書きしないよう編集を止めました。</p><button type="button" data-dialog-reload>最新の内容を読み直す（入力を破棄）</button>';
+  dialog.prepend(conflict);
+  conflict.querySelector("button").onclick = async () => {
+    const epoch = dialogEpoch;
+    setBusy(true);
+    try {
+      await reload();
+      if (!dialog.open || epoch !== dialogEpoch) return;
+      if (dialog.id === "detail") {
+        if (!state.tasks.some((task) => task.id === editId)) {
+          closeDialog(dialog);
+          message("このタスクは削除されています");
+          return;
+        }
+        openDetail(editId, false);
+      } else if (dialog.id === "role-dialog") renderRoles();
+      else if (dialog.id === "categories-dialog") renderCategories();
+      dialog.dataset.baseRevision = String(state.revision);
+      dialog.dataset.stale = "false";
+      conflict.hidden = true;
+    } catch {
+      message("最新の内容を取得できませんでした。もう一度お試しください。");
+    } finally {
+      setBusy(false);
+    }
+  };
   dialog
     .querySelectorAll("[data-close]")
     .forEach((b) => (b.onclick = () => closeDialog(dialog)));
@@ -288,7 +385,7 @@ function renderSteps() {
     )
     .join("");
 }
-function openDetail(id) {
+function openDetail(id, show = true) {
   editId = id;
   const t = state.tasks.find((t) => t.id === id),
     f = $("detail-form");
@@ -323,7 +420,7 @@ function openDetail(id) {
   renderSteps();
   $("step-text").value = "";
   $("detail-error").textContent = "";
-  openDialog($("detail"));
+  if (show) openDialog($("detail"));
 }
 $("step-add").onclick = () => {
   const input = $("step-text");
@@ -602,11 +699,13 @@ $("categories-list").onclick = async (event) => {
   }
   if ((await save(next)) && epoch === dialogEpoch) renderCategories();
 };
-function persistPending() {
-  localStorage.setItem(pendingKey, JSON.stringify(pending));
+function persistPending(args) {
+  localStorage.setItem(pendingPrefix + args.request_id, JSON.stringify(args));
+  pending = readPending();
   renderRecovery();
 }
 function renderRecovery() {
+  pending = readPending();
   $("recovery").innerHTML = Object.values(pending)
     .map(
       (args) =>
@@ -614,13 +713,15 @@ function renderRecovery() {
     )
     .join("");
 }
-$("recovery").onclick = (e) => {
-  const key = e.target.dataset.retry;
-  if (key && !busy) runClone(pending[key]);
+$("recovery").onclick = (event) => {
+  const key = event.target.dataset.retry;
+  pending = readPending();
+  if (key && pending[key] && !busy) runClone(pending[key]);
 };
 async function runClone(args) {
   if (busy) return false;
   setBusy(true);
+  let committed = false;
   try {
     let result = await api(
       "/clone?request_id=" + encodeURIComponent(args.request_id),
@@ -630,14 +731,18 @@ async function runClone(args) {
         method: "POST",
         body: JSON.stringify(args),
       });
-    delete pending[args.request_id];
-    persistPending();
+    committed = true;
+    // Keep the durable retry record until the current list has also loaded.
     await reload();
+    localStorage.removeItem(pendingPrefix + args.request_id);
+    renderRecovery();
     message(`${result.plannedDay} に複製しました。元のタスクはそのままです。`);
     return true;
-  } catch (error) {
+  } catch {
     message(
-      "複製の結果を確認できません。同じ操作の「結果確認・再試行」で回収できます。",
+      committed
+        ? "複製は保存済みですが、一覧を読み込めません。「結果確認・同じ操作を再試行」で表示を回復できます。"
+        : "複製の結果を確認できません。同じ操作の「結果確認・再試行」で回収できます。",
     );
     return false;
   } finally {
@@ -650,7 +755,16 @@ function startClone(id, days, base, deadline = null) {
     message("日数は1〜3650日で指定してください");
     return Promise.resolve(false);
   }
-  // Persist before dispatch, so response loss / reload reuses the same operation.
+  pending = readPending();
+  // An unresolved identical action is a retry, not a new independent clone.
+  const existing = Object.values(pending).find(
+    (args) =>
+      args.id === id &&
+      args.base_day === base &&
+      args.offset_days === days &&
+      (args.deadline ?? null) === deadline,
+  );
+  if (existing) return runClone(existing);
   const args = {
     id,
     request_id: crypto.randomUUID(),
@@ -658,8 +772,14 @@ function startClone(id, days, base, deadline = null) {
     offset_days: days,
     deadline,
   };
-  pending[args.request_id] = args;
-  persistPending();
+  try {
+    persistPending(args);
+  } catch {
+    message(
+      "再試行情報をこのブラウザに保存できないため、複製を送信しませんでした。ブラウザの保存設定をご確認ください。",
+    );
+    return Promise.resolve(false);
+  }
   render();
   message(`${offset(base, days)} に複製しています（日本時間）…`);
   return runClone(args);

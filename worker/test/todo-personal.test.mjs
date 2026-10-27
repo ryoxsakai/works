@@ -138,6 +138,9 @@ test("completed and pending sources remain identical; allowlist resets history a
           data: "inline attachment must not be copied",
         },
         "data:image/png;base64,private-payload",
+        { url: "data:image/png;base64,object-private-payload" },
+        { id: "data:private", object_key: "blob:private" },
+        { url: "https://example.test/file", privateHistory: "excluded" },
       ],
     }),
     task("pending", { progress: 0, status: "pending" }),
@@ -164,7 +167,10 @@ test("completed and pending sources remain identical; allowlist resets history a
       assert.equal(result.task.memo, "Reusable brief");
       assert.equal(result.task.checklist[0].checked, false);
       assert.notEqual(result.task.checklist[0].id, "s1");
-      assert.deepEqual(result.task.attachments, [{ id: "same-owner-file" }]);
+      assert.deepEqual(result.task.attachments, [
+        { id: "same-owner-file" },
+        { url: "https://example.test/file" },
+      ]);
     } else assert.equal(result.task.memo, "");
   }
   const s = await f.readTodo(env);
@@ -278,4 +284,46 @@ test("owner isolation covers clone POST/result GET and existing state; MCP token
     env,
   );
   assert.equal(response.status, 200);
+});
+
+test("legacy progress and explicit states preserve completion transitions", async (t) => {
+  const env = await fixture(t);
+  const originalTime = "2026-01-02T03:04:05.000Z";
+  let s = await f.writeTodo(env, {
+    revision: 0,
+    categories: ["スクールサポート"],
+    tasks: [task("transition", { status: "done", completedAt: originalTime })],
+  });
+  let updated = await f.callTodoTool(env, "update_todo", {
+    id: "transition",
+    status: "done",
+    expected_revision: s.revision,
+  });
+  assert.equal(
+    updated.completedAt,
+    originalTime,
+    "redundant explicit completion preserves history",
+  );
+  updated = await f.callTodoTool(env, "update_todo", {
+    id: "transition",
+    progress: 0,
+    expected_revision: updated.revision,
+  });
+  assert.equal(updated.status, "pending");
+  assert.equal(updated.completedAt, null);
+  updated = await f.callTodoTool(env, "update_todo", {
+    id: "transition",
+    progress: 100,
+    expected_revision: updated.revision,
+  });
+  assert.equal(updated.status, "done");
+  assert.ok(updated.completedAt);
+  assert.notEqual(updated.completedAt, originalTime);
+  const completed = updated.completedAt;
+  updated = await f.callTodoTool(env, "update_todo", {
+    id: "transition",
+    status: "done",
+    expected_revision: updated.revision,
+  });
+  assert.equal(updated.completedAt, completed);
 });
