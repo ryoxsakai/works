@@ -1,850 +1,246 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ja">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-  <meta http-equiv="Pragma" content="no-cache">
-  <meta http-equiv="Expires" content="0">
-  <title>ToDo管理 | Works</title>
-  <script src="/shared/theme-init.js?v=1"></script>
-  <link rel="apple-touch-icon" href="/shared/logo.png">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="Works ToDo管理">
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="/shared/styles.css?v=56">
-  <link rel="stylesheet" href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css">
-  <link rel="stylesheet" href="/todo/todo.css?v=4">
-  <style>
-    body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
-
-    #form-content {
-      transition: max-height 0.35s ease, opacity 0.3s ease;
-      overflow: hidden;
-    }
-    #form-chevron { transition: transform 0.3s ease; }
-
-    .progress-track {
-      background: #e5e7eb;
-      border-radius: 9999px;
-      height: 4px;
-      overflow: hidden;
-      margin-top: 4px;
-    }
-    .progress-fill {
-      height: 100%;
-      border-radius: 9999px;
-      transition: width 0.5s ease, background-color 0.5s ease;
-    }
-
-    .icon-btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      border: none;
-      background: transparent;
-      cursor: pointer;
-      transition: background-color 0.15s;
-    }
-
-    @keyframes pulse-warn {
-      0%, 100% { opacity: 1; }
-      50%       { opacity: 0.4; }
-    }
-    .overdue-pulse { animation: pulse-warn 2s ease-in-out infinite; }
-
-    .task-row { transition: background-color 0.12s; }
-    .task-row:hover { background-color: #f9fafb; }
-
-    .pencil-icon { opacity: 0; transition: opacity 0.2s; }
-    .task-row:hover .pencil-icon { opacity: 1; }
-
-    .editable-cell { cursor: pointer; }
-    .editable-cell:hover .cell-inner { background-color: rgba(100,116,139,0.06); border-radius: 6px; }
-
-    #mode-thumb  { transition: transform 0.2s ease; }
-    #mode-toggle { transition: background-color 0.2s ease; }
-
-    input, select, textarea { font-size: 16px !important; }
-
-    .tab-btn { transition: color 0.15s, border-color 0.15s, background-color 0.15s; }
-
-    @media (max-width: 640px) {
-      .pencil-icon { opacity: 0.4; }
-    }
-
-    input[type="range"] {
-      -webkit-appearance: none;
-      appearance: none;
-      height: 4px;
-      border-radius: 9999px;
-      background: #e5e7eb;
-      outline: none;
-      cursor: pointer;
-    }
-    input[type="range"]::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      width: 14px;
-      height: 14px;
-      border-radius: 50%;
-      background: #475569;
-      cursor: pointer;
-      transition: background 0.15s;
-    }
-    input[type="range"]::-webkit-slider-thumb:hover { background: #1e293b; }
-  </style>
-  <link rel="stylesheet" href="/shared/header.css?v=2" />
-  <script type="module" src="/shared/header.js?v=4"></script>
-</head>
-<body class="todo-page min-h-screen">
-
-  <!-- ── Header ─────────────────────────────────────────────── -->
-  <header class="page-header works-header">
-    <h1><a class="works-home" href="/" aria-label="Works ホーム"><span class="page-header-icon" aria-hidden="true">W</span><span>Works</span></a><span class="works-page-title">ToDo管理</span></h1>
-    <div class="works-header-actions">
-      <div id="todo-user-bar" class="user-bar" hidden>
-      <button id="sign-out" type="button" class="user-icon-btn" aria-label="ログアウト" title="ログアウト" onclick="signOutUser()">
-        <i class="bx bx-user-circle" aria-hidden="true"></i>
-      </button>
-    </div>
-    </div>
-  </header>
-
-  <main class="todo-main max-w-5xl mx-auto px-4 py-5 space-y-4">
-
-    <div class="todo-heading">
-      <p class="eyebrow">TASK TRACKER</p>
-      <h2><i class="bx bx-list-check" aria-hidden="true"></i> ToDo一覧</h2>
-    </div>
-
-    <!-- ── 登録フォーム（折りたたみ） ──────────────────────────── -->
-    <section class="todo-panel bg-white rounded-2xl shadow-sm border border-gray-200">
-
-      <button id="form-toggle"
-        class="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-gray-50 transition-colors rounded-2xl"
-        onclick="toggleForm()">
-        <div class="flex items-center gap-2 text-gray-700 font-semibold">
-          <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
-          </svg>
-          タスクを登録
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>ToDo管理 | Works</title>
+    <script src="/shared/theme-init.js?v=1"></script>
+    <link rel="stylesheet" href="/shared/styles.css?v=56" />
+    <link rel="stylesheet" href="/shared/header.css?v=2" />
+    <link rel="stylesheet" href="/todo/todo.css?v=5" />
+    <script type="module" src="/shared/header.js?v=4"></script>
+  </head>
+  <body class="todo-page">
+    <header class="page-header works-header">
+      <h1>
+        <a class="works-home" href="/" aria-label="Works ホーム"
+          ><span class="page-header-icon">W</span><span>Works</span></a
+        ><span class="works-page-title">ToDo管理</span>
+      </h1>
+      <div class="works-header-actions">
+        <button id="sign-out" hidden>ログアウト</button>
+      </div>
+    </header>
+    <main id="app" hidden class="todo-main">
+      <div class="heading">
+        <div>
+          <p class="eyebrow">ONE THING AT A TIME</p>
+          <h2>今日から、ひとつずつ。</h2>
+          <p id="today-label" class="muted"></p>
         </div>
-        <svg id="form-chevron" class="w-5 h-5 text-gray-400"
-          fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-        </svg>
-      </button>
-
-      <div id="form-content">
-        <div class="px-5 pb-5">
-          <div class="flex flex-col gap-3">
-
-            <!-- タスク名 -->
-            <div class="w-full">
-              <label class="block text-xs font-medium text-gray-500 mb-1.5">タスク名</label>
-              <input id="input-name" type="text" placeholder="例：企画書を作成する"
-                class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent placeholder-gray-300"
-                onkeydown="if(event.key==='Enter') addTask()"/>
-            </div>
-
-            <!-- カテゴリ＋追加ボタン -->
-            <div class="flex gap-3 items-end">
-            <div class="flex-1">
-              <label class="block text-xs font-medium text-gray-500 mb-1.5">カテゴリ</label>
-              <div class="flex gap-2">
-                <select id="input-category"
-                  class="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent">
-                </select>
-                <button onclick="openCategoryModal()" title="カテゴリを管理" aria-label="カテゴリを管理" class="todo-category-button">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                  </svg>
-                </button>
-              </div>
-            </div>
-
-            <!-- 追加ボタン -->
-            <button onclick="addTask()"
-              class="todo-add-button px-5 py-2.5 bg-slate-700 hover:bg-slate-800 active:bg-slate-900 text-white rounded-xl font-semibold text-sm shadow-sm transition-colors whitespace-nowrap">
-              追加する
-            </button>
-            </div><!-- end カテゴリ＋追加ボタン row -->
+        <button id="roles-open">役割を管理</button>
+      </div>
+      <form id="capture" class="panel capture">
+        <label for="quick-title" class="sr-only">タスク名</label
+        ><input
+          id="quick-title"
+          maxlength="500"
+          required
+          placeholder="思いついたことを、ひとこと"
+        /><button class="primary" type="submit">＋ 追加</button>
+      </form>
+      <p class="hint">
+        タイトルだけで登録できます。役割・予定日・締切などは、あとから「詳細」で。
+      </p>
+      <div class="toolbar">
+        <label
+          >役割
+          <select id="role-filter">
+            <option value="">すべて</option>
+          </select></label
+        ><label
+          >カテゴリ
+          <select id="category-filter">
+            <option value="">すべて</option>
+          </select></label
+        >
+        <button id="categories-open" type="button">カテゴリを管理</button>
+        <div class="view-switch" role="group" aria-label="表示切替">
+          <button id="list-view" aria-pressed="true">日付リスト</button
+          ><button id="board-view" aria-pressed="false">カンバン</button>
+        </div>
+      </div>
+      <div id="notice" role="status" aria-live="polite"></div>
+      <div id="recovery"></div>
+      <section class="panel deadline-panel" aria-labelledby="deadline-heading">
+        <h3 id="deadline-heading">締切の確認</h3>
+        <p class="hint">
+          期限超過・7日以内の締切をすべて表示。予定日を動かしても締切は変わりません。
+        </p>
+        <div id="deadlines"></div>
+      </section>
+      <div id="tasks"></div>
+      <p class="hint">
+        役割はあなた自身の担当です。会話からも同じToDoを更新できます。自動監視や繰り返しは設定されません。
+      </p>
+    </main>
+    <div id="login-screen" class="login panel">
+      <h2>Works ToDo管理</h2>
+      <p id="login-message">読み込み中…</p>
+      <button id="sign-in" hidden>Googleでサインイン</button>
+    </div>
+    <dialog id="detail" aria-labelledby="detail-heading">
+      <form id="detail-form">
+        <div class="dialog-head">
+          <h2 id="detail-heading">タスクの詳細</h2>
+          <button type="button" data-close aria-label="詳細を閉じる">×</button>
+        </div>
+        <label>タスク名<input name="name" maxlength="500" required /></label>
+        <div class="form-grid">
+          <label>役割<select name="roleId"></select></label
+          ><label>カテゴリ<select name="category"></select></label
+          ><label
+            >予定日（取り組む日）<input type="date" name="plannedDay" /></label
+          ><label>締切（守る期限）<input type="date" name="deadline" /></label
+          ><label
+            >進み具合<select name="status">
+              <option value="pending">未着手</option>
+              <option value="doing">進行中</option>
+              <option value="waiting">待ち</option>
+              <option value="done">完了</option>
+            </select></label
+          ><label
+            >重要度の詳細（任意）<select name="priority">
+              <option value="">指定なし</option>
+              <option value="1">低</option>
+              <option value="2">中</option>
+              <option value="3">高</option>
+            </select></label
+          >
+        </div>
+        <label class="check-label"
+          ><input type="checkbox" name="important" /> ★ 大切なタスク</label
+        ><label
+          >このタスクだけのメモ<textarea
+            name="memo"
+            maxlength="10000"
+            rows="3"
+          ></textarea>
+        </label>
+        <label
+          >複製にも引き継ぐ説明（任意）<textarea
+            name="reusableDescription"
+            maxlength="10000"
+            rows="2"
+          ></textarea>
+        </label>
+        <fieldset>
+          <legend>小さなステップ</legend>
+          <div id="checklist-editor"></div>
+          <div class="inline">
+            <input
+              id="step-text"
+              maxlength="500"
+              aria-label="新しいステップ"
+              placeholder="ステップを追加"
+            /><button type="button" id="step-add">追加</button>
           </div>
+        </fieldset>
+        <p class="hint">
+          完了履歴は元のタスクに残ります。複製ではステップも未チェックに戻ります。
+        </p>
+        <div class="dialog-actions">
+          <button type="button" id="task-delete" class="danger">削除</button
+          ><button type="button" data-close>キャンセル</button
+          ><button class="primary" type="submit">保存</button>
         </div>
+        <p id="detail-error" role="alert"></p>
+      </form>
+    </dialog>
+    <dialog id="role-dialog" aria-labelledby="roles-heading">
+      <div class="dialog-head">
+        <h2 id="roles-heading">自分の役割</h2>
+        <button data-close aria-label="役割管理を閉じる">×</button>
       </div>
-    </section>
-
-    <!-- ── タスク一覧 ────────────────────────────────────────── -->
-    <section class="todo-panel bg-white rounded-2xl shadow-sm border border-gray-200">
-
-      <!-- カテゴリタブ -->
-      <div class="px-4 pt-3 border-b border-gray-200 overflow-x-auto">
-        <div id="tab-list" class="flex gap-0.5 min-w-max"></div>
-      </div>
-
-      <!-- テーブル -->
-      <div class="todo-table-shell overflow-x-auto">
-        <table class="todo-table w-full text-sm" style="min-width:680px">
-          <colgroup>
-            <col style="min-width:160px">
-            <col style="min-width:80px;width:90px">
-            <col style="min-width:150px;width:170px">
-            <col style="min-width:140px;width:160px">
-            <col style="min-width:160px">
-            <col style="width:44px">
-          </colgroup>
-          <thead>
-            <tr class="border-b border-gray-100">
-              <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide whitespace-nowrap">
-                タスク名
-              </th>
-              <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide whitespace-nowrap cursor-pointer select-none hover:text-slate-600 transition-colors"
-                onclick="setSort('priority')">
-                <span class="flex items-center gap-1">
-                  優先度 <span id="sort-priority-icon" class="text-slate-500 text-sm"></span>
-                </span>
-              </th>
-              <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide whitespace-nowrap cursor-pointer select-none hover:text-slate-600 transition-colors"
-                onclick="setSort('deadline')">
-                <span class="flex items-center gap-1">
-                  締切日 <span id="sort-deadline-icon" class="text-slate-500 text-sm"></span>
-                </span>
-              </th>
-              <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide whitespace-nowrap">
-                進捗
-              </th>
-              <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide whitespace-nowrap">
-                メモ
-              </th>
-              <th class="px-3 py-3"></th>
-            </tr>
-          </thead>
-          <tbody id="task-list"></tbody>
-        </table>
-
-        <!-- 空の状態 -->
-        <div id="empty-state" class="hidden py-16 text-center">
-          <div class="text-4xl mb-3">📋</div>
-          <p class="text-gray-400 font-medium">タスクがありません</p>
-          <p class="text-gray-300 text-xs mt-1">上のフォームからタスクを追加してください</p>
+      <p class="hint">
+        例：生徒管理・授業管理・模試作成。カテゴリとは別に管理します。使った役割はアーカイブして履歴を残せます。
+      </p>
+      <div id="role-list"></div>
+      <form id="role-form">
+        <label
+          >役割名<input
+            name="name"
+            maxlength="100"
+            required
+            placeholder="例：生徒管理"
+        /></label>
+        <div class="form-grid">
+          <label
+            >アイコン<select name="icon">
+              <option>📚</option>
+              <option>👥</option>
+              <option>📝</option>
+              <option>🏠</option>
+              <option>💼</option>
+              <option>⭐</option>
+            </select></label
+          ><label
+            >色<select name="color">
+              <option value="blue">ブルー</option>
+              <option value="green">グリーン</option>
+              <option value="pink">ピンク</option>
+              <option value="purple">パープル</option>
+              <option value="yellow">イエロー</option>
+            </select></label
+          >
         </div>
-      </div>
-    </section>
-
-  </main>
-
-  <!-- ── カテゴリ管理モーダル ──────────────────────────────────── -->
-  <dialog id="category-modal" class="category-dialog" aria-labelledby="category-title" aria-describedby="category-help">
-    <div class="todo-modal category-surface">
-      <div class="category-header">
-        <div><p class="eyebrow">CATEGORIES</p><h3 id="category-title">カテゴリ管理</h3></div>
-        <button type="button" onclick="closeCategoryModal()" class="icon-btn" aria-label="カテゴリ管理を閉じる">×</button>
-      </div>
-      <p id="category-help">矢印で順序を変更できます。変更はその都度保存されます。</p>
-      <ul id="category-list" aria-label="カテゴリ一覧"></ul>
-      <div class="category-add">
-        <label for="new-category-input">新しいカテゴリ</label>
-        <div class="category-add-controls">
-          <input id="new-category-input" type="text" placeholder="カテゴリ名を入力"
-            onkeydown="if(event.key==='Enter' && !event.isComposing) { event.preventDefault(); addCategory(); }"/>
-          <button type="button" onclick="addCategory()" class="bg-slate-700">追加</button>
+        <button class="primary">役割を追加</button>
+      </form>
+      <p id="role-error" role="alert"></p>
+    </dialog>
+    <dialog id="clone-dialog" aria-labelledby="clone-heading">
+      <form id="clone-form">
+        <div class="dialog-head">
+          <h2 id="clone-heading">未来に複製</h2>
+          <button type="button" data-close aria-label="複製設定を閉じる">
+            ×
+          </button>
         </div>
+        <p id="clone-source"></p>
+        <div class="form-grid">
+          <label
+            >いくつ後？<input
+              name="amount"
+              type="number"
+              min="1"
+              max="3650"
+              value="1"
+              required /></label
+          ><label
+            >単位<select name="unit">
+              <option value="1">日後</option>
+              <option value="7">週間後</option>
+            </select></label
+          >
+        </div>
+        <p id="clone-target"></p>
+        <label>新しい締切（任意）<input type="date" name="deadline" /></label
+        ><button type="button" id="copy-deadline">
+          元の締切を明示的にコピー
+        </button>
+        <p id="deadline-preview" class="hint"></p>
+        <p class="hint">
+          締切の初期値は「なし」。元の完了記録は変わりません。自動繰り返しではありません。
+        </p>
+        <button class="primary" type="submit">この日へ複製</button>
+        <p id="clone-error" role="alert"></p>
+      </form>
+    </dialog>
+    <dialog id="categories-dialog" aria-labelledby="categories-heading">
+      <div class="dialog-head">
+        <h2 id="categories-heading">カテゴリを管理</h2>
+        <button data-close aria-label="カテゴリ管理を閉じる">×</button>
       </div>
-      <div class="category-footer"><button type="button" onclick="closeCategoryModal()">完了</button></div>
-    </div>
-  </dialog>
-
-  <!-- ── ログイン画面 ───────────────────────────────────────────── -->
-  <div id="login-screen" class="fixed inset-0 flex items-center justify-center z-50 bg-gray-100">
-    <!-- ローディング中 -->
-    <div id="login-loading" class="text-center">
-      <div class="text-5xl mb-4">📋</div>
-      <p class="text-gray-400 text-sm">読み込み中...</p>
-    </div>
-    <!-- ログインフォーム -->
-    <div id="login-form" class="hidden bg-white rounded-2xl shadow-lg px-8 py-10 mx-4 text-center w-full max-w-sm">
-      <div class="text-5xl mb-4">📋</div>
-      <h1 class="text-2xl font-bold text-gray-800 mb-1">Works ToDo管理</h1>
-      <p class="text-gray-400 text-sm mb-8">Googleアカウントでサインインしてください</p>
-      <button onclick="signInWithGoogle()"
-        class="w-full flex items-center justify-center gap-3 px-6 py-3 bg-white border border-gray-300 rounded-xl text-gray-700 font-medium hover:bg-gray-50 active:bg-gray-100 transition-colors shadow-sm">
-        <svg class="w-5 h-5" viewBox="0 0 24 24">
-          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-          <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
-          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-        </svg>
-        Googleでサインイン
-      </button>
-    </div>
-  </div>
-
-  <script type="module">
-    import { watchAuth, signIn, signOutUser as worksSignOut, getSessionToken } from '../shared/auth.js';
-    import { categoryDialog } from '../shared/category-dialog.js?v=1';
-    const categoryUI = categoryDialog(closeCategoryModal);
-    async function api(path, options = {}) {
-      const response = await fetch('/api' + path, { ...options, headers: {
-        'Content-Type': 'application/json', Authorization: `Bearer ${getSessionToken()}`,
-        ...(options.headers || {})
-      }});
-      if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error || `HTTP ${response.status}`);
-      return response.json();
-    }
-    // ─── State ───────────────────────────────────────────────
-    let revision = 0;
-    let tasks      = [];
-    let categories = ['仕事', '個人', 'その他'];
-    let activeTab  = 'すべて';
-    let sortField  = null;
-    let sortDir    = 'desc';
-    let editingCell = null; // { id, field }
-    let editingCatIdx = -1;
-
-    const FORM_KEY = 'todo-tracker-form-collapsed';
-    // The Works API is the shared source for the browser and MCP clients.
-    let saveQueue = Promise.resolve();
-    let saveGeneration = 0;
-    function saveData() {
-      const generation = saveGeneration;
-      const snapshot = { tasks: structuredClone(tasks), categories: [...categories] };
-      saveQueue = saveQueue.then(async () => {
-        if (generation !== saveGeneration) return;
-        const saved = await api('/todo', { method: 'PUT', body: JSON.stringify({ ...snapshot, revision }) });
-        revision = saved.revision;
-      }).catch(async error => {
-        saveGeneration++; // Discard snapshots queued before the failed save.
-        alert('保存に失敗しました: ' + error.message);
-        await loadData();
-      });
-    }
-    async function loadData() {
-      const data = await api('/todo');
-      revision = data.revision;
-      tasks = data.tasks;
-      categories = data.categories;
-      render();
-    }
-    // ─── Date helpers ─────────────────────────────────────────
-    function todayStr() { return new Date().toISOString().split('T')[0]; }
-    function pad(n) { return String(n).padStart(2, '0'); }
-
-    function formatDate(str) {
-      if (!str) return null;
-      const d = new Date(str + 'T00:00:00');
-      return `${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())}`;
-    }
-
-    function daysLeft(str) {
-      if (!str) return null;
-      const dl  = new Date(str + 'T00:00:00');
-      const now = new Date(); now.setHours(0,0,0,0);
-      return Math.ceil((dl - now) / 86400000);
-    }
-
-    function barColor(days) {
-      if (days === null) return '#22c55e';
-      if (days >= 14) return '#22c55e';
-      if (days >= 7)  return '#84cc16';
-      if (days >= 3)  return '#f97316';
-      return '#ef4444';
-    }
-
-    function barPct(days) {
-      if (days === null) return 0;
-      return Math.min(100, Math.max(4, (14 - days) / 14 * 100)).toFixed(1);
-    }
-
-    // ─── Priority helpers ──────────────────────────────────────
-    const PRI_LABEL = { 3: '高', 2: '中', 1: '低' };
-    const PRI_CLASS = {
-      3: 'bg-red-50 text-red-600 border border-red-100',
-      2: 'bg-yellow-50 text-yellow-600 border border-yellow-100',
-      1: 'bg-blue-50 text-blue-600 border border-blue-100',
-    };
-
-    // ─── Form ─────────────────────────────────────────────────
-    function initFormState() {
-      const collapsed = localStorage.getItem(FORM_KEY) === 'true';
-      const content   = document.getElementById('form-content');
-      const chevron   = document.getElementById('form-chevron');
-      if (collapsed) {
-        content.style.maxHeight = '0';
-        content.style.opacity   = '0';
-        chevron.style.transform = 'rotate(0deg)';
-      } else {
-        content.style.maxHeight = '500px';
-        content.style.opacity   = '1';
-        chevron.style.transform = 'rotate(180deg)';
-      }
-    }
-
-    function toggleForm() {
-      const content   = document.getElementById('form-content');
-      const chevron   = document.getElementById('form-chevron');
-      const collapsed = content.style.maxHeight === '0px' || content.style.maxHeight === '0';
-      if (collapsed) {
-        content.style.maxHeight = '500px';
-        content.style.opacity   = '1';
-        chevron.style.transform = 'rotate(180deg)';
-        localStorage.setItem(FORM_KEY, 'false');
-      } else {
-        content.style.maxHeight = '0';
-        content.style.opacity   = '0';
-        chevron.style.transform = 'rotate(0deg)';
-        localStorage.setItem(FORM_KEY, 'true');
-      }
-    }
-
-    function addTask() {
-      const name = document.getElementById('input-name').value.trim();
-      const cat  = document.getElementById('input-category').value;
-      if (!name) {
-        const inp = document.getElementById('input-name');
-        inp.classList.add('ring-2', 'ring-red-400');
-        inp.focus();
-        setTimeout(() => inp.classList.remove('ring-2', 'ring-red-400'), 1500);
-        return;
-      }
-      tasks.push({ id: Date.now().toString(), name, category: cat, priority: null, deadline: null, progress: 0, memo: '', createdAt: todayStr() });
-      saveData();
-      renderTaskList();
-      document.getElementById('input-name').value = '';
-      document.getElementById('input-name').focus();
-    }
-
-    // ─── Category modal ────────────────────────────────────────
-    function openCategoryModal() {
-      editingCatIdx = -1;
-      document.getElementById('new-category-input').value = '';
-      renderCategoryList();
-      categoryUI.open();
-    }
-
-    function closeCategoryModal() {
-      categoryUI.close();
-      editingCatIdx = -1;
-    }
-
-    function renderCategoryList() {
-      const ul = document.getElementById('category-list');
-      if (!categories.length) {
-        ul.innerHTML = '<li class="text-center text-gray-400 text-sm py-4">カテゴリがありません。下の入力欄から追加してください。</li>';
-        return;
-      }
-      ul.innerHTML = categories.map((cat, i) => {
-        const count = tasks.filter(t => t.category === cat).length;
-        if (i === editingCatIdx) {
-          return `<li class="flex items-center gap-2 rounded-xl px-3 py-2 bg-slate-50">
-  <input id="edit-cat-input" aria-label="カテゴリ名を変更" type="text" value="${esc(cat)}"
-    class="flex-1 border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400"
-    onkeydown="if(event.key==='Enter' && !event.isComposing) { event.preventDefault(); saveEditCat(${i}); } else if(event.key==='Escape') { event.preventDefault(); cancelEditCat(); }"/>
-  <button type="button" aria-label="変更を保存" title="変更を保存" onclick="saveEditCat(${i})" class="icon-btn text-slate-600 hover:bg-slate-100">
-    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-  </button>
-  <button type="button" aria-label="変更をキャンセル" title="変更をキャンセル" onclick="cancelEditCat()" class="icon-btn text-gray-400 hover:bg-gray-100">
-    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-  </button>
-</li>`;
-        }
-        return `<li class="category-row flex items-center gap-1 rounded-xl px-3 py-2 hover:bg-gray-50 group">
-  <div class="category-order flex mr-1">
-    <button type="button" aria-label="上へ移動" title="上へ移動" onclick="moveCat(${i},-1)" ${i===0?'disabled':''} class="icon-btn w-5 h-4 text-gray-300 hover:text-gray-500 ${i===0?'opacity-20 pointer-events-none':''}">
-      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/></svg>
-    </button>
-    <button type="button" aria-label="下へ移動" title="下へ移動" onclick="moveCat(${i},1)" ${i===categories.length-1?'disabled':''} class="icon-btn w-5 h-4 text-gray-300 hover:text-gray-500 ${i===categories.length-1?'opacity-20 pointer-events-none':''}">
-      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-    </button>
-  </div>
-  <div class="category-summary"><span class="category-name flex-1 text-sm text-gray-700">${esc(cat)}</span>
-  ${count > 0 ? `<span class="category-count text-xs text-gray-400">${count}件</span>` : ''}</div>
-  <button type="button" aria-label="名前を変更" title="名前を変更" onclick="startEditCat(${i})" class="icon-btn text-gray-300 hover:text-slate-500 hover:bg-slate-50">
-    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
-  </button>
-  <button type="button" aria-label="削除" title="削除" onclick="deleteCat(${i})" class="icon-btn text-gray-300 hover:text-red-400 hover:bg-red-50">
-    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-  </button>
-</li>`;
-      }).join('');
-      if (editingCatIdx >= 0) {
-        setTimeout(() => { const el = document.getElementById('edit-cat-input'); if (el) { el.focus(); el.select(); } }, 30);
-      }
-    }
-
-    function startEditCat(i) { editingCatIdx = i; renderCategoryList(); }
-    function cancelEditCat() { const index = editingCatIdx; editingCatIdx = -1; renderCategoryList(); categoryUI.focus(index); }
-
-    function saveEditCat(i) {
-      const inp  = document.getElementById('edit-cat-input');
-      const name = inp ? inp.value.trim() : '';
-      if (!name) { if (inp) inp.focus(); return; }
-      if (name === categories[i]) { cancelEditCat(); return; }
-      if (categories.includes(name)) { alert(`「${name}」はすでに存在します`); inp.focus(); return; }
-      const old = categories[i];
-      categories[i] = name;
-      tasks.forEach(t => { if (t.category === old) t.category = name; });
-      saveData(); editingCatIdx = -1;
-      renderCategoryList(); renderCategorySelect(); renderTabs(); renderTaskList();
-      categoryUI.focus(i);
-    }
-
-    function deleteCat(i) {
-      const name  = categories[i];
-      const count = tasks.filter(t => t.category === name).length;
-      const msg   = count > 0
-        ? `「${name}」は${count}件のタスクで使用中です。\n削除すると別のカテゴリに移動されます。削除しますか？`
-        : `「${name}」を削除しますか？`;
-      if (!confirm(msg)) return;
-      if (count > 0) {
-        const fallback = categories.find((_, idx) => idx !== i) || '';
-        tasks.forEach(t => { if (t.category === name) t.category = fallback; });
-      }
-      categories.splice(i, 1);
-      editingCatIdx = -1;
-      if (activeTab === name) activeTab = 'すべて';
-      saveData();
-      renderCategoryList(); renderCategorySelect(); renderTabs(); renderTaskList();
-      if (categories.length) categoryUI.focus(Math.min(i, categories.length - 1));
-      else document.getElementById('new-category-input').focus();
-    }
-
-    function moveCat(i, dir) {
-      const j = i + dir;
-      if (j < 0 || j >= categories.length) return;
-      [categories[i], categories[j]] = [categories[j], categories[i]];
-      saveData(); renderCategoryList(); renderCategorySelect(); renderTabs();
-      categoryUI.focus(j, 'moveCat', dir);
-    }
-
-    function addCategory() {
-      const inp  = document.getElementById('new-category-input');
-      const name = inp.value.trim();
-      if (!name) { inp.focus(); return; }
-      if (categories.includes(name)) { alert(`「${name}」はすでに存在します`); inp.focus(); return; }
-      categories.push(name);
-      saveData();
-      renderCategoryList(); renderCategorySelect(); renderTabs();
-      document.getElementById('input-category').value = name;
-      inp.value = ''; inp.focus();
-    }
-
-    // ─── Inline editing ───────────────────────────────────────
-    function startEdit(id, field) {
-      editingCell = { id, field };
-      renderTaskList();
-      setTimeout(() => {
-        const el = document.getElementById('edit-cell-input') || document.getElementById('edit-cell-select') || document.getElementById('edit-dl-year');
-        if (el) { el.focus(); if (el.select) el.select(); }
-      }, 30);
-    }
-
-    function cancelEdit() { editingCell = null; renderTaskList(); }
-
-    function saveEdit(id, field) {
-      const task = tasks.find(t => t.id === id);
-      if (!task) { editingCell = null; renderTaskList(); return; }
-      if (field === 'priority') {
-        const sel = document.getElementById('edit-cell-select');
-        task.priority = sel && sel.value !== '' ? parseInt(sel.value) : null;
-      } else if (field === 'deadline') {
-        const y = document.getElementById('edit-dl-year')?.value;
-        const m = document.getElementById('edit-dl-month')?.value;
-        const d = document.getElementById('edit-dl-day')?.value;
-        task.deadline = (y && m && d) ? `${y}-${pad(parseInt(m))}-${pad(parseInt(d))}` : null;
-      } else if (field === 'progress') {
-        const inp = document.getElementById('edit-progress-input');
-        task.progress = inp ? Math.min(100, Math.max(0, parseInt(inp.value) || 0)) : task.progress;
-      } else {
-        const inp = document.getElementById('edit-cell-input');
-        const value = inp ? inp.value.trim() : task[field];
-        if (field === 'name' && !value) { alert('タスク名を入力してください'); inp?.focus(); return; }
-        task[field] = value;
-      }
-      saveData(); editingCell = null; renderTaskList();
-    }
-
-    function clearDeadline(id) {
-      const task = tasks.find(t => t.id === id);
-      if (task) { task.deadline = null; saveData(); }
-      editingCell = null; renderTaskList();
-    }
-
-    function updateDlDays() {
-      const y = document.getElementById('edit-dl-year')?.value;
-      const m = document.getElementById('edit-dl-month')?.value;
-      const ds = document.getElementById('edit-dl-day');
-      if (!y || !m || !ds) return;
-      const cur = parseInt(ds.value);
-      const max = new Date(parseInt(y), parseInt(m), 0).getDate();
-      ds.innerHTML = Array.from({ length: max }, (_, i) =>
-        `<option value="${i+1}" ${i+1===Math.min(cur,max)?'selected':''}>${i+1}</option>`
-      ).join('');
-    }
-
-    // ─── Delete ───────────────────────────────────────────────
-    function deleteTask(id) {
-      const task = tasks.find(t => t.id === id);
-      if (!task || !confirm(`「${task.name}」を削除しますか？`)) return;
-      tasks = tasks.filter(t => t.id !== id);
-      saveData(); renderTaskList();
-    }
-
-    // ─── Tabs ─────────────────────────────────────────────────
-    function setTab(tab) { activeTab = tab; renderTabs(); renderTaskList(); }
-
-    function renderTabs() {
-      const container = document.getElementById('tab-list');
-      const tabs = ['すべて', ...categories];
-      if (!tabs.includes(activeTab)) activeTab = 'すべて';
-      container.innerHTML = tabs.map(t => {
-        const active = t === activeTab;
-        return `<button data-todo-tab="${esc(t)}"
-          class="tab-btn px-4 py-2.5 text-sm font-medium rounded-t-lg border-b-2 whitespace-nowrap
-            ${active ? 'border-slate-700 text-slate-700 bg-slate-50' : 'border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50'}">
-          ${esc(t)}
-        </button>`;
-      }).join('');
-      container.querySelectorAll('[data-todo-tab]').forEach(button => {
-        button.addEventListener('click', () => setTab(button.dataset.todoTab));
-      });
-    }
-
-    // ─── Sort ─────────────────────────────────────────────────
-    function setSort(field) {
-      if (sortField === field) { sortDir = sortDir === 'asc' ? 'desc' : 'asc'; }
-      else { sortField = field; sortDir = field === 'deadline' ? 'asc' : 'desc'; }
-      updateSortIcons(); renderTaskList();
-    }
-
-    function updateSortIcons() {
-      const pi = document.getElementById('sort-priority-icon');
-      const di = document.getElementById('sort-deadline-icon');
-      if (pi) pi.textContent = sortField === 'priority' ? (sortDir === 'asc' ? '↑' : '↓') : '';
-      if (di) di.textContent = sortField === 'deadline' ? (sortDir === 'asc' ? '↑' : '↓') : '';
-    }
-
-    function sortedTasks(list) {
-      if (!sortField) return [...list];
-      return [...list].sort((a, b) => {
-        if (sortField === 'priority') {
-          const pa = a.priority ?? -1, pb = b.priority ?? -1;
-          return sortDir === 'desc' ? pb - pa : pa - pb;
-        }
-        if (!a.deadline && !b.deadline) return 0;
-        if (!a.deadline) return 1;
-        if (!b.deadline) return -1;
-        return sortDir === 'asc' ? a.deadline.localeCompare(b.deadline) : b.deadline.localeCompare(a.deadline);
-      });
-    }
-
-    // ─── Render helpers ───────────────────────────────────────
-    const pencilSvg = `<svg class="pencil-icon w-3 h-3 text-gray-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>`;
-    const checkSvg  = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>`;
-    const xSvg      = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>`;
-
-    function saveBtn(id, field) {
-      return `<button onclick="saveEdit('${esc(id)}','${field}')" class="icon-btn text-slate-500 hover:bg-slate-100">${checkSvg}</button>`;
-    }
-    function cancelBtn() {
-      return `<button onclick="cancelEdit()" class="icon-btn text-gray-300 hover:bg-gray-100">${xSvg}</button>`;
-    }
-
-    // ─── Render task list ─────────────────────────────────────
-    function renderCategorySelect() {
-      const sel  = document.getElementById('input-category');
-      const prev = sel.value;
-      sel.innerHTML = categories.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
-      if (categories.includes(prev)) sel.value = prev;
-    }
-
-    function renderTaskList() {
-      const tbody = document.getElementById('task-list');
-      const empty = document.getElementById('empty-state');
-      const filtered = activeTab === 'すべて' ? tasks : tasks.filter(t => t.category === activeTab);
-
-      if (!filtered.length) {
-        tbody.innerHTML = ''; empty.classList.remove('hidden'); return;
-      }
-      empty.classList.add('hidden');
-
-      tbody.innerHTML = sortedTasks(filtered).map(task => {
-        const isOver = task.deadline && daysLeft(task.deadline) < 0;
-        const days   = daysLeft(task.deadline);
-
-        // ── Name cell
-        const nameCell = editingCell?.id === task.id && editingCell?.field === 'name'
-          ? `<td class="px-4 py-2"><div class="flex items-center gap-1">
-               <input id="edit-cell-input" type="text" value="${esc(task.name)}"
-                 class="border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400 w-44"
-                 onkeydown="if(event.key==='Enter') saveEdit('${esc(task.id)}','name'); else if(event.key==='Escape') cancelEdit()"/>
-               ${saveBtn(task.id,'name')} ${cancelBtn()}
-             </div></td>`
-          : `<td class="px-5 py-3.5 editable-cell" onclick="startEdit('${esc(task.id)}','name')">
-               <span class="cell-inner inline-flex items-center gap-1.5 px-1.5 py-0.5 font-medium text-gray-700">${esc(task.name)} ${pencilSvg}</span>
-             </td>`;
-
-        // ── Priority cell
-        const priCell = editingCell?.id === task.id && editingCell?.field === 'priority'
-          ? `<td class="px-4 py-2 whitespace-nowrap"><div class="flex items-center gap-1">
-               <select id="edit-cell-select"
-                 class="border border-slate-300 rounded-lg px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-400"
-                 onkeydown="if(event.key==='Escape') cancelEdit()">
-                 <option value="" ${task.priority===null?'selected':''}>—</option>
-                 <option value="3" ${task.priority===3?'selected':''}>3　高</option>
-                 <option value="2" ${task.priority===2?'selected':''}>2　中</option>
-                 <option value="1" ${task.priority===1?'selected':''}>1　低</option>
-               </select>
-               ${saveBtn(task.id,'priority')} ${cancelBtn()}
-             </div></td>`
-          : `<td class="px-5 py-3.5 editable-cell" onclick="startEdit('${esc(task.id)}','priority')">
-               <span class="cell-inner inline-flex items-center gap-1.5 px-1.5 py-0.5">
-                 ${task.priority
-                   ? `<span class="inline-block px-2 py-0.5 rounded-full text-xs font-medium ${PRI_CLASS[task.priority]}">${PRI_LABEL[task.priority]}</span>`
-                   : `<span class="text-gray-300">—</span>`}
-                 ${pencilSvg}
-               </span>
-             </td>`;
-
-        // ── Deadline cell
-        let dlCell;
-        if (editingCell?.id === task.id && editingCell?.field === 'deadline') {
-          const base  = task.deadline ? new Date(task.deadline + 'T00:00:00') : new Date();
-          const cy = base.getFullYear(), cm = base.getMonth()+1, cd = base.getDate();
-          const maxD  = new Date(cy, cm, 0).getDate();
-          const nowY  = new Date().getFullYear();
-          const years = Array.from({ length: nowY - 2019 + 6 }, (_, i) => 2020 + i);
-          dlCell = `<td class="px-4 py-2 whitespace-nowrap"><div class="flex items-center gap-1 flex-wrap">
-            <select id="edit-dl-year" onchange="updateDlDays()"
-              class="border border-slate-300 rounded-lg px-1.5 py-1.5 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-slate-400">
-              ${years.map(y=>`<option value="${y}" ${y===cy?'selected':''}>${y}</option>`).join('')}
-            </select><span class="text-gray-400 text-xs">年</span>
-            <select id="edit-dl-month" onchange="updateDlDays()"
-              class="border border-slate-300 rounded-lg px-1.5 py-1.5 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-slate-400">
-              ${Array.from({length:12},(_,i)=>i+1).map(m=>`<option value="${m}" ${m===cm?'selected':''}>${m}</option>`).join('')}
-            </select><span class="text-gray-400 text-xs">月</span>
-            <select id="edit-dl-day"
-              class="border border-slate-300 rounded-lg px-1.5 py-1.5 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-slate-400">
-              ${Array.from({length:maxD},(_,i)=>i+1).map(d=>`<option value="${d}" ${d===cd?'selected':''}>${d}</option>`).join('')}
-            </select><span class="text-gray-400 text-xs">日</span>
-            ${saveBtn(task.id,'deadline')}
-            ${task.deadline ? `<button onclick="clearDeadline('${esc(task.id)}')" class="icon-btn text-gray-300 hover:text-red-400 hover:bg-red-50" title="締切日をクリア">${xSvg}</button>` : cancelBtn()}
-            ${task.deadline ? cancelBtn() : ''}
-          </div></td>`;
-        } else {
-          const dLabel = days === null ? '' : isOver
-            ? `<span class="text-red-500 text-xs font-semibold">${Math.abs(days)}日超過</span>`
-            : days === 0
-              ? `<span class="text-orange-500 text-xs font-semibold">今日</span>`
-              : `<span class="text-gray-400 text-xs">あと${days}日</span>`;
-          dlCell = `<td class="px-5 py-3.5 editable-cell" onclick="startEdit('${esc(task.id)}','deadline')" style="min-width:140px">
-            ${task.deadline
-              ? `<div class="space-y-1">
-                   <span class="cell-inner inline-flex items-center gap-1.5 px-1.5 py-0.5 text-gray-600">${formatDate(task.deadline)} ${pencilSvg}</span>
-                   <div class="flex items-center gap-2 px-1.5">
-                     <div class="progress-track flex-1">
-                       <div class="progress-fill ${isOver?'overdue-pulse':''}" style="width:${barPct(days)}%;background-color:${barColor(days)}"></div>
-                     </div>
-                     ${dLabel}
-                   </div>
-                 </div>`
-              : `<span class="cell-inner inline-flex items-center gap-1.5 px-1.5 py-0.5 text-gray-300">— ${pencilSvg}</span>`}
-          </td>`;
-        }
-
-        // ── Progress cell
-        const pct = task.progress ?? 0;
-        const progColor = pct >= 100 ? '#22c55e' : pct >= 60 ? '#3b82f6' : pct >= 30 ? '#f97316' : '#94a3b8';
-        const progressCell = editingCell?.id === task.id && editingCell?.field === 'progress'
-          ? `<td class="px-4 py-2" style="min-width:140px"><div class="space-y-2">
-               <div class="flex items-center gap-2">
-                 <input id="edit-progress-input" type="range" min="0" max="100" step="5" value="${pct}"
-                   class="flex-1"
-                   style="background:linear-gradient(to right,${progColor} ${pct}%,#e5e7eb ${pct}%)"
-                   oninput="this.style.background='linear-gradient(to right,${progColor} '+this.value+'%,#e5e7eb '+this.value+'%)'; document.getElementById('edit-progress-val').textContent=this.value+'%'"/>
-                 <span id="edit-progress-val" class="text-sm font-medium text-gray-600 w-10 text-right">${pct}%</span>
-               </div>
-               <div class="flex gap-1">
-                 ${saveBtn(task.id,'progress')} ${cancelBtn()}
-               </div>
-             </div></td>`
-          : `<td class="px-5 py-3.5 editable-cell" onclick="startEdit('${esc(task.id)}','progress')" style="min-width:140px">
-               <div class="space-y-1">
-                 <div class="flex items-center gap-2">
-                   <div class="progress-track flex-1">
-                     <div class="progress-fill" style="width:${pct}%;background-color:${progColor}"></div>
-                   </div>
-                   <span class="text-xs text-gray-500 w-8 text-right">${pct}%</span>
-                   ${pencilSvg}
-                 </div>
-               </div>
-             </td>`;
-
-        // ── Memo cell
-        const memoCell = editingCell?.id === task.id && editingCell?.field === 'memo'
-          ? `<td class="px-4 py-2"><div class="flex items-center gap-1">
-               <input id="edit-cell-input" type="text" value="${esc(task.memo||'')}" placeholder="メモを入力"
-                 class="border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400 w-48"
-                 onkeydown="if(event.key==='Enter') saveEdit('${esc(task.id)}','memo'); else if(event.key==='Escape') cancelEdit()"/>
-               ${saveBtn(task.id,'memo')} ${cancelBtn()}
-             </div></td>`
-          : `<td class="px-5 py-3.5 editable-cell max-w-xs" onclick="startEdit('${esc(task.id)}','memo')">
-               <span class="cell-inner inline-flex items-center gap-1.5 px-1.5 py-0.5 text-gray-500">
-                 <span class="truncate" style="max-width:12rem">${task.memo ? esc(task.memo) : '<span class="text-gray-300">—</span>'}</span>
-                 ${pencilSvg}
-               </span>
-             </td>`;
-
-        return `<tr class="task-row border-b border-gray-50 ${isOver?'bg-red-50/30':''}">
-  ${nameCell}${priCell}${dlCell}${progressCell}${memoCell}
-  <td class="px-3 py-3.5">
-    <button onclick="deleteTask('${esc(task.id)}')" class="icon-btn text-gray-300 hover:text-red-400 hover:bg-red-50" title="削除">
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-    </button>
-  </td>
-</tr>`;
-      }).join('');
-    }
-
-    function render() { renderCategorySelect(); renderTabs(); renderTaskList(); updateSortIcons(); }
-
-    function esc(s) {
-      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-    }
-
-    // ─── Works authentication ──────────────────────────────
-    function signInWithGoogle() { signIn(); }
-    async function signOutUser() { await worksSignOut(); location.reload(); }
-    watchAuth({
-      onSignedIn: async () => {
-        try {
-          await loadData();
-          initFormState();
-          document.getElementById('login-screen').classList.add('hidden');
-          document.getElementById('todo-user-bar').hidden = false;
-        } catch (error) {
-          document.getElementById('login-loading').textContent = '読み込みに失敗しました: ' + error.message;
-        }
-      },
-      onSignedOut: message => {
-        document.getElementById('login-loading').classList.add('hidden');
-        document.getElementById('login-form').classList.remove('hidden');
-        if (message) document.querySelector('#login-form p').textContent = message;
-      }
-    });
-    // ─── Expose globals ───────────────────────────────────────
-    Object.assign(window, {
-      toggleForm, addTask,
-      openCategoryModal, closeCategoryModal,
-      addCategory, startEditCat, cancelEditCat, saveEditCat, deleteCat, moveCat,
-      startEdit, cancelEdit, saveEdit, clearDeadline, updateDlDays,
-      deleteTask, setTab, setSort,
-      signInWithGoogle, signOutUser,
-    });
-  </script>
-</body>
+      <p class="hint">
+        従来のカテゴリです。役割とは別に保持します。使用中のカテゴリを削除する場合は、移動先を選んでください。
+      </p>
+      <div id="categories-list"></div>
+      <form id="categories-form">
+        <label
+          >新しいカテゴリ<input name="name" maxlength="100" required /></label
+        ><button class="primary">カテゴリを追加</button>
+      </form>
+    </dialog>
+    <script type="module" src="/todo/todo.js?v=1"></script>
+  </body>
 </html>
