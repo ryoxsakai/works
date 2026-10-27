@@ -7,7 +7,7 @@
     <script src="/shared/theme-init.js?v=1"></script>
     <link rel="stylesheet" href="/shared/styles.css?v=56" />
     <link rel="stylesheet" href="/shared/header.css?v=2" />
-    <link rel="stylesheet" href="/todo/todo.css?v=5" />
+    <link rel="stylesheet" href="/todo/todo.css?v=6" />
     <script type="module" src="/shared/header.js?v=4"></script>
   </head>
   <body class="todo-page">
@@ -39,9 +39,11 @@
           placeholder="思いついたことを、ひとこと"
         /><button class="primary" type="submit">＋ 追加</button>
       </form>
+      <label class="capture-destination">追加先<select id="capture-day"><option value="">予定なし · インボックス</option><option value="0">今日の予定</option><option value="1">明日の予定</option></select></label>
       <p class="hint">
         タイトルだけで登録できます。役割・予定日・締切などは、あとから「詳細」で。
       </p>
+      <div class="task-search"><label for="task-search">タスクを探す</label><input id="task-search" type="search" placeholder="タイトル・メモで検索" /><button id="clear-filters" type="button" hidden>絞り込みを解除</button></div>
       <div class="toolbar">
         <label
           >役割
@@ -69,7 +71,7 @@
         </p>
         <div id="deadlines"></div>
       </section>
-      <div id="tasks"></div>
+      <p id="task-count" class="hint" role="status"></p><div id="tasks" aria-label="タスク一覧"></div>
       <p class="hint">
         役割はあなた自身の担当です。会話からも同じToDoを更新できます。自動監視や繰り返しは設定されません。
       </p>
@@ -241,6 +243,6 @@
         ><button class="primary">カテゴリを追加</button>
       </form>
     </dialog>
-    <script type="module" src="/todo/todo.js?v=1"></script>
+    <script type="module" src="/todo/todo.js?v=2"></script>
   </body>
 </html>

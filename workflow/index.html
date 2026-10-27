@@ -63,6 +63,11 @@
           へ変わります。同一定義に未完了の Run がある間は次回を作成しません。
         </p>
         <p id="coverage" class="wf-note"></p>
+        <div class="workspace-search">
+          <label for="workflow-search">名前・目的で検索</label>
+          <input id="workflow-search" type="search" placeholder="予定・未完了・定義を検索" />
+          <button id="reset-filters" type="button" hidden>絞り込みを解除</button>
+        </div>
         <label
           >担当で絞り込み<select id="role-filter">
             <option value="">担当すべて</option>
@@ -93,12 +98,6 @@
             <a href="/wiki/">Wiki参考資料を見る →</a>
           </div>
           <div class="workspace-search">
-            <label for="workflow-search">ワークフローを検索</label
-            ><input
-              id="workflow-search"
-              type="search"
-              placeholder="名前・目的で検索"
-            />
             <div
               id="active-filters"
               class="ui-segmented"
@@ -280,6 +279,6 @@
         <div id="run-history"></div>
       </details>
     </dialog>
-    <script type="module" src="./app.js?v=5"></script>
+    <script type="module" src="./app.js?v=7"></script>
   </body>
 </html>

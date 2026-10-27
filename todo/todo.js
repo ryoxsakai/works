@@ -182,7 +182,7 @@ function roleBadge(t) {
 function card(t) {
   const done = statusOf(t) === "done",
     base = today();
-  return `<article class="task-card" data-task="${esc(t.id)}"><div class="task-top"><button class="done-toggle" data-action="complete" aria-label="${done ? "未着手に戻す" : "完了にする"}：${esc(t.name)}">${done ? "✓" : "○"}</button><div><p class="task-name">${t.important ? "★ " : ""}${esc(t.name)}</p><div class="task-meta">${roleBadge(t)}<span class="badge">${statusNames[statusOf(t)]}</span>${t.plannedDay ? `<span class="badge">予定 ${esc(t.plannedDay)}</span>` : ""}${t.deadline ? `<span class="badge ${t.deadline < base && !done ? "overdue" : ""}">締切 ${esc(t.deadline)}</span>` : ""}${t.priority ? `<span class="badge">重要度 ${["", "低", "中", "高"][t.priority]}</span>` : ""}${t.checklist?.length ? `<span class="badge">ステップ ${t.checklist.filter((c) => c.checked).length}/${t.checklist.length}</span>` : ""}</div><p class="hint">カテゴリ：${esc(t.category)}${t.cloneSourceId ? " · 複製元の記録あり" : ""}${t.progress > 0 && t.progress < 100 ? ` · 従来の進捗 ${t.progress}%` : ""}</p></div><button class="detail-button" data-action="detail" aria-label="詳細：${esc(t.name)}">詳細</button></div><div class="task-actions">${[
+  return `<article class="task-card" data-task="${esc(t.id)}"><div class="task-top"><button class="done-toggle" data-action="complete" aria-label="${done ? "未着手に戻す" : "完了にする"}：${esc(t.name)}">${done ? "✓" : "○"}</button><div><p class="task-name">${t.important ? "★ " : ""}${esc(t.name)}</p><div class="task-meta">${roleBadge(t)}<span class="badge">${statusNames[statusOf(t)]}</span>${t.plannedDay ? `<span class="badge">予定 ${esc(t.plannedDay)}</span>` : ""}${t.deadline ? `<span class="badge ${t.deadline < base && !done ? "overdue" : ""}">締切 ${esc(t.deadline)}</span>` : ""}${t.priority ? `<span class="badge">重要度 ${["", "低", "中", "高"][t.priority]}</span>` : ""}${t.checklist?.length ? `<span class="badge">ステップ ${t.checklist.filter((c) => c.checked).length}/${t.checklist.length}</span>` : ""}</div><p class="hint">カテゴリ：${esc(t.category)}${t.cloneSourceId ? " · 複製元の記録あり" : ""}${t.progress > 0 && t.progress < 100 ? ` · 従来の進捗 ${t.progress}%` : ""}</p></div><button class="detail-button" data-action="detail" aria-label="詳細：${esc(t.name)}">詳細</button></div><p class="clone-caption">独立したタスクを複製（今日から）</p><div class="task-actions">${[
     [1, "1日後"],
     [3, "3日後"],
     [7, "1週間後"],
@@ -190,11 +190,11 @@ function card(t) {
   ]
     .map(
       ([n, label]) =>
-        `<button class="clone-fast" data-action="clone" data-days="${n}" aria-label="${label}に複製：${esc(t.name)}">${label}に複製<span>${offset(base, n)}</span></button>`,
+        `<button class="clone-fast" data-action="clone" data-days="${n}" title="${offset(base, n)} に独立したタスクを複製" aria-label="${label}に複製：${esc(t.name)}">${label}<span class="sr-only">に複製</span></button>`,
     )
     .join(
       "",
-    )}<button data-action="custom-clone">日数・締切を指定</button></div></article>`;
+    )}<button data-action="custom-clone">その他の複製</button>${!done && t.plannedDay !== base ? '<button data-action="plan-today">今日に予定</button>' : ""}</div></article>`;
 }
 function group(title, tasks, note = "") {
   return `<section class="group"><div class="group-heading"><h3>${esc(title)}</h3><span class="count">${tasks.length}件</span></div>${note ? `<p class="hint">${esc(note)}</p>` : ""}${tasks.length ? tasks.map(card).join("") : '<p class="empty">ここにはタスクがありません。</p>'}</section>`;
@@ -221,9 +221,13 @@ function render() {
   category = $("category-filter").value;
   const list = state.tasks.filter(
       (t) =>
-        (!role || t.roleId === role) && (!category || t.category === category),
+        (!role || t.roleId === role) && (!category || t.category === category) &&
+        (!$("task-search").value.trim() || [t.name, t.memo, t.reusableDescription].join(" ").toLocaleLowerCase().includes($("task-search").value.trim().toLocaleLowerCase())),
     ),
     base = today();
+  const filtered = !!(role || category || $("task-search").value.trim());
+  $("clear-filters").hidden = !filtered;
+  $("task-count").textContent = `${list.length}件表示 / 全${state.tasks.length}件${filtered ? " · 絞り込み中（締切の確認は全件）" : ""}`;
   const active = list.filter((t) => statusOf(t) !== "done");
   // Deadline guardrail deliberately ignores role/category filters.
   const due = state.tasks
@@ -296,6 +300,7 @@ function render() {
         list.filter((t) => statusOf(t) === "done"),
       );
   }
+  if (!list.length) $("tasks").innerHTML = `<p class="empty">${filtered ? "条件に合うタスクがありません。絞り込みを解除して確認できます。" : "タスクはまだありません。上の入力欄にタイトルを入れて追加しましょう。"}</p>`;
   $("list-view").setAttribute("aria-pressed", mode === "list");
   $("board-view").setAttribute("aria-pressed", mode === "board");
   renderRecovery();
@@ -453,6 +458,7 @@ $("step-add").onclick = () => {
 $("step-text").onkeydown = (e) => {
   if (e.key === "Enter") {
     e.preventDefault();
+    if (e.isComposing || e.keyCode === 229) return;
     $("step-add").click();
   }
 };
@@ -499,10 +505,15 @@ $("task-delete").onclick = async () => {
   next.tasks = next.tasks.filter((t) => t.id !== id);
   if ((await save(next)) && epoch === dialogEpoch) closeDialog($("detail"));
 };
+$("quick-title").onkeydown = (e) => {
+  if (e.key === "Enter" && (e.isComposing || e.keyCode === 229)) e.preventDefault();
+};
 $("capture").onsubmit = async (e) => {
   e.preventDefault();
   if (busy) return;
-  const name = $("quick-title").value.trim();
+  const name = $("quick-title").value.trim(),
+    captureBase = today(),
+    plannedDay = $("capture-day").value === "" ? null : offset(captureBase, Number($("capture-day").value));
   if (!name) return;
   const next = structuredClone(state);
   next.tasks.push({
@@ -513,12 +524,14 @@ $("capture").onsubmit = async (e) => {
     deadline: null,
     progress: 0,
     memo: "",
-    createdAt: today(),
-    plannedDay: null,
+    createdAt: captureBase,
+    plannedDay,
     status: "pending",
   });
-  if (await save(next, "インボックスに追加しました")) {
+  if (await save(next, plannedDay === null ? "インボックスに追加しました" : `${plannedDay} の予定に追加しました（締切なし）`)) {
     $("quick-title").value = "";
+    $("task-search").value = $("role-filter").value = $("category-filter").value = "";
+    render();
     $("quick-title").focus();
   }
 };
@@ -530,6 +543,12 @@ $("tasks").onclick = async (e) => {
   if (button.dataset.action === "clone")
     startClone(id, Number(button.dataset.days), today());
   if (button.dataset.action === "custom-clone") openClone(id);
+  if (button.dataset.action === "plan-today") {
+    const next = structuredClone(state);
+    next.tasks.find((t) => t.id === id).plannedDay = today();
+    await save(next, "今日の予定に移しました。締切は変更していません");
+    document.querySelector(`[data-task="${CSS.escape(id)}"] [data-action="detail"]`)?.focus();
+  }
   if (button.dataset.action === "complete") {
     const next = structuredClone(state),
       t = next.tasks.find((t) => t.id === id);
@@ -542,6 +561,12 @@ $("tasks").onclick = async (e) => {
 $("deadlines").onclick = (e) => {
   const b = e.target.closest("[data-deadline]");
   if (b && !busy) openDetail(b.dataset.deadline);
+};
+$("task-search").oninput = render;
+$("clear-filters").onclick = () => {
+  $("task-search").value = $("role-filter").value = $("category-filter").value = "";
+  render();
+  $("task-search").focus();
 };
 $("role-filter").onchange = render;
 $("category-filter").onchange = render;

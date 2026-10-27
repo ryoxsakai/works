@@ -193,6 +193,7 @@ async function load(more = false, refresh = true) {
   );
   state.pages = more ? [...state.pages, ...data.pages] : data.pages;
   state.offset = offset + data.pages.length;
+  $("clear-search").hidden = !$("search").value;
   $("folder-grid").hidden = Boolean($("search").value);
   if ($("search").value)
     $("folder-heading").textContent = "検索結果（全フォルダ）";
@@ -289,6 +290,7 @@ function render() {
 }
 async function open(id, push = true) {
   state.data = await api("pages/" + path(id));
+  document.querySelector(".wiki-page-tools").open = false;
   state.dirty = false;
   state.editing = false;
   $("editor").hidden = true;
@@ -458,6 +460,14 @@ $("more-history").onclick = () =>
     state.data.history_has_more = h.has_more;
     render();
   });
+$("clear-search").onclick = () => {
+  if (!beforeNavigate()) return;
+  run(async () => {
+    $("search").value = "";
+    await chooseFolder(folders.current(), false);
+    $("search").focus();
+  });
+};
 $("find").onclick = () => run(() => load());
 $("search").onkeydown = (e) => {
   if (e.key === "Enter") run(() => load());

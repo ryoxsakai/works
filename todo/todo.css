@@ -511,3 +511,31 @@ html[data-theme="dark"] .todo-page #role-error {
   min-height: 44px;
   flex-shrink: 0;
 }
+
+/* Keep direct clone actions compact, with dates in their accessible descriptions. */
+.task-search { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:20px 0 12px; }
+.task-search label { font-weight:600; }
+.task-search input { flex:1; min-width:160px; }
+.task-actions { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); }
+.task-actions .clone-fast { min-width:0; padding:6px 2px; }
+.task-actions > button:not(.clone-fast) { grid-column:span 2; font-size:12px; padding:6px; }
+.task-actions .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+.task-card { padding:12px; }
+.task-meta { margin:6px 0; }
+.task-card .hint { margin:4px 0; font-size:12px; }
+@media(max-width:600px) { .task-search label { width:100%; } .task-top { gap:8px; } }
+
+.capture-destination { display:flex; align-items:center; gap:10px; font-size:13px; margin:10px 0; color:var(--muted); }
+.capture-destination select { min-height:44px; color:var(--ink); }
+
+.board .task-actions { display:grid; }
+
+.clone-caption { margin:10px 0 0; color:var(--muted); font-size:12px; }
+.clone-caption + .task-actions { margin-top:4px; }
+/* Reserve useful reading width for long task names on narrow screens. */
+.deadline-row button { min-width:0; overflow-wrap:anywhere; }
+@media(max-width:600px) {
+  .deadline-row { flex-direction:column; align-items:stretch; gap:2px; }
+  .deadline-row button { width:100%; padding:8px 0; }
+  .deadline-row > span { align-self:flex-end; }
+}

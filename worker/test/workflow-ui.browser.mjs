@@ -72,7 +72,8 @@ const context = await browser.newContext({
   viewport: { width: 1440, height: 1000 },
 });
 let writes = 0,
-  heldResponse = null;
+  heldResponse = null,
+  failNextWorkflowRead = false;
 function holdResponse(method, action) {
   let reached, release;
   const started = new Promise((resolve) => {
@@ -94,6 +95,10 @@ await context.route("**/*", async (route) => {
       body: `export const getSessionToken=()=>${JSON.stringify(token)};export const signIn=()=>{};export const signOutUser=async()=>{};export const watchAuth=({onSignedIn})=>onSignedIn({email:'owner@example.test'});`,
     });
   if (url.pathname.startsWith("/api/")) {
+    if (url.pathname === "/api/workflow" && request.method() === "GET" && !url.search && failNextWorkflowRead) {
+      failNextWorkflowRead = false;
+      return route.fulfill({status:503,contentType:"application/json",body:JSON.stringify({error:"synthetic refresh unavailable"})});
+    }
     if (request.method() !== "GET") writes++;
     const response = await worker.fetch(
       new Request(url, {
@@ -208,16 +213,30 @@ try {
   await f.locator("[name=start]").fill("2026-10-20T09:15");
   await f.locator("[name=task-title]").fill("根拠を整理");
   await f.locator("[name=task-completion]").fill("資料URLを確認");
+  failNextWorkflowRead = true;
   await f.getByRole("button", { name: "下書きを保存" }).click();
   await expect(page.locator("#editor")).not.toBeVisible();
+  await expect(page.locator("#error")).toContainText("下書きは保存しました");
+  await page.locator("#refresh").click();
+  await expect(page.locator("#definitions article")).toHaveCount(1);
+  await expect(page.locator("#error")).toBeEmpty();
   await expect(page.locator("#definitions")).toContainText("合成フロー <img");
   assert.equal(await page.locator("#definitions img").count(), 0);
   await page.getByRole("button", { name: "編集", exact: true }).click();
   await expect(hoursInput).toHaveValue("3");
   await expect(f.locator("[name=start]")).toHaveValue("2026-10-20T09:15");
   await f.locator("[name=title]").fill("週次レポートの作成（合成データ）");
+  const savedRefresh = holdResponse("GET");
   await f.getByRole("button", { name: "下書きを保存" }).click();
+  await savedRefresh.started;
+  await expect(page.locator("#editor")).toBeVisible();
+  await expect(page.locator("#workspace")).toHaveAttribute("aria-busy", "true");
+  await expect(f.locator("[name=title]")).toBeDisabled();
+  await expect(f.getByRole("button", {name:"下書きを保存"})).toBeDisabled();
+  await expect(page.locator('[data-close="editor"]')).toBeEnabled();
+  savedRefresh.release();
   await expect(page.locator("#editor")).not.toBeVisible();
+  await expect(page.locator("#workspace")).toHaveAttribute("aria-busy", "false");
   await page.getByRole("button", { name: "内容を確認・実行を許可" }).click();
   await expect(page.locator("#definitions")).toContainText("実行許可済み");
   await expect(page.locator("#definitions")).toContainText("3時間ごと");
@@ -282,7 +301,13 @@ try {
   await expect(page.locator("#active-runs .wf-run")).toHaveCount(1);
   await page.locator('[data-active="review"]').click();
   await expect(page.locator("#active-runs .wf-run")).toHaveCount(0);
-  await page.locator('[data-active="all"]').click();
+  await expect(page.locator("#reset-filters")).toBeVisible();
+  await page.locator("#workflow-search").fill("一致しない検索");
+  await page.locator("#reset-filters").click();
+  await expect(page.locator('[data-active="all"]')).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("#active-runs .wf-run")).toHaveCount(1);
+  await expect(page.locator("#workflow-search")).toBeFocused();
+  await expect(page.locator("#reset-filters")).toBeHidden();
   await page.locator('[data-view="agenda"]').click();
   await expect(page.locator("#calendar")).toHaveClass(/wf-agenda/);
   await page.locator('[data-view="calendar"]').click();
