@@ -53,6 +53,7 @@ let state,
   busy = false,
   signedIn = false;
 let runViewGeneration = 0;
+let editorViewGeneration = 0;
 let planningIndex = null;
 let activeFilter = "all",
   calendarView = "calendar";
@@ -592,7 +593,15 @@ const localTime = (x) =>
   x
     ? new Date(new Date(x).getTime() + 9 * 3600000).toISOString().slice(0, 16)
     : "";
+function unlockDefinitionForm() {
+  for (const el of $("#definition-form").querySelectorAll("[data-saving-disabled]")) {
+    el.disabled = el.dataset.savingDisabled === "true";
+    delete el.dataset.savingDisabled;
+  }
+}
 function openEditor(d = null) {
+  editorViewGeneration++;
+  unlockDefinitionForm();
   editing = d;
   const form = $("#definition-form");
   form.reset();
@@ -1024,6 +1033,7 @@ $("#definition-form").addEventListener("submit", (event) => {
   event.preventDefault();
   guard(async () => {
     const f = event.target,
+      generation = editorViewGeneration,
       content = {};
     for (const k of [
       "title",
@@ -1062,15 +1072,28 @@ $("#definition-form").addEventListener("submit", (event) => {
         .value.split(/\n/)
         .filter(Boolean),
     }));
-    await api({
-      action: editing ? "edit" : "create",
-      ...(editing
-        ? { definition_id: editing.id, revision: editing.revision }
-        : {}),
-      content,
-    });
-    closeDialog($("#editor"));
-    await load();
+    for (const el of f.querySelectorAll("input,select,textarea,button:not([data-close])")) {
+      el.dataset.savingDisabled = String(el.disabled);
+      el.disabled = true;
+    }
+    try {
+      await api({
+        action: editing ? "edit" : "create",
+        ...(editing
+          ? { definition_id: editing.id, revision: editing.revision }
+          : {}),
+        content,
+      });
+      try {
+        await load();
+      } catch {
+        $("#error").textContent = "下書きは保存しましたが、一覧を取得できませんでした。「更新」で確認してください。再作成は不要です。";
+      }
+      if (generation === editorViewGeneration && $("#editor").open)
+        closeDialog($("#editor"));
+    } finally {
+      unlockDefinitionForm();
+    }
   }, "#editor-error");
 });
 $("#run-action").addEventListener("submit", (e) => e.preventDefault());
