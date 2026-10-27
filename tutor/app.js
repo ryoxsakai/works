@@ -3702,12 +3702,14 @@ document.querySelector("#initialize-lesson-baselines").addEventListener("click",
   const total={inspected:0,observed:0,historical:0,unavailable:0,collisions:0};let cursor="";
   try {
     while(true) {
-      const result=await apiFetch("/lesson-baseline/initialize",{method:"POST",body:JSON.stringify({cursor,limit:25})},null);
+      const result=await apiFetch("/lesson-baseline/initialize",{method:"POST",body:JSON.stringify({cursor})},null);
       for(const field of Object.keys(total))total[field]+=result[field];
       status.textContent=`比較用の観測を準備中：${total.inspected}件確認、${total.observed}件観測（所属未確認）`;
+      if(result.retry_required)throw new Error("カレンダーの取得が中断されました。時間をおいて再試行してください");
       if(result.done){status.textContent=`${total.unavailable||total.collisions ? "比較用の観測は一部未完了です" : "比較用の観測を準備しました"}。${total.observed}件（所属未確認）、開始日前${total.historical}件、個別保留${result.held}件、取得不可${total.unavailable}件、ID重複${total.collisions}件。取得不可・重複は個別に確認してください。`;break;}
       if(result.next_cursor===cursor)throw new Error("準備の進捗を確認できません。再試行してください");
       cursor=result.next_cursor;
+      await new Promise(resolve=>setTimeout(resolve,Math.max(1000,result.retry_after_ms||0)));
     }
   } catch(error){status.textContent=error.message+"。再試行しても、作成済みの観測値や旧記録を上書きしません。";}
   finally{button.disabled=false;}
