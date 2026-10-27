@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFileSync} from 'node:fs';
 import {Miniflare} from 'miniflare';
 import {findNextLesson,lessonEventRef,isScheduledLesson} from '../../shared/lesson-plan.js';
+import {ensureAttribution} from '../src/lesson-attribution.js';
 import {readLessonPlan,readNextLessonPlan,writeLessonPlan} from '../src/lesson-plan.js';
 
 const event=(id,date='2026-10-17',hour=10,calendar='class-a',summary='山田')=>({id,calendar_id:calendar,summary,etag:`"${id}-1"`,start:{dateTime:`${date}T${hour}:00:00+09:00`},end:{dateTime:`${date}T${hour+1}:00:00+09:00`}});
@@ -16,7 +16,10 @@ async function setup(t) {
   const deps={settings:async()=>settings,token:async()=>({access_token:'synthetic'}),
     event:async(_token,cal,id)=>structuredClone(events.find(e=>e.calendar_id===cal&&e.id===id)||null),
     events:async(_token,cal,min,max)=>structuredClone(events.filter(e=>e.calendar_id===cal&&Date.parse(e.end.dateTime)>Date.parse(min)&&Date.parse(e.start.dateTime)<Date.parse(max)))};
-  const env={DB};return {env,events,settings,deps,DB};
+  const env={DB};
+  await ensureAttribution(env);
+  await DB.prepare("INSERT INTO lesson_record_identity(event_id,calendar_id,title,revision) VALUES ('b','class-a','山田',0)").run();
+  return {env,events,settings,deps,DB};
 }
 test('exact title and calendar, consecutive same-day lessons and excluded slots',()=>{
   const a=event('a'),b=event('b','2026-10-17',11);
@@ -45,7 +48,7 @@ test('read preserves the existing next plan and does not create a source record'
 });
 test('linked save changes only the next event lesson_plan, retaining every other field',async t=>{
   const {env,deps,DB}=await setup(t);const next=await readNextLessonPlan(env,'class-a','a',deps);
-  await writeLessonPlan(env,{source:next.source,target:next.target,expected_lesson_plan:next.lesson_plan,lesson_plan:'連動した予定'},deps);
+  await writeLessonPlan(env,{source:next.source,target:next.target,record_revision:next.record_revision,expected_lesson_plan:next.lesson_plan,lesson_plan:'連動した予定'},deps);
   const row=await DB.prepare("SELECT * FROM curriculum_entries WHERE calendar_event_id='b'").first();
   assert.equal(row.lesson_plan,'連動した予定');assert.equal(row.completed,1);assert.equal(row.homework,'既存宿題');
   assert.equal(row.confirmation_test,'既存テスト');assert.equal(row.lesson_memo,'既存授業メモ');
@@ -53,7 +56,7 @@ test('linked save changes only the next event lesson_plan, retaining every other
 });
 test('a direct lesson edit is the same persisted value shown through its previous lesson',async t=>{
   const {env,deps}=await setup(t);const plan=await readLessonPlan(env,'class-a','b',deps);
-  await writeLessonPlan(env,{target:plan.target,expected_lesson_plan:plan.lesson_plan,lesson_plan:'当日の画面から変更'},deps);
+  await writeLessonPlan(env,{target:plan.target,record_revision:plan.record_revision,expected_lesson_plan:plan.lesson_plan,lesson_plan:'当日の画面から変更'},deps);
   assert.equal((await readNextLessonPlan(env,'class-a','a',deps)).lesson_plan,'当日の画面から変更');
 });
 for(const change of ['move','cancel','earlier','source'])test(`changed schedule blocks a stale destination: ${change}`,async t=>{
@@ -62,7 +65,7 @@ for(const change of ['move','cancel','earlier','source'])test(`changed schedule 
   if(change==='cancel')events[1].status='cancelled';
   if(change==='earlier')events.push(event('new','2026-10-17',11));
   if(change==='source')events[0].summary='佐藤';
-  await assert.rejects(writeLessonPlan(env,{source:next.source,target:next.target,expected_lesson_plan:next.lesson_plan,lesson_plan:'保存してはいけない'},deps),error=>error.status===409);
+  await assert.rejects(writeLessonPlan(env,{source:next.source,target:next.target,record_revision:next.record_revision,expected_lesson_plan:next.lesson_plan,lesson_plan:'保存してはいけない'},deps),error=>error.status===409);
   assert.equal((await DB.prepare("SELECT lesson_plan FROM curriculum_entries WHERE calendar_event_id='b'").first()).lesson_plan,'既存の次回予定');
 });
 test('no next lesson and cross-calendar ID collisions never create an entry',async t=>{
@@ -79,12 +82,12 @@ test('source changes during the fresh lookup are caught again before the SQL wri
     if(cal==='class-a'&&id==='b')events[0].etag='"source-changed-after-list"';
     return read(token,cal,id);
   };
-  await assert.rejects(writeLessonPlan(env,{source:next.source,target:next.target,expected_lesson_plan:next.lesson_plan,lesson_plan:'x'},deps),e=>e.code==='LESSON_TARGET_CHANGED');
+  await assert.rejects(writeLessonPlan(env,{source:next.source,target:next.target,record_revision:next.record_revision,expected_lesson_plan:next.lesson_plan,lesson_plan:'x'},deps),e=>e.code==='LESSON_TARGET_CHANGED');
   assert.equal((await DB.prepare("SELECT lesson_plan FROM curriculum_entries WHERE calendar_event_id='b'").first()).lesson_plan,'既存の次回予定');
 });
-test('concurrent writers use a single SQL compare-and-set; only one stale baseline can succeed',async t=>{
+test('concurrent writers preserve one winner for a stale baseline',async t=>{
   const {env,deps,DB}=await setup(t);const plan=await readLessonPlan(env,'class-a','b',deps);
-  const body={target:plan.target,expected_lesson_plan:plan.lesson_plan};
+  const body={target:plan.target,record_revision:plan.record_revision,expected_lesson_plan:plan.lesson_plan};
   const results=await Promise.allSettled(['一','二'].map(lesson_plan=>writeLessonPlan(env,{...body,lesson_plan},deps)));
   assert.equal(results.filter(r=>r.status==='fulfilled').length,1);
   assert.equal(results.find(r=>r.status==='rejected').reason.code,'LESSON_PLAN_CONFLICT');
@@ -92,17 +95,57 @@ test('concurrent writers use a single SQL compare-and-set; only one stale baseli
 });
 test('only an empty expected baseline can create a new target record',async t=>{
   const {env,deps,DB}=await setup(t);const plan=await readLessonPlan(env,'class-a','c',deps);
-  await assert.rejects(writeLessonPlan(env,{target:plan.target,expected_lesson_plan:'stale',lesson_plan:'x'},deps),e=>e.status===409);
+  await assert.rejects(writeLessonPlan(env,{target:plan.target,record_revision:plan.record_revision,expected_lesson_plan:'stale',lesson_plan:'x'},deps),e=>e.status===409);
   assert.equal(await DB.prepare("SELECT * FROM curriculum_entries WHERE calendar_event_id='c'").first(),null);
-  await writeLessonPlan(env,{target:plan.target,expected_lesson_plan:'',lesson_plan:'新しい予定'},deps);
+  await writeLessonPlan(env,{target:plan.target,record_revision:plan.record_revision,expected_lesson_plan:'',lesson_plan:'新しい予定'},deps);
   assert.equal((await DB.prepare("SELECT * FROM curriculum_entries WHERE calendar_event_id='c'").first()).lesson_plan,'新しい予定');
 });
-test('a partial legacy update cannot restore a plan read before another writer changed it',async t=>{
-  const {env,DB}=await setup(t);const source=readFileSync(new URL('../src/index.js',import.meta.url),'utf8');
-  const start=source.indexOf('async function upsertCurriculumEntry('),end=source.indexOf('\n}',start)+2;
-  const update=new Function('SCHEDULE_TEXT_FIELDS',`return ${source.slice(start,end)}`)(['lesson_plan','confirmation_test','homework','lesson_memo']);
-  const proxy={prepare(sql){const statement=DB.prepare(sql);if(sql.startsWith('SELECT * FROM curriculum_entries'))return {bind(...args){const bound=statement.bind(...args);return {async first(){const old=await bound.first();await DB.prepare("UPDATE curriculum_entries SET lesson_plan='新しい別画面の予定' WHERE calendar_event_id='b'").run();return old;}}}};return statement;}};
-  await update({DB:proxy},'b',{homework:'新しい宿題'});
-  const row=await DB.prepare("SELECT * FROM curriculum_entries WHERE calendar_event_id='b'").first();
-  assert.equal(row.lesson_plan,'新しい別画面の予定');assert.equal(row.homework,'新しい宿題');
+test('a partial update cannot restore a stale plan or overwrite a racing writer',async t=>{
+  const {env,DB}=await setup(t);
+  const {rawRecord,recordWriteStatements,commitRecords}=await import('../src/lesson-attribution.js');
+  const row=await rawRecord(env,'b');
+  const statements=await recordWriteStatements(env,{id:'b',calendar_id:'class-a',title:'山田'},{homework:'新しい宿題'},row.record_revision);
+  await DB.prepare("UPDATE curriculum_entries SET lesson_plan='新しい別画面の予定' WHERE calendar_event_id='b'").run();
+  await assert.rejects(commitRecords(env,statements),e=>e.code==='LESSON_RECORD_CONFLICT');
+  const latest=await rawRecord(env,'b');
+  await commitRecords(env,await recordWriteStatements(env,{id:'b',calendar_id:'class-a',title:'山田'},{homework:'新しい宿題'},latest.record_revision));
+  const saved=await rawRecord(env,'b');assert.equal(saved.lesson_plan,'新しい別画面の予定');assert.equal(saved.homework,'新しい宿題');
+});
+
+test('a same-title replacement after commit cannot be returned as the original save response',async t=>{
+  const {env,deps,DB}=await setup(t);
+  const {ensureAttribution,rawRecord,resolveAttribution,recordWriteStatements,commitRecords}=await import('../src/lesson-attribution.js');
+  const plan=await readLessonPlan(env,'class-a','b',deps);
+  let armed=false;
+  const proxy={prepare:DB.prepare.bind(DB),async batch(statements){
+    const result=await DB.batch(statements);
+    if(armed){
+      armed=false;
+      const row=await rawRecord(env,'b');
+      await resolveAttribution(env,plan.target,row.record_revision,'separate');
+      const next=await rawRecord(env,'b');
+      await commitRecords(env,await recordWriteStatements(env,plan.target,{lesson_plan:'other student private content'},next.record_revision));
+    }
+    return result;
+  }};
+  const proxyEnv={DB:proxy};await ensureAttribution(proxyEnv);armed=true;
+  await assert.rejects(writeLessonPlan(proxyEnv,{target:plan.target,record_revision:plan.record_revision,expected_lesson_plan:plan.lesson_plan,lesson_plan:'my committed plan'},deps),error=>{
+    assert.equal(error.code,'LESSON_RECORD_CHANGED_AFTER_SAVE');assert.equal(error.committed,true);
+    assert.equal(JSON.stringify(error).includes('other student private content'),false);return true;
+  });
+  const archive=await DB.prepare('SELECT * FROM lesson_record_archive').first();
+  assert.equal(JSON.parse(archive.snapshot_json).lesson_plan,'my committed plan');
+  assert.equal((await rawRecord(env,'b')).lesson_plan,'other student private content');
+});
+
+test('a stale same-title save conflict withholds the new ownership generation plan',async t=>{
+  const {env,deps}=await setup(t);const plan=await readLessonPlan(env,'class-a','b',deps);
+  const {rawRecord,resolveAttribution,recordWriteStatements,commitRecords}=await import('../src/lesson-attribution.js');
+  await resolveAttribution(env,plan.target,plan.record_revision,'separate');
+  const next=await rawRecord(env,'b');
+  await commitRecords(env,await recordWriteStatements(env,plan.target,{lesson_plan:'private replacement plan'},next.record_revision));
+  await assert.rejects(writeLessonPlan(env,{target:plan.target,record_revision:plan.record_revision,expected_lesson_plan:plan.lesson_plan,lesson_plan:'old draft'},deps),error=>{
+    assert.equal(error.code,'LESSON_PLAN_CONFLICT');assert.equal(error.current.lesson_plan,'');
+    assert.equal(JSON.stringify(error).includes('private replacement plan'),false);return true;
+  });
 });

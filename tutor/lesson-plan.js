@@ -6,19 +6,23 @@ export function createLessonPlanController({ readNext, write, onChange = () => {
   const plans = new Map(), links = new Map();
   let version = 0;
   const notify = () => onChange();
-  function seed(target, value, readVersion = version) {
+  function seed(target, value, readVersion = version, recordRevision = 0, attributionStatus = "new") {
     const key = lessonEventKey(target);
     let state = plans.get(key);
     if (!state) {
-      state = { key, target, value, base: value, dirty: false, status: "ready", revision: 0, changedAt: version, pending: 0, queue: Promise.resolve() };
+      state = { key, target, value, recordRevision, attributionStatus, base: value, dirty: false, status: "ready", revision: 0, changedAt: version, pending: 0, queue: Promise.resolve() };
       plans.set(key, state);
     } else if (!state.dirty && !state.pending && state.changedAt <= readVersion) {
-      Object.assign(state, { target, value, base: value, status: "ready" });
+      Object.assign(state, { target, value, recordRevision, attributionStatus, base: value, status: "ready" });
     }
     return state;
   }
   return {
     get version() { return version; }, seed,
+    observeRecord(target, revision) {
+      const state=plans.get(lessonEventKey(target));
+      if(state && !state.pending) state.recordRevision=revision;
+    },
     get: (key) => plans.get(key), getLink: (key) => links.get(key),
     async loadNext(source) {
       const key = lessonEventKey(source);
@@ -34,8 +38,11 @@ export function createLessonPlanController({ readNext, write, onChange = () => {
           || (old?.dirty && !sameLessonEvent(link.target, result.target));
         link.current = result;
         if (changed) { link.status = "conflict"; notify(); return; }
+        if (['legacy_unknown','known_change','title_changed','id_collision','target_unavailable'].includes(result.attribution_status)) {
+          link.status='attribution'; link.targetKey=''; notify(); return;
+        }
         link.target = result.target;
-        link.targetKey = result.target ? seed(result.target, result.lesson_plan || "", readVersion).key : "";
+        link.targetKey = result.target ? seed(result.target, result.lesson_plan || "", readVersion, result.record_revision,result.attribution_status).key : "";
         link.status = result.target ? "ready" : result.reason;
         notify();
       } catch (error) {
@@ -62,8 +69,10 @@ export function createLessonPlanController({ readNext, write, onChange = () => {
       const save = state.queue.catch(() => {}).then(async () => {
         if (state.status === "conflict" || (linkKey && link?.status === "conflict")) return;
         try {
-          const result = await write({ target, ...(source ? { source } : {}), expected_lesson_plan: state.base, lesson_plan: value });
+          const result = await write({ target, ...(source ? { source } : {}), expected_lesson_plan: state.base, record_revision:state.recordRevision, lesson_plan: value });
           state.base = result.lesson_plan || "";
+          state.recordRevision = result.record_revision;
+          state.attributionStatus = result.attribution_status || state.attributionStatus;
           state.changedAt = ++version;
           if (state.revision === revision) { state.value = state.base; state.dirty = false; state.status = "saved"; }
           else state.status = "unsaved";

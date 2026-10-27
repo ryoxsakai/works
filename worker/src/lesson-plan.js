@@ -1,6 +1,11 @@
+import { rawRecord, currentRecord, requireCurrent, prepareRecordWrite, commitRecords, readCommittedRecord, observeRecord } from './lesson-attribution.js';
 import { NEXT_LESSON_DAYS, lessonEventRef, sameLessonEvent, findNextLesson } from "../../shared/lesson-plan.js";
 
-const failure = (status, message, code, current) => Object.assign(new Error(message), { status, code, current });
+// A stale write may refer to a different ownership generation, even with an identical title.
+// Conflict responses identify the fresh target but never return another generation's plan.
+const failure = (status, message, code, current) => Object.assign(new Error(message), {
+  status, code, current: current ? {...current,lesson_plan:"",record_requires_reload:true} : undefined,
+});
 function identifiers(calendarId, eventId) {
   if (typeof calendarId !== "string" || !calendarId || calendarId.length > 2048
     || typeof eventId !== "string" || !eventId || eventId.length > 1024) {
@@ -24,14 +29,14 @@ async function uniqueRecordId(deps, context, ref) {
     throw failure(409, "複数カレンダーに同じ予定IDがあります。安全に連動できません", "LESSON_ID_COLLISION");
   }
 }
-async function planValue(env, id) {
-  const row = await env.DB.prepare("SELECT lesson_plan FROM curriculum_entries WHERE calendar_event_id = ?").bind(id).first();
-  return row?.lesson_plan || "";
+async function planRecord(env, ref) {
+  return currentRecord(await observeRecord(env,ref),ref);
 }
 export async function readLessonPlan(env, calendarId, eventId, deps) {
   const context = await lookup(deps, calendarId, eventId);
   await uniqueRecordId(deps, context, context.ref);
-  return { target: context.ref, lesson_plan: await planValue(env, eventId) };
+  const record = await planRecord(env, context.ref);
+  return { target: context.ref, lesson_plan: record.lesson_plan || "", attribution_status: record.attribution_status, attribution_notice:record.attribution_notice || null, record_revision: record.record_revision };
 }
 export async function readNextLessonPlan(env, calendarId, eventId, deps) {
   const context = await lookup(deps, calendarId, eventId);
@@ -45,7 +50,8 @@ export async function readNextLessonPlan(env, calendarId, eventId, deps) {
   const result = findNextLesson(source, events, context.settings.excluded_titles || []);
   if (!result.target) return { source, ...result, search_end: searchEnd, lesson_plan: "" };
   await uniqueRecordId(deps, context, result.target);
-  return { source, ...result, search_end: searchEnd, lesson_plan: await planValue(env, result.target.id) };
+  const record = await planRecord(env, result.target);
+  return { source, ...result, search_end: searchEnd, lesson_plan: record.lesson_plan || "", attribution_status: record.attribution_status, attribution_notice:record.attribution_notice || null, record_revision: record.record_revision };
 }
 export async function writeLessonPlan(env, body, deps) {
   if (!body || typeof body.lesson_plan !== "string" || body.lesson_plan.length > 5000
@@ -76,15 +82,18 @@ export async function writeLessonPlan(env, body, deps) {
       throw failure(409, "授業日時や予定名が変更されました。再読み込みしてください", "LESSON_TARGET_CHANGED", current);
     }
   }
-  // One conditional statement updates only lesson_plan; other curriculum fields are untouched.
-  const saved = await env.DB.prepare(`INSERT INTO curriculum_entries (calendar_event_id, lesson_plan, updated_at)
-    SELECT ?, ?, datetime('now') WHERE ? = '' OR EXISTS (SELECT 1 FROM curriculum_entries WHERE calendar_event_id = ?)
-    ON CONFLICT(calendar_event_id) DO UPDATE SET lesson_plan = excluded.lesson_plan, updated_at = excluded.updated_at
-    WHERE COALESCE(curriculum_entries.lesson_plan, '') = ? RETURNING *`)
-    .bind(eventId, body.lesson_plan || null, body.expected_lesson_plan, eventId, body.expected_lesson_plan).first();
-  if (!saved) {
-    current.lesson_plan = await planValue(env, eventId);
+  const row = await rawRecord(env, eventId);
+  requireCurrent(row, body.target);
+  if (!Number.isSafeInteger(body.record_revision) || body.record_revision !== row.record_revision || (row.lesson_plan || "") !== body.expected_lesson_plan) {
     throw failure(409, "授業予定が他の画面で変更されています。入力を残して保存を停止しました", "LESSON_PLAN_CONFLICT", current);
   }
-  return saved;
+  let prepared;
+  try {
+    prepared=await prepareRecordWrite(env,body.target,{lesson_plan:body.lesson_plan},row.record_revision);
+    await commitRecords(env,prepared.statements);
+  } catch(error) {
+    if (error.code === 'LESSON_RECORD_CONFLICT') throw failure(409, error.message, 'LESSON_PLAN_CONFLICT');
+    throw error;
+  }
+  return readCommittedRecord(env,body.target,prepared);
 }

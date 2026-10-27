@@ -7,8 +7,8 @@ import worker from "../src/index.js";
 
 const origin = "https://works.example.test";
 const bindings = { SESSION_SECRET: "runtime-synthetic-secret", WORKS_API_KEY: "runtime-synthetic-key", ALLOWED_EMAIL: "owner@example.test", ALLOWED_ORIGIN: origin, GOOGLE_CLIENT_ID: "synthetic-client", GOOGLE_CLIENT_SECRET: "synthetic-google-secret" };
-async function browserToken() {
-  const payload = Buffer.from(JSON.stringify({ email: bindings.ALLOWED_EMAIL, exp: Date.now() + 86400000 })).toString("base64url");
+async function browserToken(claims = {}) {
+  const payload = Buffer.from(JSON.stringify({ email: bindings.ALLOWED_EMAIL, exp: Date.now() + 86400000, ...claims })).toString("base64url");
   const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(bindings.SESSION_SECRET), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   return `${payload}.${Buffer.from(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload))).toString("base64url")}`;
 }
@@ -92,6 +92,8 @@ test('actual Worker routes read and conditionally save the next lesson without c
   const source={id:'a',summary:'サンプル生徒',etag:'"a-1"',start:{dateTime:'2026-10-17T10:00:00+09:00'},end:{dateTime:'2026-10-17T11:00:00+09:00'}};
   const target={...source,id:'b',etag:'"b-1"',start:{dateTime:'2026-10-17T11:00:00+09:00'},end:{dateTime:'2026-10-17T12:00:00+09:00'}};
   await DB.prepare("INSERT INTO curriculum_entries(calendar_event_id,lesson_plan,homework)VALUES('b','既存予定','既存宿題')").run();
+  const {ensureAttribution}=await import('../src/lesson-attribution.js');await ensureAttribution({DB});
+  await DB.prepare("INSERT INTO lesson_record_hold(event_id,calendar_id,reason)VALUES('b','synthetic-calendar','known_title_change')").run();
   fetchMock.get('https://oauth2.googleapis.com').intercept({path:'/token',method:'POST'}).reply(200,{access_token:'synthetic-google-access',expires_in:3600}).persist();
   const google=fetchMock.get('https://www.googleapis.com');
   google.intercept({path:'/calendar/v3/calendars/synthetic-calendar/events/a',method:'GET'}).reply(200,source).persist();
@@ -100,12 +102,97 @@ test('actual Worker routes read and conditionally save the next lesson without c
   const apiPath='/api/next-lesson-plan?calendar_id=synthetic-calendar&event_id=a';
   assert.equal((await call(apiPath)).status,401);
   const headers={Authorization:'Bearer '+await browserToken(),'Content-Type':'application/json'};
+  const bearer=await browserToken({aud:'works-mcp',scope:'schedule:read'});
+  const mcp=async(name,args)=>(await call('/mcp',{method:'POST',headers:{Authorization:'Bearer '+bearer,'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'tools/call',params:{name,arguments:args}})})).json();
+  const schedule=await mcp('get_schedule',{date:'2026-10-17'});
+  assert.ok(!schedule.result.isError,JSON.stringify(schedule));
+  const held=schedule.result.structuredContent.events.find(e=>e.id==='b');
+  assert.equal(held.attribution_status,'known_change');assert.equal(held.lesson_plan,null);assert.equal(held.homework,null);
+  const monthly=await mcp('get_monthly_report',{month:'2026-10'});
+  assert.ok(!monthly.result.isError,JSON.stringify(monthly));
+  assert.equal(monthly.result.structuredContent.totals.attribution_pending,1);
+  assert.equal(monthly.result.structuredContent.totals.unrecorded,1);
+  assert.equal(monthly.result.structuredContent.totals.completion_rate,null);
+  const unrecorded=await mcp('get_unrecorded_lessons',{end_date:'2026-10-17',lookback_days:1});
+  assert.ok(!unrecorded.result.isError,JSON.stringify(unrecorded));
+  assert.equal(unrecorded.result.structuredContent.attribution_pending_count,1);
+  assert.equal(unrecorded.result.structuredContent.lessons.some(event=>event.id==='b'),false);
+
+  const blocked=await mcp('update_schedule',{calendar_id:'synthetic-calendar',event_id:'b',homework:'must not write'});
+  assert.equal(blocked.result.isError,true);
   const response=await call(apiPath,{headers});assert.equal(response.status,200);const linked=await response.json();
-  assert.equal(linked.target.id,'b');assert.equal(linked.lesson_plan,'既存予定');
-  const value={source:linked.source,target:linked.target,expected_lesson_plan:linked.lesson_plan,lesson_plan:'次回の準備'};
+  assert.equal(linked.target.id,'b');assert.equal(linked.lesson_plan,'');assert.equal(linked.attribution_status,'known_change');
+  const withheld=await call('/api/lesson-plan',{method:'PUT',headers,body:JSON.stringify({target:linked.target,expected_lesson_plan:'',lesson_plan:'must not save'})});
+  assert.equal(withheld.status,409);
+  assert.equal((await call('/api/curriculum',{headers}).then(r=>r.json()))[0].lesson_plan,undefined);
+  const review=await call('/api/lesson-record?calendar_id=synthetic-calendar&event_id=b',{headers}).then(r=>r.json());
+  assert.equal(review.record.lesson_plan,null);assert.equal(review.previous_record.lesson_plan,'既存予定');
+  const resolution=await call('/api/lesson-record',{method:'PUT',headers,body:JSON.stringify({target:review.target,record_revision:review.previous_record.record_revision,decision:'inherit'})});
+  assert.equal(resolution.status,200);assert.equal((await resolution.json()).lesson_plan,'既存予定');
+  const stale=await call('/api/curriculum/b',{method:'PUT',headers,body:JSON.stringify({homework:'obsolete client'})});assert.equal(stale.status,409);
+  const refreshed=await call(apiPath,{headers}).then(r=>r.json());Object.assign(linked,refreshed);
+  assert.equal(linked.lesson_plan,'既存予定');
+  const value={source:linked.source,target:linked.target,record_revision:linked.record_revision,expected_lesson_plan:linked.lesson_plan,lesson_plan:'次回の準備'};
   const saved=await call('/api/lesson-plan',{method:'PUT',headers,body:JSON.stringify(value)});assert.equal(saved.status,200);
   assert.equal((await saved.json()).lesson_plan,'次回の準備');
   assert.equal((await DB.prepare("SELECT homework FROM curriculum_entries WHERE calendar_event_id='b'").first()).homework,'既存宿題');
   assert.equal(await DB.prepare("SELECT * FROM curriculum_entries WHERE calendar_event_id='a'").first(),null);
   const conflict=await call('/api/lesson-plan',{method:'PUT',headers,body:JSON.stringify({...value,lesson_plan:'古い予定'})});assert.equal(conflict.status,409);assert.equal((await conflict.json()).code,'LESSON_PLAN_CONFLICT');
+  const updated=await mcp('update_schedule',{calendar_id:'synthetic-calendar',event_id:'b',homework:'MCP宿題'});
+  assert.ok(!updated.result.isError,JSON.stringify(updated));assert.equal(updated.result.structuredContent.entry.lesson_plan,'次回の準備');
+  // Even equal-title/content re-attribution invalidates prior ownership history.
+  const again=await call('/api/lesson-record?calendar_id=synthetic-calendar&event_id=b',{headers}).then(r=>r.json());
+  assert.equal((await call('/api/lesson-record',{method:'PUT',headers,body:JSON.stringify({target:again.target,record_revision:again.previous_record.record_revision,decision:'inherit'})})).status,200);
+  const undone=await mcp('undo_schedule_update',{change_id:updated.result.structuredContent.change_id});
+  assert.equal(undone.result.isError,true);
+  assert.equal((await DB.prepare("SELECT homework FROM curriculum_entries WHERE calendar_event_id='b'").first()).homework,'MCP宿題');
+  const created=await mcp('update_schedule',{calendar_id:'synthetic-calendar',event_id:'a',homework:'new event'});
+  assert.ok(!created.result.isError,JSON.stringify(created));
+  const undoCreated=await mcp('undo_schedule_update',{change_id:created.result.structuredContent.change_id});
+  assert.ok(!undoCreated.result.isError,JSON.stringify(undoCreated));
+  assert.equal(await DB.prepare("SELECT * FROM curriculum_entries WHERE calendar_event_id='a'").first(),null);
+  const tombstone=(await call('/api/curriculum?attribution=1',{headers}).then(r=>r.json())).find(row=>row.calendar_event_id==='a');
+  assert.equal(tombstone.record_exists,0);assert.ok(tombstone.record_revision>0);
+  await DB.prepare("UPDATE settings SET value='[\"synthetic-calendar\",\"second-calendar\"]' WHERE key='selected_calendars'").run();
+  google.intercept({path:'/calendar/v3/calendars/second-calendar/events/a',method:'GET'}).reply(200,source).persist();
+  const collision=await mcp('update_schedule',{calendar_id:'synthetic-calendar',event_id:'a',homework:'collision write'});
+  assert.equal(collision.result.isError,true);
+  assert.equal(await DB.prepare("SELECT * FROM curriculum_entries WHERE calendar_event_id='a'").first(),null);
+
+});
+
+test('prospective baseline preserves unverified plans, observes on first MCP write, and supports controlled initial sweep',async t=>{
+ const {DB,fetchMock,call}=await setup(t);
+ const {ensureAttribution}=await import('../src/lesson-attribution.js');const {activationSql}=await import('../scripts/prepare-lesson-attribution-config.mjs');
+ await ensureAttribution({DB});
+ const config=activationSql({effective_date:'2026-10-27',holds:[{event_id:'held-existing-change',calendar_id:'synthetic-calendar',reason:'known_title_change'}]});
+ await DB.batch(config.split('\n').filter(line=>line&&!line.startsWith('--')).map(line=>DB.prepare(line)));
+ for(const id of ['legacy','sweep','history'])await DB.prepare("INSERT INTO curriculum_entries(calendar_event_id,completed,lesson_plan,homework)VALUES(?,1,'original legacy plan','original homework')").bind(id).run();
+ const event={id:'legacy',summary:'Synthetic Baseline Student',etag:'one',start:{dateTime:'2026-10-27T12:50:00+09:00'},end:{dateTime:'2026-10-27T13:50:00+09:00'}};
+ fetchMock.get('https://oauth2.googleapis.com').intercept({path:'/token',method:'POST'}).reply(200,{access_token:'synthetic',expires_in:3600}).persist();
+ const google=fetchMock.get('https://www.googleapis.com');
+ google.intercept({path:'/calendar/v3/calendars/synthetic-calendar/events/legacy',method:'GET'}).reply(()=>({statusCode:200,data:JSON.stringify(event)})).persist();
+ google.intercept({path:'/calendar/v3/calendars/synthetic-calendar/events/sweep',method:'GET'}).reply(200,{...event,id:'sweep'}).persist();
+ google.intercept({path:'/calendar/v3/calendars/synthetic-calendar/events/history',method:'GET'}).reply(200,{...event,id:'history',start:{dateTime:'2026-10-26T12:50:00+09:00'},end:{dateTime:'2026-10-26T13:50:00+09:00'}}).persist();
+ const bearer=await browserToken({aud:'works-mcp',scope:'schedule:read'});
+ const mcp=async(name,args)=>(await call('/mcp',{method:'POST',headers:{Authorization:'Bearer '+bearer,'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'tools/call',params:{name,arguments:args}})})).json();
+ const updated=await mcp('update_schedule',{calendar_id:'synthetic-calendar',event_id:'legacy',homework:'edited'});
+ assert.ok(!updated.result.isError,JSON.stringify(updated));const saved=updated.result.structuredContent.entry;
+ assert.equal(saved.attribution_status,'legacy_unverified');assert.equal(saved.record_title,null);assert.equal(saved.lesson_plan,'original legacy plan');
+ assert.equal((await DB.prepare("SELECT title FROM lesson_record_baseline WHERE event_id='legacy'").first()).title,event.summary);
+ const undone=await mcp('undo_schedule_update',{change_id:updated.result.structuredContent.change_id});
+ assert.ok(!undone.result.isError,JSON.stringify(undone));
+ assert.equal(undone.result.structuredContent.restored.attribution_status,'legacy_unverified');
+ assert.equal((await DB.prepare("SELECT title FROM lesson_record_identity WHERE event_id='legacy'").first()).title,null);
+ assert.equal((await DB.prepare("SELECT homework FROM curriculum_entries WHERE calendar_event_id='legacy'").first()).homework,'original homework');
+
+ const original=await DB.prepare("SELECT snapshot_json FROM lesson_record_legacy_source WHERE event_id='legacy'").first();assert.equal(JSON.parse(original.snapshot_json).homework,'original homework');
+ const headers={Authorization:'Bearer '+await browserToken(),'Content-Type':'application/json'};
+ const sweep=await call('/api/lesson-baseline/initialize',{method:'POST',headers,body:JSON.stringify({limit:25})});assert.equal(sweep.status,200);
+ const result=await sweep.json();assert.equal(result.observed,1);assert.equal(result.historical,1);assert.equal(result.held,1);assert.equal(result.ownership_verified,false);
+ assert.equal(await DB.prepare("SELECT * FROM lesson_record_baseline WHERE event_id='history'").first(),null);
+ event.summary='Replacement Synthetic Student';event.etag='two';
+ const changed=await call('/api/lesson-plan?calendar_id=synthetic-calendar&event_id=legacy',{headers}).then(r=>r.json());
+ assert.equal(changed.attribution_status,'title_changed');assert.equal(changed.lesson_plan,'');
+ assert.equal((await DB.prepare("SELECT title FROM lesson_record_baseline WHERE event_id='legacy'").first()).title,'Synthetic Baseline Student');
 });

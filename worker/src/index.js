@@ -1862,7 +1862,7 @@ async function ensureCurriculumIntegrity(env) {
 
 function curriculumSnapshot(row) {
   return {
-    exists: Boolean(row?.calendar_event_id),
+    exists: row?.record_exists !== undefined ? Boolean(row.record_exists) : Boolean(row?.calendar_event_id),
     completed: Boolean(row?.completed),
     ...Object.fromEntries(SCHEDULE_TEXT_FIELDS.map((field) => [field, row?.[field] || null])),
   };
@@ -1888,24 +1888,32 @@ function curriculumAfterPatch(before, patch) {
 }
 
 async function prepareAuditedScheduleUpdate(env, target, patch) {
-  const before = curriculumSnapshot(await readCurriculumEntry(env, target.event_id));
+  // Records are still keyed by event ID alone: explicit calendar selection cannot bypass collisions.
+  const verified = await resolveCalendarEventById(env,target.event_id);
+  if (verified.calendar_id !== target.calendar_id || String(verified.event.summary || "(無題)").trim() !== target.title) {
+    throw httpError(409,"授業のカレンダーまたは予定名が変更されました。再確認してください");
+  }
+  const { observeRecord, requireCurrent, prepareRecordWrite } = await import("./lesson-attribution.js");
+  const { lessonEventRef } = await import("../../shared/lesson-plan.js");
+  const ref=lessonEventRef(verified.event,verified.calendar_id);
+  const raw = await observeRecord(env,ref);
+  requireCurrent(raw,ref);
+  const before = curriculumSnapshot(raw);
   const after = curriculumAfterPatch(before, patch);
   const changeId = crypto.randomUUID();
+  const write = await prepareRecordWrite(env,ref,patch,raw.record_revision);
   return {
+    write,
+    ref,
     target,
     patch,
     before,
     after,
     change_id: changeId,
     statements: [
-      env.DB.prepare(`INSERT INTO curriculum_entries (calendar_event_id, completed, lesson_plan, confirmation_test, homework, lesson_memo, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
-        ON CONFLICT(calendar_event_id) DO UPDATE SET completed = excluded.completed, lesson_plan = excluded.lesson_plan,
-          confirmation_test = excluded.confirmation_test, homework = excluded.homework,
-          lesson_memo = excluded.lesson_memo, updated_at = excluded.updated_at`)
-        .bind(target.event_id, after.completed ? 1 : 0, after.lesson_plan, after.confirmation_test, after.homework, after.lesson_memo),
+      ...write.statements,
       env.DB.prepare("INSERT INTO mcp_schedule_changes (id, event_id, action, changed_fields, before_json, after_json) VALUES (?, ?, 'update', ?, ?, ?)")
-        .bind(changeId, target.event_id, JSON.stringify(Object.keys(patch)), JSON.stringify(before), JSON.stringify(after)),
+        .bind(changeId, target.event_id, JSON.stringify(Object.keys(patch)), JSON.stringify({...before, record_calendar_id:raw.record_calendar_id, record_title:raw.record_title}), JSON.stringify({...after, target_calendar_id:ref.calendar_id,target_title:ref.title,record_calendar_id:write.record_calendar_id, record_title:write.record_title, record_generation:write.generation})),
     ],
   };
 }
@@ -1913,8 +1921,10 @@ async function prepareAuditedScheduleUpdate(env, target, patch) {
 async function auditedScheduleUpdate(env, target, patch) {
   await ensureMcpFeatureSchema(env);
   const prepared = await prepareAuditedScheduleUpdate(env, target, patch);
-  await env.DB.batch(prepared.statements);
-  return { entry: await readCurriculumEntry(env, target.event_id), change_id: prepared.change_id };
+  const { commitRecords } = await import("./lesson-attribution.js");
+  await commitRecords(env,prepared.statements);
+  const { readCommittedRecord } = await import("./lesson-attribution.js");
+  return { entry: await readCommittedRecord(env,prepared.ref,prepared.write), change_id: prepared.change_id };
 }
 
 async function updateScheduleFromArguments(env, args) {
@@ -1968,12 +1978,14 @@ async function updateSchedulesFromArguments(env, args) {
   for (const { target, patch } of prepared) {
     atomicUpdates.push(await prepareAuditedScheduleUpdate(env, target, patch));
   }
-  await env.DB.batch(atomicUpdates.flatMap((update) => update.statements));
+  const { commitRecords } = await import("./lesson-attribution.js");
+  await commitRecords(env,atomicUpdates.flatMap((update) => update.statements));
 
   const results = [];
   for (const update of atomicUpdates) {
     const { target, patch, change_id: changeId } = update;
-    const entry = await readCurriculumEntry(env, target.event_id);
+    const { readCommittedRecord } = await import("./lesson-attribution.js");
+    const entry = await readCommittedRecord(env,update.ref,update.write);
     results.push({
       change_id: changeId,
       event_id: target.event_id,
@@ -2889,9 +2901,7 @@ async function readScheduleEvents(
       ? settings.excluded_titles.map((title) => String(title).trim())
       : []
   );
-  const details = new Map(
-    (await readCurriculumEntries(env)).map((entry) => [entry.calendar_event_id, entry])
-  );
+
   const filteredEvents = eventGroups
     .flat()
     .filter((event) => event.status !== "cancelled")
@@ -2904,6 +2914,7 @@ async function readScheduleEvents(
       const rightStart = right.start?.dateTime || right.start?.date || "";
       return leftStart.localeCompare(rightStart);
     });
+  const details = new Map((await readObservedCurriculumEntries(env,filteredEvents,{settings,token})).map(row=>[row.calendar_event_id,row]));
   const materialLinks = await readScheduleMaterialLinks(
     env,
     filteredEvents.map((event) => ({
@@ -2911,8 +2922,10 @@ async function readScheduleEvents(
       event_id: event.id,
     }))
   );
+  const attribution = await import("./lesson-attribution.js");
   return filteredEvents.map((event) => {
-      const detail = details.get(event.id) || {};
+      const { currentRecord } = attribution;
+      const detail = currentRecord(details.get(event.id), {id:event.id,calendar_id:event.calendar_id,title:event.summary || "",start:event.start?.dateTime || event.start?.date});
       return {
         id: event.id,
         calendar_id: event.calendar_id,
@@ -2920,6 +2933,8 @@ async function readScheduleEvents(
         start: event.start?.dateTime || event.start?.date || null,
         end: event.end?.dateTime || event.end?.date || null,
         all_day: Boolean(event.start?.date && !event.start?.dateTime),
+        attribution_status: detail.attribution_status,
+        attribution_notice: detail.attribution_notice || null,
         completed: Boolean(detail.completed),
         lesson_plan: detail.lesson_plan || null,
         confirmation_test: detail.confirmation_test || null,
@@ -2968,7 +2983,7 @@ async function searchSchedules(env, args = {}) {
     .filter((event) => !query || event.title.toLocaleLowerCase("ja").includes(query))
     .filter((event) => args.completed === undefined || event.completed === args.completed)
     .map((event) => ({ ...event, missing_fields: scheduleMissingFields(event) }))
-    .filter((event) => !args.missing_only || event.missing_fields.length > 0);
+    .filter((event) => !args.missing_only || (event.missing_fields?.length || 0) > 0);
   return {
     start_date: startDate,
     end_date: endDate,
@@ -2982,7 +2997,14 @@ async function searchSchedules(env, args = {}) {
   };
 }
 
+function scheduleLegacyUnverified(event) {
+  return ['legacy_unverified','legacy_historical'].includes(event.attribution_status);
+}
+function scheduleAttributionPending(event) {
+  return ['legacy_unknown','known_change','title_changed','id_collision','target_unavailable'].includes(event.attribution_status);
+}
 function scheduleMissingFields(event) {
+  if (scheduleAttributionPending(event)) return null;
   return SCHEDULE_TEXT_FIELDS.filter((field) => !event[field]);
 }
 
@@ -3012,6 +3034,7 @@ async function readTodayBriefing(env, args = {}) {
       .filter(
         (candidate) =>
           candidate.id !== event.id &&
+          candidate.calendar_id === event.calendar_id &&
           candidate.title === event.title &&
           Date.parse(candidate.start || "") < currentStart
       )
@@ -3026,6 +3049,9 @@ async function readTodayBriefing(env, args = {}) {
       previous_lesson: previousLesson
         ? {
             id: previousLesson.id,
+            calendar_id: previousLesson.calendar_id,
+            attribution_status: previousLesson.attribution_status,
+            attribution_notice: previousLesson.attribution_notice || null,
             start: previousLesson.start,
             completed: previousLesson.completed,
             lesson_plan: previousLesson.lesson_plan,
@@ -3063,7 +3089,7 @@ async function readUnrecordedLessons(env, args = {}) {
   const lessons = events
     .filter((event) => {
       const end = Date.parse(event.end || "");
-      return !event.all_day && Number.isFinite(end) && end < now && !event.completed;
+      return !event.all_day && !scheduleAttributionPending(event) && Number.isFinite(end) && end < now && !event.completed;
     })
     .map((event) => ({
       ...event,
@@ -3075,6 +3101,10 @@ async function readUnrecordedLessons(env, args = {}) {
     end_date: endDate,
     time_zone: SCHEDULE_TIME_ZONE,
     lookback_days: lookbackDays,
+    attribution_pending_count: events.filter(event=>!event.all_day && scheduleAttributionPending(event) && Date.parse(event.end || '')<now).length,
+    attribution_pending_lessons: events.filter(event=>!event.all_day && scheduleAttributionPending(event) && Date.parse(event.end || '')<now),
+    legacy_unverified_count: lessons.filter(scheduleLegacyUnverified).length,
+    ownership_verified: !lessons.some(scheduleLegacyUnverified),
     count: lessons.length,
     lessons,
     generated_at: new Date().toISOString(),
@@ -3173,10 +3203,12 @@ async function readCurriculumProgress(env, args = {}) {
   ]);
   const now = Date.now();
   const matching = events.filter((event) => event.title === identity.schedule_title && !event.all_day);
-  const completed = matching.filter((event) => event.completed);
-  const pastDue = matching.filter((event) => !event.completed && Date.parse(event.end || "") < now);
-  const inProgress = matching.filter((event) => !event.completed && Date.parse(event.start || "") <= now && Date.parse(event.end || "") >= now);
-  const upcoming = matching.filter((event) => !event.completed && Date.parse(event.start || "") > now);
+  const pending = matching.filter(scheduleAttributionPending);
+  const classified = matching.filter(event=>!scheduleAttributionPending(event));
+  const completed = classified.filter((event) => event.completed);
+  const pastDue = classified.filter((event) => !event.completed && Date.parse(event.end || "") < now);
+  const inProgress = classified.filter((event) => !event.completed && Date.parse(event.start || "") <= now && Date.parse(event.end || "") >= now);
+  const upcoming = classified.filter((event) => !event.completed && Date.parse(event.start || "") > now);
   const elapsedTotal = completed.filter((event) => Date.parse(event.end || "") < now).length + pastDue.length;
   const elapsedCompleted = completed.filter((event) => Date.parse(event.end || "") < now).length;
   return {
@@ -3190,7 +3222,12 @@ async function readCurriculumProgress(env, args = {}) {
       past_due: pastDue.length,
       in_progress: inProgress.length,
       upcoming: upcoming.length,
-      elapsed_completion_rate: percent(elapsedCompleted, elapsedTotal),
+      attribution_pending_count: pending.length,
+      attribution_pending_lessons: pending.slice(0,lessonLimit),
+      legacy_unverified_count: matching.filter(scheduleLegacyUnverified).length,
+      ownership_verified: !matching.some(scheduleLegacyUnverified) && pending.length===0,
+      data_complete: pending.length === 0 && !matching.some(scheduleLegacyUnverified),
+      elapsed_completion_rate: pending.some(event=>Date.parse(event.end || '')<now) ? null : percent(elapsedCompleted, elapsedTotal),
       completed_lessons: completed.slice(-lessonLimit).reverse(),
       past_due_lessons: pastDue.slice(-lessonLimit).reverse(),
       upcoming_lessons: upcoming.slice(0, lessonLimit),
@@ -3247,7 +3284,17 @@ async function undoScheduleUpdate(env, args = {}) {
   if (change.undone_by) throw httpError(409, "schedule change was already undone");
   const before = parseJsonColumn(change.before_json, null);
   const after = parseJsonColumn(change.after_json, null);
-  const current = curriculumSnapshot(await readCurriculumEntry(env, change.event_id));
+  const { rawRecord, readCommittedRecord, requireCurrent, guardStatements, commitRecords } = await import("./lesson-attribution.js");
+  const resolved=await resolveCalendarEventById(env,change.event_id);
+  const {lessonEventRef}=await import("../../shared/lesson-plan.js");
+  const {lessonTitleKey}=await import("../../shared/lesson-attribution.js");
+  const liveRef=lessonEventRef(resolved.event,resolved.calendar_id);
+  const raw = await rawRecord(env,change.event_id);
+  requireCurrent(raw,liveRef);
+  if (!after.target_calendar_id || after.target_calendar_id!==liveRef.calendar_id || lessonTitleKey(after.target_title)!==lessonTitleKey(liveRef.title) || after.record_calendar_id !== raw.record_calendar_id || after.record_title !== raw.record_title || after.record_generation !== raw.record_generation) {
+    throw httpError(409,"授業記録の対応が変わったか、旧履歴のため安全に復元できません");
+  }
+  const current = curriculumSnapshot(raw);
   if (!equalCurriculumSnapshots(current, after)) {
     throw httpError(409, "schedule changed after this history entry; undo stopped");
   }
@@ -3260,14 +3307,16 @@ async function undoScheduleUpdate(env, args = {}) {
         .bind(change.event_id, before.completed ? 1 : 0, before.lesson_plan, before.confirmation_test, before.homework, before.lesson_memo)
     : env.DB.prepare("DELETE FROM curriculum_entries WHERE calendar_event_id = ?").bind(change.event_id);
   const undoId = crypto.randomUUID();
-  await env.DB.batch([
+  await commitRecords(env,[
+    ...guardStatements(env,change.event_id,raw.record_revision),
     restoreStatement,
     env.DB.prepare("INSERT INTO mcp_schedule_changes (id, event_id, action, changed_fields, before_json, after_json) VALUES (?, ?, 'undo', ?, ?, ?)")
       .bind(undoId, change.event_id, change.changed_fields, JSON.stringify(current), JSON.stringify(before)),
     env.DB.prepare("UPDATE mcp_schedule_changes SET undone_by = ? WHERE id = ?")
       .bind(undoId, changeId),
   ]);
-  const restored = curriculumSnapshot(await readCurriculumEntry(env, change.event_id));
+  const restoredRecord=await readCommittedRecord(env,liveRef,{revision:raw.record_revision+1,generation:raw.record_generation});
+  const restored = {...curriculumSnapshot(restoredRecord),attribution_status:restoredRecord.attribution_status};
   return { undone_change_id: changeId, undo_change_id: undoId, event_id: change.event_id, restored };
 }
 
@@ -3467,27 +3516,37 @@ async function readMonthlyReport(env, args = {}) {
     .filter((event) => !event.all_day && (!scheduleTitle || event.title === scheduleTitle));
   const now = Date.now();
   const elapsed = events.filter((event) => Date.parse(event.end || "") < now);
-  const completed = elapsed.filter((event) => event.completed);
-  const unrecorded = elapsed.filter((event) => !event.completed);
-  const missingFields = Object.fromEntries(SCHEDULE_TEXT_FIELDS.map((field) => [field, events.filter((event) => !event[field]).length]));
+  const pending = events.filter(scheduleAttributionPending);
+  const classified = events.filter(event=>!scheduleAttributionPending(event));
+  const classifiedElapsed = elapsed.filter(event=>!scheduleAttributionPending(event));
+  const pendingElapsed = elapsed.filter(scheduleAttributionPending);
+  const completed = classifiedElapsed.filter((event) => event.completed);
+  const unrecorded = classifiedElapsed.filter((event) => !event.completed);
+  const missingFields = Object.fromEntries(SCHEDULE_TEXT_FIELDS.map((field) => [field, classified.filter((event) => !event[field]).length]));
   const grouped = new Map();
   for (const event of events) {
-    const summary = grouped.get(event.title) || { title: event.title, total: 0, elapsed: 0, completed: 0, unrecorded: 0 };
+    const summary = grouped.get(event.title) || { title: event.title, total: 0, elapsed: 0, completed: 0, unrecorded: 0, attribution_pending:0, elapsed_attribution_pending:0,legacy_unverified:0 };
     summary.total += 1;
+    if(scheduleLegacyUnverified(event)) summary.legacy_unverified += 1;
+    if (scheduleAttributionPending(event)) summary.attribution_pending += 1;
     if (Date.parse(event.end || "") < now) {
       summary.elapsed += 1;
-      if (event.completed) summary.completed += 1;
+      if (scheduleAttributionPending(event)) summary.elapsed_attribution_pending += 1;
+      else if (event.completed) summary.completed += 1;
       else summary.unrecorded += 1;
     }
     grouped.set(event.title, summary);
   }
-  const byTitle = [...grouped.values()].map((item) => ({ ...item, completion_rate: percent(item.completed, item.elapsed) })).sort((left, right) => left.title.localeCompare(right.title, "ja"));
+  const byTitle = [...grouped.values()].map((item) => ({ ...item, completion_rate: item.elapsed_attribution_pending ? null : percent(item.completed, item.elapsed) })).sort((left, right) => left.title.localeCompare(right.title, "ja"));
   return {
     month,
     name: name || null,
     schedule_title: scheduleTitle,
     time_zone: SCHEDULE_TIME_ZONE,
-    totals: { lessons: events.length, elapsed: elapsed.length, completed: completed.length, unrecorded: unrecorded.length, completion_rate: percent(completed.length, elapsed.length) },
+    totals: { lessons: events.length, elapsed: elapsed.length, completed: completed.length, unrecorded: unrecorded.length, legacy_unverified:events.filter(scheduleLegacyUnverified).length, attribution_pending:pending.length, elapsed_attribution_pending:pendingElapsed.length, classified_elapsed:classifiedElapsed.length, completion_rate: pendingElapsed.length ? null : percent(completed.length, elapsed.length) },
+    ownership_verified: !events.some(scheduleLegacyUnverified) && pending.length===0,
+    data_complete: pending.length === 0 && !events.some(scheduleLegacyUnverified),
+    attribution_pending_lessons: pending,
     missing_fields: missingFields,
     by_title: byTitle,
     unrecorded_lessons: unrecorded,
@@ -4344,59 +4403,86 @@ async function setChapterProgress(env, name, chapterId, completed) {
 // 予定そのものはGoogle Calendar側にあるため、ここではcalendar_event_idをキーに
 // 完了チェック・授業予定・確認テスト・授業メモだけを保存する。
 async function readCurriculumEntries(env) {
-  const { results } = await env.DB.prepare("SELECT * FROM curriculum_entries").all();
-  return results;
+  const { allRecords } = await import("./lesson-attribution.js");
+  return allRecords(env);
+}
+
+async function readObservedCurriculumEntries(env, targets, context = {}) {
+  const { lessonEventRef } = await import("../../shared/lesson-plan.js");
+  const { lessonRecordHasContent, lessonDate } = await import("../../shared/lesson-attribution.js");
+  const { readLessonPlan } = await import("./lesson-plan.js");
+  const original = await readCurriculumEntries(env);
+  const records = new Map(original.map(row=>[row.calendar_event_id,row]));
+  const refs = [...new Map(targets.map(target=>{const ref=lessonEventRef(target);return [JSON.stringify([ref.calendar_id,ref.id]),ref];})).values()];
+  const calendars = new Map();
+  for(const ref of refs) {const ids=calendars.get(ref.id)||new Set();ids.add(ref.calendar_id);calendars.set(ref.id,ids);}
+  const collisions = new Set([...calendars].filter(([,ids])=>ids.size>1).map(([id])=>id));
+  const unavailable=new Set();
+  let settingsPromise,tokenPromise;
+  const deps={settings:()=>settingsPromise ||= Promise.resolve(context.settings || readSettings(env)),
+    token:()=>tokenPromise ||= Promise.resolve(context.token || mintGoogleAccessToken(env)),
+    event:fetchCalendarEventWithToken,events:fetchCalendarEventsForSchedule};
+  const candidates=refs.filter(ref=>{
+    const row=records.get(ref.id);
+    return row && row.record_policy_enabled && row.record_title==null && row.record_observed_title==null
+      && !row.record_hold_active && !collisions.has(ref.id) && lessonRecordHasContent(row)
+      && (!lessonDate(ref) || lessonDate(ref)>=row.record_effective_date);
+  });
+  for(let offset=0;offset<candidates.length;offset+=6) await Promise.all(candidates.slice(offset,offset+6).map(async ref=>{
+    try {await readLessonPlan(env,ref.calendar_id,ref.id,deps);}
+    catch(error) {if(error.code==='LESSON_ID_COLLISION') collisions.add(ref.id);else if(error.status===404||error.code==='LESSON_TARGET_CHANGED')unavailable.add(ref.id);else throw error;}
+  }));
+  return (await readCurriculumEntries(env)).map(row=>({...row,...(collisions.has(row.calendar_event_id)?{record_collision:true}:{}),...(unavailable.has(row.calendar_event_id)?{record_target_unavailable:true}:{})}));
+}
+
+async function initializeLessonBaselines(env, body = {}) {
+  const { allRecords, observeRecord } = await import("./lesson-attribution.js");
+  const { lessonRecordHasContent, lessonDate } = await import("../../shared/lesson-attribution.js");
+  const { lessonEventRef } = await import("../../shared/lesson-plan.js");
+  const rows=await allRecords(env);
+  const policy=await env.DB.prepare("SELECT * FROM lesson_record_policy WHERE id=1").first();
+  const holdCount=(await env.DB.prepare("SELECT COUNT(*) AS n FROM lesson_record_hold").first()).n;
+  if(!policy?.enabled || holdCount<policy.required_hold_count) throw httpError(409,"既知の変更枠の保留設定と開始日を先に適用してください");
+  const limit=body.limit??25,cursor=body.cursor??"";
+  if(!Number.isInteger(limit)||limit<1||limit>25||typeof cursor!=="string"||cursor.length>1024) throw httpError(400,"初期化の範囲が不正です");
+  const pending=rows.filter(row=>row.calendar_event_id>cursor&&row.record_title==null&&row.record_observed_title==null&&!row.record_hold_active&&lessonRecordHasContent(row))
+    .sort((a,b)=>a.calendar_event_id<b.calendar_event_id?-1:1);
+  const page=pending.slice(0,limit),context=page.length?await createCalendarLookupContext(env):null;
+  const counts={observed:0,historical:0,unavailable:0,collisions:0};
+  for(let offset=0;offset<page.length;offset+=5) await Promise.all(page.slice(offset,offset+5).map(async row=>{
+    try {
+      const resolved=await resolveCalendarEventById(env,row.calendar_event_id,null,context);
+      const ref=lessonEventRef(resolved.event,resolved.calendar_id);
+      if(!lessonDate(ref)||lessonDate(ref)<policy.effective_date){counts.historical++;return;}
+      const observed=await observeRecord(env,ref);if(observed.record_observed_title!=null)counts.observed++;
+    } catch(error){if(error.status===404)counts.unavailable++;else if(error.status===409)counts.collisions++;else throw error;}
+  }));
+  return {effective_date:policy.effective_date,inspected:page.length,...counts,held:rows.filter(row=>row.record_hold_active).length,
+    done:page.length<limit,next_cursor:page.at(-1)?.calendar_event_id || cursor,ownership_verified:false};
+}
+
+async function verifiedLessonTarget(env, target) {
+  if (!target?.id || !target?.calendar_id) throw httpError(409, "カレンダーと予定を再読み込みしてください");
+  const { readLessonPlan } = await import("./lesson-plan.js");
+  const { sameLessonEvent } = await import("../../shared/lesson-plan.js");
+  const current = await readLessonPlan(env, target.calendar_id, target.id, {
+    settings: () => readSettings(env), token: () => mintGoogleAccessToken(env),
+    event: fetchCalendarEventWithToken, events: fetchCalendarEventsForSchedule,
+  });
+  if (!sameLessonEvent(target, current.target)) throw httpError(409, "予定名や日時が変更されています。再読み込みしてください");
+  return current.target;
 }
 
 async function upsertCurriculumEntry(env, eventId, body) {
-  if (!eventId) throw new Error("event id is required");
-  const existing =
-    (await env.DB.prepare(
-      "SELECT * FROM curriculum_entries WHERE calendar_event_id = ?"
-    )
-      .bind(eventId)
-      .first()) || {};
-
-  const completed =
-    body.completed !== undefined
-      ? body.completed
-        ? 1
-        : 0
-      : existing.completed
-        ? 1
-        : 0;
-  const values = {};
-  for (const field of SCHEDULE_TEXT_FIELDS) {
-    values[field] =
-      body[field] !== undefined ? body[field] || null : existing[field] || null;
-  }
-
-  await env.DB.prepare(
-    `INSERT INTO curriculum_entries (calendar_event_id, completed, lesson_plan, confirmation_test, homework, lesson_memo, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
-     ON CONFLICT(calendar_event_id) DO UPDATE SET
-       completed = CASE WHEN ? THEN excluded.completed ELSE curriculum_entries.completed END,
-       lesson_plan = CASE WHEN ? THEN excluded.lesson_plan ELSE curriculum_entries.lesson_plan END,
-       confirmation_test = CASE WHEN ? THEN excluded.confirmation_test ELSE curriculum_entries.confirmation_test END,
-       homework = CASE WHEN ? THEN excluded.homework ELSE curriculum_entries.homework END,
-       lesson_memo = CASE WHEN ? THEN excluded.lesson_memo ELSE curriculum_entries.lesson_memo END,
-       updated_at = excluded.updated_at`
-  )
-    .bind(
-      eventId,
-      completed,
-      values.lesson_plan,
-      values.confirmation_test,
-      values.homework,
-      values.lesson_memo,
-      ...["completed", ...SCHEDULE_TEXT_FIELDS].map((field) => body[field] !== undefined ? 1 : 0)
-    )
-    .run();
-  return env.DB.prepare(
-    "SELECT * FROM curriculum_entries WHERE calendar_event_id = ?"
-  )
-    .bind(eventId)
-    .first();
+  if (body.target?.id !== eventId) throw httpError(409, "予定を再読み込みしてください");
+  const target = await verifiedLessonTarget(env, body.target);
+  const { prepareRecordWrite, commitRecords, readCommittedRecord } = await import("./lesson-attribution.js");
+  const patch = Object.fromEntries(["completed", ...SCHEDULE_TEXT_FIELDS].filter(field => body[field] !== undefined).map(field => [field, body[field]]));
+  // Older clients must refresh before writing; they cannot establish attribution.
+  if (!Number.isSafeInteger(body.record_revision)) throw httpError(409, "再読み込みしてから保存してください");
+  const prepared=await prepareRecordWrite(env,target,patch,body.record_revision);
+  await commitRecords(env,prepared.statements);
+  return readCommittedRecord(env,target,prepared);
 }
 
 // 生徒(name)ごとの短期・中期・長期目標。sort_orderで並べ替えを保持する。
@@ -6127,8 +6213,44 @@ export default {
         }
       }
 
+      if (url.pathname === "/api/lesson-baseline/initialize" && request.method === "POST") {
+        if (browserSession.aud || browserSession.scope || browserSession.fid) throw httpError(401,"browser session required");
+        return json(await initializeLessonBaselines(env,await request.json()),headers);
+      }
+
+      if (url.pathname === "/api/lesson-records" && request.method === "POST") {
+        if (browserSession.aud || browserSession.scope || browserSession.fid) throw httpError(401,"browser session required");
+        const body=await request.json();
+        if (!Array.isArray(body.targets) || body.targets.length>250 || body.targets.some(ref=>typeof ref?.id!=="string" || !ref.id || typeof ref?.calendar_id!=="string" || !ref.calendar_id)) throw httpError(400,"予定の対象が不正です");
+        return json((await readObservedCurriculumEntries(env,body.targets)).map(row=>({...row,attribution_status:"unverified"})),headers);
+      }
+
       if (url.pathname === "/api/curriculum" && request.method === "GET") {
-        return json(await readCurriculumEntries(env), headers);
+        const rows = await readCurriculumEntries(env);
+        // Older clients do not know how to compare titles. Never send their stale content.
+        return json(rows.map(row => url.searchParams.get("attribution") === "1"
+          ? {...row, attribution_status:"unverified"}
+          : {calendar_event_id:row.calendar_event_id, attribution_status:"review_required", completed:0}), headers);
+      }
+
+      if (url.pathname === "/api/lesson-record" && ["GET", "PUT"].includes(request.method)) {
+        if (browserSession.aud || browserSession.scope || browserSession.fid) throw httpError(401, "browser session required");
+        const { rawRecord, currentRecord, resolveAttribution } = await import("./lesson-attribution.js");
+        const body = request.method === "PUT" ? await request.json() : null;
+        let target = body?.target;
+        if (!target) {
+          const calendarId = url.searchParams.get("calendar_id"), eventId = url.searchParams.get("event_id");
+          const { readLessonPlan } = await import("./lesson-plan.js");
+          target = (await readLessonPlan(env,calendarId,eventId,{
+            settings:()=>readSettings(env),token:()=>mintGoogleAccessToken(env),
+            event:fetchCalendarEventWithToken,events:fetchCalendarEventsForSchedule,
+          })).target;
+        } else target = await verifiedLessonTarget(env,target);
+        if (body) return json(await resolveAttribution(env,target,body.record_revision,body.decision),headers);
+        const row = await rawRecord(env,target.id);
+        const history = await env.DB.prepare("SELECT * FROM lesson_record_archive WHERE event_id = ? ORDER BY created_at DESC, id").bind(target.id).all();
+        const legacySource=await env.DB.prepare("SELECT snapshot_json,captured_at FROM lesson_record_legacy_source WHERE event_id=?").bind(target.id).first();
+        return json({target,record:currentRecord(row,target),previous_record:row,history:history.results,legacy_source:legacySource},headers);
       }
 
       const curriculumMatch = url.pathname.match(/^\/api\/curriculum\/(.+)$/);
