@@ -4,7 +4,7 @@ import {mkdir} from 'node:fs/promises';
 import {createFixture} from './next-lesson-fixture.mjs';
 import {activationSql} from '../scripts/prepare-lesson-attribution-config.mjs';
 const fixture=await createFixture();
-const browser=await chromium.launch({headless:true,executablePath:process.env.BROWSER_EXECUTABLE||'/usr/bin/chromium'});
+const browser=await chromium.launch({headless:true,...(process.env.BROWSER_EXECUTABLE?{executablePath:process.env.BROWSER_EXECUTABLE}:{})});
 const page=await browser.newPage({viewport:{width:390,height:900}});
 const row=id=>page.locator(`#record-tbody tr[data-event-id="${id}"]`);
 try {
