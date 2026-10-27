@@ -30,6 +30,8 @@ jobs:
       - run: npm run test:wiki:browser
       - run: npm run test:workflow:browser
       - run: npm run test:next-lesson:browser
+      - run: npm run test:lesson-attribution:browser
+      - run: npm run test:lesson-baseline:browser
       - run: npm run test:header:browser
       - run: node test/memo-ui.browser.mjs
       - name: Verify category dialogs with compiled ToDo utilities

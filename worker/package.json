@@ -16,7 +16,9 @@
     "test:header:browser": "node test/header-theme.browser.mjs",
     "test:category:browser": "node test/category-ui.browser.mjs && npm run test:todo:browser",
     "test:todo:browser": "node test/todo-personal.browser.mjs",
-    "test:workflow:browser": "node test/workflow-ui.browser.mjs"
+    "test:workflow:browser": "node test/workflow-ui.browser.mjs",
+    "test:lesson-attribution:browser": "node test/lesson-attribution.browser.mjs",
+    "test:lesson-baseline:browser": "node test/lesson-baseline.browser.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",
