@@ -319,6 +319,9 @@ try {
     await expect(page.locator("#page-breadcrumb")).toContainText(
       name + " knowledge",
     );
+    // Saving renders the body before its awaited list refresh finishes. Tabs stay
+    // disabled until the complete save settles, so wait for the public busy flag.
+    await expect(page.locator("#workspace")).toHaveAttribute("aria-busy", "false");
     await page.locator("#tab-content").focus();
     await page.keyboard.press("ArrowRight");
     await expect(page.locator("#tab-proposals")).toBeFocused();
