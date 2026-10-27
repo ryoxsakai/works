@@ -1,22 +1,24 @@
 import { esc } from "./markdown.js?v=2";
+import { navigationParents } from "./hierarchy.mjs?v=1";
 const $ = (id) => document.getElementById(id);
 export function createFolderBrowser(hooks) {
   const state = {
     folders: [],
+    parents: new Map(),
     pages: [],
     current: null,
     view: "folders",
     dialog: null,
   };
   const folder = (id) => state.folders.find((f) => f.id === id);
-  const ancestors = (id) => {
+  const ancestors = (id, raw = false) => {
     const result = [],
       seen = new Set();
     let f = folder(id);
     while (f && !seen.has(f.id)) {
       seen.add(f.id);
       result.unshift(f);
-      f = folder(f.parent_id);
+      f = folder(raw ? f.parent_id : state.parents.get(f.id));
     }
     return result;
   };
@@ -37,13 +39,16 @@ export function createFolderBrowser(hooks) {
       ),
     );
     ancestors(state.current).forEach((f) => open.add(f.id));
-    const tree = (parent, depth = 0) => {
-      if (depth > 16) return "";
+    const parents = state.parents;
+    $("hierarchy-warning").hidden = !state.folders.some(
+      (f) => parents.get(f.id) !== (f.parent_id ?? null),
+    );
+    const tree = (parent) => {
       return state.folders
-        .filter((f) => f.parent_id === parent)
+        .filter((f) => parents.get(f.id) === parent)
         .map(
           (f) =>
-            `<details class="material-tree-folder" data-folder="${esc(f.id)}"${open.has(f.id) ? " open" : ""}><summary><span class="material-tree-chevron" aria-hidden="true">›</span><span class="material-folder-icon" aria-hidden="true">▣</span>${folderButton(f.id, f.name)}</summary><div class="material-tree-children">${tree(f.id, depth + 1)}${state.pages
+            `<details class="material-tree-folder" data-folder="${esc(f.id)}"${open.has(f.id) ? " open" : ""}><summary><span class="material-tree-chevron" aria-hidden="true">›</span><span class="material-folder-icon" aria-hidden="true">▣</span>${folderButton(f.id, f.name)}</summary><div class="material-tree-children">${tree(f.id)}${state.pages
               .filter(
                 (p) =>
                   p.folder_id === f.id && (hooks.archived() || !p.archived),
@@ -60,7 +65,11 @@ export function createFolderBrowser(hooks) {
       folderButton(null, "Wiki / 未分類") +
       tree(null) +
       state.pages
-        .filter((p) => !p.folder_id && (hooks.archived() || !p.archived))
+        .filter(
+          (p) =>
+            (!p.folder_id || !folder(p.folder_id)) &&
+            (hooks.archived() || !p.archived),
+        )
         .map(
           (p) =>
             `<button type="button" class="material-tree-file" data-page="${esc(p.id)}">${esc(p.title)}</button>`,
@@ -74,22 +83,29 @@ export function createFolderBrowser(hooks) {
             '<span aria-hidden="true"> / </span>' + folderButton(f.id, f.name),
         )
         .join("");
+    $("page-breadcrumb").innerHTML =
+      $("folder-breadcrumb").innerHTML +
+      (hooks.page()
+        ? `<span aria-hidden="true"> / </span><span aria-current="page">${esc(hooks.page().title)}</span>`
+        : "");
     $("folder-heading").textContent = label(state.current);
     $("rename-folder").hidden = $("move-folder").hidden = !state.current;
     $("folder-grid").innerHTML = state.folders
-      .filter((f) => f.parent_id === state.current)
+      .filter((f) => parents.get(f.id) === state.current)
       .map(
         (f) =>
           `<article class="material-folder-card"><button type="button" class="material-folder-open" data-folder-open="${esc(f.id)}"><span class="material-folder-icon" aria-hidden="true">▣</span><span class="material-folder-copy"><strong>${esc(f.name)}</strong></span><span aria-hidden="true">›</span></button></article>`,
       )
       .join("");
-    document.querySelectorAll('#folder-tree [data-page]').forEach((button) => {
-      if (button.dataset.page === hooks.page()?.id) button.setAttribute('aria-current', 'page');
+    document.querySelectorAll("#folder-tree [data-page]").forEach((button) => {
+      if (button.dataset.page === hooks.page()?.id)
+        button.setAttribute("aria-current", "page");
     });
   }
   async function refresh() {
     const data = await hooks.api("folders");
     state.folders = data.folders;
+    state.parents = navigationParents(state.folders);
     state.pages = data.pages;
     $("tree-limit").hidden = !data.pages_truncated;
     if (state.current && !folder(state.current)) state.current = null;
@@ -122,7 +138,7 @@ export function createFolderBrowser(hooks) {
     return (
       '<option value="">Wiki / 未分類</option>' +
       state.folders
-        .filter((f) => !ancestors(f.id).some((a) => a.id === excluded))
+        .filter((f) => !ancestors(f.id, true).some((a) => a.id === excluded))
         .map((f) => `<option value="${esc(f.id)}">${esc(label(f.id))}</option>`)
         .join("")
     );
@@ -134,6 +150,7 @@ export function createFolderBrowser(hooks) {
     $("folder-dialog").close();
     state.dialog = null;
     hooks.dialogDirty(false);
+    if (state.opener?.isConnected) state.opener.focus();
   }
   $("folder-dialog-close").onclick = $("folder-dialog-cancel").onclick = close;
   $("folder-dialog").addEventListener("cancel", (e) => {
@@ -143,6 +160,7 @@ export function createFolderBrowser(hooks) {
   $("folder-form").oninput = () => hooks.dialogDirty(true);
   function show(kind) {
     if (!hooks.beforeNavigate()) return;
+    state.opener = document.activeElement;
     hooks.run(async () => {
       await refresh();
       const source =

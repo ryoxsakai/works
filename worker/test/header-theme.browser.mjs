@@ -94,7 +94,7 @@ async function selectedTheme(page) {
         return r.fulfill({contentType:'application/json',body:JSON.stringify(result)});
       }
       const isList = /^\/api\/(goal-templates|students|materials|material-categories|periods|calendars|records|curriculum|schedules|schedule-names|ss-projects|admissions|material-library\/(folders|files))(\/|$)/.test(url.pathname);
-      return r.fulfill({contentType:'application/json',body:JSON.stringify(isList ? [] : {items:[],books:[],pages:[],memos:[],tasks:[],categories:[],calendars:[],events:[],files:[],folders:[],students:[],schedules:[],materials:[]})});
+      return r.fulfill({contentType:'application/json',body:JSON.stringify(isList ? [] : {items:[],books:[],pages:[],memos:[],tasks:[],categories:[],roles:[],cloneRequests:{},revision:0,calendars:[],events:[],files:[],folders:[],students:[],schedules:[],materials:[]})});
     }
     const file = path.join(root, decodeURIComponent(url.pathname) + (url.pathname.endsWith('/') ? 'index.html' : ''));
     if (!file.startsWith(root) || !fs.existsSync(file)) return r.fulfill({status:404,body:''});

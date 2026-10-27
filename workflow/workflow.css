@@ -414,3 +414,52 @@ body {
 body {
   background: var(--bg);
 }
+/* Four date columns; mobile keeps one selected date and explicit date controls. */
+.wf-week {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  overflow: visible;
+}
+.wf-day,
+.wf-run {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.wf-role {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #20252c;
+  background: #e8e8ed;
+}
+.role-rose {
+  background: #f8dce5;
+}
+.role-sky {
+  background: #d7eafb;
+}
+.role-mint {
+  background: #d7eee2;
+}
+.role-amber {
+  background: #f7e8bf;
+}
+.role-violet {
+  background: #e6ddf7;
+}
+.wf-dialog textarea {
+  width: 100%;
+  box-sizing: border-box;
+}
+@media (max-width: 760px) {
+  .wf-week {
+    display: block;
+  }
+  .wf-day:not(.selected) {
+    display: none;
+  }
+  .wf-role {
+    max-width: 100%;
+  }
+}

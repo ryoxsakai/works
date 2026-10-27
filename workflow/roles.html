@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>担当 | Works</title>
+    <script src="/shared/theme-init.js?v=1"></script>
+    <link rel="stylesheet" href="/shared/styles.css?v=56" />
+    <link rel="stylesheet" href="/shared/header.css?v=2" />
+    <link rel="stylesheet" href="./workflow.css?v=4" />
+    <link rel="stylesheet" href="/shared/workspace-ui.css?v=1" />
+    <script type="module" src="/shared/header.js?v=4"></script>
+  </head>
+  <body class="works-workspace workflow-workspace">
+    <header class="page-header works-header">
+      <h1>
+        <a class="works-home" href="/"
+          ><span class="page-header-icon">W</span><span>Works</span></a
+        ><span class="works-page-title">ワークフロー</span>
+      </h1>
+      <div class="works-header-actions">
+        <button id="auth">ログイン</button>
+      </div>
+    </header>
+    <main>
+      <a href="./">← 日付カンバン</a>
+      <h2>◆ 担当の登録・編集</h2>
+      <p>
+        担当は役割、実行者は自分 / dot
+        です。操作範囲の説明は実行許可になりません。
+      </p>
+      <p id="error" role="alert"></p>
+      <section id="workspace" hidden>
+        <button id="new-role">＋ 担当を追加</button>
+        <div id="roles"></div>
+      </section>
+    </main>
+    <dialog id="role-editor" class="wf-dialog" aria-labelledby="role-title">
+      <form id="role-form">
+        <div class="wf-title">
+          <h2 id="role-title">担当</h2>
+          <button type="button" id="close-role" aria-label="閉じる">×</button>
+        </div>
+        <label>名前<input name="name" maxlength="100" required /></label>
+        <label
+          >責任・仕事内容<textarea
+            name="responsibilities"
+            maxlength="2000"
+            required
+          ></textarea>
+        </label>
+        <label
+          >操作範囲（実行許可は別途必要）<textarea
+            name="operations"
+            maxlength="2000"
+            required
+          ></textarea>
+        </label>
+        <label
+          >完了条件<textarea
+            name="completion"
+            maxlength="2000"
+            required
+          ></textarea>
+        </label>
+        <label
+          >アイコン<select name="icon">
+            <option>●</option>
+            <option>◆</option>
+            <option>★</option>
+            <option>☑</option>
+            <option>◎</option>
+          </select></label
+        >
+        <label
+          >色<select name="color">
+            <option value="rose">ローズ</option>
+            <option value="sky">空色</option>
+            <option value="mint">ミント</option>
+            <option value="amber">琥珀</option>
+            <option value="violet">紫</option>
+          </select></label
+        >
+        <p id="role-error" role="alert"></p>
+        <button type="submit">保存</button>
+      </form>
+    </dialog>
+    <script type="module" src="./roles.js?v=1"></script>
+  </body>
+</html>
