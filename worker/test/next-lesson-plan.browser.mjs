@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {mkdir} from 'node:fs/promises';
 import {createFixture} from './next-lesson-fixture.mjs';
 const fixture=await createFixture();
-const browser=await chromium.launch({headless:true});
+const browser=await chromium.launch({headless:true,...(process.env.BROWSER_EXECUTABLE?{executablePath:process.env.BROWSER_EXECUTABLE}:{})});
 const page=await browser.newPage({viewport:{width:390,height:900}});
 const row=id=>page.locator(`#record-tbody tr[data-event-id="${id}"]`);
 const next=id=>row(id).locator('.record-next-plan textarea');

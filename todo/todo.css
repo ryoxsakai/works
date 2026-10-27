@@ -500,3 +500,14 @@ html[data-theme="dark"] .todo-page #role-error {
 .category-row .inline {
   justify-content: flex-start;
 }
+
+/* Keep compact category ordering controls usable on touch screens. */
+.category-row [data-category-action="up"],
+.category-row [data-category-action="down"] {
+  min-width: 44px;
+}
+.todo-page dialog button {
+  min-width: 44px;
+  min-height: 44px;
+  flex-shrink: 0;
+}

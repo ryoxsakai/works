@@ -176,7 +176,7 @@ const server = createServer(async (req, res) => {
 await new Promise((r) => server.listen(0, "127.0.0.1", r));
 const origin = `http://127.0.0.1:${server.address().port}`;
 const browser = await chromium.launch({
-  executablePath: process.env.CHROMIUM_PATH || "/usr/bin/chromium",
+  ...((process.env.CHROMIUM_PATH || process.env.BROWSER_EXECUTABLE) ? {executablePath:process.env.CHROMIUM_PATH || process.env.BROWSER_EXECUTABLE} : {}),
   headless: true,
   args: ["--no-sandbox"],
 });

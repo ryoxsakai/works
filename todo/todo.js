@@ -35,6 +35,7 @@ let state,
   cloneSource,
   cloneBase,
   dialogEpoch = 0;
+let pendingFocusRestore = null;
 const pendingPrefix = pendingKey + ":";
 function validPending(args) {
   return (
@@ -112,6 +113,15 @@ function setBusy(value) {
         el.hasAttribute("data-fixed-disabled") ||
         (stale && !el.hasAttribute("data-dialog-reload"));
     });
+  if (!value && pendingFocusRestore) {
+    const pending = pendingFocusRestore;
+    pendingFocusRestore = null;
+    if (
+      pending.epoch === dialogEpoch &&
+      !document.querySelector("dialog[open]")
+    )
+      restoreDialogFocus(pending.target);
+  }
 }
 async function reload() {
   state = await api();
@@ -301,11 +311,7 @@ function openDialog(dialog) {
   dialog.showModal();
   history.pushState({ todoDialog: dialog.id }, "");
 }
-function closeDialog(dialog, fromBack = false) {
-  if (!dialog.open) return;
-  dialogEpoch++;
-  dialog.close();
-  let target = dialog.returnFocus;
+function restoreDialogFocus(target) {
   if (target && !target.isConnected) {
     const taskId = target.closest("[data-task]")?.dataset.task;
     const action = target.dataset.action;
@@ -318,7 +324,16 @@ function closeDialog(dialog, fromBack = false) {
         `[data-deadline="${CSS.escape(target.dataset.deadline)}"]`,
       );
   }
-  target?.focus();
+  if (target && !target.disabled && target.getClientRects().length)
+    target.focus();
+}
+function closeDialog(dialog, fromBack = false) {
+  if (!dialog.open) return;
+  dialogEpoch++;
+  dialog.close();
+  const target = dialog.returnFocus;
+  if (target?.disabled) pendingFocusRestore = { target, epoch: dialogEpoch };
+  else restoreDialogFocus(target);
   if (!fromBack && history.state?.todoDialog === dialog.id) history.back();
 }
 window.addEventListener("popstate", () =>
