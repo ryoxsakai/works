@@ -141,6 +141,7 @@ function render() {
   }
   roleFilter.value = previousRole;
 
+  $("#reset-filters").hidden = !($("#workflow-search").value.trim() || previousRole || filter !== "unfinished" || activeFilter !== "all");
   $("#day").value = selected;
   const active = state.runs.filter(
     (r) => !["completed", "cancelled"].includes(r.status),
@@ -1164,6 +1165,15 @@ $("#calendar-view").addEventListener("click", (event) => {
     item.setAttribute("aria-pressed", String(item === b));
 });
 
+$("#reset-filters").onclick = () => {
+  $("#workflow-search").value = $("#role-filter").value = "";
+  filter = "unfinished";
+  activeFilter = "all";
+  for (const item of $("#active-filters").querySelectorAll("button"))
+    item.setAttribute("aria-pressed", String(item.dataset.active === "all"));
+  render();
+  $("#workflow-search").focus();
+};
 $("#role-filter").onchange = render;
 
 async function rolling(action) {

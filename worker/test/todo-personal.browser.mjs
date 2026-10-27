@@ -208,6 +208,12 @@ try {
         inputStyle.color,
         theme === "dark" ? "rgb(231, 237, 246)" : "rgb(36, 51, 71)",
       );
+      await page.locator("#task-search").fill("no such teacher task");
+      await expect(page.locator("#tasks")).toContainText("条件に合うタスクがありません");
+      await expect(page.locator("#deadlines")).toContainText("today4");
+      await page.locator("#clear-filters").click();
+      await expect(page.locator("#task-search")).toBeFocused();
+      await expect(page.locator("#task-count")).toContainText("全8件");
       const groups = page.locator(".group");
       await expect(
         groups
@@ -229,6 +235,9 @@ try {
           })
           .locator(".task-card"),
       ).toHaveCount(2);
+      const cardHeight = await page.locator('[data-task="today0"]').evaluate(e => e.getBoundingClientRect().height);
+      assert.ok(cardHeight < 330, `compact card ${width}/${theme}: ${cardHeight}`);
+      for (const n of [1,3,7,14]) await expect(page.locator(`[data-task="today0"] [data-days="${n}"]`)).toBeVisible();
       await page.locator("#role-filter").selectOption("lessons");
       await expect(page.locator("#deadlines")).toContainText("today4");
       await page.locator("#role-filter").selectOption("");
@@ -277,6 +286,7 @@ try {
       await detail.click();
       await page.goBack();
       await expect(page.locator("#detail")).toBeHidden();
+      await page.evaluate(() => scrollTo(0,0));
       await page.screenshot({
         path: `${artifacts}/${width}-${theme}.png`,
         fullPage: true,
@@ -320,10 +330,36 @@ try {
     (await db()).tasks.length,
     "active renamed category normalizes filter and visible list together",
   );
+  await page.locator("#task-search").fill("not visible capture context");
+  await page.locator("#quick-title").fill("日本語の確定中");
+  const beforeIme = (await db()).tasks.length;
+  for (const fields of [{isComposing:true}, {keyCode:229}]) {
+    const cancelled = await page.locator("#quick-title").evaluate((input, fields) => {
+      const event = new KeyboardEvent("keydown", {key:"Enter",code:"Enter",bubbles:true,cancelable:true,...fields});
+      return !input.dispatchEvent(event) && event.defaultPrevented;
+    }, fields);
+    assert.equal(cancelled, true, "composition Enter must cancel implicit submit");
+  }
+  assert.equal((await db()).tasks.length, beforeIme);
   await page.locator("#quick-title").fill("タイトルだけ");
   await page.locator("#capture button").click();
   await expect(page.locator("#notice")).toContainText("インボックス");
   assert.equal((await db()).tasks.at(-1).plannedDay, null);
+  await expect(page.locator("#task-search")).toHaveValue("");
+  await page.locator("#capture-day").selectOption("1");
+  await page.locator("#quick-title").fill("明日の保護者面談資料を準備");
+  await page.locator("#quick-title").press("Enter");
+  await expect(page.locator("#notice")).toContainText("2026-10-28");
+  assert.equal((await db()).tasks.at(-1).plannedDay, "2026-10-28");
+  assert.equal((await db()).tasks.at(-1).deadline, null);
+  const newId = (await db()).tasks.at(-1).id;
+  await page.locator(`[data-task="${newId}"] [data-action="plan-today"]`).click();
+  await expect(page.locator("#notice")).toContainText("締切は変更していません");
+  assert.equal((await db()).tasks.at(-1).plannedDay, base);
+  assert.equal((await db()).tasks.at(-1).deadline, null);
+  await expect(page.locator(`[data-task="${newId}"] [data-action="detail"]`)).toBeFocused();
+  await page.locator("#capture-day").selectOption("");
+
   await page
     .getByRole("button", { name: "詳細：合成 today4", exact: true })
     .click();
@@ -517,6 +553,20 @@ try {
   );
   assert.equal((await db()).tasks.at(-1).plannedDay, "2026-10-29");
   console.log("PASS fast clone uses operation Tokyo today after midnight");
+  // A separate synthetic teaching-day walkthrough; no live services or user data.
+  const audit = await db();
+  const names = ["面談記録を整理する", "高3英語の授業プリントを確認", "模試の解説を見直す", "保護者への連絡内容を下書き", "提出期限のある答案を採点", "明日の板書案を準備", "次回面談の論点をメモ", "授業の振り返りを記録"];
+  audit.tasks = audit.tasks.slice(0,8).map((t,i) => ({...t,name:names[i]}));
+  await DB.prepare("UPDATE todo_state SET data=?, revision=revision+1 WHERE id=1").bind(JSON.stringify(audit)).run();
+  await page.reload();
+  await expect(page.locator("#app")).toBeVisible();
+  await page.evaluate(() => scrollTo(0,0));
+  const deadlineHeight = await page.locator(".deadline-row").first().evaluate(e => e.getBoundingClientRect().height);
+  assert.ok(deadlineHeight < 150, `long teacher deadline readable: ${deadlineHeight}`);
+  await page.screenshot({path:`${artifacts}/teacher-day-mobile.png`,fullPage:true});
+  await page.setViewportSize({width:1440,height:1000});
+  await page.screenshot({path:`${artifacts}/teacher-day-desktop.png`,fullPage:true});
+
   console.log(
     "PASS capture, category add/rename preserving task links, reschedule/deadline distinction, role archive/reassignment, pending disabled, repeated independent clones, completion preservation/checklist reset, lost-response reload recovery, custom week/deadline, delayed dismissal",
   );

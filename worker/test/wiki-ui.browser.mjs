@@ -500,6 +500,7 @@ try {
     await expect(page.locator("#editor")).toBeHidden();
     await expect(page.locator("#body")).toContainText("Safe knowledge");
     const download = page.waitForEvent("download");
+    await page.locator(".wiki-page-tools summary").click();
     await page.locator("[data-export=json]").click();
     assert.match((await download).suggestedFilename(), /\.json$/);
     const beforeArchive = (await api("pages/" + id)).page.revision;
@@ -820,6 +821,20 @@ try {
     await expect(page.locator("#pages .wiki-empty")).toContainText(
       "一致するページがありません",
     );
+    await page.screenshot({path:new URL(`../test-artifacts/wiki-long-tree-${name}.png`, import.meta.url).pathname,fullPage:true});
+    await page.locator("#edit").click();
+    await page.locator("#editor [name=body]").fill("未保存の面談メモ · 合成データ");
+    acceptDialogs = false;
+    await page.locator("#clear-search").click();
+    await expect(page.locator("#editor [name=body]")).toHaveValue("未保存の面談メモ · 合成データ");
+    await expect(page.locator("#search")).toHaveValue("no-matching-page-unique-query");
+    acceptDialogs = true;
+    await page.locator("#clear-search").click();
+    await expect(page.locator("#editor")).toBeHidden();
+    await expect(page.locator("#search")).toHaveValue("");
+    await expect(page.locator("#search")).toBeFocused();
+    await expect(page.locator("#folder-heading")).not.toHaveText("検索結果（全フォルダ）");
+    await expect(page.locator("#clear-search")).toBeHidden();
     await checkTheme(page, selectedTheme);
     // Corrupt legacy hierarchy is projected safely without issuing writes.
     const navigationFixture = {

@@ -282,7 +282,13 @@ try {
   await expect(page.locator("#active-runs .wf-run")).toHaveCount(1);
   await page.locator('[data-active="review"]').click();
   await expect(page.locator("#active-runs .wf-run")).toHaveCount(0);
-  await page.locator('[data-active="all"]').click();
+  await expect(page.locator("#reset-filters")).toBeVisible();
+  await page.locator("#workflow-search").fill("一致しない検索");
+  await page.locator("#reset-filters").click();
+  await expect(page.locator('[data-active="all"]')).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("#active-runs .wf-run")).toHaveCount(1);
+  await expect(page.locator("#workflow-search")).toBeFocused();
+  await expect(page.locator("#reset-filters")).toBeHidden();
   await page.locator('[data-view="agenda"]').click();
   await expect(page.locator("#calendar")).toHaveClass(/wf-agenda/);
   await page.locator('[data-view="calendar"]').click();
