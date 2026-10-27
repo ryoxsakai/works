@@ -1,6 +1,6 @@
 # Role-based workflow and rolling planning
 
-The initial snapshot is draft PR #126, commit `f0cceecaf56c25dd8b324024b1946c01f3f9a02d`, based on `main` e9371ed. The follow-up described here is local while publication/push is on hold. Only workflow-owned modules, tests, migrations and this document change; no Wiki, ToDo, shared navigation/styles, Exam or Vocabulary files change.
+The initial snapshot is draft PR #126, commit `f0cceecaf56c25dd8b324024b1946c01f3f9a02d`, based on `main` e9371ed. The follow-up described here is local while publication/push is on hold. The existing parent-dot runner contract and non-activation procedure are in [workflow-dot-runner.md](workflow-dot-runner.md). Only workflow-owned modules, tests, migrations and this document change; no Wiki, ToDo, shared navigation/styles, Exam or Vocabulary files change.
 
 ## Requirement review
 
@@ -33,6 +33,7 @@ Future plans are one versioned row per definition/scheduled slot. The row contai
 
 Existing authenticated browser endpoint: `GET/POST /api/workflow`. Existing owner OAuth MCP transport and execution endpoint remain. No new scopes/secrets are created.
 
+- `read_workflow_dispatch`: SELECT-only, typed runner envelope with stable refs, role/worker binding, effective instruction, stop/lease state, migration readiness and terminal evidence; no tokens, permission grant or worker allocation. See the parent-dot contract above.
 - `read_workflows`: adds `roles`, `staged_plans`, and role `dispatch` metadata on Runs. `stage_id` retrieves a staged row and last 100 history versions. `stage_offset` paginates staged records in 200-row pages, separately from existing Run `offset`. Old installations without migrations return null feature sections and remain readable.
 - `draft_workflow`: adds `planning_policy` and task `role_id`, `fixed`, `wiki_refs`. Drafts still cannot execute.
 - `suggest_workflow_plan`: task-indexed inert suggestions, including later serial tasks.
@@ -58,7 +59,7 @@ All migrations are additive, explicit, and were tested only in synthetic D1:
 
 1. Existing `0001-workflow.sql` is prerequisite.
 2. `0002-roles.sql`: role registry and history/reference-validation triggers; planning-policy role references are checked transactionally.
-3. `0003-staged-plans.sql`: inert future-plan table, immutable history, role-reference/race guards.
+3. `0003-staged-plans.sql`: inert future-plan table, immutable history, role-reference/race guards, shared planning epoch and reservation-change triggers. Complete migration readiness is required for rolling apply; no existing execution row is rewritten.
 
 No existing Run/definition/settings row is rewritten by migrations. Old task JSON without roles, policy or plans remains supported. A missing new migration disables the corresponding feature with a migration error/null feature section. Archived role snapshots remain in history. Rollback preserves new tables/history and restores the previous Worker/static version; do not restore the whole DB and erase newer execution history.
 
@@ -85,8 +86,10 @@ No existing Run/definition/settings row is rewritten by migrations. Old task JSO
 
 ## Validation
 
-Final local Worker suite: **106 tests passed**. Chromium browser suite passed (22 synthetic writes). All local DB/browser tests use synthetic data. Coverage includes owner/CAS/archival/history and reassignment, additive migration compatibility, bounded vs manual approvals, multi-task/future-slot plans, immutable active instructions and leases, role-worker mismatch/lane conflicts, staging/Run race reconciliation, ignored unadopted/stale plans, deadline/horizon/dependency ordering, terminal display dates, unified time ordering, and existing lease/unknown-outcome/no-repeat/stop/completion safety.
+Local full Worker suite: **116 tests passed**; after the last default-deny/schema hardening, final focused checks include **11 pure runner/planner/date tests and 4 dispatch/API regressions**. Chromium browser suite passed (22 synthetic writes). All local DB/browser tests use synthetic data. Coverage includes owner/CAS/archival/history and reassignment, additive migration compatibility, bounded vs manual approvals, multi-task/future-slot plans, immutable active instructions and leases, role-worker mismatch/lane conflicts, staging/Run race reconciliation, ignored unadopted/stale plans, deadline/horizon/dependency ordering, terminal display dates, unified time ordering, and existing lease/unknown-outcome/no-repeat/stop/completion safety.
 
 Browser coverage includes role creation/editing, planning/adoption/bounded updates and future staging, no early Run creation, desktop/mobile and light/dark, modal Escape/Back/focus, delayed POST/load dismissals and newer navigation, repeated Close→Back history behavior, XSS and overflow. Screenshots are generated under `worker/test-artifacts/workflow/` (ignored by git).
+
+Independent local review reproduced and checked fixes for shared reservation races, active predecessor release, next-work instruction display and missing-stage errors. Rolling apply captures a shared epoch before reading sources and conservatively retains other tasks’ old reservations; ordinary explicit `update_workflow_plan`/`stage_workflow_plan` date edits validate owner bounds/dependencies but do not claim to compute exclusive free lanes. The role claim lease remains exclusive at execution time. Use rolling planning to compute shared available-lane assignments. The final runner defaults to no launch preparation for unknown/blocked control decisions.
 
 Production migrations, Cloudflare deployment behavior, connector schema refresh, real external operations, Mac runtime and actual agent dispatch remain untested/unconfigured. No production write or extra feature push was performed in the follow-up.

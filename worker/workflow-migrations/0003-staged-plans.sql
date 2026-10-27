@@ -20,3 +20,26 @@ END;
 CREATE TRIGGER IF NOT EXISTS wf_role_staged_archive BEFORE UPDATE ON wf_roles WHEN new.archived=1 BEGIN
  SELECT CASE WHEN EXISTS(SELECT 1 FROM wf_staged_plans p JOIN wf_definitions d ON d.id=p.definition_id AND d.owner=p.owner,json_each(p.data,'$.plans') t WHERE p.owner=new.owner AND d.enabled=1 AND d.archived=0 AND d.data=p.definition_data AND NOT EXISTS(SELECT 1 FROM wf_runs r WHERE r.owner=p.owner AND r.definition_id=p.definition_id AND r.scheduled_for=p.scheduled_for) AND json_extract(t.value,'$.role_id')=new.id) THEN RAISE(ABORT,'staged plans reference role') END;
 END;
+
+-- Shared reservation fence: no existing execution/setting data is rewritten.
+CREATE TABLE IF NOT EXISTS wf_planning_epoch (
+ owner TEXT PRIMARY KEY, revision INTEGER NOT NULL DEFAULT 0
+);
+CREATE TRIGGER IF NOT EXISTS wf_epoch_wf_runs_insert AFTER INSERT ON wf_runs BEGIN
+ INSERT INTO wf_planning_epoch(owner,revision) VALUES(new.owner,1) ON CONFLICT(owner) DO UPDATE SET revision=wf_planning_epoch.revision+1;
+END;
+CREATE TRIGGER IF NOT EXISTS wf_epoch_wf_runs_update AFTER UPDATE ON wf_runs BEGIN
+ INSERT INTO wf_planning_epoch(owner,revision) VALUES(new.owner,1) ON CONFLICT(owner) DO UPDATE SET revision=wf_planning_epoch.revision+1;
+END;
+CREATE TRIGGER IF NOT EXISTS wf_epoch_wf_staged_plans_insert AFTER INSERT ON wf_staged_plans BEGIN
+ INSERT INTO wf_planning_epoch(owner,revision) VALUES(new.owner,1) ON CONFLICT(owner) DO UPDATE SET revision=wf_planning_epoch.revision+1;
+END;
+CREATE TRIGGER IF NOT EXISTS wf_epoch_wf_staged_plans_update AFTER UPDATE ON wf_staged_plans BEGIN
+ INSERT INTO wf_planning_epoch(owner,revision) VALUES(new.owner,1) ON CONFLICT(owner) DO UPDATE SET revision=wf_planning_epoch.revision+1;
+END;
+CREATE TRIGGER IF NOT EXISTS wf_epoch_wf_definitions_insert AFTER INSERT ON wf_definitions BEGIN
+ INSERT INTO wf_planning_epoch(owner,revision) VALUES(new.owner,1) ON CONFLICT(owner) DO UPDATE SET revision=wf_planning_epoch.revision+1;
+END;
+CREATE TRIGGER IF NOT EXISTS wf_epoch_wf_definitions_update AFTER UPDATE ON wf_definitions BEGIN
+ INSERT INTO wf_planning_epoch(owner,revision) VALUES(new.owner,1) ON CONFLICT(owner) DO UPDATE SET revision=wf_planning_epoch.revision+1;
+END;

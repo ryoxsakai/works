@@ -153,7 +153,7 @@ export async function stageWrite(env, a, browser, h) {
     }
   }
   const stored = await env.DB.prepare(
-    `INSERT INTO wf_staged_plans(id,owner,definition_id,definition_revision,scheduled_for,definition_data,data) SELECT ?,?,?,?,?,?,? WHERE ?=0 AND EXISTS(SELECT 1 FROM wf_definitions WHERE id=? AND owner=? AND revision=? AND enabled=1 AND archived=0) AND NOT EXISTS(SELECT 1 FROM wf_runs WHERE owner=? AND definition_id=? AND scheduled_for=?) AND NOT EXISTS(SELECT 1 FROM wf_settings WHERE owner=? AND stopped=1) ON CONFLICT(id) DO UPDATE SET definition_revision=excluded.definition_revision,definition_data=excluded.definition_data,data=excluded.data,revision=wf_staged_plans.revision+1 WHERE wf_staged_plans.owner=excluded.owner AND wf_staged_plans.revision=? RETURNING *`,
+    `INSERT INTO wf_staged_plans(id,owner,definition_id,definition_revision,scheduled_for,definition_data,data) SELECT ?,?,?,?,?,?,? WHERE ?=0 AND EXISTS(SELECT 1 FROM wf_definitions WHERE id=? AND owner=? AND revision=? AND enabled=1 AND archived=0) AND NOT EXISTS(SELECT 1 FROM wf_runs WHERE owner=? AND definition_id=? AND scheduled_for=?) AND NOT EXISTS(SELECT 1 FROM wf_settings WHERE owner=? AND stopped=1) ${a.planning_epoch === undefined ? "" : "AND COALESCE((SELECT revision FROM wf_planning_epoch WHERE owner=?),0)=?"} ON CONFLICT(id) DO UPDATE SET definition_revision=excluded.definition_revision,definition_data=excluded.definition_data,data=excluded.data,revision=wf_staged_plans.revision+1 WHERE wf_staged_plans.owner=excluded.owner AND wf_staged_plans.revision=? RETURNING *`,
   )
     .bind(
       id,
@@ -171,6 +171,7 @@ export async function stageWrite(env, a, browser, h) {
       d.id,
       scheduled,
       owner(env),
+      ...(a.planning_epoch === undefined ? [] : [owner(env), a.planning_epoch]),
       expected,
     )
     .first();

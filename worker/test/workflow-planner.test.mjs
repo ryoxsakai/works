@@ -56,3 +56,28 @@ test("fixed and running reservations stay fixed; deadlines and fixed successors 
   );
   assert(out.blocked.some((p) => p.run_id === "late"));
 });
+
+test("active predecessor with past plan releases different-role successor only after its current reservation", () => {
+  const working = run("active", 1, [
+    { status: "running", planned_for: "2026-10-25T01:00:00Z" },
+    { role_id: "b" },
+  ]);
+  working.status = "running";
+  const out = rollingPlans([working], now);
+  assert.equal(out.plans[0].plan.task_index, 1);
+  assert(Date.parse(out.plans[0].plan.planned_for) >= now + 30 * 60000);
+});
+test("old reservations of other editable sources remain protected if their later apply fails", () => {
+  const now = Date.parse("2026-10-27T00:00:00Z");
+  const high = run("high", 1, [{}], {
+    planning_policy: { enabled: true, role_ids: [] },
+  });
+  const lower = run("lower", 2, [{ planned_for: "2026-10-27T00:00:00Z" }], {
+    planning_policy: { enabled: true, role_ids: [] },
+  });
+  const out = rollingPlans([high, lower], now);
+  assert.equal(
+    out.plans.find((p) => p.run_id === "high").plan.planned_for,
+    "2026-10-27T00:30:00.000Z",
+  );
+});

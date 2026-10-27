@@ -1,3 +1,4 @@
+import { readWorkflowDispatch } from "../src/workflow-dispatch.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { Miniflare } from "miniflare";
@@ -1466,6 +1467,7 @@ test("bounded planning covers future pending tasks, keeps active instructions/le
 test("rolling planner previews without writes, applies per-Run atomically within prior owner bounds, respects stops and stale revisions", async (t) => {
   const { env, create } = await fixture(t);
   await installRoles(env);
+  await installStaging(env);
   const role = await write(
     env,
     { action: "role_create", content: roleContent },
@@ -1844,4 +1846,315 @@ test("future manual role assignment blocks archival until reassigned and preserv
     ),
   );
   assert.equal((await workflowRead(env)).runs.length, 0);
+});
+
+test("concurrent rolling applies fence shared reservations, including a different Run source", async (t) => {
+  const { env, create } = await fixture(t);
+  await installRoles(env);
+  await installStaging(env);
+  const role = await write(
+    env,
+    { action: "role_create", content: roleContent },
+    true,
+  );
+  const d = await create({
+    ...content,
+    start: new Date().toISOString(),
+    tasks: [{ ...content.tasks[0], role_id: role.id }],
+    planning_policy: {
+      enabled: true,
+      revise_instructions: false,
+      role_ids: [],
+    },
+  });
+  const sources = [];
+  for (const key of ["epoch-a", "epoch-b"])
+    sources.push(
+      await write(
+        env,
+        {
+          action: "start",
+          definition_id: d.id,
+          revision: d.revision,
+          request_id: key,
+        },
+        true,
+      ),
+    );
+  const output = await Promise.all(
+    sources.map((r) =>
+      workflowPlanning(env, {
+        action: "apply",
+        targets: [{ run_id: r.id, revision: r.revision }],
+      }),
+    ),
+  );
+  const saved = (await workflowRead(env)).runs;
+  const reservations = saved
+    .filter((r) => r.data.tasks[0].planned_for)
+    .map((r) => r.data.tasks[0].role_id + "@" + r.data.tasks[0].planned_for);
+  assert.equal(reservations.length, new Set(reservations).size);
+  assert(output.some((r) => r.updated.length));
+  assert(
+    output.reduce((n, r) => n + r.updated.length + r.conflicts.length, 0) >= 2,
+  );
+});
+test("dispatch envelopes are owner-isolated read-only data; stable refs and final evidence survive task advance", async (t) => {
+  const { env, create, call, api, token } = await fixture(t);
+  await installRoles(env);
+  await installStaging(env);
+  const role = await write(
+    env,
+    { action: "role_create", content: roleContent },
+    true,
+  );
+  const d = await create({
+    ...content,
+    tasks: [
+      {
+        ...content.tasks[0],
+        role_id: role.id,
+        gate: false,
+        wiki_refs: ["https://example.test/wiki"],
+      },
+    ],
+    planning_policy: {
+      enabled: true,
+      revise_instructions: true,
+      role_ids: [role.id],
+    },
+  });
+  let r = await write(
+    env,
+    {
+      action: "start",
+      definition_id: d.id,
+      revision: d.revision,
+      request_id: "dispatch-envelope",
+    },
+    true,
+  );
+  const before = await workflowRead(env),
+    counts = await env.DB.prepare(
+      "SELECT count(*) AS n FROM wf_history",
+    ).first();
+  const first = await readWorkflowDispatch(env, { run_id: r.id });
+  assert.equal(first.control.decision, "claimable");
+  assert.equal(first.authority.fresh_grants, false);
+  assert.equal(first.context_data.workflow.permissions, content.permissions);
+  assert.equal(first.context_data.role.id, role.id);
+  assert.deepEqual(first.context_data.wiki_refs, ["https://example.test/wiki"]);
+  assert.deepEqual((await workflowRead(env)).runs, before.runs);
+  assert.deepEqual((await workflowRead(env)).settings, before.settings);
+  assert.equal(
+    (await env.DB.prepare("SELECT count(*) AS n FROM wf_history").first()).n,
+    counts.n,
+  );
+  await assert.rejects(
+    () =>
+      readWorkflowDispatch(
+        { ...env, ALLOWED_EMAIL: "other@example.test" },
+        { run_id: r.id },
+      ),
+    { status: 404 },
+  );
+  await assert.rejects(
+    () => readWorkflowDispatch(env, { run_id: r.id, revision: r.revision + 1 }),
+    { status: 409 },
+  );
+  assert.equal((await api(null)).status, 200);
+  const http = await worker.fetch(
+    new Request(
+      env.ALLOWED_ORIGIN +
+        "/api/workflow?dispatch_run_id=" +
+        r.id +
+        "&revision=" +
+        r.revision +
+        "&task_index=0",
+      { headers: { Authorization: "Bearer " + token() } },
+    ),
+    env,
+  );
+  assert.equal(http.status, 200);
+  assert.equal((await http.json()).schema_version, first.schema_version);
+  const viaMcp = await call("read_workflow_dispatch", { run_id: r.id });
+  assert.equal((await viaMcp.json()).result.isError, false);
+  const tool = workflowTools.find((x) => x.name === "read_workflow_dispatch");
+  assert.equal(tool.annotations.readOnlyHint, true);
+  assert.equal(
+    tool.outputSchema.properties.schema_version.const,
+    first.schema_version,
+  );
+  const claim = await exec(env, {
+    action: "claim",
+    run_id: r.id,
+    revision: r.revision,
+    role_id: role.id,
+    worker_id: "role-researcher",
+  });
+  const bound = await readWorkflowDispatch(env, { run_id: r.id });
+  assert.equal(bound.routing.claimed_worker_id, "role-researcher");
+  assert.equal(bound.identity.work_ref, first.identity.work_ref);
+  assert.equal(JSON.stringify(bound).includes(claim.token), false);
+  r = await exec(env, {
+    action: "external_begin",
+    run_id: r.id,
+    revision: claim.revision,
+    generation: claim.generation,
+    token: claim.token,
+    worker_id: "role-researcher",
+    external_ref: first.identity.work_ref,
+    result: "承認範囲内の役割workerジョブ",
+  });
+  r = await exec(env, {
+    action: "external_result",
+    run_id: r.id,
+    revision: r.revision,
+    generation: claim.generation,
+    token: claim.token,
+    worker_id: "role-researcher",
+    external_ref: first.identity.work_ref,
+    outcome: "completed",
+    result: "原典と成果物を確認",
+    evidence,
+  });
+  r = await exec(env, {
+    action: "complete",
+    run_id: r.id,
+    revision: r.revision,
+    generation: claim.generation,
+    token: claim.token,
+    worker_id: "role-researcher",
+    ...completion,
+  });
+  const terminal = await readWorkflowDispatch(env, { run_id: r.id });
+  assert.equal(terminal.control.decision, "terminal");
+  assert.equal(terminal.completion.no_repeat, true);
+  assert.equal(terminal.external.ref, first.identity.work_ref);
+  assert.equal(terminal.routing.worker_id, "role-researcher");
+  assert.equal(terminal.context_data.task.instruction, content.tasks[0].title);
+  assert.equal(terminal.identity.work_ref, first.identity.work_ref);
+  assert.equal(JSON.stringify(terminal).includes(claim.token), false);
+  // Exercise compatibility with terminal snapshots written before per-task refs were retained.
+  await env.DB.prepare(
+    "UPDATE wf_runs SET data=json_remove(data,'$.tasks[0].external','$.tasks[0].worker'),revision=revision+1 WHERE id=?",
+  )
+    .bind(r.id)
+    .run();
+  const legacy = await readWorkflowDispatch(env, { run_id: r.id });
+  assert.equal(legacy.external.provenance, "immutable_history");
+  assert.equal(legacy.external.ref, first.identity.work_ref);
+});
+test("missing/partial feature migrations fail safely and a dispatch read never initializes settings or execution", async (t) => {
+  const { env, create } = await fixture(t);
+  const d = await create();
+  const r = await write(
+    env,
+    {
+      action: "start",
+      definition_id: d.id,
+      revision: d.revision,
+      request_id: "legacy-dispatch",
+    },
+    true,
+  );
+  const legacy = await readWorkflowDispatch(env, { run_id: r.id });
+  assert.equal(legacy.control.capabilities.roles, false);
+  assert.equal(legacy.control.capabilities.staging, false);
+  assert.equal(legacy.control.capabilities.rolling_apply, false);
+  const source = { run_id: r.id, revision: r.revision };
+  await assert.rejects(
+    () => write(env, { action: "role_create", content: roleContent }, true),
+    { status: 503 },
+  );
+  await assert.rejects(() => workflowRead(env, { stage_id: "missing" }), {
+    status: 503,
+  });
+  await assert.rejects(
+    () => workflowPlanning(env, { action: "apply", targets: [source] }),
+    { status: 503 },
+  );
+  assert.equal(
+    (await workflowRead(env, { run_id: r.id })).run.revision,
+    r.revision,
+  );
+  await installRoles(env);
+  await installStaging(env);
+  await env.DB.prepare("DROP TRIGGER wf_epoch_wf_runs_update").run();
+  assert.equal(
+    (await readWorkflowDispatch(env, { run_id: r.id })).control.capabilities
+      .rolling_apply,
+    false,
+  );
+  await assert.rejects(
+    () => workflowPlanning(env, { action: "apply", targets: [source] }),
+    { status: 503 },
+  );
+  await env.DB.prepare("DELETE FROM wf_settings WHERE owner=?")
+    .bind(env.ALLOWED_EMAIL)
+    .run();
+  const noSettings = await readWorkflowDispatch(env, { run_id: r.id });
+  assert.equal(noSettings.control.decision, "settings_unavailable");
+  assert.equal(
+    (await env.DB.prepare("SELECT count(*) AS n FROM wf_settings").first()).n,
+    0,
+  );
+});
+test("adopted next-task instruction is the next-work text after verified serial advance", async (t) => {
+  const { env, create } = await fixture(t);
+  await installRoles(env);
+  const d = await create({
+    ...content,
+    tasks: content.tasks.map((x) => ({ ...x, gate: false, assignee: "dot" })),
+  });
+  let r = await write(
+    env,
+    {
+      action: "start",
+      definition_id: d.id,
+      revision: d.revision,
+      request_id: "next-instruction",
+    },
+    true,
+  );
+  r = await write(env, {
+    action: "plan_suggest",
+    run_id: r.id,
+    revision: r.revision,
+    plan: {
+      ...planContent,
+      task_index: 1,
+      instruction: "採用済みの次工程の詳しい指示",
+    },
+  });
+  r = await write(
+    env,
+    {
+      action: "plan_apply",
+      run_id: r.id,
+      revision: r.revision,
+      task_index: 1,
+      authorized: true,
+    },
+    true,
+  );
+  const claim = await exec(env, {
+    action: "claim",
+    run_id: r.id,
+    revision: r.revision,
+  });
+  r = await exec(env, {
+    action: "complete",
+    run_id: r.id,
+    revision: claim.revision,
+    generation: claim.generation,
+    token: claim.token,
+    ...completion,
+  });
+  assert.equal(r.data.next_work, "採用済みの次工程の詳しい指示");
+  assert.equal(
+    (await readWorkflowDispatch(env, { run_id: r.id })).context_data.task
+      .instruction,
+    r.data.next_work,
+  );
 });

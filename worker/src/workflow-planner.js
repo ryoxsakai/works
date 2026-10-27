@@ -20,19 +20,16 @@ export function rollingPlans(runs, now = Date.now()) {
     blocked = [];
   const slot = 30 * 60000;
   const lane = (t) => t.role_id || "unassigned";
-  const reserve = (key, start) => {
+  const reserve = (key, start, taskKey) => {
     if (!reservations.has(key)) reservations.set(key, []);
-    reservations.get(key).push([start, start + slot]);
+    reservations.get(key).push([start, start + slot, taskKey]);
   };
   for (const r of runs)
-    for (const t of r.data.tasks) {
-      if (t.status === "running") reserve(lane(t), now);
-      else if (
-        (t.fixed || !r.data.definition.planning_policy?.enabled) &&
-        t.status === "pending" &&
-        t.planned_for
-      )
-        reserve(lane(t), Date.parse(t.planned_for));
+    for (const [i, t] of r.data.tasks.entries()) {
+      const taskKey = r.id + ":" + i;
+      if (t.status === "running") reserve(lane(t), now, taskKey);
+      else if (t.status === "pending" && t.planned_for)
+        reserve(lane(t), Date.parse(t.planned_for), taskKey);
     }
   const ordered = [...runs].sort(
     (a, b) =>
@@ -51,7 +48,11 @@ export function rollingPlans(runs, now = Date.now()) {
     for (let i = r.data.current; i < r.data.tasks.length; i++) {
       const t = r.data.tasks[i];
       if (t.status !== "pending" || t.fixed) {
-        after = Math.max(after, (Date.parse(t.planned_for) || now) + slot);
+        after = Math.max(
+          after,
+          now + slot,
+          (Date.parse(t.planned_for) || now) + slot,
+        );
         continue;
       }
       const candidates = [
@@ -64,10 +65,10 @@ export function rollingPlans(runs, now = Date.now()) {
       let best;
       for (const role_id of candidates) {
         let at = Math.ceil(after / slot) * slot;
-        for (const [start, finish] of [
+        for (const [start, finish, taskKey] of [
           ...(reservations.get(role_id || "unassigned") || []),
         ].sort((a, b) => a[0] - b[0]))
-          if (at < finish && at + slot > start)
+          if (taskKey !== r.id + ":" + i && at < finish && at + slot > start)
             at = Math.ceil(finish / slot) * slot;
         if (!best || at < best.at) best = { role_id, at };
       }
@@ -97,7 +98,7 @@ export function rollingPlans(runs, now = Date.now()) {
         rationale: `優先度${r.data.definition.priority}・期限・直列依存・担当の空き枠を確認（30分枠）`,
       };
       results.push({ run_id: r.id, revision: r.revision, plan });
-      reserve(best.role_id || "unassigned", best.at);
+      reserve(best.role_id || "unassigned", best.at, r.id + ":" + i);
       after = best.at + slot;
     }
   }
