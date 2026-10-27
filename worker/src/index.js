@@ -5305,82 +5305,471 @@ async function deleteMaterialFile(env, id) {
   await db.prepare("DELETE FROM material_files WHERE id = ?").bind(id).run();
 }
 
-// Shared ToDo document.  Initialize only after the schema migration has run.
-const emptyTodo = () => ({ tasks: [], categories: ["仕事", "個人", "その他"] });
+// Personal ToDo document, guarded by the existing single ALLOWED_EMAIL owner.
+// Additive JSON fields: no SQL migration or category rewrite is required.
+const emptyTodo = () => ({
+  tasks: [],
+  categories: ["仕事", "個人", "その他"],
+  roles: [],
+});
+const todoError = (message) =>
+  Object.assign(new Error(message), { status: 400 });
+const todoDate = (value) =>
+  typeof value === "string" &&
+  /^\d{4}-\d{2}-\d{2}$/.test(value) &&
+  !Number.isNaN(Date.parse(value)) &&
+  new Date(value).toISOString().slice(0, 10) === value;
+const todoToday = (now = new Date()) =>
+  new Date(now.getTime() + 9 * 3600000).toISOString().slice(0, 10);
+function todoOffset(base, days) {
+  if (!todoDate(base) || !Number.isInteger(days) || days < 1 || days > 3650)
+    throw todoError("未来の日数は1〜3650日で指定してください");
+  return new Date(Date.parse(base) + days * 86400000)
+    .toISOString()
+    .slice(0, 10);
+}
 async function readTodo(env) {
-  const row = await env.DB.prepare("SELECT data, revision FROM todo_state WHERE id = 1").first();
-  return row ? { ...JSON.parse(row.data), revision: row.revision } : { ...emptyTodo(), revision: 0 };
+  const row = await env.DB.prepare(
+    "SELECT data, revision FROM todo_state WHERE id = 1",
+  ).first();
+  return row
+    ? { roles: [], ...JSON.parse(row.data), revision: row.revision }
+    : { ...emptyTodo(), revision: 0 };
 }
 function validateTodo(state) {
-  if (!state || !Array.isArray(state.tasks) || !Array.isArray(state.categories) ||
-      state.tasks.length > 10000 || state.categories.length > 200 ||
-      new Set(state.categories).size !== state.categories.length ||
-      state.tasks.some(t => !t || typeof t.id !== "string" || !t.id ||
-        typeof t.name !== "string" || !t.name.trim() || t.name.length > 500 ||
-        typeof t.category !== "string" || t.category.length > 100 ||
+  const roles = state?.roles ?? [];
+  const validRoles =
+    Array.isArray(roles) &&
+    roles.length <= 200 &&
+    roles.every(
+      (r) =>
+        r &&
+        typeof r.id === "string" &&
+        r.id &&
+        typeof r.name === "string" &&
+        r.name.trim() &&
+        r.name.length <= 100 &&
+        ["blue", "green", "pink", "purple", "yellow"].includes(r.color) &&
+        ["📚", "👥", "📝", "🏠", "💼", "⭐"].includes(r.icon) &&
+        typeof r.archived === "boolean",
+    ) &&
+    new Set(roles.map((r) => r.id)).size === roles.length;
+  if (
+    !validRoles ||
+    !state ||
+    !Array.isArray(state.tasks) ||
+    !Array.isArray(state.categories) ||
+    state.tasks.length > 10000 ||
+    state.categories.length > 200 ||
+    new Set(state.categories).size !== state.categories.length ||
+    state.tasks.some(
+      (t) =>
+        !t ||
+        typeof t.id !== "string" ||
+        !t.id ||
+        typeof t.name !== "string" ||
+        !t.name.trim() ||
+        t.name.length > 500 ||
+        typeof t.category !== "string" ||
+        t.category.length > 100 ||
         ![null, 1, 2, 3].includes(t.priority) ||
-        (t.deadline !== null && !/^\d{4}-\d{2}-\d{2}$/.test(t.deadline)) ||
-        !Number.isInteger(t.progress) || t.progress < 0 || t.progress > 100 ||
-        typeof t.memo !== "string" || t.memo.length > 10000) ||
-      new Set(state.tasks.map(t => t.id)).size !== state.tasks.length ||
-      state.categories.some(c => typeof c !== "string" || !c.trim() || c.length > 100)) {
-    throw new Error("invalid todo data");
-  }
+        (t.deadline !== null && !todoDate(t.deadline)) ||
+        !Number.isInteger(t.progress) ||
+        t.progress < 0 ||
+        t.progress > 100 ||
+        typeof t.memo !== "string" ||
+        t.memo.length > 10000 ||
+        (t.reusableDescription !== undefined &&
+          (typeof t.reusableDescription !== "string" ||
+            t.reusableDescription.length > 10000)) ||
+        (t.plannedDay != null && !todoDate(t.plannedDay)) ||
+        (t.status !== undefined &&
+          !["pending", "doing", "waiting", "done"].includes(t.status)) ||
+        (t.important !== undefined && typeof t.important !== "boolean") ||
+        (t.roleId != null && !roles.some((r) => r.id === t.roleId)) ||
+        (t.checklist !== undefined &&
+          (!Array.isArray(t.checklist) ||
+            t.checklist.length > 200 ||
+            t.checklist.some(
+              (c) =>
+                !c ||
+                typeof c.id !== "string" ||
+                !c.id ||
+                typeof c.text !== "string" ||
+                !c.text.trim() ||
+                c.text.length > 500 ||
+                typeof c.checked !== "boolean",
+            ) ||
+            new Set(t.checklist.map((c) => c.id)).size !== t.checklist.length)),
+    ) ||
+    new Set(state.tasks.map((t) => t.id)).size !== state.tasks.length ||
+    state.categories.some(
+      (c) => typeof c !== "string" || !c.trim() || c.length > 100,
+    )
+  )
+    throw todoError("invalid todo data");
   return state;
 }
-async function writeTodo(env, state) {
+async function writeTodo(env, state, cloneRequests) {
+  const current = await readTodo(env);
+  // Old clients cannot erase roles or operation receipts by omitting them.
+  state = { ...state, roles: state.roles ?? current.roles };
   validateTodo(state);
-  if (!Number.isSafeInteger(state.revision) || state.revision < 0) throw new Error("revision is required");
-  const data = JSON.stringify({ tasks: state.tasks, categories: state.categories });
+  if (!Number.isSafeInteger(state.revision) || state.revision < 0)
+    throw todoError("revision is required");
+  if (current.roles.some((r) => !state.roles.some((next) => next.id === r.id)))
+    throw todoError("役割は削除せずアーカイブしてください");
+  const data = JSON.stringify({
+    tasks: state.tasks,
+    categories: state.categories,
+    roles: state.roles,
+    cloneRequests: cloneRequests ?? current.cloneRequests ?? {},
+  });
   let result;
   if (state.revision === 0) {
-    result = await env.DB.prepare("INSERT OR IGNORE INTO todo_state (id, data, revision) VALUES (1, ?, 1)").bind(data).run();
+    result = await env.DB.prepare(
+      "INSERT OR IGNORE INTO todo_state (id, data, revision) VALUES (1, ?, 1)",
+    )
+      .bind(data)
+      .run();
   } else {
-    result = await env.DB.prepare("UPDATE todo_state SET data = ?, revision = revision + 1 WHERE id = 1 AND revision = ?")
-      .bind(data, state.revision).run();
+    result = await env.DB.prepare(
+      "UPDATE todo_state SET data = ?, revision = revision + 1 WHERE id = 1 AND revision = ?",
+    )
+      .bind(data, state.revision)
+      .run();
   }
-  if (!result.meta.changes) { const error = new Error("変更が競合しました。再読み込みしてください"); error.status = 409; throw error; }
-  return { ...state, revision: state.revision + 1 };
+  if (!result.meta.changes) {
+    const error = new Error("変更が競合しました。再読み込みしてください");
+    error.status = 409;
+    throw error;
+  }
+  return {
+    ...state,
+    cloneRequests: cloneRequests ?? current.cloneRequests ?? {},
+    revision: state.revision + 1,
+  };
 }
+async function cloneTodo(env, args) {
+  if (
+    typeof args.request_id !== "string" ||
+    !/^[a-zA-Z0-9_-]{16,100}$/.test(args.request_id)
+  )
+    throw todoError("stable request_id is required");
+  const target = todoOffset(args.base_day, args.offset_days);
+  if (args.deadline != null && !todoDate(args.deadline))
+    throw todoError("invalid deadline");
+  const signature = JSON.stringify([
+    args.id,
+    args.base_day,
+    args.offset_days,
+    args.deadline ?? null,
+  ]);
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const state = await readTodo(env);
+    const receipt = state.cloneRequests?.[args.request_id];
+    if (receipt) {
+      if (receipt.signature !== signature)
+        throw Object.assign(
+          new Error("request_id already used with different arguments"),
+          { status: 409 },
+        );
+      return receipt.result;
+    }
+    const source = state.tasks.find((t) => t.id === args.id);
+    if (!source)
+      throw Object.assign(new Error("task not found"), { status: 404 });
+    // Explicit allowlist excludes execution history and old completion notes.
+    const task = {
+      id: crypto.randomUUID(),
+      name: source.name,
+      category: source.category,
+      roleId: source.roleId ?? null,
+      priority: source.priority,
+      important: source.important ?? false,
+      memo: source.reusableDescription ?? "",
+      reusableDescription: source.reusableDescription ?? "",
+      plannedDay: target,
+      deadline: args.deadline ?? null,
+      progress: 0,
+      status: "pending",
+      checklist: (source.checklist || []).map((c) => ({
+        id: crypto.randomUUID(),
+        text: c.text,
+        checked: false,
+      })),
+      createdAt: todoToday(),
+      cloneSourceId: source.id,
+    };
+    // References stay inside the same authenticated owner document.
+    for (const key of ["links", "attachments"])
+      if (Array.isArray(source[key]))
+        task[key] = source[key]
+          .map((ref) => {
+            if (typeof ref === "string") return /^(https?:\/\/|[a-zA-Z0-9_./-]{1,512}$)/.test(ref) && !/^(data|blob):/i.test(ref) ? ref : null;
+            if (!ref || typeof ref !== "object") return null;
+            const clean = Object.fromEntries(
+              ["id", "url", "object_key"]
+                .filter((k) => typeof ref[k] === "string")
+                .map((k) => [k, ref[k]]),
+            );
+            return Object.keys(clean).length ? clean : null;
+          })
+          .filter(Boolean);
+    state.tasks.push(task);
+    const result = {
+      task,
+      request_id: args.request_id,
+      plannedDay: target,
+      revision: state.revision + 1,
+    };
+    const receipts = {
+      ...state.cloneRequests,
+      [args.request_id]: { signature, result },
+    };
+    try {
+      await writeTodo(env, state, receipts);
+      return result;
+    } catch (error) {
+      if (error.status !== 409 || attempt === 4) throw error;
+    }
+  }
+}
+const todoFields = {
+  name: { type: "string" },
+  category: { type: "string" },
+  roleId: { type: ["string", "null"] },
+  priority: { type: ["integer", "null"] },
+  important: { type: "boolean" },
+  plannedDay: {
+    type: ["string", "null"],
+    description:
+      "Planned working day, distinct from hard deadline, YYYY-MM-DD Asia/Tokyo",
+  },
+  deadline: { type: ["string", "null"] },
+  status: { enum: ["pending", "doing", "waiting", "done"] },
+  progress: { type: "integer" },
+  reusableDescription: {
+    type: "string",
+    description: "Description explicitly safe to reuse in future clones",
+  },
+  memo: {
+    type: "string",
+    description: "Reusable description only; no private execution history",
+  },
+  checklist: {
+    type: "array",
+    items: {
+      type: "object",
+      required: ["id", "text", "checked"],
+      properties: {
+        id: { type: "string" },
+        text: { type: "string" },
+        checked: { type: "boolean" },
+      },
+    },
+  },
+};
 const todoTools = [
-  { name: "list_todos", description: "List Works ToDo tasks and categories", inputSchema: { type: "object", properties: { category: { type: "string" } } } },
-  { name: "create_todo", description: "Create a Works ToDo task", inputSchema: { type: "object", required: ["name"], properties: { name: { type: "string" }, category: { type: "string" }, priority: { type: ["integer", "null"] }, deadline: { type: ["string", "null"] }, progress: { type: "integer" }, memo: { type: "string" } } } },
-  { name: "update_todo", description: "Update a Works ToDo task by id", inputSchema: { type: "object", required: ["id"], properties: { id: { type: "string" }, name: { type: "string" }, category: { type: "string" }, priority: { type: ["integer", "null"] }, deadline: { type: ["string", "null"] }, progress: { type: "integer" }, memo: { type: "string" } } } },
-  { name: "delete_todo", description: "Delete a Works ToDo task by id", inputSchema: { type: "object", required: ["id"], properties: { id: { type: "string" } } } },
-  { name: "manage_todo_categories", description: "List or replace ordered Works ToDo categories", inputSchema: { type: "object", properties: { categories: { type: "array", items: { type: "string" } } } } },
+  {
+    name: "list_todos",
+    description:
+      "List owner ToDos, roles, categories and revision. No automatic monitoring is configured. Never infer completion from age.",
+    inputSchema: {
+      type: "object",
+      properties: { category: { type: "string" }, roleId: { type: "string" } },
+    },
+  },
+  {
+    name: "create_todo",
+    description: "Create an independent owner ToDo",
+    inputSchema: { type: "object", required: ["name"], properties: todoFields },
+  },
+  {
+    name: "update_todo",
+    description:
+      "Read list_todos first; update exact stable id using expected_revision. Never silently move deadline when rescheduling.",
+    inputSchema: {
+      type: "object",
+      required: ["id", "expected_revision"],
+      properties: {
+        ...todoFields,
+        id: { type: "string" },
+        expected_revision: { type: "integer" },
+      },
+    },
+  },
+  {
+    name: "delete_todo",
+    description:
+      "Delete exact owner ToDo with explicit authorization and current revision",
+    inputSchema: {
+      type: "object",
+      required: ["id", "expected_revision"],
+      properties: {
+        id: { type: "string" },
+        expected_revision: { type: "integer" },
+      },
+    },
+  },
+  {
+    name: "clone_todo",
+    description:
+      "Clone to a future planned day. Freeze base_day at initial request's Tokyo today; retry identical arguments/request_id after unknown response. New independent task; no recurrence, no source completion. Deadline omitted by default; supply exact date only with explicit instruction.",
+    inputSchema: {
+      type: "object",
+      required: ["id", "request_id", "base_day", "offset_days"],
+      properties: {
+        id: { type: "string" },
+        request_id: { type: "string" },
+        base_day: { type: "string" },
+        offset_days: { type: "integer", minimum: 1, maximum: 3650 },
+        deadline: { type: ["string", "null"] },
+      },
+    },
+  },
+  {
+    name: "get_todo_clone_result",
+    description:
+      "Recover result by stable request_id without creating anything",
+    inputSchema: {
+      type: "object",
+      required: ["request_id"],
+      properties: { request_id: { type: "string" } },
+    },
+  },
+  {
+    name: "manage_todo_roles",
+    description:
+      "List or replace owner hats (not AI roles). Archive used roles; preserve ids. Read revision first and reassign tasks explicitly.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        roles: {
+          type: "array",
+          items: {
+            type: "object",
+            required: ["id", "name", "icon", "color", "archived"],
+            additionalProperties: false,
+            properties: {
+              id: { type: "string" },
+              name: { type: "string" },
+              icon: { enum: ["📚", "👥", "📝", "🏠", "💼", "⭐"] },
+              color: { enum: ["blue", "green", "pink", "purple", "yellow"] },
+              archived: { type: "boolean" },
+            },
+          },
+        },
+        expected_revision: { type: "integer" },
+      },
+    },
+  },
+  {
+    name: "manage_todo_categories",
+    description:
+      "List or replace legacy categories separately from personal roles",
+    inputSchema: {
+      type: "object",
+      properties: {
+        categories: { type: "array", items: { type: "string" } },
+        expected_revision: { type: "integer" },
+      },
+    },
+  },
 ];
 async function callTodoTool(env, name, args = {}) {
+  if (name === "clone_todo") return cloneTodo(env, args);
   const state = await readTodo(env);
-  if (name === "list_todos") return { tasks: args.category ? state.tasks.filter(t => t.category === args.category) : state.tasks, categories: state.categories };
+  if (name === "get_todo_clone_result")
+    return state.cloneRequests?.[args.request_id]?.result ?? { found: false };
+  if (name === "list_todos")
+    return {
+      tasks: state.tasks.filter(
+        (t) =>
+          (!args.category || t.category === args.category) &&
+          (!args.roleId || t.roleId === args.roleId),
+      ),
+      categories: state.categories,
+      roles: state.roles,
+      revision: state.revision,
+    };
+  if (
+    ["update_todo", "delete_todo"].includes(name) ||
+    args.roles !== undefined ||
+    args.categories !== undefined
+  ) {
+    if (args.expected_revision !== state.revision)
+      throw Object.assign(
+        new Error("expected_revision must match list_todos revision"),
+        { status: 409 },
+      );
+  }
+  if (name === "manage_todo_roles") {
+    if (args.roles === undefined)
+      return { roles: state.roles, revision: state.revision };
+    state.roles = args.roles;
+    return writeTodo(env, state);
+  }
   if (name === "manage_todo_categories") {
     if (args.categories === undefined) return state.categories;
-    if (!Array.isArray(args.categories) || state.tasks.some(t => !args.categories.includes(t.category))) {
-      throw new Error("existing tasks use a category missing from the replacement list");
-    }
+    if (
+      !Array.isArray(args.categories) ||
+      state.tasks.some((t) => !args.categories.includes(t.category))
+    )
+      throw todoError(
+        "existing tasks use a category missing from the replacement list",
+      );
     state.categories = args.categories;
     await writeTodo(env, state);
     return state.categories;
   }
   if (name === "create_todo") {
-    if (typeof args.name !== "string" || !args.name.trim()) throw new Error("name is required");
-    const task = { id: crypto.randomUUID(), name: args.name, category: args.category || state.categories[0] || "その他", priority: args.priority ?? null, deadline: args.deadline ?? null, progress: args.progress ?? 0, memo: args.memo ?? "", createdAt: new Date().toISOString().slice(0, 10) };
+    const task = {
+      id: crypto.randomUUID(),
+      name: args.name,
+      category: args.category || state.categories[0] || "その他",
+      priority: null,
+      deadline: null,
+      progress: 0,
+      memo: "",
+      createdAt: todoToday(),
+    };
+    for (const key of Object.keys(todoFields))
+      if (Object.hasOwn(args, key)) task[key] = args[key];
     state.tasks.push(task);
-    await writeTodo(env, state);
-    return task;
+    const saved = await writeTodo(env, state);
+    return { ...task, revision: saved.revision };
   }
-  const task = state.tasks.find(t => t.id === args.id);
-  if (!task) throw new Error("task not found");
+  const task = state.tasks.find((t) => t.id === args.id);
+  if (!task) throw Object.assign(new Error("task not found"), { status: 404 });
   if (name === "update_todo") {
-    for (const key of ["name", "category", "priority", "deadline", "progress", "memo"]) if (Object.hasOwn(args, key)) task[key] = args[key];
-    await writeTodo(env, state);
-    return task;
+    for (const key of Object.keys(todoFields))
+      if (Object.hasOwn(args, key)) task[key] = args[key];
+    if (args.status !== undefined) {
+      task.progress =
+        args.status === "done"
+          ? 100
+          : task.progress === 100
+            ? 0
+            : task.progress;
+      task.completedAt =
+        args.status === "done" ? new Date().toISOString() : null;
+    } else if (args.progress !== undefined)
+      task.status =
+        args.progress === 100
+          ? "done"
+          : args.progress > 0
+            ? "doing"
+            : "pending";
+    const saved = await writeTodo(env, state);
+    return { ...task, revision: saved.revision };
   }
   if (name === "delete_todo") {
-    state.tasks = state.tasks.filter(t => t.id !== args.id);
+    state.tasks = state.tasks.filter((t) => t.id !== args.id);
     await writeTodo(env, state);
     return { ok: true };
   }
-  throw new Error("unknown tool");
+  throw todoError("unknown tool");
 }
 
 export default {
@@ -5475,6 +5864,8 @@ export default {
         if (browserSession.aud || browserSession.scope || browserSession.fid) throw httpError(401, "browser session required for KDP API");
         return await handleKdp(request, env, url, headers);
       }
+      if (url.pathname === "/api/todo/clone" && request.method === "POST") return json(await cloneTodo(env, await request.json()), headers);
+      if (url.pathname === "/api/todo/clone" && request.method === "GET") return json((await readTodo(env)).cloneRequests?.[url.searchParams.get("request_id")]?.result ?? { found: false }, headers);
       if (url.pathname === "/api/todo" && request.method === "GET") return json(await readTodo(env), headers);
       if (url.pathname === "/api/todo" && request.method === "PUT") return json(await writeTodo(env, await request.json()), headers);
 
