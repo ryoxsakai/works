@@ -67,7 +67,8 @@ async function selectedTheme(page) {
         if(url.pathname==='/api/years')result=[{id:1,label:'サンプル年度'}];
         if(url.pathname==='/api/terms')result=[{id:1,year_id:1,label:'サンプル学期',start_date:'2000-01-01',end_date:'2099-12-31'}];
         if(url.pathname.startsWith('/api/curriculum/') && r.request().method()==='PUT'){
-          const id=decodeURIComponent(url.pathname.slice('/api/curriculum/'.length));recordSaves.set(id,{...recordSaves.get(id),...r.request().postDataJSON()});result={ok:true};
+          const id=decodeURIComponent(url.pathname.slice('/api/curriculum/'.length)),body=r.request().postDataJSON(),prior=recordSaves.get(id)||{};
+          result={...prior,...body,calendar_event_id:id,record_exists:1,record_calendar_id:body.target.calendar_id,record_title:body.target.title,record_revision:(prior.record_revision||0)+1};recordSaves.set(id,result);
         }
         if(url.pathname==='/api/next-lesson-plan'){
           const id=url.searchParams.get('event_id'),day=id.slice(0,10);
@@ -76,7 +77,7 @@ async function selectedTheme(page) {
         }
         if(url.pathname==='/api/lesson-plan'&&r.request().method()==='PUT'){
           const body=r.request().postDataJSON(),id=body.target.id;
-          recordSaves.set(id,{...recordSaves.get(id),lesson_plan:body.lesson_plan});result=recordSaves.get(id);
+          const prior=recordSaves.get(id)||{};result={...prior,calendar_event_id:id,record_exists:1,record_calendar_id:body.target.calendar_id,record_title:body.target.title,record_revision:(prior.record_revision||0)+1,lesson_plan:body.lesson_plan};recordSaves.set(id,result);
         }
         if(url.pathname==='/api/student-prefs'){
           const name=url.searchParams.get('name');
@@ -90,7 +91,7 @@ async function selectedTheme(page) {
             result=profiles.get(name)||{name,memo:null,print_name:null};
           }
         }
-        if(url.pathname==='/api/curriculum')result=[...recordSaves].map(([calendar_event_id,record])=>({calendar_event_id,...record}));
+        if(url.pathname==='/api/curriculum'||url.pathname==='/api/lesson-records')result=[...recordSaves].map(([calendar_event_id,record])=>({calendar_event_id,...record}));
         return r.fulfill({contentType:'application/json',body:JSON.stringify(result)});
       }
       const isList = /^\/api\/(goal-templates|students|materials|material-categories|periods|calendars|records|curriculum|schedules|schedule-names|ss-projects|admissions|material-library\/(folders|files))(\/|$)/.test(url.pathname);
