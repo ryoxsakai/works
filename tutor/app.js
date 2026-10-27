@@ -581,7 +581,7 @@ function renderRecordTable(rows) {
               : ""
           }
         </td>
-        <td data-label="回数">${r.n}/${r.m}回<br><button type="button" class="lesson-record-review" style="min-height:44px" data-ref="${escapeHtml(JSON.stringify(r.ref))}">記録の対応・履歴</button></td>
+        <td data-label="回数">${r.n}/${r.m}回</td>
         <td data-label="時刻">${formatTimeOrPeriod(r.start, "Asia/Tokyo")}</td>
         <td data-label="授業予定">${lessonPlanEditor(r.ref, r.label, "record-plan")}</td>
         <td data-label="確認テスト"><textarea class="record-test" rows="1" aria-label="${escapeHtml(r.label)}の確認テスト">${escapeHtml(r.confirmationTest)}</textarea></td>
@@ -2636,7 +2636,7 @@ async function renderCurriculumTable(events, context = captureStudentContext()) 
       lessonPlans.seed(ref, saved.lesson_plan || "", planReadVersion, saved.record_revision,saved.attribution_status);
       return `<tr data-event-id="${escapeHtml(ev.id)}" data-record-ref="${escapeHtml(JSON.stringify(ref))}" data-record-revision="${saved.record_revision}" data-completed="${saved.completed ? 1 : 0}">
         <td><input type="checkbox" class="curriculum-completed" ${checked} /></td>
-        <td>第${i + 1}回${lessonAttributionNotice(saved)}<br><button type="button" class="lesson-record-review" style="min-height:44px" data-ref="${escapeHtml(JSON.stringify(ref))}">記録の対応・履歴</button></td>
+        <td>第${i + 1}回${lessonAttributionNotice(saved)}</td>
         <td>${formatCurriculumDate(start)}</td>
         <td>${lessonPlanEditor(ref, ev.summary || "授業", "curriculum-plan")}</td>
         <td><textarea class="curriculum-test" rows="2">${escapeHtml(saved.confirmation_test || "")}</textarea></td>

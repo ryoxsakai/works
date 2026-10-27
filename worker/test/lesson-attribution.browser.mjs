@@ -35,15 +35,24 @@ try {
   await record('b').locator('.record-plan').fill('新しい生徒の予定');await record('b').locator('.record-plan').press('Tab');
   await expect(record('b').locator('.lesson-plan-status').first()).toHaveText('保存済み');
   await page.reload();await expect(record('b').locator('.record-plan')).toHaveValue('新しい生徒の予定');
+  await expect(page.getByRole('button',{name:'記録の対応・履歴'})).toHaveCount(0);
   // Legacy source remains available and explicitly unverified, without blanket quarantine.
   await fixture.DB.prepare("UPDATE lesson_record_identity SET title=NULL,calendar_id=NULL,revision=revision+1 WHERE event_id='b'").run();
   await page.reload();await expect(record('b')).toContainText('旧記録・所属未確認');
   await expect(record('b').locator('.record-plan')).toHaveValue('新しい生徒の予定');
-  await record('b').getByRole('button',{name:'記録の対応・履歴'}).click();
+  await expect(page.getByRole('button',{name:'記録の対応・履歴'})).toHaveCount(0);
+  const baselineEvent=fixture.events.find(e=>e.id==='b');
+  await fixture.DB.prepare('INSERT INTO lesson_record_baseline(event_id,calendar_id,title,effective_date)VALUES(?,?,?,?)').bind('b',baselineEvent.calendar_id,baselineEvent.summary,'2026-10-27').run();
+  baselineEvent.summary='名前修正サンプル';
+  await page.reload();
+  await page.getByRole('button',{name:'旧記録を確認して対応を選ぶ'}).click();
   await expect(dialog).toContainText('不明（旧形式）');
   await dialog.getByRole('button',{name:'同じ生徒の名前修正：記録を引き継ぐ'}).click();
   await expect(record('b').locator('.record-plan')).toHaveValue('新しい生徒の予定');
-  await record('b').getByRole('button',{name:'記録の対応・履歴'}).click();
+  await expect(page.getByRole('button',{name:'記録の対応・履歴'})).toHaveCount(0);
+  fixture.events.find(e=>e.id==='b').summary='再変更サンプル';
+  await page.reload();
+  await page.getByRole('button',{name:'旧記録を確認して対応を選ぶ'}).click();
   await dialog.getByText('保存された旧記録の履歴（2件）').click();await expect(dialog).toContainText('既存の次回予定');
   console.log('PASS title attribution: masked replacement, explicit old content, keyboard cancel/confirm, archive, separate/inherit, reload, legacy unknown and 320/390/1280px accessibility');
 } finally {await browser.close();await fixture.close();}
