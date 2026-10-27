@@ -28,7 +28,22 @@ try {
  await expect.poll(async()=> (await fixture.DB.prepare("SELECT homework FROM curriculum_entries WHERE calendar_event_id='b'").first()).homework).toBe('edited legacy homework');
  assert.equal((await fixture.DB.prepare("SELECT title FROM lesson_record_identity WHERE event_id='b'").first()).title,null);
  assert.equal(JSON.parse((await fixture.DB.prepare("SELECT snapshot_json FROM lesson_record_legacy_source WHERE event_id='b'").first()).snapshot_json).homework,'既存宿題');
- await page.locator('#open-settings').click();await page.locator('#initialize-lesson-baselines').click();await expect(page.locator('#lesson-baseline-progress')).toContainText('所属未確認');
+ // Exercise the real UI loop against bounded, paced pages and partial failure.
+ const initializationCalls=[];let interrupt=false;
+ await page.route('**/api/lesson-baseline/initialize',async route=>{
+   const body=route.request().postDataJSON();initializationCalls.push({body,at:Date.now()});
+   assert.equal(body.limit,undefined);
+   await route.fulfill({json:{effective_date:'2026-10-27',inspected:1,observed:1,historical:0,unavailable:0,collisions:0,held:1,
+     ownership_verified:false,done:!!body.cursor,next_cursor:body.cursor||'page-one',retry_required:interrupt,retry_after_ms:1000}});
+ });
+ await page.locator('#open-settings').click();await page.locator('#initialize-lesson-baselines').click();
+ await expect(page.locator('#lesson-baseline-progress')).toContainText('準備しました');
+ assert.equal(initializationCalls.length,2);assert.ok(initializationCalls[1].at-initializationCalls[0].at>=950);
+ assert.equal(initializationCalls[1].body.cursor,'page-one');
+ interrupt=true;await page.locator('#initialize-lesson-baselines').click();
+ await expect(page.locator('#lesson-baseline-progress')).toContainText('時間をおいて再試行');
+ assert.equal(initializationCalls.length,3);assert.equal(initializationCalls[2].body.cursor,'');
+ await expect(page.locator('#initialize-lesson-baselines')).toBeEnabled();
  await page.keyboard.press('Escape');
  fixture.events.find(event=>event.id==='b').summary='Future Synthetic Replacement';
  await page.reload();const changed=page.locator('#record-tbody tr').filter({hasText:'Future Synthetic Replacement'});

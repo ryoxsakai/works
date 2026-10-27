@@ -196,3 +196,60 @@ test('prospective baseline preserves unverified plans, observes on first MCP wri
  assert.equal(changed.attribution_status,'title_changed');assert.equal(changed.lesson_plan,'');
  assert.equal((await DB.prepare("SELECT title FROM lesson_record_baseline WHERE event_id='legacy'").first()).title,'Synthetic Baseline Student');
 });
+
+test('initialization budgets cold D1 statements and all selected-calendar fetches, caps old callers, and resumes partial failure',async t=>{
+ const {DB}=await setup(t);
+ const {ensureAttribution}=await import('../src/lesson-attribution.js');
+ const {activationSql}=await import('../scripts/prepare-lesson-attribution-config.mjs');
+ await ensureAttribution({DB});
+ await DB.batch(activationSql({effective_date:'2026-10-27',holds:[{event_id:'hold',calendar_id:'cal-0',reason:'known_title_change'}]}).split('\n').filter(line=>line&&!line.startsWith('--')).map(line=>DB.prepare(line)));
+ for(let i=0;i<5;i++)await DB.prepare("INSERT INTO curriculum_entries(calendar_event_id,completed,lesson_plan)VALUES(?,1,'preserve original')").bind('budget-'+i).run();
+ let budget=0,calendarFetches=0,failedId=null,renamed=false,conflict=false;
+ const wrap=statement=>new Proxy(statement,{get(target,key){
+   if(key==='bind')return (...args)=>wrap(target.bind(...args));
+   if(['all','first','run','raw'].includes(key))return (...args)=>{budget++;return target[key](...args);};
+   const value=target[key];return typeof value==='function'?value.bind(target):value;
+ }});
+ const countedDB={prepare:sql=>wrap(DB.prepare(sql)),batch:statements=>{budget+=statements.length;
+   if(conflict && statements.length===5){conflict=false;throw new Error('CHECK constraint failed');}
+   return DB.batch(statements);}};
+ t.mock.method(globalThis,'fetch',async url=>{
+   budget++;
+   if(String(url).includes('oauth2.googleapis.com'))return Response.json({access_token:'synthetic',expires_in:3600});
+   calendarFetches++;const parsed=new URL(url),id=decodeURIComponent(parsed.pathname.split('/').at(-1));
+   if(id===failedId)return new Response('temporary failure',{status:503});
+   if(!parsed.pathname.includes('/cal-0/'))return new Response('',{status:404});
+   return Response.json({id,summary:renamed?'Later title':'Observed title',start:{dateTime:'2026-10-27T12:50:00+09:00'},end:{dateTime:'2026-10-27T13:50:00+09:00'}});
+ });
+ const headers={Authorization:'Bearer '+await browserToken(),'Content-Type':'application/json'};
+ const invoke=async(body={limit:25})=>{
+   budget=0;calendarFetches=0;
+   const response=await worker.fetch(new Request(origin+'/api/lesson-baseline/initialize',{method:'POST',headers,body:JSON.stringify(body)}),{...bindings,DB:{...countedDB}});
+   assert.ok(budget<=45,`cold/warm invocation used ${budget} subrequests`);
+   return {status:response.status,...await response.json(),calendarFetches,budget};
+ };
+ for(const n of [1,3,10,17]) {
+   await DB.prepare("UPDATE settings SET value=? WHERE key='selected_calendars'").bind(JSON.stringify(Array.from({length:n},(_,i)=>'cal-'+i))).run();
+   // Reset only synthetic observation fixtures to exercise every cold/warm budget.
+   await DB.prepare('DELETE FROM lesson_record_baseline').run();await DB.prepare('DELETE FROM lesson_record_legacy_source').run();
+   const result=await invoke();assert.equal(result.status,200);assert.ok(result.inspected<=2);assert.equal(result.calendarFetches,result.inspected*n);assert.equal(result.ownership_verified,false);
+ }
+ await DB.prepare("UPDATE settings SET value='[\"cal-0\",\"cal-1\",\"cal-2\"]' WHERE key='selected_calendars'").run();
+ await DB.prepare('DELETE FROM lesson_record_baseline').run();await DB.prepare('DELETE FROM lesson_record_legacy_source').run();
+ failedId='budget-1';const partial=await invoke();assert.equal(partial.observed,1);assert.equal(partial.retry_required,true);assert.equal(partial.next_cursor,'budget-0');assert.equal(partial.done,false);
+ const original=await DB.prepare("SELECT * FROM lesson_record_baseline WHERE event_id='budget-0'").first();
+ const source=await DB.prepare("SELECT * FROM lesson_record_legacy_source WHERE event_id='budget-0'").first();
+ failedId=null;renamed=true;
+ // No response/cursor is required: restart from the first page after partial writes.
+ const resumed=await invoke();assert.equal(resumed.observed,2);assert.equal(resumed.next_cursor,'budget-2');
+ assert.deepEqual(await DB.prepare("SELECT * FROM lesson_record_baseline WHERE event_id='budget-0'").first(),original);
+ assert.deepEqual(await DB.prepare("SELECT * FROM lesson_record_legacy_source WHERE event_id='budget-0'").first(),source);
+ conflict=true;const raced=await invoke({cursor:resumed.next_cursor});assert.equal(raced.retry_required,true);assert.equal(raced.collisions,0);assert.equal(raced.inspected,0);assert.equal(raced.next_cursor,resumed.next_cursor);
+ failedId='budget-3';const stopped=await invoke({cursor:resumed.next_cursor});assert.equal(stopped.inspected,0);assert.equal(stopped.next_cursor,resumed.next_cursor);assert.equal(stopped.retry_required,true);
+ failedId=null;const finished=await invoke({cursor:stopped.next_cursor});assert.equal(finished.done,true);assert.equal(finished.observed,2);
+ assert.equal((await DB.prepare("SELECT COUNT(*) AS n FROM curriculum_entries WHERE completed=1 AND lesson_plan='preserve original'").first()).n,5);
+ assert.equal((await DB.prepare('SELECT COUNT(*) AS n FROM lesson_record_identity WHERE title IS NOT NULL').first()).n,0);
+ assert.equal((await DB.prepare('SELECT COUNT(*) AS n FROM lesson_record_hold WHERE resolved_at IS NULL').first()).n,1);
+ await DB.prepare("UPDATE settings SET value=? WHERE key='selected_calendars'").bind(JSON.stringify(Array.from({length:30},(_,i)=>'cal-'+i))).run();
+ await DB.prepare('DELETE FROM lesson_record_baseline').run();const over=await invoke();assert.equal(over.status,409);assert.equal(over.calendarFetches,0);
+});

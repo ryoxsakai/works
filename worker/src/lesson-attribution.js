@@ -69,8 +69,8 @@ export async function allRecords(env) {
   return results;
 }
 // Call only with an authoritative, selected, collision-checked Calendar event.
-export async function observeRecord(env,ref) {
-  for(let attempt=0;attempt<2;attempt++) {
+export async function observeRecord(env,ref,{attempts=2}={}) {
+  for(let attempt=0;attempt<attempts;attempt++) {
     const row=await rawRecord(env,ref.id);
     if(!row.record_policy_enabled || row.record_hold_active || row.record_title!=null || row.record_observed_title!=null
       || !row.record_exists || !lessonRecordHasContent(row) || !lessonDate(ref) || lessonDate(ref)<row.record_effective_date) return row;
@@ -83,7 +83,7 @@ export async function observeRecord(env,ref) {
           ON CONFLICT(event_id) DO UPDATE SET revision=revision+1`).bind(ref.id),
       ]);
       return rawRecord(env,ref.id);
-    } catch(error) { if(error.code!=='LESSON_RECORD_CONFLICT' || attempt===1) throw error; }
+    } catch(error) { if(error.code!=='LESSON_RECORD_CONFLICT' || attempt===attempts-1) throw error; }
   }
 }
 export function guardStatements(env, eventId, revision) {

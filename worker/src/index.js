@@ -4443,22 +4443,38 @@ async function initializeLessonBaselines(env, body = {}) {
   const policy=await env.DB.prepare("SELECT * FROM lesson_record_policy WHERE id=1").first();
   const holdCount=(await env.DB.prepare("SELECT COUNT(*) AS n FROM lesson_record_hold").first()).n;
   if(!policy?.enabled || holdCount<policy.required_hold_count) throw httpError(409,"既知の変更枠の保留設定と開始日を先に適用してください");
-  const limit=body.limit??25,cursor=body.cursor??"";
-  if(!Number.isInteger(limit)||limit<1||limit>25||typeof cursor!=="string"||cursor.length>1024) throw httpError(400,"初期化の範囲が不正です");
+  const requestedLimit=body.limit??25,cursor=body.cursor??"";
+  if(!Number.isInteger(requestedLimit)||requestedLimit<1||requestedLimit>25||typeof cursor!=="string"||cursor.length>1024) throw httpError(400,"初期化の範囲が不正です");
   const pending=rows.filter(row=>row.calendar_event_id>cursor&&row.record_title==null&&row.record_observed_title==null&&!row.record_hold_active&&lessonRecordHasContent(row))
     .sort((a,b)=>a.calendar_event_id<b.calendar_event_id?-1:1);
-  const page=pending.slice(0,limit),context=page.length?await createCalendarLookupContext(env):null;
+  // Budget cold schema checks, D1 statements, token refresh and every selected calendar.
+  // A caller's old limit=25 must never expand a Worker invocation beyond this cap.
+  const { baselinePageLimit } = await import("./lesson-baseline-budget.js");
+  const calendarIds=pending.length?await selectedScheduleCalendarIds(env):[];
+  const limit=baselinePageLimit(calendarIds.length,requestedLimit);
+  if(pending.length && !limit) throw httpError(409,"対象カレンダーが多いため安全に準備できません。設定を確認してください");
+  const page=pending.slice(0,limit),context=page.length?{calendar_ids:calendarIds,access_token:(await mintGoogleAccessToken(env)).access_token}:null;
   const counts={observed:0,historical:0,unavailable:0,collisions:0};
-  for(let offset=0;offset<page.length;offset+=5) await Promise.all(page.slice(offset,offset+5).map(async row=>{
+  let inspected=0,nextCursor=cursor,retryRequired=false;
+  // Sequential processing makes the returned cursor a contiguous completed prefix.
+  // A failed row remains pending; successful atomic observations are never rewritten.
+  for(const row of page) {
     try {
       const resolved=await resolveCalendarEventById(env,row.calendar_event_id,null,context);
       const ref=lessonEventRef(resolved.event,resolved.calendar_id);
-      if(!lessonDate(ref)||lessonDate(ref)<policy.effective_date){counts.historical++;return;}
-      const observed=await observeRecord(env,ref);if(observed.record_observed_title!=null)counts.observed++;
-    } catch(error){if(error.status===404)counts.unavailable++;else if(error.status===409)counts.collisions++;else throw error;}
-  }));
-  return {effective_date:policy.effective_date,inspected:page.length,...counts,held:rows.filter(row=>row.record_hold_active).length,
-    done:page.length<limit,next_cursor:page.at(-1)?.calendar_event_id || cursor,ownership_verified:false};
+      if(!lessonDate(ref)||lessonDate(ref)<policy.effective_date) counts.historical++;
+      else {const observed=await observeRecord(env,ref,{attempts:1});if(observed.record_observed_title!=null)counts.observed++;}
+    } catch(error){
+      if(error.code==='LESSON_RECORD_CONFLICT'){retryRequired=true;break;}
+      if(error.status===404)counts.unavailable++;
+      else if(error.status===409)counts.collisions++;
+      else {retryRequired=true;break;}
+    }
+    inspected++;nextCursor=row.calendar_event_id;
+  }
+  return {effective_date:policy.effective_date,inspected,...counts,held:rows.filter(row=>row.record_hold_active).length,
+    done:!retryRequired&&pending.length<=inspected,next_cursor:nextCursor,ownership_verified:false,
+    retry_required:retryRequired,retry_after_ms:1000};
 }
 
 async function verifiedLessonTarget(env, target) {
