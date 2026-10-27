@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFileSync} from 'node:fs';
 import {tokyoDateKey,shiftRecordDate,recordDateRange} from '../record-date.js';
+import {attributedLessonRecord} from '../../shared/lesson-attribution.js';
 import {lessonEventRef} from '../../shared/lesson-plan.js';
 const source=readFileSync(new URL('../app.js',import.meta.url),'utf8');
 function fn(name){const start=source.indexOf(`async function ${name}(`);return source.slice(start,source.indexOf('\n}',start)+2);}
@@ -23,9 +24,9 @@ test('two date buttons accumulate days from the displayed date',async()=>{
   assert.deepEqual(loaded,['2026-12-31','2026-12-30','2026-12-31']);
 });
 function setup(overrides={}){
-  const state=vm.createContext({lessonPlans:{version:0},lessonEventRef,recordTableRequest:0,selectedRecordDate:'2026-10-17',selectedCalendarIds:new Set(['qa']),selectedTermIds:new Set(),terms:[],calendarColors:new Map(),
+  const state=vm.createContext({lessonPlans:{version:0},lessonEventRef,attributedLessonRecord,recordTableRequest:0,selectedRecordDate:'2026-10-17',selectedCalendarIds:new Set(['qa']),selectedTermIds:new Set(),terms:[],calendarColors:new Map(),
     els:{recordTbody:{innerHTML:''}},getSessionToken:()=>true,renderRecordDateLabel(){},recordDateRange,shiftRecordDate,isExcludedScheduleEvent:()=>false,
-    fetchCalendarEvents:async()=>[],apiFetch:async()=>[],renderRecordTable:rows=>{state.rendered=rows;},...overrides});
+    readRecordEntries:async()=>state.apiFetch(),fetchCalendarEvents:async()=>[],apiFetch:async()=>[],renderRecordTable:rows=>{state.rendered=rows;},...overrides});
   vm.runInContext(fn('loadRecordTable'),state);return state;
 }
 const ev=(day)=>({id:day,summary:'サンプル',start:{dateTime:day+'T10:00:00+09:00'},_calendarId:'qa'});
@@ -58,7 +59,7 @@ test('old errors are suppressed while current errors replace the loading row',as
   assert.match(state.els.recordTbody.innerHTML,/取得できません/);
 });
 test('fetch uses Tokyo day boundaries and preserves record payloads',async()=>{
-  const ranges=[];const state=setup({fetchCalendarEvents:async(min,max)=>{ranges.push([min,max]);return [ev('2026-10-17')];},apiFetch:async()=>[{calendar_event_id:'2026-10-17',lesson_plan:'既存の日本語\n二行目',homework:'宿題'}]});
+  const ranges=[];const state=setup({fetchCalendarEvents:async(min,max)=>{ranges.push([min,max]);return [ev('2026-10-17')];},apiFetch:async()=>[{calendar_event_id:'2026-10-17',record_exists:true,record_calendar_id:'qa',record_title:'サンプル',record_revision:1,lesson_plan:'既存の日本語\n二行目',homework:'宿題'}]});
   await state.loadRecordTable();
   assert.deepEqual(ranges[0],recordDateRange('2026-10-17'));
   assert.equal(state.rendered[0].lessonPlan,'既存の日本語\n二行目');assert.equal(state.rendered[0].homework,'宿題');

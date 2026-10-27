@@ -294,6 +294,12 @@
     <div class="modal-tab-panel" data-tab-panel="calendar">
       <p class="hint">授業予定が入っているカレンダーにチェックを入れてください(全デバイス共通の設定です)。色はGoogleカレンダー側の設定がそのまま使われます。</p>
       <div id="calendar-checklist"></div>
+      <section style="margin-top:1rem">
+        <h3>授業記録の名前変更検出</h3>
+        <p class="hint">開始日以降の既存授業について、現在の予定名を比較用に観測します。旧記録の生徒の所属が確認済みになることはありません。既に変更された枠は個別確認のまま残します。</p>
+        <button type="button" id="initialize-lesson-baselines" class="btn-primary" style="min-height:44px">初回の比較用予定名を準備</button>
+        <p id="lesson-baseline-progress" role="status" aria-live="polite"></p>
+      </section>
     </div>
     <div class="modal-tab-panel" data-tab-panel="excluded" hidden>
       <p class="hint">タイトルが完全一致する予定を、授業予定・カリキュラム・授業記録などすべての表示から除外します(空き枠など)。</p>
@@ -458,6 +464,6 @@
     </div>
   </dialog>
 
-  <script type="module" src="./app.js?v=77"></script>
+  <script type="module" src="./app.js?v=79"></script>
 </body>
 </html>

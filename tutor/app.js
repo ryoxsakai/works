@@ -1,3 +1,4 @@
+import { attributedLessonRecord, lessonRecordNeedsReview } from "../shared/lesson-attribution.js?v=2";
 import {
   watchAuth,
   signOutUser,
@@ -7,7 +8,7 @@ import {
 import { getTheme, setTheme } from "../shared/theme.js?v=6";
 import { tokyoDateKey, shiftRecordDate, recordDateRange } from "./record-date.js?v=1";
 import { createStudentMemoStore } from "./student-memo.js?v=1";
-import { createLessonPlanController } from "./lesson-plan.js?v=1";
+import { createLessonPlanController } from "./lesson-plan.js?v=3";
 import { lessonEventRef, lessonEventKey } from "../shared/lesson-plan.js?v=1";
 
 const PASTEL_FALLBACK_COLORS = [
@@ -231,7 +232,14 @@ const studentMemos = createStudentMemoStore({
 
 const lessonPlans = createLessonPlanController({
   readNext: (source) => apiFetch(`/next-lesson-plan?calendar_id=${encodeURIComponent(source.calendar_id)}&event_id=${encodeURIComponent(source.id)}`, {}, null),
-  write: (body) => apiFetch("/lesson-plan", { method: "PUT", body: JSON.stringify(body) }, null),
+  write: async (body) => {
+    const result = await apiFetch("/lesson-plan", { method: "PUT", body: JSON.stringify(body) }, null);
+    document.querySelectorAll("tr[data-record-ref]").forEach(row => {
+      const ref=JSON.parse(row.dataset.recordRef);
+      if (lessonEventKey(ref) === lessonEventKey(body.target)) row.dataset.recordRevision = result.record_revision;
+    });
+    return result;
+  },
   onChange: () => renderLessonPlans(),
 });
 
@@ -484,7 +492,7 @@ async function loadRecordTable() {
     if (!isCurrent()) return;
 
     const planReadVersion = lessonPlans.version;
-    const entries = await apiFetch("/curriculum");
+    const entries = await readRecordEntries([...dayEvents,...rangeEvents]);
     if (!isCurrent()) return;
     const entryMap = new Map(entries.map((entry) => [entry.calendar_event_id, entry]));
 
@@ -511,9 +519,9 @@ async function loadRecordTable() {
         });
       const n = sameLabelEvents.findIndex((e) => e.id === ev.id) + 1;
       const m = sameLabelEvents.length;
-      const saved = entryMap.get(ev.id) || {};
+      const saved = attributedLessonRecord(entryMap.get(ev.id), lessonEventRef(ev));
       const prevEvent = n > 1 ? sameLabelEvents[n - 2] : null;
-      const prevSaved = prevEvent ? entryMap.get(prevEvent.id) || {} : {};
+      const prevSaved = prevEvent ? attributedLessonRecord(entryMap.get(prevEvent.id),lessonEventRef(prevEvent)) : {};
       return {
         eventId: ev.id,
         ref: lessonEventRef(ev),
@@ -525,11 +533,13 @@ async function loadRecordTable() {
         m: m || 1,
         start,
         iconColor: calendar?.raw || "",
+        record: saved,
         completed: !!saved.completed,
         lessonPlan: saved.lesson_plan || "",
         confirmationTest: saved.confirmation_test || "",
         homework: saved.homework || "",
         lessonMemo: saved.lesson_memo || "",
+        prevRecord:prevSaved,
         prevLessonPlan: prevSaved.lesson_plan || "",
         prevHomework: prevSaved.homework || "",
         prevLessonMemo: prevSaved.lesson_memo || "",
@@ -545,7 +555,7 @@ async function loadRecordTable() {
 }
 
 function renderRecordTable(rows) {
-  rows.filter((row) => !row.emptySlot).forEach((row) => lessonPlans.seed(row.ref, row.lessonPlan, row.planReadVersion));
+  rows.filter((row) => !row.emptySlot && !lessonRecordNeedsReview(row.record)).forEach((row) => lessonPlans.seed(row.ref, row.lessonPlan, row.planReadVersion, row.record.record_revision,row.record.attribution_status));
   els.recordTbody.innerHTML = rows
     .map((r) => {
       if (r.emptySlot) {
@@ -556,12 +566,14 @@ function renderRecordTable(rows) {
           <td colspan="4"></td>
         </tr>`;
       }
-      return `<tr data-event-id="${escapeHtml(r.eventId)}" data-completed="${r.completed ? 1 : 0}">
+      if (lessonRecordNeedsReview(r.record)) return lessonReviewRow(r.ref,r.record,r.label,formatTimeOrPeriod(r.start,"Asia/Tokyo"));
+      return `<tr data-event-id="${escapeHtml(r.eventId)}" data-record-ref="${escapeHtml(JSON.stringify(r.ref))}" data-record-revision="${r.record.record_revision}" data-completed="${r.completed ? 1 : 0}">
         <td>
           <button type="button" class="record-student-link" data-calendar-id="${escapeHtml(r.calendarId || "")}" data-name="${escapeHtml(r.label)}" data-term-id="${r.termId}"><span class="record-avatar"${r.iconColor ? ` style="background-color:${escapeHtml(lightenHexColor(r.iconColor, 0.75))};color:${escapeHtml(r.iconColor)}"` : ""}><i class="bx bx-book-open"></i></span> ${escapeHtml(r.label)}</button>
+          ${lessonAttributionNotice(r.record)}
           ${
             r.prevLessonPlan || r.prevHomework || r.prevLessonMemo
-              ? `<div class="record-prev-info">
+              ? `<div class="record-prev-info">${lessonAttributionNotice(r.prevRecord)}
                   ${r.prevLessonPlan ? `<p><i class="bx bx-book-content"></i> ${escapeHtml(r.prevLessonPlan)}</p>` : ""}
                   ${r.prevHomework ? `<p><i class="bx bx-pencil"></i> ${escapeHtml(r.prevHomework)}</p>` : ""}
                   ${r.prevLessonMemo ? `<p><i class="bx bx-note"></i> ${escapeHtml(r.prevLessonMemo)}</p>` : ""}
@@ -569,7 +581,7 @@ function renderRecordTable(rows) {
               : ""
           }
         </td>
-        <td data-label="回数">${r.n}/${r.m}回</td>
+        <td data-label="回数">${r.n}/${r.m}回<br><button type="button" class="lesson-record-review" style="min-height:44px" data-ref="${escapeHtml(JSON.stringify(r.ref))}">記録の対応・履歴</button></td>
         <td data-label="時刻">${formatTimeOrPeriod(r.start, "Asia/Tokyo")}</td>
         <td data-label="授業予定">${lessonPlanEditor(r.ref, r.label, "record-plan")}</td>
         <td data-label="確認テスト"><textarea class="record-test" rows="1" aria-label="${escapeHtml(r.label)}の確認テスト">${escapeHtml(r.confirmationTest)}</textarea></td>
@@ -610,7 +622,7 @@ function lessonPlanDate(ref) {
 }
 function renderLessonPlans() {
   const states = { unsaved: "未保存・入力を終えると自動保存", saving: "保存中…", saved: "保存済み", error: "保存できませんでした。入力は残っています", conflict: "予定または内容が変更されています。入力を残して保存を停止しました" };
-  const reasons = { loading: "次回を確認中…", none: "366日先までに次回の授業が見つかりません", ineligible: "この予定は次回連動の対象外です", ambiguous: "同時刻に候補が複数あるため連動できません", error: "次回を取得できませんでした", conflict: states.conflict };
+  const reasons = { attribution: "次回の記録は予定名の対応確認が必要です。次回授業の授業記録画面で確認してください", loading: "次回を確認中…", none: "366日先までに次回の授業が見つかりません", ineligible: "この予定は次回連動の対象外です", ambiguous: "同時刻に候補が複数あるため連動できません", error: "次回を取得できませんでした", conflict: states.conflict };
   document.querySelectorAll(".lesson-plan-editor").forEach((editor) => {
     const sourceKey = editor.dataset.sourceKey;
     const link = sourceKey ? lessonPlans.getLink(sourceKey) : null;
@@ -624,7 +636,7 @@ function renderLessonPlans() {
     input.hidden = !!sourceKey && !state;
     if (input.value !== (state?.value || "")) input.value = state?.value || "";
     const message = sourceKey && linkStatus !== "ready" ? reasons[linkStatus] : states[state?.pending ? "saving" : state?.status];
-    status.textContent = message || "";
+    status.textContent = (state?.attributionStatus?.startsWith("legacy_") ? "旧記録・所属未確認。 " : "") + (message || "");
     status.dataset.error = String(!!conflict || state?.status === "error" || (sourceKey && linkStatus === "error"));
     if (sourceKey) {
       const target = conflict ? link?.current?.target || link?.target : link?.target;
@@ -750,15 +762,19 @@ els.recordTbody.addEventListener("change", async (e) => {
   const homework = row.querySelector(".record-homework").value;
   const lessonMemo = row.querySelector(".record-memo").value;
   try {
-    await apiFetch(`/curriculum/${encodeURIComponent(eventId)}`, {
+    const savedRecord = await apiFetch(`/curriculum/${encodeURIComponent(eventId)}`, {
       method: "PUT",
       body: JSON.stringify({
+        target: JSON.parse(row.dataset.recordRef),
+        record_revision: Number(row.dataset.recordRevision),
         completed,
         confirmation_test: confirmationTest,
         homework,
         lesson_memo: lessonMemo,
       }),
     });
+    row.dataset.recordRevision = savedRecord.record_revision;
+    lessonPlans.observeRecord(JSON.parse(row.dataset.recordRef),savedRecord.record_revision);
   } catch (err) {
     showActionError(err);
   }
@@ -2606,20 +2622,21 @@ async function renderCurriculumTable(events, context = captureStudentContext()) 
   }
 
   const planReadVersion = lessonPlans.version;
-  const entries = await apiFetch("/curriculum", {}, context);
+  const entries = await readRecordEntries(events,context);
   assertStudentContext(context);
   const entryMap = new Map(entries.map((entry) => [entry.calendar_event_id, entry]));
 
   els.curriculumTbody.innerHTML = events
     .map((ev, i) => {
-      const saved = entryMap.get(ev.id) || {};
+      const saved = attributedLessonRecord(entryMap.get(ev.id), lessonEventRef(ev));
       const start = ev.start?.dateTime || ev.start?.date || "";
+      if (lessonRecordNeedsReview(saved)) return lessonReviewRow(lessonEventRef(ev),saved,ev.summary || "授業",formatCurriculumDate(start));
       const checked = saved.completed ? "checked" : "";
       const ref = lessonEventRef(ev);
-      lessonPlans.seed(ref, saved.lesson_plan || "", planReadVersion);
-      return `<tr data-event-id="${escapeHtml(ev.id)}" data-completed="${saved.completed ? 1 : 0}">
+      lessonPlans.seed(ref, saved.lesson_plan || "", planReadVersion, saved.record_revision,saved.attribution_status);
+      return `<tr data-event-id="${escapeHtml(ev.id)}" data-record-ref="${escapeHtml(JSON.stringify(ref))}" data-record-revision="${saved.record_revision}" data-completed="${saved.completed ? 1 : 0}">
         <td><input type="checkbox" class="curriculum-completed" ${checked} /></td>
-        <td>第${i + 1}回</td>
+        <td>第${i + 1}回${lessonAttributionNotice(saved)}<br><button type="button" class="lesson-record-review" style="min-height:44px" data-ref="${escapeHtml(JSON.stringify(ref))}">記録の対応・履歴</button></td>
         <td>${formatCurriculumDate(start)}</td>
         <td>${lessonPlanEditor(ref, ev.summary || "授業", "curriculum-plan")}</td>
         <td><textarea class="curriculum-test" rows="2">${escapeHtml(saved.confirmation_test || "")}</textarea></td>
@@ -2642,15 +2659,19 @@ els.curriculumTbody.addEventListener("change", async (e) => {
   const homework = row.querySelector(".curriculum-homework").value;
   const lessonMemo = row.querySelector(".curriculum-memo").value;
   try {
-    await apiFetch(`/curriculum/${encodeURIComponent(eventId)}`, {
+    const savedRecord = await apiFetch(`/curriculum/${encodeURIComponent(eventId)}`, {
       method: "PUT",
       body: JSON.stringify({
+        target: JSON.parse(row.dataset.recordRef),
+        record_revision: Number(row.dataset.recordRevision),
         completed,
         confirmation_test: confirmationTest,
         homework,
         lesson_memo: lessonMemo,
       }),
     });
+    row.dataset.recordRevision = savedRecord.record_revision;
+    lessonPlans.observeRecord(JSON.parse(row.dataset.recordRef),savedRecord.record_revision);
   } catch (err) {
     showActionError(err);
   }
@@ -3313,7 +3334,7 @@ async function loadCalendarEvents() {
     return aStart.localeCompare(bStart);
   });
   // カードに授業予定・宿題・授業メモを表示するため、既存の進行記録を対応付ける。
-  const curriculumEntries = await apiFetch("/curriculum");
+  const curriculumEntries = await readRecordEntries(sortedEvents);
   if (request !== calendarEventsRequest) return;
   rawEvents = sortedEvents;
   eventDetails = new Map(curriculumEntries.map((entry) => [entry.calendar_event_id, entry]));
@@ -3464,7 +3485,7 @@ function renderListView(events) {
         <div class="event-empty-label">空き</div>
       </li>`;
     }
-    const detail = eventDetails.get(ev.id) || {};
+    const detail = attributedLessonRecord(eventDetails.get(ev.id),lessonEventRef(ev));
     const summary = (ev.summary || "(無題)").trim();
     const plan = detail.lesson_plan || "未入力";
     const homework = detail.homework || "未入力";
@@ -3473,6 +3494,7 @@ function renderListView(events) {
       <div class="event-time"><span>${formatEventTime(ev)}</span><small>${period}</small></div>
       <div class="event-main">
         <button type="button" class="event-student-name name-token-text" data-calendar-id="${escapeHtml(ev._calendarId || "")}" data-token="${escapeHtml(summary)}">${escapeHtml(summary)}</button>
+        ${lessonAttributionNotice(detail)}
         <dl class="event-details">
           <div><dt>授業予定</dt><dd>${escapeHtml(plan)}</dd></div>
           <div><dt>宿題</dt><dd>${escapeHtml(homework)}</dd></div>
@@ -3614,3 +3636,79 @@ function escapeHtml(str) {
     (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])
   );
 }
+
+
+function lessonReviewRow(ref,record,label,date) {
+  return `<tr><td colspan="7"><strong>${escapeHtml(label)}</strong> ${escapeHtml(date)}
+    <p role="status">${record.attribution_status === "known_change" ? "既に予定名が変更されたことが分かっている枠です。" : record.attribution_status === "target_unavailable" ? "予定が削除・変更されたため再読み込みが必要です。" : record.attribution_status === "id_collision" ? "複数カレンダーに同じ予定IDがあり、安全に対応できません。" : record.record_title != null ? `確認済みの予定名「${escapeHtml(record.record_title)}」から変更されています。` : `比較開始時に観測した予定名「${escapeHtml(record.record_observed_title || "不明")}」から変更されています。この観測値は所属の証明ではありません。`} 対応を確認するまで授業記録の表示・保存を停止しています。</p>
+    <button type="button" class="lesson-record-review" style="min-height:44px" data-ref="${escapeHtml(JSON.stringify(ref))}">旧記録を確認して対応を選ぶ</button></td></tr>`;
+}
+document.addEventListener("click",async event => {
+  const button=event.target.closest(".lesson-record-review");
+  if(!button || button.disabled) return;
+  button.disabled=true;
+  try {
+    const ref=JSON.parse(button.dataset.ref);
+    const result=await apiFetch(`/lesson-record?calendar_id=${encodeURIComponent(ref.calendar_id)}&event_id=${encodeURIComponent(ref.id)}`,{},null);
+    const dialog=document.createElement("dialog");
+    dialog.setAttribute("aria-label","授業記録の対応を確認");
+    dialog.style.cssText="box-sizing:border-box; max-width:min(92vw,640px); max-height:85vh; overflow:auto; overflow-wrap:anywhere; padding:20px; border:1px solid var(--border,#bbb); border-radius:16px; background:var(--bg,#fff); color:var(--fg,#111)";
+    const old=result.previous_record;
+    const snapshot=row => `<p>保存時の予定名: ${escapeHtml(row.record_title ?? "不明（旧形式）")}<br>カレンダー: ${escapeHtml(row.record_calendar_id ?? "不明")}</p>${row.record_observed_title != null ? `<p>比較開始時の観測名（所属未確認）: ${escapeHtml(row.record_observed_title)}<br>観測日時（UTC）: ${escapeHtml(row.record_observed_at || "")}</p>` : ""}<p>完了: ${row.completed ? "済" : "未"}</p>${[["授業予定",row.lesson_plan],["確認テスト",row.confirmation_test],["宿題",row.homework],["授業メモ",row.lesson_memo]].map(([name,value])=>`<p><strong>${name}</strong><br><span style="white-space:pre-wrap">${escapeHtml(value || "（未入力）")}</span></p>`).join("")}`;
+    dialog.innerHTML=`<h2>授業記録の対応を確認</h2><p>現在の予定: ${escapeHtml(result.target.title)}<br>${escapeHtml(result.target.start)}<br>カレンダー: ${escapeHtml(result.target.calendar_id)}</p><p>以下は旧記録です。現在の生徒の記録と確認されたものではありません。</p>${snapshot(old)}${result.legacy_source ? `<details><summary>観測・編集を始める前の原記録（所属未確認）</summary>${snapshot(JSON.parse(result.legacy_source.snapshot_json))}</details>` : ""}<p>どちらを選んでも旧記録を履歴に保存します。生徒メモは移動しません。</p><div style="display:grid;gap:12px"><button type="button" class="btn-primary" data-decision="inherit">同じ生徒の名前修正：記録を引き継ぐ</button><button type="button" class="btn-primary" data-decision="separate">別の生徒への入れ替え：空の記録で始める</button><button type="button" class="btn-primary" data-close>判断せず閉じる</button></div><p role="status" class="review-status"></p><details><summary>保存された旧記録の履歴（${result.history.length}件）</summary>${result.history.map(item=>`<article><p>${escapeHtml(item.created_at)} / ${escapeHtml(({inherit:"名前修正として引き継ぎ",separate:"別の生徒として開始",empty_rebind:"空の記録の対応変更"})[item.decision] || item.decision)}</p>${snapshot(JSON.parse(item.snapshot_json))}</article>`).join("")}</details>`;
+    dialog.querySelectorAll("button").forEach(item=>item.style.minHeight="44px");
+    dialog.addEventListener("close",()=>{dialog.remove();button.focus();});
+    dialog.querySelector("[data-close]").onclick=()=>dialog.close();
+    dialog.querySelectorAll("[data-decision]").forEach(action=>action.onclick=async()=>{
+      dialog.querySelectorAll("button").forEach(item=>item.disabled=true);
+      try {
+        await apiFetch("/lesson-record",{method:"PUT",body:JSON.stringify({target:result.target,record_revision:old.record_revision,decision:action.dataset.decision})},null);
+        lessonPlans.discard(lessonEventKey(result.target));
+        dialog.close();
+        const context=captureStudentContext();
+        await Promise.all([loadRecordTable(),loadCurriculumEvents(context)]);
+      } catch(error) {
+        dialog.querySelector(".review-status").textContent=error.message+"。閉じて記録を再確認してください。";
+        dialog.querySelector("[data-close]").disabled=false;
+      }
+    });
+    document.body.append(dialog);dialog.showModal();
+  } catch(error) { showActionError(error); }
+  finally {button.disabled=false;}
+});
+
+
+function lessonAttributionNotice(record) {
+  return record?.attribution_status?.startsWith("legacy_")
+    ? '<small class="legacy-record-notice" role="status" style="display:block">旧記録・所属未確認（保存時の生徒名は不明）</small>'
+    : lessonRecordNeedsReview(record) ? '<small role="status">予定名の対応確認が必要です</small>' : '';
+}
+async function readRecordEntries(events,context=null) {
+  const targets=[...new Map(events.map(event=>{const ref=lessonEventRef(event);return [lessonEventKey(ref),ref];})).values()];
+  let entries=[];const collisions=new Set(),unavailable=new Set();
+  if(!targets.length) return apiFetch("/curriculum?attribution=1",{},context);
+  for(let offset=0;offset<targets.length;offset+=250) {
+    entries=await apiFetch("/lesson-records",{method:"POST",body:JSON.stringify({targets:targets.slice(offset,offset+250)})},context);
+    entries.filter(row=>row.record_collision).forEach(row=>collisions.add(row.calendar_event_id));
+    entries.filter(row=>row.record_target_unavailable).forEach(row=>unavailable.add(row.calendar_event_id));
+  }
+  return entries.map(row=>({...row,...(collisions.has(row.calendar_event_id)?{record_collision:true}:{}),...(unavailable.has(row.calendar_event_id)?{record_target_unavailable:true}:{})}));
+}
+
+
+document.querySelector("#initialize-lesson-baselines").addEventListener("click",async event=>{
+  const button=event.currentTarget,status=document.querySelector("#lesson-baseline-progress");
+  button.disabled=true;
+  const total={inspected:0,observed:0,historical:0,unavailable:0,collisions:0};let cursor="";
+  try {
+    while(true) {
+      const result=await apiFetch("/lesson-baseline/initialize",{method:"POST",body:JSON.stringify({cursor,limit:25})},null);
+      for(const field of Object.keys(total))total[field]+=result[field];
+      status.textContent=`比較用の観測を準備中：${total.inspected}件確認、${total.observed}件観測（所属未確認）`;
+      if(result.done){status.textContent=`${total.unavailable||total.collisions ? "比較用の観測は一部未完了です" : "比較用の観測を準備しました"}。${total.observed}件（所属未確認）、開始日前${total.historical}件、個別保留${result.held}件、取得不可${total.unavailable}件、ID重複${total.collisions}件。取得不可・重複は個別に確認してください。`;break;}
+      if(result.next_cursor===cursor)throw new Error("準備の進捗を確認できません。再試行してください");
+      cursor=result.next_cursor;
+    }
+  } catch(error){status.textContent=error.message+"。再試行しても、作成済みの観測値や旧記録を上書きしません。";}
+  finally{button.disabled=false;}
+});

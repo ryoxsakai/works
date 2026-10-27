@@ -136,7 +136,7 @@ test('an older calendar request cannot replace a later term refresh', async () =
   let resolveOld;let calls=0;
   const state=setup({calendarEventsRequest:0,getSessionToken:()=>true,
     fetchCalendarEvents:async()=>++calls===1?await new Promise(resolve=>resolveOld=resolve):[event('最新')],
-    apiFetch:async()=>[],renderCurrentView(){},renderCurriculumNameSuggestions(){},alignCurriculumTermWithSettings(){},setStudentBusy(){},
+    readRecordEntries:async()=>[],apiFetch:async()=>[],renderCurrentView(){},renderCurriculumNameSuggestions(){},alignCurriculumTermWithSettings(){},setStudentBusy(){},
   });
   vm.runInContext(fn('loadCalendarEvents'),state);
   const old=state.loadCalendarEvents();await state.loadCalendarEvents();resolveOld([event('古い')]);await old;
