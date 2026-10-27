@@ -153,11 +153,45 @@ page.on("pageerror", (e) => {
   errors.push(e.message);
   console.error("Browser error:", e.message);
 });
-page.on("dialog", (d) => d.accept());
+let acceptDialogs=true,beforeUnloadWarnings=0;
+page.on("dialog", (d) => {if(d.type()==="beforeunload")beforeUnloadWarnings++;return acceptDialogs?d.accept():d.dismiss();});
 try {
   await mkdir(new URL("../test-artifacts/workflow/", import.meta.url), {
     recursive: true,
   });
+  // Empty first-use guide is navigation only; no real data or authorization writes.
+  await page.goto(origin + "/workflow/");
+  await expect(page.locator('#step-1')).toBeVisible();
+  await expect(page.locator('#setup-guide')).toBeVisible();
+  await expect(page.locator('#setup-back')).toBeDisabled();
+  await page.locator('#setup-next').click();await expect(page.locator('#board-heading')).toBeFocused();
+  await page.reload();await expect(page.locator('#step-2')).toBeVisible();await expect(page.locator('#setup-guide')).toBeVisible();
+  await page.locator('#setup-back').click();await page.locator('#setup-cancel').click();
+  await expect(page.locator('#step-2')).toBeVisible();await expect(page.locator('#setup-guide')).toBeHidden();
+  await page.locator('#resume-setup').click();await expect(page.locator('#step-1')).toBeVisible();
+  await page.locator('#new-role').click();await page.locator('#role-form [name=name]').fill('未保存の合成入力');
+  acceptDialogs=false;await page.keyboard.press('Escape');await expect(page.locator('#role-editor')).toBeVisible();
+  await page.goBack();await expect(page.locator('#role-editor')).toBeVisible();
+  await page.evaluate(()=>location.reload());await expect.poll(()=>beforeUnloadWarnings).toBe(1);
+  await expect(page.locator('#role-form [name=name]')).toHaveValue('未保存の合成入力');
+  acceptDialogs=true;await page.locator('#close-role').click();await expect(page.locator('#new-role')).toBeFocused();
+  await page.locator('#setup-next').click();await page.locator('#setup-next').click();
+  await expect(page.locator('#step-3')).toBeVisible();await expect(page.locator('#active-runs')).toContainText('未完了の実行はありません');
+  await page.locator('#setup-next').click();await expect(page.locator('#step-2')).toBeVisible();
+  for(const id of ['definitions-dialog','planning-dialog','settings-dialog','history-dialog','filters-dialog']){
+    const opener=page.locator(`[data-open="${id}"]`);await opener.click();await expect(page.locator('#'+id)).toBeVisible();
+    await page.keyboard.press('Escape');await expect(opener).toBeFocused();
+  }
+  for(const width of [320,390,1440]){
+    await page.setViewportSize({width,height:1000});
+    for(const step of [1,2,3]){await page.locator(`[data-step="${step}"]`).focus();await page.keyboard.press('Enter');await expect(page.locator('#step-'+step)).toBeVisible();assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:new URL(`../test-artifacts/workflow/step-${step}-${width}.png`,import.meta.url).pathname});}
+    await page.locator('[data-step="2"]').click();
+  }
+  await page.setViewportSize({width:1440,height:1000});
+  await page.locator('[data-open="settings-dialog"]').click();await page.locator('#interval').selectOption('30');
+  acceptDialogs=false;await page.keyboard.press('Escape');await expect(page.locator('#settings-dialog')).toBeVisible();
+  acceptDialogs=true;await page.keyboard.press('Escape');await page.locator('[data-open="settings-dialog"]').click();await expect(page.locator('#interval')).toHaveValue('60');await page.keyboard.press('Escape');
+  assert.equal(writes,0,'guide, dirty cancel, modal navigation never write data');
   await page.goto(origin + "/workflow/roles.html");
   await expect(page.locator("#workspace")).toBeVisible();
   await page.locator("#new-role").click();
@@ -191,8 +225,11 @@ try {
   await expect(
     page.getByRole("button", { name: "編集", exact: true }),
   ).toBeFocused();
+  await page.evaluate(()=>sessionStorage.setItem('works_workflow_guide_v1',JSON.stringify({step:99,guiding:true})));
   await page.goto(origin + "/workflow/");
   await expect(page.locator("#workspace")).toBeVisible();
+  await expect(page.locator('#step-2')).toBeVisible();
+  await expect(page.locator('#setup-guide')).toBeHidden();
   await page.locator("#new").click();
   const f = page.locator("#definition-form");
   await f.locator("[name=task-role]").selectOption({ label: "● 調査担当" });
@@ -222,6 +259,7 @@ try {
   await expect(page.locator("#error")).toBeEmpty();
   await expect(page.locator("#definitions")).toContainText("合成フロー <img");
   assert.equal(await page.locator("#definitions img").count(), 0);
+  await page.locator('[data-open="definitions-dialog"]').click();
   await page.getByRole("button", { name: "編集", exact: true }).click();
   await expect(hoursInput).toHaveValue("3");
   await expect(f.locator("[name=start]")).toHaveValue("2026-10-20T09:15");
@@ -240,6 +278,7 @@ try {
   await page.getByRole("button", { name: "内容を確認・実行を許可" }).click();
   await expect(page.locator("#definitions")).toContainText("実行許可済み");
   await expect(page.locator("#definitions")).toContainText("3時間ごと");
+  await page.locator('[data-close="definitions-dialog"]').click();
   await page.locator("#day").fill("2026-10-21");
   await page.locator("#day").dispatchEvent("change");
   await expect(
@@ -253,6 +292,7 @@ try {
   ).first();
   assert.equal(JSON.parse(stored.data).start, "2026-10-20T00:15:00.000Z");
   await page.locator("#today").click();
+  await page.locator('[data-open="definitions-dialog"]').click();
   await page.getByRole("button", { name: "手動実行", exact: true }).click();
   await expect(page.locator("#run-dialog")).toBeVisible();
   await page.getByText("配分案・未着手指示の改稿", { exact: true }).click();
@@ -287,6 +327,7 @@ try {
     "未着手 · 定義",
   );
   await page.locator("[data-close=run-dialog]").click();
+  await page.locator('[data-close="definitions-dialog"]').click();
   await page.screenshot({
     path: new URL(
       "../test-artifacts/workflow/board-planned.png",
@@ -296,11 +337,13 @@ try {
   });
   await expect(page.locator("#active-runs .wf-run")).toHaveCount(1);
   await page.locator("#workflow-search").fill("一致しない検索");
-  await expect(page.locator("#active-runs .wf-run")).toHaveCount(0);
+  await expect(page.locator("#active-runs .wf-run")).toHaveCount(1);
   await page.locator("#workflow-search").fill("");
   await expect(page.locator("#active-runs .wf-run")).toHaveCount(1);
+  await page.locator('[data-step="3"]').click();
   await page.locator('[data-active="review"]').click();
   await expect(page.locator("#active-runs .wf-run")).toHaveCount(0);
+  await page.locator('[data-step="2"]').click();
   await expect(page.locator("#reset-filters")).toBeVisible();
   await page.locator("#workflow-search").fill("一致しない検索");
   await page.locator("#reset-filters").click();
@@ -322,11 +365,12 @@ try {
   await page.locator("#day").dispatchEvent("change");
   await expect(page.locator("#active-runs .wf-run")).toHaveCount(1);
   await page.locator("#today").click();
-  await page.getByText("巡回の状態・設定", { exact: true }).click();
+  await page.locator('[data-open="settings-dialog"]').click();
   await page.locator("#interval").selectOption("30");
   await page.locator("#save-interval").click();
   await expect(page.locator("#patrol-status")).toContainText("設定未反映");
   await expect(page.locator("#patrol-status")).toContainText("実際 未設定");
+  await page.locator('[data-close="settings-dialog"]').click();
   // First dot task completes to a human gate; UI approval must verify evidence.
   const all = await env.DB.prepare("SELECT * FROM wf_runs LIMIT 1").first(),
     claim = await workflowExecute(env, {
@@ -348,11 +392,15 @@ try {
     criteria_verified: true,
   });
   await page.locator("#refresh").click();
+  await expect(page.locator("#review-count")).toContainText("確認待ち 1件");
+  await page.locator('[data-open="filters-dialog"]').click();
   await page
     .locator("#filters")
     .getByRole("button", { name: /確認待ち/ })
     .click();
-  await page.locator(".wf-run").first().click();
+  await page.locator('[data-close="filters-dialog"]').click();
+  await page.locator('[data-step="3"]').click();
+  await page.locator("#active-runs .wf-run").first().click();
   await page.getByRole("button", { name: "確認して次へ" }).click();
   await expect(page.locator("#run-error")).toContainText("verified completion");
   await page.locator("[name=criteria_verified]").check();
@@ -362,7 +410,10 @@ try {
     "完了 · 定義",
   );
   await page.locator("[data-close=run-dialog]").click();
+  await page.locator('[data-step="2"]').click();
+  await page.locator('[data-open="filters-dialog"]').click();
   await page.locator("#filters").getByRole("button", { name: /^完了/ }).click();
+  await page.locator('[data-close="filters-dialog"]').click();
   await mkdir(new URL("../test-artifacts/workflow/", import.meta.url), {
     recursive: true,
   });
@@ -509,6 +560,7 @@ try {
       ordered.indexOf(early.id) < ordered.indexOf(late.id),
     "day board is chronological across workflow/automation kinds",
   );
+  await page.locator('[data-step="3"]').click();
   // Delayed POST and subsequent load must not resurrect a closed/Escaped/Back-dismissed modal.
   for (const [method, close] of [
     ["POST", "close"],
@@ -635,9 +687,7 @@ try {
   });
   await page.locator("[data-close=run-dialog]").click();
   await page.waitForFunction(() => !history.state?.workflowModal);
-  await page
-    .getByText("dot の交通整理（実行は開始しません）", { exact: true })
-    .click();
+  await page.locator('[data-open="planning-dialog"]').click();
   await page.getByRole("button", { name: "配分案を計算", exact: true }).click();
   await expect(page.locator("#planning-status")).toContainText(
     "未反映の配分案",

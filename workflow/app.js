@@ -1,4 +1,6 @@
-import { showDialog, closeDialog } from "./dialogs.mjs";
+import { showDialog, closeDialog, markDialogSaved } from "./dialogs.mjs?v=2";
+import { renderRoles } from "./roles.js?v=2";
+import { createWorkflowSteps } from "./steps.mjs?v=1";
 import { runTime, orderRuns, roleOf } from "./planning.mjs";
 import {
   watchAuth,
@@ -52,6 +54,8 @@ let state,
   viewing = null,
   busy = false,
   signedIn = false;
+const workflowSteps = createWorkflowSteps({ state: () => state, showDialog, closeDialog });
+document.addEventListener("workflow-roles-changed", () => guard(load));
 let runViewGeneration = 0;
 let editorViewGeneration = 0;
 let planningIndex = null;
@@ -91,10 +95,23 @@ async function guard(fn, target = "#error") {
   $("#workspace").setAttribute("aria-busy", "true");
   $("#workflow-feedback").textContent = "処理しています…";
   $(target).textContent = "";
+  if (target === "#error") document.querySelectorAll("dialog[open] .wf-dialog-error").forEach(error => error.remove());
   try {
     await fn();
   } catch (e) {
     $(target).textContent = e.message;
+    if (target === "#error") {
+      const dialog = [...document.querySelectorAll("dialog[open]")].at(-1);
+      if (dialog) {
+        let error = dialog.querySelector(".wf-dialog-error");
+        if (!error) {
+          error = node("p", "", "wf-dialog-error");
+          error.setAttribute("role", "alert");
+          dialog.append(error);
+        }
+        error.textContent = e.message;
+      }
+    }
   } finally {
     busy = false;
     $("#workspace").setAttribute("aria-busy", "false");
@@ -128,6 +145,8 @@ function shift(n) {
   render();
 }
 function render() {
+  workflowSteps.render();
+  renderRoles(state);
   const roleFilter = $("#role-filter"),
     previousRole = roleFilter.value;
   roleFilter.replaceChildren(node("option", "担当すべて"));
@@ -143,14 +162,13 @@ function render() {
   roleFilter.value = previousRole;
 
   $("#reset-filters").hidden = !($("#workflow-search").value.trim() || previousRole || filter !== "unfinished" || activeFilter !== "all");
+  $("#filter-summary").textContent = `${states[filter]}${previousRole?"・担当指定":""}`;
   $("#day").value = selected;
   const active = state.runs.filter(
     (r) => !["completed", "cancelled"].includes(r.status),
   );
   const visibleActive = active.filter(
     (r) =>
-      searchMatches(r.data.definition) &&
-      matched(r) &&
       (activeFilter === "all" || r.status === activeFilter),
   );
   $("#active-count").textContent =
@@ -162,7 +180,7 @@ function render() {
       : [
           node(
             "p",
-            "条件に合う未完了の実行はありません。検索や絞り込みを変更するか、下のワークフローから開始できます。",
+            "条件に合う未完了の実行はありません。確認事項の絞り込みを変更できます。",
             "wf-empty",
           ),
         ]),
@@ -383,7 +401,6 @@ function render() {
   $("#calendar").replaceChildren(...days);
   $("#definitions").replaceChildren(
     ...state.definitions
-      .filter((d) => searchMatches(d.data))
       .map((d) => {
         const el = node("article", undefined, "wf-definition");
         el.append(
@@ -453,6 +470,7 @@ function render() {
         return el;
       }),
   );
+  if(!state.definitions.length) $("#definitions").append(node("p","定義はまだありません。カンバンからワークフローを作成してください。","wf-empty"));
 }
 function runCard(r) {
   const b = node("button", r.data.definition.title);
@@ -1089,8 +1107,10 @@ $("#definition-form").addEventListener("submit", (event) => {
       } catch {
         $("#error").textContent = "下書きは保存しましたが、一覧を取得できませんでした。「更新」で確認してください。再作成は不要です。";
       }
-      if (generation === editorViewGeneration && $("#editor").open)
+      if (generation === editorViewGeneration && $("#editor").open) {
+        markDialogSaved($("#editor"));
         closeDialog($("#editor"));
+      }
     } finally {
       unlockDefinitionForm();
     }
@@ -1122,6 +1142,7 @@ $("#save-interval").onclick = () =>
       desired_interval: Number($("#interval").value),
     });
     await load();
+    markDialogSaved($("#settings-dialog"));
   });
 $("#global-stop").onclick = () =>
   guard(async () => {
@@ -1158,6 +1179,11 @@ watchAuth({
     guard(load);
   },
   onSignedOut: (message) => {
+    workflowSteps.reset();
+    for (const dialog of document.querySelectorAll("dialog[open]")) {
+      markDialogSaved(dialog);
+      closeDialog(dialog);
+    }
     $("#workspace").hidden = true;
     $("#error").textContent =
       message || "Works にログインしてワークフローを管理します。";
@@ -1282,3 +1308,7 @@ async function rolling(action) {
 }
 $("#rolling-preview").onclick = () => guard(() => rolling("rolling_preview"));
 $("#rolling-apply").onclick = () => guard(() => rolling("rolling_apply"));
+
+$("#settings-dialog").addEventListener("close", () => {
+  if (state) $("#interval").value = state.settings.desired_interval;
+});
