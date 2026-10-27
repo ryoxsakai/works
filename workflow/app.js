@@ -1,4 +1,4 @@
-import { showDialog } from "./dialogs.mjs";
+import { showDialog, closeDialog } from "./dialogs.mjs";
 import { runTime, orderRuns, roleOf } from "./planning.mjs";
 import {
   watchAuth,
@@ -8,6 +8,7 @@ import {
 } from "/shared/auth.js?v=12";
 const $ = (x) => document.querySelector(x);
 const states = {
+  planned: "計画のみ（未実行）",
   unfinished: "未完了",
   queued: "未着手",
   running: "進行中",
@@ -52,6 +53,7 @@ let state,
   busy = false,
   signedIn = false;
 let runViewGeneration = 0;
+let planningIndex = null;
 let activeFilter = "all",
   calendarView = "calendar";
 const searchMatches = (d) =>
@@ -59,6 +61,10 @@ const searchMatches = (d) =>
   (d.title + " " + d.purpose)
     .toLocaleLowerCase()
     .includes($("#workflow-search").value.trim().toLocaleLowerCase());
+const policySummary = (d) =>
+  d.planning_policy?.enabled
+    ? `今日から3日先の未着手工程の日付・担当を自動調整。追加候補：${d.planning_policy.role_ids.map((id) => state.roles?.find((r) => r.id === id)?.data.name || id).join("、") || "なし（元の担当のみ）"}。指示改稿：${d.planning_policy.revise_instructions ? "同じ目的・許可範囲・完了条件内で可" : "不可"}`
+    : "未許可（毎回本人の採用が必要）";
 const manualKeys = new Map();
 async function api(body, query = "") {
   const r = await fetch("/api/workflow" + query, {
@@ -101,7 +107,10 @@ async function load() {
     (state.next_offset
       ? "最新500件の Run を表示しています。古い実行は API の offset で確認できます。 "
       : "") +
-    (state.definitions_truncated ? "定義は先頭200件を表示しています。" : "");
+    (state.definitions_truncated ? "定義は先頭200件を表示しています。" : "") +
+    (state.staged_plans?.truncated
+      ? " 将来計画は先頭200件です。API stage_offset で続きを取得できます。"
+      : "");
 }
 function matched(r) {
   if (!searchMatches(r.data.definition)) return false;
@@ -157,6 +166,7 @@ function render() {
         ]),
   );
   const cfg = state.settings;
+  $("#rolling-apply").disabled = !!cfg.stopped;
   $("#patrol-status").replaceChildren(
     node("strong", cfg.stopped ? "全体停止中" : "巡回状態"),
     node(
@@ -168,19 +178,21 @@ function render() {
   $("#interval").value = cfg.desired_interval;
   $("#global-stop").textContent = cfg.stopped ? "全体停止を解除" : "全体停止";
   $("#filters").replaceChildren(
-    ...Object.entries(states).map(([k, v]) => {
-      const count = state.runs.filter((r) =>
-        k === "unfinished"
-          ? !["completed", "cancelled"].includes(r.status)
-          : r.status === k,
-      ).length;
-      const b = button(`${v} ${count}`, () => {
-        filter = k;
-        render();
-      });
-      b.setAttribute("aria-pressed", String(filter === k));
-      return b;
-    }),
+    ...Object.entries(states)
+      .filter(([k]) => k !== "planned")
+      .map(([k, v]) => {
+        const count = state.runs.filter((r) =>
+          k === "unfinished"
+            ? !["completed", "cancelled"].includes(r.status)
+            : r.status === k,
+        ).length;
+        const b = button(`${v} ${count}`, () => {
+          filter = k;
+          render();
+        });
+        b.setAttribute("aria-pressed", String(filter === k));
+        return b;
+      }),
   );
   const anchor = new Date(selected + "T00:00:00Z");
   const days = [];
@@ -204,18 +216,10 @@ function render() {
         }).format(anchor),
       ),
     );
-    for (const [kind, label] of [
-      ["automation", "自動実行"],
-      ["workflow", "ワークフロー"],
-    ]) {
+    {
+      const label = "時刻順";
       const runs = state.runs
-        .filter(
-          (r) =>
-            runTime(r) &&
-            dateJP(runTime(r)) === day &&
-            r.data.definition.kind === kind &&
-            matched(r),
-        )
+        .filter((r) => runTime(r) && dateJP(runTime(r)) === day && matched(r))
         .sort(orderRuns);
       const upcoming = state.definitions
         .filter(
@@ -227,7 +231,6 @@ function render() {
               )) &&
             d.enabled &&
             d.next_due &&
-            d.data.kind === kind &&
             ["unfinished", "queued"].includes(filter),
         )
         .flatMap((d) => {
@@ -268,10 +271,62 @@ function render() {
       group.append(
         node("summary", `${label} ${runs.length + upcoming.length}`),
       );
+      const future = state.runs
+        .flatMap((r) =>
+          r.data.tasks
+            .map((t, i) => ({ r, t, i }))
+            .filter(
+              ({ t, i }) =>
+                i > r.data.current &&
+                t.status === "pending" &&
+                t.planned_for &&
+                dateJP(t.planned_for) === day,
+            )
+            .map(({ t, i }) => ({
+              ...r,
+              status: "queued",
+              preview_task_index: i,
+              data: { ...r.data, current: i, plan: t.plan || null },
+            })),
+        )
+        .filter(matched);
+      const stagedUpcoming = (state.staged_plans?.plans || [])
+        .filter((p) => p.current)
+        .flatMap((p) =>
+          Object.entries(p.data.plans || {}).map(([index, plan]) => ({
+            d: state.definitions.find((d) => d.id === p.definition_id),
+            at: plan.planned_for,
+            scheduled: p.scheduled_for,
+            stageTaskIndex: Number(index),
+            plan,
+          })),
+        )
+        .filter(
+          (p) =>
+            p.d &&
+            p.at &&
+            dateJP(p.at) === day &&
+            searchMatches(p.d.data) &&
+            (!$("#role-filter").value ||
+              p.plan.role_id === $("#role-filter").value) &&
+            ["unfinished", "queued"].includes(filter),
+        );
       const entries = [
         ...runs.map((r) => ({ r, at: runTime(r) })),
-        ...upcoming,
+        ...future.map((r) => ({ r, at: runTime(r) })),
+        ...upcoming.filter(
+          (p) =>
+            !state.staged_plans?.plans.some(
+              (s) =>
+                s.current &&
+                s.definition_id === p.d.id &&
+                s.scheduled_for === p.at &&
+                s.data.plans?.[0],
+            ),
+        ),
+        ...stagedUpcoming,
       ];
+      group.firstChild.textContent = `${label} ${entries.length}`;
       entries.sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
       for (const entry of entries) {
         if (entry.r) {
@@ -288,7 +343,25 @@ function render() {
           ),
           node("small", "巡回時に Run を作成"),
         );
-        const role = d.data.tasks[0]?.role_snapshot;
+        if (entry.stageTaskIndex !== undefined)
+          card.append(
+            node(
+              "strong",
+              `工程${entry.stageTaskIndex + 1}：${d.data.tasks[entry.stageTaskIndex].title}（事前計画）`,
+            ),
+          );
+        if (state.staged_plans) {
+          const edit = node("button", "予定工程を調整");
+          edit.onclick = () =>
+            openFuture(
+              d.id,
+              entry.scheduled || at,
+              entry.stageTaskIndex ?? null,
+            ).catch((e) => ($("#error").textContent = e.message));
+          card.append(edit);
+        }
+        const role =
+          entry.plan?.role_snapshot || d.data.tasks[0]?.role_snapshot;
         if (role)
           card.append(
             node(
@@ -299,8 +372,7 @@ function render() {
           );
         group.append(card);
       }
-      if (!runs.length && !upcoming.length)
-        group.append(node("small", "予定なし"));
+      if (!entries.length) group.append(node("small", "予定なし"));
       el.append(group);
     }
     days.push(el);
@@ -332,6 +404,7 @@ function render() {
               await load();
             }),
             button("手動実行", async () => {
+              const generation = runViewGeneration;
               if (!manualKeys.has(d.id))
                 manualKeys.set(d.id, crypto.randomUUID());
               const r = await api({
@@ -342,7 +415,7 @@ function render() {
               });
               manualKeys.delete(d.id);
               await load();
-              await openRun(r.id);
+              if (generation === runViewGeneration) await openRun(r.id);
             }),
           );
         } else
@@ -363,7 +436,7 @@ function render() {
             }),
             button("編集", () => openEditor(d)),
             button("内容を確認・実行を許可", async () => {
-              const details = `${d.data.title}\n目的: ${d.data.purpose}\n完了条件: ${d.data.completion}\n許可範囲: ${d.data.permissions}\n工程:\n${d.data.tasks.map((t, i) => `${i + 1}. ${t.title} (${t.assignee === "dot" ? "dot" : "自分"}${t.gate ? "・確認ゲート" : ""})\n完了条件: ${t.completion}`).join("\n")}\nこの本人の仕事を実行可能にしますか？`;
+              const details = `${d.data.title}\n目的: ${d.data.purpose}\n完了条件: ${d.data.completion}\n許可範囲: ${d.data.permissions}\n工程:\n${d.data.tasks.map((t, i) => `${i + 1}. ${t.title} (${t.assignee === "dot" ? "dot" : "自分"}・担当 ${t.role_snapshot?.name || "なし"}${t.fixed ? "・本人固定" : ""}${t.gate ? "・確認ゲート" : ""})\n完了条件: ${t.completion}`).join("\n")}\n交通整理の事前許可: ${policySummary(d.data)}\nこの本人の仕事を実行可能にしますか？`;
               if (!confirm(details)) return;
               await api({
                 action: "publish",
@@ -380,9 +453,20 @@ function render() {
   );
 }
 function runCard(r) {
-  const b = button(r.data.definition.title, () => openRun(r.id));
+  const b = node("button", r.data.definition.title);
+  b.dataset.runId = r.id;
+  b.type = "button";
+  b.onclick = () =>
+    openRun(r.id).catch((e) => ($("#error").textContent = e.message));
   b.className = "wf-run wf-active-card";
   b.dataset.status = r.status;
+  if (r.preview_task_index !== undefined)
+    b.append(
+      node(
+        "strong",
+        `工程${r.preview_task_index + 1}：${r.data.tasks[r.preview_task_index].title}（前工程待ち）`,
+      ),
+    );
   const done = r.data.tasks.filter((t) => t.status === "completed").length;
   const status = node("span", states[r.status] || r.status, "wf-status");
   b.prepend(status);
@@ -520,6 +604,20 @@ function openEditor(d = null) {
           ? localTime(v)
           : v;
   } else form.elements.start.value = localTime(Date.now() + 3600000);
+  form.elements.planning_enabled.checked =
+    d?.data.planning_policy?.enabled === true;
+  form.elements.planning_instructions.checked =
+    d?.data.planning_policy?.revise_instructions === true;
+  const allowed = form.elements.planning_roles;
+  allowed.replaceChildren();
+  for (const role of state.roles || [])
+    if (!role.archived) {
+      const o = node("option", role.data.name);
+      o.value = role.id;
+      o.selected =
+        d?.data.planning_policy?.role_ids?.includes(role.id) || false;
+      allowed.append(o);
+    }
   updateHoursInput();
   $("#task-editor").replaceChildren(
     ...(d?.data.tasks || [undefined]).map(taskEditor),
@@ -527,12 +625,101 @@ function openEditor(d = null) {
   showDialog($("#editor"));
 }
 async function openRun(id) {
+  if (viewing?.id !== id) planningIndex = null;
   const viewGeneration = ++runViewGeneration;
   const detail = await api(null, "?run_id=" + encodeURIComponent(id));
   if (viewGeneration !== runViewGeneration) return;
   viewing = detail.run;
   renderRun(detail);
-  if (!$("#run-dialog").open) showDialog($("#run-dialog"));
+  if (!$("#run-dialog").open)
+    await showDialog(
+      $("#run-dialog"),
+      () => viewGeneration === runViewGeneration && viewing?.id === id,
+    );
+}
+async function futureDetail(id, scheduled) {
+  const { definition: d } = await api(
+    null,
+    "?definition_id=" + encodeURIComponent(id),
+  );
+  const known = state.staged_plans?.plans.find(
+    (p) => p.definition_id === id && p.scheduled_for === scheduled,
+  );
+  const stored = known
+    ? await api(null, "?stage_id=" + encodeURIComponent(known.id))
+    : null;
+  const plans = known?.current ? stored?.staged_plan.data.plans || {} : {},
+    suggestions = known?.current
+      ? stored?.staged_plan.data.suggestions || {}
+      : {};
+  const tasks = d.data.tasks.map((t, i) => ({
+    ...t,
+    ...(plans[i]
+      ? {
+          role_id: plans[i].role_id,
+          role_snapshot: plans[i].role_snapshot,
+          instruction: plans[i].instruction,
+          planned_for: plans[i].planned_for,
+          plan: plans[i],
+        }
+      : {}),
+    plan_suggestion: suggestions[i],
+    status: "pending",
+    evidence: [],
+    result: "",
+  }));
+  return {
+    run: {
+      id: "future:" + id + "@" + scheduled,
+      status: "planned",
+      revision: d.revision,
+      definition_revision: d.revision,
+      scheduled_for: scheduled,
+      future: {
+        definition_id: id,
+        definition_revision: d.revision,
+        scheduled_for: scheduled,
+        stage_revision: stored?.staged_plan.revision || 0,
+      },
+      data: {
+        current: 0,
+        definition: d.data,
+        tasks,
+        next_work: "将来の予定案。Runは未作成です",
+        stop_reason: "",
+        external: null,
+      },
+    },
+    history: stored?.history || [],
+  };
+}
+async function openFuture(id, scheduled, index = null) {
+  const generation = ++runViewGeneration;
+  planningIndex = index;
+  const detail = await futureDetail(id, scheduled);
+  if (generation !== runViewGeneration) return;
+  viewing = detail.run;
+  renderRun(detail);
+  await showDialog(
+    $("#run-dialog"),
+    () => generation === runViewGeneration && viewing?.id === detail.run.id,
+  );
+}
+async function refreshVisibleRun(id, generation) {
+  const current = () =>
+    $("#run-dialog").open &&
+    viewing?.id === id &&
+    runViewGeneration === generation;
+  if (!current()) return;
+  const detail = viewing.future
+    ? await futureDetail(
+        viewing.future.definition_id,
+        viewing.future.scheduled_for,
+      )
+    : await api(null, "?run_id=" + encodeURIComponent(id));
+  if (!current()) return;
+  viewing = detail.run;
+  renderRun(detail);
 }
 function renderRun(detail) {
   const r = detail.run,
@@ -542,7 +729,7 @@ function renderRun(detail) {
     node("h3", d.definition.title),
     node(
       "p",
-      `${states[r.status]} · 定義 v${r.definition_revision} / Run v${r.revision}`,
+      `${states[r.status]} · 定義 v${r.definition_revision} / ${r.future ? (r.future.stage_revision ? "予定計画 v" + r.future.stage_revision : "予定計画は未保存") : "Run v" + r.revision}`,
     ),
     node("p", "目的：" + d.definition.purpose),
     node("p", "全体の完了条件：" + d.definition.completion),
@@ -551,17 +738,56 @@ function renderRun(detail) {
     node("p", "次の作業：" + d.next_work),
     node("p", "停止理由：" + (d.stop_reason || "なし")),
   );
+  $("#run-action").hidden = !!r.future;
+  $("#run-dialog h2").textContent = r.future
+    ? "将来予定の交通整理（実行前）"
+    : "今回の実行";
   const task = d.tasks[d.current];
-  if (task && !task.fixed && !["completed", "cancelled"].includes(r.status)) {
-    const planning = node("details");
+  const editable = d.tasks
+    .map((t, i) => ({ t, i }))
+    .filter(({ t, i }) => i >= d.current && !t.fixed);
+  if (editable.length && !["completed", "cancelled"].includes(r.status)) {
+    const index = editable.some((x) => x.i === planningIndex)
+      ? planningIndex
+      : editable[0].i;
+    const planTask = d.tasks[index],
+      planning = node("details");
     planning.append(node("summary", "配分案・未着手指示の改稿"));
     planning.append(
       node(
         "p",
-        "案の保存では指示・権限は変わりません。本人の採用は実行権未取得の未着手工程だけ。直列依存・実行者・確認ゲート・許可範囲を維持します。",
+        d.definition.planning_policy?.enabled
+          ? "dotの交通整理は事前承認済みです。指定担当・今日から3日先・未着手工程の範囲内で予定を調整できます。実行許可や実行中指示は変わりません。"
+          : "提案は実行指示を変えません。交通整理が未承認のため本人の採用が必要です。未来の未着手工程も選べます。",
       ),
     );
-    const fields = {};
+    const targetLabel = node("label", "計画する工程"),
+      target = node("select");
+    target.id = "planning-task-index";
+    for (const { t, i } of editable) {
+      const o = node(
+        "option",
+        `${i + 1}. ${t.title}${i > d.current ? "（前工程待ち）" : ""}`,
+      );
+      o.value = i;
+      target.append(o);
+    }
+    target.value = index;
+    targetLabel.append(target);
+    planning.append(targetLabel);
+    target.onchange = () => {
+      planningIndex = Number(target.value);
+      renderRun(detail);
+      const section = $("#planning-task-index").closest("details");
+      section.open = true;
+      $("#planning-task-index").focus();
+    };
+    const fields = {},
+      proposal =
+        planTask.plan_suggestion ||
+        planTask.plan ||
+        (index === d.current ? d.plan_suggestion || d.plan : null) ||
+        {};
     for (const [key, label, type] of [
       ["role_id", "担当", "select"],
       ["planned_for", "予定（日本時間）", "input"],
@@ -583,62 +809,92 @@ function renderRun(detail) {
           }
       }
       if (key === "planned_for") input.type = "datetime-local";
-      const proposal = d.plan_suggestion || d.plan || {};
       input.value =
         key === "planned_for"
           ? localTime(proposal[key])
           : proposal[key] ||
             (key === "instruction"
-              ? task.instruction || task.title
+              ? planTask.instruction || planTask.title
               : key === "role_id"
-                ? task.role_id || ""
+                ? planTask.role_id || ""
                 : "");
       l.append(input);
       planning.append(l);
     }
+    const inputPlan = () => {
+      const plan = Object.fromEntries(
+        Object.entries(fields).map(([k, input]) => [k, input.value]),
+      );
+      return {
+        ...plan,
+        task_index: index,
+        role_id: plan.role_id || null,
+        planned_for: plan.planned_for
+          ? new Date(plan.planned_for + ":00+09:00").toISOString()
+          : null,
+      };
+    };
+    const mutate = async (action) => {
+      const generation = runViewGeneration;
+      await api(
+        r.future
+          ? {
+              action: "stage_plan",
+              ...r.future,
+              mode: action === "plan_suggest" ? "suggest" : "apply",
+              plan: inputPlan(),
+            }
+          : { action, run_id: r.id, revision: r.revision, plan: inputPlan() },
+      );
+      await load();
+      await refreshVisibleRun(r.id, generation);
+    };
     planning.append(
-      button(
-        "配分案を保存",
-        async () => {
-          const plan = Object.fromEntries(
-            Object.entries(fields).map(([k, input]) => [k, input.value]),
-          );
-          plan.planned_for = plan.planned_for
-            ? new Date(plan.planned_for + ":00+09:00").toISOString()
-            : null;
-          await api({
-            action: "plan_suggest",
-            run_id: r.id,
-            revision: r.revision,
-            plan,
-          });
-          await load();
-          await openRun(r.id);
-        },
-        "#run-error",
-      ),
+      button("配分案を保存", () => mutate("plan_suggest"), "#run-error"),
     );
-    if (d.plan_suggestion) {
-      planning.append(node("pre", JSON.stringify(d.plan_suggestion, null, 2)));
-      if (r.status === "queued")
+    const canChange =
+      planTask.status === "pending" &&
+      (r.future || index > d.current || r.status === "queued");
+    if (d.definition.planning_policy?.enabled && canChange)
+      planning.append(
+        button("承認範囲内で反映", () => mutate("plan_update"), "#run-error"),
+      );
+    const suggestion =
+      planTask.plan_suggestion ||
+      (index === d.current ? d.plan_suggestion : null);
+    if (suggestion) {
+      planning.append(node("pre", JSON.stringify(suggestion, null, 2)));
+      if (canChange)
         planning.append(
           button(
             "この案を確認・採用",
             async () => {
               if (
                 !confirm(
-                  "表示中の案を現在工程へ採用します。実行者・許可範囲・確認ゲートは維持されます。",
+                  "表示中の案を選択工程へ採用します。実行者・許可範囲・確認ゲートは維持されます。",
                 )
               )
                 return;
-              await api({
-                action: "plan_apply",
-                run_id: r.id,
-                revision: r.revision,
-                authorized: true,
-              });
+              const generation = runViewGeneration;
+              await api(
+                r.future
+                  ? {
+                      action: "stage_plan",
+                      ...r.future,
+                      mode: "apply",
+                      plan: suggestion,
+                      authorized: true,
+                    }
+                  : {
+                      action: "plan_apply",
+                      run_id: r.id,
+                      revision: r.revision,
+                      task_index: index,
+                      authorized: true,
+                    },
+              );
               await load();
-              await openRun(r.id);
+              await refreshVisibleRun(r.id, generation);
             },
             "#run-error",
           ),
@@ -663,6 +919,8 @@ function renderRun(detail) {
       );
     if (t.fixed) li.append(node("p", "本人固定"));
     if (t.instruction) li.append(node("p", "採用済み指示：" + t.instruction));
+    if (t.planned_for)
+      li.append(node("p", "工程予定：" + stamp(t.planned_for)));
     for (const href of t.wiki_refs || []) {
       const a = node("a", "Wiki参考資料（権限ではありません）");
       a.href = href;
@@ -696,7 +954,7 @@ function renderRun(detail) {
     f.elements.evidence.value = task.evidence.join("\n");
   }
   const actions = [];
-  if (!["completed", "cancelled"].includes(r.status)) {
+  if (!r.future && !["completed", "cancelled"].includes(r.status)) {
     actions.push(["pause", "一時停止"], ["cancel", "今回を中止"]);
     if (["waiting", "paused"].includes(r.status))
       actions.push(["resume", "今回を再開"]);
@@ -714,6 +972,7 @@ function renderRun(detail) {
             !confirm("今回を中止します。外部で完了した操作は取り消しません。")
           )
             return;
+          const generation = runViewGeneration;
           const f = $("#run-action");
           await api({
             action,
@@ -729,7 +988,7 @@ function renderRun(detail) {
               f.elements.workflow_criteria_verified.checked,
           });
           await load();
-          if ($("#run-dialog").open) await openRun(r.id);
+          await refreshVisibleRun(r.id, generation);
         },
         "#run-error",
       ),
@@ -783,6 +1042,13 @@ $("#definition-form").addEventListener("submit", (event) => {
     content.deadline = f.elements.deadline.value
       ? new Date(f.elements.deadline.value + ":00+09:00").toISOString()
       : null;
+    content.planning_policy = {
+      enabled: f.elements.planning_enabled.checked,
+      revise_instructions: f.elements.planning_instructions.checked,
+      role_ids: [...f.elements.planning_roles.selectedOptions].map(
+        (o) => o.value,
+      ),
+    };
     content.tasks = [...$("#task-editor").children].map((row) => ({
       title: row.querySelector("[name=task-title]").value,
       completion: row.querySelector("[name=task-completion]").value,
@@ -802,7 +1068,7 @@ $("#definition-form").addEventListener("submit", (event) => {
         : {}),
       content,
     });
-    $("#editor").close();
+    closeDialog($("#editor"));
     await load();
   }, "#editor-error");
 });
@@ -810,7 +1076,7 @@ $("#run-action").addEventListener("submit", (e) => e.preventDefault());
 $("#new").onclick = () => openEditor();
 $("#add-task").onclick = () => $("#task-editor").append(taskEditor());
 for (const b of document.querySelectorAll("[data-close]"))
-  b.onclick = () => $("#" + b.dataset.close).close();
+  b.onclick = () => closeDialog($("#" + b.dataset.close));
 $("#prev").onclick = () => shift(-1);
 $("#next").onclick = () => shift(1);
 $("#today").onclick = () => {
@@ -899,3 +1165,87 @@ $("#calendar-view").addEventListener("click", (event) => {
 });
 
 $("#role-filter").onchange = render;
+
+async function rolling(action) {
+  const candidates = state.runs
+    .filter(
+      (r) =>
+        r.data.definition.planning_policy?.enabled &&
+        ["queued", "running", "review"].includes(r.status),
+    )
+    .map((r) => ({
+      priority: r.data.definition.priority,
+      deadline: r.data.definition.deadline,
+      target: { run_id: r.id, revision: r.revision },
+    }));
+  if (state.staged_plans)
+    for (const d of state.definitions.filter(
+      (d) => d.enabled && d.next_due && d.data.planning_policy?.enabled,
+    )) {
+      const period = {
+          once: 0,
+          hourly: d.data.interval_hours * 3600000,
+          daily: 86400000,
+          weekly: 604800000,
+        }[d.data.repeat],
+        end = Date.parse(dateJP(Date.now()) + "T00:00:00+09:00") + 4 * 86400000;
+      let at = Date.parse(d.next_due);
+      if (period)
+        at += Math.max(0, Math.ceil((Date.now() - at) / period)) * period;
+      for (
+        let count = 0;
+        at >= Date.now() && at < end && count < 96;
+        count++, at += period
+      ) {
+        const scheduled = new Date(at).toISOString();
+        if (
+          !state.runs.some(
+            (r) => r.definition_id === d.id && r.scheduled_for === scheduled,
+          )
+        )
+          candidates.push({
+            priority: d.data.priority,
+            deadline: d.data.deadline,
+            target: {
+              definition_id: d.id,
+              revision: d.revision,
+              scheduled_for: scheduled,
+              stage_revision:
+                state.staged_plans.plans.find(
+                  (p) =>
+                    p.definition_id === d.id && p.scheduled_for === scheduled,
+                )?.revision || 0,
+            },
+          });
+        if (!period) break;
+      }
+    }
+  const targets = candidates
+    .sort(
+      (a, b) =>
+        a.priority - b.priority ||
+        (Date.parse(a.deadline) || Infinity) -
+          (Date.parse(b.deadline) || Infinity),
+    )
+    .slice(0, 20)
+    .map((x) => x.target);
+  if (!targets.length) {
+    $("#planning-status").textContent =
+      "交通整理を事前承認した未完了Runはありません。既存Runの許可は変わりません。";
+    return;
+  }
+  const result = await api({ action, targets });
+  $("#planning-status").textContent =
+    `対象${targets.length}件${candidates.length > 20 ? "（先頭20件・続きを再計算してください）" : ""} / ${result.mode === "applied" ? "配分を更新" : "未反映の配分案"}：${result.mode === "applied" ? (result.updated || []).reduce((n, x) => n + x.task_indexes.length, 0) : result.plans.length}工程 / ${result.blocked.length}工程は期限・固定予定等の確認が必要${result.conflicts?.length ? " / 競合あり。読み直してください" : ""}`;
+  $("#planning-preview").replaceChildren(
+    ...result.plans.map((x) =>
+      node(
+        "p",
+        `${state.runs.find((r) => r.id === x.run_id)?.data.definition.title || state.definitions.find((d) => x.run_id.startsWith("future:" + d.id + "@"))?.data.title || "将来予定"} / 工程${x.plan.task_index + 1} / ${stamp(x.plan.planned_for)} / ${state.roles?.find((r) => r.id === x.plan.role_id)?.data.name || "担当なし"}`,
+      ),
+    ),
+  );
+  if (action === "rolling_apply") await load();
+}
+$("#rolling-preview").onclick = () => guard(() => rolling("rolling_preview"));
+$("#rolling-apply").onclick = () => guard(() => rolling("rolling_apply"));

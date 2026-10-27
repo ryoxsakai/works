@@ -37,6 +37,16 @@
             ><button id="new" class="ui-primary">＋ ワークフローを作成</button>
           </div>
         </div>
+        <details class="wf-settings">
+          <summary>dot の交通整理（実行は開始しません）</summary>
+          <p>
+            定義で事前承認した範囲内の未着手工程を、優先度・期限・直列依存・担当の空き枠で今日から3日先へ配分します。固定・実行中の工程は変更しません。
+          </p>
+          <button id="rolling-preview">配分案を計算</button
+          ><button id="rolling-apply">事前承認の範囲内で配分</button>
+          <p id="planning-status" role="status"></p>
+          <div id="planning-preview"></div>
+        </details>
         <div class="workspace-section-heading">
           <h2 class="wf-section-title">実行予定と履歴</h2>
           <div
@@ -200,6 +210,31 @@
             >期限（日本時間）<input type="datetime-local" name="deadline"
           /></label>
         </div>
+        <fieldset>
+          <legend>dot に任せる交通整理の範囲（実行許可とは別）</legend>
+          <label class="wf-check"
+            ><input
+              type="checkbox"
+              name="planning_enabled"
+            />今日から3日先の未着手工程の日付・担当配分を任せる</label
+          >
+          <label
+            >配分できる追加担当<select
+              name="planning_roles"
+              multiple
+              aria-describedby="planning-help"
+            ></select
+          ></label>
+          <p id="planning-help">
+            工程に指定した担当と、ここで選んだ担当の範囲内だけで再配分します。元の実行者・許可範囲・確認ゲート・完了条件は維持されます。
+          </p>
+          <label class="wf-check"
+            ><input
+              type="checkbox"
+              name="planning_instructions"
+            />同じ許可範囲・目的・完了条件内で、未着手工程の指示改稿も任せる</label
+          >
+        </fieldset>
         <h3>直列工程</h3>
         <div id="task-editor"></div>
         <button type="button" id="add-task">＋ 工程</button>

@@ -1,4 +1,4 @@
-import { showDialog } from "./dialogs.mjs";
+import { showDialog, closeDialog } from "./dialogs.mjs";
 import {
   watchAuth,
   signIn,
@@ -103,7 +103,7 @@ async function load() {
   }
 }
 $("#new-role").onclick = (e) => open(null, e.target);
-$("#close-role").onclick = () => dialog.close();
+$("#close-role").onclick = () => closeDialog(dialog);
 dialog.addEventListener("close", () => opener?.focus());
 form.onsubmit = (e) => {
   e.preventDefault();
@@ -114,7 +114,7 @@ form.onsubmit = (e) => {
       ...(editing ? { role_id: editing.id, revision: editing.revision } : {}),
       content,
     });
-    dialog.close();
+    closeDialog(dialog);
     await load();
   }, "#role-error");
 };
@@ -127,7 +127,7 @@ watchAuth({
   },
   onSignedOut: () => {
     $("#workspace").hidden = true;
-    dialog.close();
+    closeDialog(dialog);
     roles = [];
     $("#roles").replaceChildren();
     $("#auth").textContent = "ログイン";

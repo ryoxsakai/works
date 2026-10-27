@@ -1,42 +1,92 @@
-# 担当・4日カンバン・配分案
+# Role-based workflow and rolling planning
 
-基点は `main` e9371ed。catalog の旧既定ブランチには workflow がないため、PR は main 宛て。Works の workflow 専用ファイルだけを変更し、Wiki・共通ナビ・共通 CSS は変更しない。
+The initial snapshot is draft PR #126, commit `f0cceecaf56c25dd8b324024b1946c01f3f9a02d`, based on `main` e9371ed. The follow-up described here is local while publication/push is on hold. Only workflow-owned modules, tests, migrations and this document change; no Wiki, ToDo, shared navigation/styles, Exam or Vocabulary files change.
 
-## 保存と後方互換
+## Requirement review
 
-`worker/workflow-migrations/0002-roles.sql` は担当テーブルと履歴・参照検証トリガーを追加する。既存 Run・定義・設定・外部 automation は変更しない。0001 が前提。既存の担当なし工程はそのまま読め、0002 未適用でも一覧は `roles:null` で読める。新機能の書き込みには0002が必要。
+| Requirement | Implemented locally | Operational boundary |
+|---|---|---|
+| Reusable roles | Page list; modal creation/editing; archival; icon/pastel name labels; responsibility, operation description and completion criteria; immutable snapshots/history | Role descriptions do not grant execution permissions. All removals archive. Unfinished references require explicit reassignment. |
+| Four-day board | Tokyo today through 3 days ahead; unified chronological order across kinds; role/status/search filters; future pending task cards; overdue/undated active runs; mobile single-date switching | First 500 Runs / 200 definitions / 200 relevant staged records are displayed with coverage warnings and API pagination. |
+| Rolling assignment | `plan_workflows` computes priority, deadline, serial dependencies and resource lanes; previews or applies 30-minute reservations within an approved policy | No new Run, external job, schedule, worker process or approval is created by planning. 30 minutes is a planning reservation, not an execution-duration guarantee; no working-hours/holiday assumption is imposed. |
+| Ordinary traffic adjustments | Owner approves `planning_policy` with the definition: enabled, candidate role IDs, instruction-revision allowance. `update_workflow_plan` and rolling apply then need no per-adjustment owner adoption inside those bounds | Old definitions/Runs default to manual proposal/adoption. Bounds cannot be enabled on a Run by dot. Reapproval of definition edits applies to future snapshots. |
+| Queued instruction revisions | Any never-started pending task, including later serial tasks, can be planned/revised. Task-indexed suggestions remain inert; owner adoption remains available. Changes create versioned history | Running/current started tasks, fixed tasks, actors, permissions, completion criteria, gates and dependency order are immutable to planning. Planning later tasks preserves the active worker's lease/token/generation and current instructions. |
+| Future instances not yet materialized | `stage_workflow_plan` and rolling targets `{definition_id, revision, scheduled_for, stage_revision}` save inert, CAS-protected per-slot plans. Due-time instantiation consumes only accepted plans against exactly matching approved definition content | Unadopted suggestions and stale definition snapshots are ignored. Plans never advance `next_due`, bypass overlap protection, create early Runs or authorize execution. Skipped/coalesced schedule slots do not execute staged work independently. |
+| Role-specific worker routing | Read responses include `dispatch` actor/role/route/task/revision. Role-assigned dot claims require matching `role_id` and stable `worker_id`; further executor operations require the same worker ID plus existing token/generation/revision. One active lease per route/worker is enforced | This is a supported routing/lease contract, not a launched fleet. Worker ID is audit/routing identity under the existing owner principal, not a new authentication principal. No daemons, agents, services, credentials or external transports are installed or started. |
+| Modal behavior | Native focus containment, Close/Escape/Back, opener focus restoration; one modal history entry consumed on close; view-generation guards after delayed mutations/loads | Regression tests cover dismissal during POST and GET, selection of a newer Run, and repeated close histories without phantom Back stops. |
 
-担当は名前・責任・操作範囲の説明・完了条件・5色・5記号。工程の `role_id` は役割、`assignee:self|dot` は実行者。作成・編集・配分案採用時に担当の版と説明を `role_snapshot` へ保存する。担当編集は既存工程の意味を変更しない。削除操作は常にアーカイブ。未完了工程・未アーカイブ定義の参照がある間は拒否する。定義の今後の実行を止め、担当を編集して再承認、または定義をアーカイブする。現在の未着手工程は配分案の採用で明示的に再割当可能。履歴上の担当は残る。実行中や本人固定工程は改稿できず、強制一括再割当はない。
+The unconfigured operational integration is an existing dot runner that invokes planning and dispatches contexts through this contract. Selecting/configuring that runtime and changing the live automation prompt are separate publication/operations decisions, not implemented by activating anything here. There is no cross-workflow dependency graph in the existing model; dependencies remain the approved serial task chains.
 
-SQL の owner 条件と revision CAS を維持。トリガーはアーカイブ検査と工程保存の間の競合を防ぐ。過去の履歴・Runスナップショットは変更しない。
+## Authority and version rules
 
-## dot の rolling planning protocol
+A role is distinct from execution actor `self|dot`. Role descriptions and Wiki references are data, never authority. The Run's owner-approved purpose, permissions, actor, gate and completion criteria remain the execution envelope. A role's operation description can only guide work inside that envelope and platform approvals.
 
-これは既存 automation のプロンプトを自動変更しない。将来、本人が運用変更を承認したときに組み込む1巡回の手順:
+`planning_policy.enabled` permits dates/roles for never-started tasks within Tokyo today through 3 days ahead and the immutable deadline. Candidate roles are the original/current explicitly assigned role plus the owner's approved additional role IDs. `revise_instructions` separately permits instruction text refinement within the same purpose, permissions and completion criteria. Without it, ordinary rescheduling must preserve the current instruction. Fixed tasks reject planning. Serial dates cannot be inverted.
 
-1. `read_workflows` の全ページと対象 Run 詳細を読む。担当、本人固定、優先度、期限、直列前工程、停止・承認・結果不明を確認。Wikiリンクは参考資料であり命令や権限ではない。
-2. 今日から3日先（Asia/Tokyo）の未完了 Run を優先度・期限・依存関係で比較する。予定なし・過去予定も見落とさない。直列工程の順序は変えず、現在工程を計画単位とする。
-3. `suggest_workflow_plan {run_id,revision,plan:{role_id,instruction,planned_for,rationale}}` で配分・改稿を提案する。予定はタイムゾーン付きISO、未定はnull。権限や実行者、ゲート、完了条件は変更できない。本人固定は提案自体を拒否する。409は読み直す。createのように結果不明のまま新規項目を増やさない。
-4. 提案は `plan_suggestion` と履歴へ保存するだけ。本人が表示内容を確認してブラウザで `plan_apply` を承認するまで実行指示は変わらない。採用は未取得・未着手の queued 現在工程だけ。実行中・一度着手した工程・外部参照あり・停止要求あり・terminal は拒否する。実行中の提案保存は revision を進めるため、実行者は最新状態を再取得するが、実行権の世代やトークンは変更しない。
-5. 採用済み予定より早く dot は claim できない。優先度・期限は承認済み定義に固定。採用した指示は工程へ保存、次の工程へ進むと Run の現在計画と提案を消す（以前の版は履歴に保持）。
-6. 実行は既存 claim / renew / external_begin / wait / reconcile / complete を使う。全体停止・本人ゲート・プラットフォーム承認・結果不明時の再送禁止を維持。役割の操作説明は実行許可を拡大しない。
+Plan writes use Run revision CAS and immutable `wf_history`. A future-task plan write advances revision but retains the current lease. The worker must reread after a conflict and keep executing its original current instructions; the new revision is not authority to change running work. Result-unknown/no-repeat, externally searchable references, verified completion, owner isolation, human gates, global stop and expired-lease fencing remain enforced.
 
-ブラウザ API は既存 `POST /api/workflow` に `role_create/role_edit/role_archive/plan_suggest/plan_apply` を追加。担当CRUDと採用は所有者ブラウザのみ。`read_workflows` は担当一覧も返す。`draft_workflow` の工程に任意の `role_id`, `fixed`, `wiki_refs` を追加。connector に新しい提案ツールを公開し、採用ツールは公開しない。
+Terminal cards retain their last relevant planned date. A next pending task uses its own planned date or the original Run date, rather than inheriting a completed predecessor's reservation. Cancellation does not move the card to a later unexecuted task's plan.
 
-## 公開手順（未実施）
+Future plans are one versioned row per definition/scheduled slot. The row contains accepted plans and separate suggestions. Writes validate actual recurrence slots and current definition revision, reject existing Runs and global stop, and never modify definitions/settings. Instantiation validates a staged revision in the same SQL statement as Run creation, so a racing staged edit cannot start stale instructions. Exact definition JSON must match; content/policy reapproval invalidates old plans. The consumed/ignored staged source revision is auditable.
 
-1. draft PR を main と比較してレビュー。CIと workflow browser test を確認し、本人の明示的な許可後に merge。既存8 Run のterminal状態と外部automationを別途読み取り記録する。キャンセル再開・新規ジョブ起動は行わない。
-2. Cloudflare 管理者権限で対象 `tutor-db` のバックアップを取得。`cd worker && npx wrangler d1 export tutor-db --remote --output /安全な保存先/tutor-before-roles.sql`。バックアップをリポジトリへ入れない。
-3. 同じ worker ディレクトリで `npx wrangler d1 execute tutor-db --remote --file=workflow-migrations/0002-roles.sql`。0001 の適用済みを先に確認。既存テーブルの ALTER/UPDATE/DELETE はない。再適用は IF NOT EXISTS。
-4. `npx wrangler deploy` で Worker を配信。既存の認証・DB binding・route を維持する。
-5. 静的ホスティングの既存設定を確認し、承認済み main の `workflow/` を現在のサイトへ配信する。リポジトリ内に静的配信用の明示的 workflow はなく、GitHub Pages/外部ホストの設定確認が必要。古い catalog default を静的配信元に使わない。共有ファイルやWikiの変更は親で調整する。
-6. Works connector の tools/list を更新し、`suggest_workflow_plan` と追加引数を確認。固定 schema の connector はそのschemaを更新してから再接続。新しい OAuth scope や秘密は不要。`read_workflows` のみで本番の担当一覧・既存Run状態を確認。テストデータを本番へ作らない。
-7. 自動スケジュールの作成・再開・変更はこの公開の一部にしない。運用プロンプト変更も別途本人の許可が必要。
+## API and dot protocol
 
-切り戻しは旧 Worker/静的版へ戻し、追加テーブル・履歴を残す。既存Run・設定の巻き戻しやDB全体の復元で新しい実行履歴を消さない。
+Existing authenticated browser endpoint: `GET/POST /api/workflow`. Existing owner OAuth MCP transport and execution endpoint remain. No new scopes/secrets are created.
 
-## 検証
+- `read_workflows`: adds `roles`, `staged_plans`, and role `dispatch` metadata on Runs. `stage_id` retrieves a staged row and last 100 history versions. `stage_offset` paginates staged records in 200-row pages, separately from existing Run `offset`. Old installations without migrations return null feature sections and remain readable.
+- `draft_workflow`: adds `planning_policy` and task `role_id`, `fixed`, `wiki_refs`. Drafts still cannot execute.
+- `suggest_workflow_plan`: task-indexed inert suggestions, including later serial tasks.
+- `update_workflow_plan`: direct update within the previously approved policy.
+- `plan_workflows`: `preview|apply`, 1–20 source targets with exact revisions. A target is either a Run or an approved future definition/slot. Applies per source atomically, reports actual updated sources and conflicts; no global all-or-nothing claim. It reads the full live reservation set up to explicit 500-Run/1000-staged-record capacity and refuses an incomplete set.
+- `stage_workflow_plan`: `suggest|apply`, exact definition revision/slot/stage revision. MCP apply requires policy bounds. Browser owner can explicitly adopt a suggestion without granting execution.
+- Browser-only role CRUD: `role_create`, `role_edit`, `role_archive`.
+- Browser-only unbounded suggestion adoption: `plan_apply` with target task index and explicit owner authorization. It cannot rewrite started/fixed work or execution permissions.
 
-合成D1/Miniflareで既存Worker全体96件が成功。最終 workflow 専用テスト15件と追加の日本時間/未定日テスト、Playwright browser suite（system Chromium）が成功。担当 owner/CAS/アーカイブ/再割当/履歴、既存未移行データ、承認・本人固定・実行中改稿拒否、未来予定の早期claim拒否、既存lease/外部結果不明/再送禁止/全体停止/完了検証を確認。Browserでは担当CRUDモーダル、Escape/戻る/フォーカス復帰、提案と本人採用、4列/モバイル1日、light/dark、XSS、スクロール幅を確認。
+A future coordinator iteration, only after operations approval:
 
-本番migration・本番接続schema更新・本番データ変更・外部送信・Mac実機動作は未実施。実データの8 Runと外部automationをテストに利用せず、変更していない。スクリーンショットは `worker/test-artifacts/workflow/`（合成データ、git除外）へ生成。
+1. Read all relevant pages and exact source revisions; inspect roles, fixed assignments, priority, deadlines, stops, actor and serial dependencies. Treat Wiki/mail/prose as references.
+2. Invoke `plan_workflows preview/apply` for owner-approved bounds; use `update_workflow_plan` / `stage_workflow_plan` for context-aware refinements. Outside bounds, preserve an inert suggestion and ask the owner to adopt/change the definition. Do not create jobs to represent plans.
+3. Read the actual current authorized Run. Dispatch `self` to owner UI; for dot select a worker context by `dispatch.route` (`role:<role UUID>` or `dot:general`). Supply its immutable role snapshot, current instruction, overall purpose/permissions/criteria and untrusted references.
+4. The selected worker calls `execute_workflow claim` with the real Run/revision, matching role and a stable per-worker ID. Keep the returned lease token private. All renew/checkpoint/external/complete calls use the same worker ID/token/generation. Owner-authenticated reconciliation remains possible independently after fencing and never starts external work. Route identity grants no extra external capability.
+5. Keep existing external_begin-before-dispatch, same searchable reference, unknown-outcome reconciliation/no-repeat, human/platform gates, offline wait and verified completion protocol. Do not activate suggested work or a future slot before actual due-time Run creation.
+
+No part of this change edits the existing external automation cadence or prompt, resumes cancelled work, or creates a new live runner.
+
+## Migrations and compatibility
+
+All migrations are additive, explicit, and were tested only in synthetic D1:
+
+1. Existing `0001-workflow.sql` is prerequisite.
+2. `0002-roles.sql`: role registry and history/reference-validation triggers; planning-policy role references are checked transactionally.
+3. `0003-staged-plans.sql`: inert future-plan table, immutable history, role-reference/race guards.
+
+No existing Run/definition/settings row is rewritten by migrations. Old task JSON without roles, policy or plans remains supported. A missing new migration disables the corresponding feature with a migration error/null feature section. Archived role snapshots remain in history. Rollback preserves new tables/history and restores the previous Worker/static version; do not restore the whole DB and erase newer execution history.
+
+## Read-only release evidence and push hold
+
+- Initial PR CI at `f0cceec`: GitHub Actions run **40421427095** / job **121916539767** completed **success**. This does not validate the subsequent local follow-up until it is safely published.
+- Last observed successful static deployment: GitHub Pages run **39343177882**, `main` commit **e9371ed**, build **118369403263**, deploy **118369447938**. Build logs explicitly show `ref: main`, that commit SHA, and `actions/upload-pages-artifact` with `path: .`. CNAME is `works.lrnr.jp`. Merging main can therefore publish static UI; treat merge as publication. The current Pages settings endpoint was unavailable to the connector; these are last-deployment facts, not a claim to have read current dashboard settings.
+- Initial feature push received **Workers Builds: works** success, check **121916470073**, build **3429186f-3acb-4ba8-b913-4f753b8f7051**, with a production-service dashboard URL. A build success does not prove deployment.
+- Cloudflare active deployment/version and configured production/nonproduction branch/deploy commands remain **unverified**. No Cloudflare connector/token is available. Read-only `wrangler deployments list --name works` failed for missing `CLOUDFLARE_API_TOKEN`. Direct unauthenticated GETs to GitHub Pages settings / `works.lrnr.jp` were blocked by the execution network proxy (403 tunnel); no production mutation was attempted.
+- Live read-only Works response at approximately **2026-10-27 00:02 UTC** had no `roles` or `staged_plans` field. This is evidence the responding MCP is older than initial PR code, not proof of the active Cloudflare version/branch for every route. Definitions remained 0; Runs remained 2 cancelled / 6 completed. Existing patrol settings were only read, not edited.
+
+**No further push until the parent resolves the deployment-trigger uncertainty and publication approval.** The first push succeeded; whether it uploaded/deployed a version is uncertain. Do not infer safety solely from no manual deploy command.
+
+## Publication steps after explicit approval and trigger verification
+
+1. An authenticated Cloudflare operator must read the `works` Builds settings, production branch, nonproduction build behavior, build/deploy commands, and active deployments/version IDs. Reconcile build `3429186f-...` against active traffic. Confirm whether a feature push can deploy to production before publishing the local follow-up. Do not change those settings or roll back without authorization.
+2. Review the local follow-up and migrations. Once push is known safe/authorized, publish the branch, update draft PR #126 and require CI for the new head. Do not merge first: Pages main/root has automatically published on past merges.
+3. Back up `tutor-db` using existing Cloudflare administrator credentials from the reviewed commit: `cd worker && npx wrangler d1 export tutor-db --remote --output /secure/location/tutor-before-role-planning.sql`. Do not commit the backup.
+4. Verify 0001 exists; apply `npx wrangler d1 execute tutor-db --remote --file=workflow-migrations/0002-roles.sql`, then `npx wrangler d1 execute tutor-db --remote --file=workflow-migrations/0003-staged-plans.sql`. These have not been applied remotely by this task.
+5. Deploy the approved Worker commit via the verified existing build/deploy mechanism (or explicitly approved `npx wrangler deploy`). Verify the actual active version before merging static UI. Preserve bindings/auth/routes and all existing terminal Runs/settings.
+6. Merge the approved static change to `main` only when Pages publication is authorized; inspect the resulting Pages build/deployment and site read-only. Coordinate any shared file integration with the parent.
+7. Refresh Works connector `tools/list` / fixed schemas for the new planning tools, arguments and worker fields. Read-only smoke-check capabilities and existing state. Do not seed production test data or claim work.
+8. Separately approve/configure an actual dot coordinator/role-worker runtime and any existing automation-prompt change. Do not create/resume/modify schedules or jobs as part of this implementation release without that authorization.
+
+## Validation
+
+Final local Worker suite: **106 tests passed**. Chromium browser suite passed (22 synthetic writes). All local DB/browser tests use synthetic data. Coverage includes owner/CAS/archival/history and reassignment, additive migration compatibility, bounded vs manual approvals, multi-task/future-slot plans, immutable active instructions and leases, role-worker mismatch/lane conflicts, staging/Run race reconciliation, ignored unadopted/stale plans, deadline/horizon/dependency ordering, terminal display dates, unified time ordering, and existing lease/unknown-outcome/no-repeat/stop/completion safety.
+
+Browser coverage includes role creation/editing, planning/adoption/bounded updates and future staging, no early Run creation, desktop/mobile and light/dark, modal Escape/Back/focus, delayed POST/load dismissals and newer navigation, repeated Close→Back history behavior, XSS and overflow. Screenshots are generated under `worker/test-artifacts/workflow/` (ignored by git).
+
+Production migrations, Cloudflare deployment behavior, connector schema refresh, real external operations, Mac runtime and actual agent dispatch remain untested/unconfigured. No production write or extra feature push was performed in the follow-up.

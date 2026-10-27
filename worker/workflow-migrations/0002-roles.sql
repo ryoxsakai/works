@@ -12,9 +12,11 @@ END;
 -- Close the validation/write race between archival and new assignments.
 CREATE TRIGGER IF NOT EXISTS wf_role_definition_insert BEFORE INSERT ON wf_definitions WHEN new.archived=0 BEGIN
  SELECT CASE WHEN EXISTS(SELECT 1 FROM json_each(new.data,'$.tasks') t WHERE json_extract(t.value,'$.role_id') IS NOT NULL AND NOT EXISTS(SELECT 1 FROM wf_roles r WHERE r.id=json_extract(t.value,'$.role_id') AND r.owner=new.owner AND r.archived=0)) THEN RAISE(ABORT,'role unavailable') END;
+ SELECT CASE WHEN EXISTS(SELECT 1 FROM json_each(new.data,'$.planning_policy.role_ids') p WHERE NOT EXISTS(SELECT 1 FROM wf_roles r WHERE r.id=p.value AND r.owner=new.owner AND r.archived=0)) THEN RAISE(ABORT,'planning role unavailable') END;
 END;
 CREATE TRIGGER IF NOT EXISTS wf_role_definition_update BEFORE UPDATE ON wf_definitions WHEN new.archived=0 BEGIN
  SELECT CASE WHEN EXISTS(SELECT 1 FROM json_each(new.data,'$.tasks') t WHERE json_extract(t.value,'$.role_id') IS NOT NULL AND NOT EXISTS(SELECT 1 FROM wf_roles r WHERE r.id=json_extract(t.value,'$.role_id') AND r.owner=new.owner AND r.archived=0)) THEN RAISE(ABORT,'role unavailable') END;
+ SELECT CASE WHEN EXISTS(SELECT 1 FROM json_each(new.data,'$.planning_policy.role_ids') p WHERE NOT EXISTS(SELECT 1 FROM wf_roles r WHERE r.id=p.value AND r.owner=new.owner AND r.archived=0)) THEN RAISE(ABORT,'planning role unavailable') END;
 END;
 CREATE TRIGGER IF NOT EXISTS wf_role_run_insert BEFORE INSERT ON wf_runs BEGIN
  SELECT CASE WHEN EXISTS(SELECT 1 FROM json_each(new.data,'$.tasks') t WHERE json_extract(t.value,'$.role_id') IS NOT NULL AND NOT EXISTS(SELECT 1 FROM wf_roles r WHERE r.id=json_extract(t.value,'$.role_id') AND r.owner=new.owner AND r.archived=0)) THEN RAISE(ABORT,'role unavailable') END;

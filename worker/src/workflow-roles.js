@@ -25,11 +25,18 @@ export async function rolesRead(env) {
 }
 export async function activeRole(env, id) {
   if (!id) return null;
-  const role = await env.DB.prepare(
-    "SELECT * FROM wf_roles WHERE id=? AND owner=? AND archived=0",
-  )
-    .bind(text(id, 100), owner(env))
-    .first();
+  let role;
+  try {
+    role = await env.DB.prepare(
+      "SELECT * FROM wf_roles WHERE id=? AND owner=? AND archived=0",
+    )
+      .bind(text(id, 100), owner(env))
+      .first();
+  } catch (e) {
+    if (/no such table/.test(e.message))
+      fail(503, "Apply workflow migration 0002-roles.sql");
+    throw e;
+  }
   if (!role) fail(409, "担当がありません、またはアーカイブ済みです");
   return { id: role.id, revision: role.revision, ...JSON.parse(role.data) };
 }
@@ -70,9 +77,9 @@ export async function rolesWrite(env, a, browser) {
   // Used roles are archived, never deleted. Existing immutable history keeps their label.
   // Unfinished references must first be explicitly reassigned, including draft definitions.
   const unfinished = await env.DB.prepare(
-    `SELECT id FROM wf_runs WHERE owner=? AND status NOT IN ('completed','cancelled') AND EXISTS(SELECT 1 FROM json_each(data,'$.tasks') t WHERE json_extract(t.value,'$.role_id')=? AND json_extract(t.value,'$.status')!='completed') UNION ALL SELECT id FROM wf_definitions WHERE owner=? AND archived=0 AND EXISTS(SELECT 1 FROM json_each(data,'$.tasks') t WHERE json_extract(t.value,'$.role_id')=?) LIMIT 1`,
+    `SELECT id FROM wf_runs WHERE owner=? AND status NOT IN ('completed','cancelled') AND EXISTS(SELECT 1 FROM json_each(data,'$.tasks') t WHERE json_extract(t.value,'$.role_id')=? AND json_extract(t.value,'$.status')!='completed') UNION ALL SELECT id FROM wf_definitions WHERE owner=? AND archived=0 AND (EXISTS(SELECT 1 FROM json_each(data,'$.tasks') t WHERE json_extract(t.value,'$.role_id')=?) OR EXISTS(SELECT 1 FROM json_each(data,'$.planning_policy.role_ids') p WHERE p.value=?)) LIMIT 1`,
   )
-    .bind(owner(env), r.id, owner(env), r.id)
+    .bind(owner(env), r.id, owner(env), r.id, r.id)
     .first();
   if (unfinished)
     fail(
@@ -80,11 +87,18 @@ export async function rolesWrite(env, a, browser) {
       "未完了の工程・定義を別の担当へ変更してからアーカイブしてください。実行中は停止・結果確認が必要です",
     );
   // Atomic predicate also protects against concurrent definition/run assignment.
-  const saved = await env.DB.prepare(
-    `UPDATE wf_roles SET archived=1,revision=revision+1 WHERE id=? AND owner=? AND revision=? AND NOT EXISTS(SELECT 1 FROM wf_runs r,json_each(r.data,'$.tasks') t WHERE r.owner=? AND r.status NOT IN ('completed','cancelled') AND json_extract(t.value,'$.role_id')=wf_roles.id AND json_extract(t.value,'$.status')!='completed') AND NOT EXISTS(SELECT 1 FROM wf_definitions d,json_each(d.data,'$.tasks') t WHERE d.owner=? AND d.archived=0 AND json_extract(t.value,'$.role_id')=wf_roles.id) RETURNING id`,
-  )
-    .bind(r.id, owner(env), r.revision, owner(env), owner(env))
-    .first();
+  let saved;
+  try {
+    saved = await env.DB.prepare(
+      `UPDATE wf_roles SET archived=1,revision=revision+1 WHERE id=? AND owner=? AND revision=? AND NOT EXISTS(SELECT 1 FROM wf_runs r,json_each(r.data,'$.tasks') t WHERE r.owner=? AND r.status NOT IN ('completed','cancelled') AND json_extract(t.value,'$.role_id')=wf_roles.id AND json_extract(t.value,'$.status')!='completed') AND NOT EXISTS(SELECT 1 FROM wf_definitions d WHERE d.owner=? AND d.archived=0 AND (EXISTS(SELECT 1 FROM json_each(d.data,'$.tasks') t WHERE json_extract(t.value,'$.role_id')=wf_roles.id) OR EXISTS(SELECT 1 FROM json_each(d.data,'$.planning_policy.role_ids') p WHERE p.value=wf_roles.id))) RETURNING id`,
+    )
+      .bind(r.id, owner(env), r.revision, owner(env), owner(env))
+      .first();
+  } catch (e) {
+    if (/staged plans reference role/.test(e.message))
+      fail(409, "将来予定の担当を変更してからアーカイブしてください");
+    throw e;
+  }
   if (!saved) fail(409, "role references changed");
   return saved;
 }

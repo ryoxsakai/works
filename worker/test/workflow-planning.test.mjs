@@ -31,3 +31,27 @@ test("Tokyo midnight, date ordering, manual timestamps and undated entries", () 
     null,
   );
 });
+
+test("terminal cards retain replanned date; next task falls back independently", () => {
+  const run = {
+    id: "run",
+    status: "completed",
+    scheduled_for: "2026-10-26T00:00:00Z",
+    data: {
+      current: 1,
+      plan: null,
+      tasks: [
+        {
+          planned_for: "2026-10-29T00:00:00Z",
+          plan: { planned_for: "2026-10-29T00:00:00Z" },
+        },
+      ],
+    },
+  };
+  assert.equal(runTime(run), "2026-10-29T00:00:00Z");
+  run.status = "queued";
+  run.data.tasks.push({ status: "pending" });
+  assert.equal(runTime(run), "2026-10-26T00:00:00Z");
+  run.data.tasks[1].planned_for = null;
+  assert.equal(runTime(run), null);
+});

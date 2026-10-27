@@ -4,7 +4,7 @@ import { readFile, mkdir } from "node:fs/promises";
 import { createHmac } from "node:crypto";
 import assert from "node:assert/strict";
 import worker from "../src/index.js";
-import { workflowExecute } from "../src/workflow.js";
+import { workflowExecute, workflowWrite } from "../src/workflow.js";
 const origin = "https://workflow.example.test",
   root = new URL("../../", import.meta.url);
 const mf = new Miniflare({
@@ -42,6 +42,17 @@ await env.DB.batch(
     .filter((s) => s.trim())
     .map((s) => env.DB.prepare(s)),
 );
+const stageSql = await readFile(
+  new URL("../workflow-migrations/0003-staged-plans.sql", import.meta.url),
+  "utf8",
+);
+await env.DB.batch(
+  stageSql
+    .replace(/^--.*$/gm, "")
+    .split(/(?=^CREATE )/m)
+    .filter((s) => s.trim())
+    .map((s) => env.DB.prepare(s)),
+);
 const payload = Buffer.from(
     JSON.stringify({ email: env.ALLOWED_EMAIL, exp: Date.now() + 3600000 }),
   ).toString("base64url"),
@@ -60,7 +71,19 @@ const browser = await chromium.launch({
 const context = await browser.newContext({
   viewport: { width: 1440, height: 1000 },
 });
-let writes = 0;
+let writes = 0,
+  heldResponse = null;
+function holdResponse(method, action) {
+  let reached, release;
+  const started = new Promise((resolve) => {
+      reached = resolve;
+    }),
+    resume = new Promise((resolve) => {
+      release = resolve;
+    });
+  heldResponse = { method, action, reached, resume };
+  return { started, release };
+}
 await context.route("**/*", async (route) => {
   const request = route.request(),
     url = new URL(request.url());
@@ -84,6 +107,18 @@ await context.route("**/*", async (route) => {
       }),
       env,
     );
+    if (
+      heldResponse &&
+      request.method() === heldResponse.method &&
+      (request.method() === "GET"
+        ? !url.search
+        : request.postDataJSON()?.action === heldResponse.action)
+    ) {
+      const hold = heldResponse;
+      heldResponse = null;
+      hold.reached();
+      await hold.resume;
+    }
     return route.fulfill({
       status: response.status,
       headers: Object.fromEntries(response.headers),
@@ -262,7 +297,7 @@ try {
   await page.locator("#day").dispatchEvent("change");
   await expect(page.locator("#active-runs .wf-run")).toHaveCount(1);
   await page.locator("#today").click();
-  await page.locator(".wf-settings > summary").click();
+  await page.getByText("巡回の状態・設定", { exact: true }).click();
   await page.locator("#interval").selectOption("30");
   await page.locator("#save-interval").click();
   await expect(page.locator("#patrol-status")).toContainText("設定未反映");
@@ -271,11 +306,14 @@ try {
   const all = await env.DB.prepare("SELECT * FROM wf_runs LIMIT 1").first(),
     claim = await workflowExecute(env, {
       action: "claim",
+      role_id: JSON.parse(all.data).tasks[0].role_id,
+      worker_id: "synthetic-role-worker",
       run_id: all.id,
       revision: all.revision,
     });
   await workflowExecute(env, {
     action: "complete",
+    worker_id: "synthetic-role-worker",
     run_id: all.id,
     revision: claim.revision,
     generation: claim.generation,
@@ -344,6 +382,249 @@ try {
   await expect(page.locator("#automation")).toContainText("ワークフロー");
   await expect(page.locator('#automation a[href="/wiki/"]')).toHaveCount(1);
   await expect(page.locator('#operations a[href="/wiki/"]')).toHaveCount(0);
+  // Regression: repeated explicit closes consume the history entry; no phantom Back stops.
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto(origin + "/workflow/roles.html");
+  for (let i = 0; i < 3; i++) {
+    await page.locator("#new-role").click();
+    await expect(page.locator("#role-editor")).toBeVisible();
+    if (i % 2) await page.keyboard.press("Escape");
+    else await page.locator("#close-role").click();
+    await expect(page.locator("#new-role")).toBeFocused();
+    await page.waitForFunction(() => !history.state?.workflowModal);
+  }
+  await page.goBack();
+  await expect(page).toHaveURL(origin + "/");
+  const base = await env.DB.prepare(
+    "SELECT * FROM wf_definitions LIMIT 1",
+  ).first();
+  const original = JSON.parse(base.data);
+  const laterDef = await workflowWrite(
+    env,
+    {
+      action: "create",
+      content: {
+        ...original,
+        title: "後の自動実行",
+        kind: "automation",
+        repeat: "once",
+      },
+    },
+    true,
+  );
+  const published = await workflowWrite(
+    env,
+    {
+      action: "publish",
+      definition_id: laterDef.id,
+      revision: laterDef.revision,
+      authorized: true,
+    },
+    true,
+  );
+  let early = await workflowWrite(
+    env,
+    {
+      action: "start",
+      definition_id: base.id,
+      revision: base.revision,
+      request_id: "navigation-early",
+    },
+    true,
+  );
+  let late = await workflowWrite(
+    env,
+    {
+      action: "start",
+      definition_id: published.id,
+      revision: published.revision,
+      request_id: "navigation-late",
+    },
+    true,
+  );
+  const dayJP = new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+  for (const [r, hour] of [
+    [early, "09"],
+    [late, "17"],
+  ]) {
+    const suggestion = await workflowWrite(env, {
+      action: "plan_suggest",
+      run_id: r.id,
+      revision: r.revision,
+      plan: {
+        role_id: r.data.tasks[0].role_id,
+        instruction: r.data.tasks[0].title,
+        planned_for: dayJP + "T" + hour + ":00:00+09:00",
+        rationale: "日内の並び順の合成検証",
+      },
+    });
+    await workflowWrite(
+      env,
+      {
+        action: "plan_apply",
+        run_id: r.id,
+        revision: suggestion.revision,
+        authorized: true,
+      },
+      true,
+    );
+  }
+  await page.goto(origin + "/workflow/");
+  await expect(page.locator("#workspace")).toBeVisible();
+  const ordered = await page
+    .locator(".wf-day.selected .wf-run")
+    .evaluateAll((nodes) => nodes.map((n) => n.dataset.runId));
+  assert(
+    ordered.indexOf(early.id) >= 0 &&
+      ordered.indexOf(early.id) < ordered.indexOf(late.id),
+    "day board is chronological across workflow/automation kinds",
+  );
+  // Delayed POST and subsequent load must not resurrect a closed/Escaped/Back-dismissed modal.
+  for (const [method, close] of [
+    ["POST", "close"],
+    ["GET", "escape"],
+    ["POST", "back"],
+    ["GET", "close"],
+  ]) {
+    await page.locator(`#active-runs [data-run-id="${early.id}"]`).click();
+    await page.getByText("配分案・未着手指示の改稿", { exact: true }).click();
+    await page
+      .getByLabel("理由・優先順位・期限・依存の確認", { exact: true })
+      .fill("遅延応答の合成検証");
+    const hold = holdResponse(method, "plan_suggest");
+    await page
+      .getByRole("button", { name: "配分案を保存", exact: true })
+      .click();
+    await hold.started;
+    if (close === "escape") await page.keyboard.press("Escape");
+    else if (close === "back") await page.goBack();
+    else await page.locator("[data-close=run-dialog]").click();
+    await page.waitForFunction(() => !history.state?.workflowModal);
+    hold.release();
+    await expect(page.locator("#workspace")).toHaveAttribute(
+      "aria-busy",
+      "false",
+    );
+    await expect(page.locator("#run-dialog")).not.toBeVisible();
+  }
+  // A newer run selected while an old mutation is pending stays selected after the old response.
+  await page.locator(`#active-runs [data-run-id="${early.id}"]`).click();
+  await page.getByText("配分案・未着手指示の改稿", { exact: true }).click();
+  await page
+    .getByLabel("理由・優先順位・期限・依存の確認", { exact: true })
+    .fill("新しい詳細選択を保持");
+  const hold = holdResponse("POST", "plan_suggest");
+  await page.getByRole("button", { name: "配分案を保存", exact: true }).click();
+  await hold.started;
+  await page.locator("[data-close=run-dialog]").click();
+  await page.waitForFunction(() => !history.state?.workflowModal);
+  await page.locator(`#active-runs [data-run-id="${late.id}"]`).click();
+  await expect(page.locator("#run-detail h3")).toHaveText("後の自動実行");
+  hold.release();
+  await expect(page.locator("#workspace")).toHaveAttribute(
+    "aria-busy",
+    "false",
+  );
+  await expect(page.locator("#run-detail h3")).toHaveText("後の自動実行");
+  await expect(page.locator("#run-dialog")).toBeVisible();
+  await page.locator("[data-close=run-dialog]").click();
+  await page.waitForFunction(() => !history.state?.workflowModal);
+  // Future instances are planned in an inert staging record; no Run/job is created early.
+  const futureStart = new Date(Date.now() + 3600000).toISOString();
+  const futureDef = await workflowWrite(
+    env,
+    {
+      action: "create",
+      content: {
+        ...original,
+        title: "将来の交通整理",
+        repeat: "once",
+        start: futureStart,
+        planning_policy: {
+          enabled: true,
+          revise_instructions: true,
+          role_ids: [original.tasks[0].role_id],
+        },
+        tasks: [
+          original.tasks[0],
+          { ...original.tasks[0], title: "将来の照合" },
+        ],
+      },
+    },
+    true,
+  );
+  await workflowWrite(
+    env,
+    {
+      action: "publish",
+      definition_id: futureDef.id,
+      revision: futureDef.revision,
+      authorized: true,
+    },
+    true,
+  );
+  const runCount = (
+    await env.DB.prepare("SELECT count(*) AS n FROM wf_runs").first()
+  ).n;
+  await page.goto(origin + "/workflow/");
+  await expect(page.locator("#workspace")).toBeVisible();
+  await page
+    .locator(".wf-upcoming")
+    .filter({ hasText: "将来の交通整理" })
+    .getByRole("button", { name: "予定工程を調整" })
+    .click();
+  await expect(page.locator("#run-dialog h2")).toHaveText(
+    "将来予定の交通整理（実行前）",
+  );
+  await expect(page.locator("#run-action")).not.toBeVisible();
+  await page.getByText("配分案・未着手指示の改稿", { exact: true }).click();
+  await page.locator("#planning-task-index").selectOption("1");
+  await page
+    .getByLabel("指示案", { exact: true })
+    .fill("承認範囲内で原典と照合する");
+  await page
+    .getByLabel("予定（日本時間）", { exact: true })
+    .fill(
+      new Date(Date.parse(futureStart) + 9 * 3600000 + 1800000)
+        .toISOString()
+        .slice(0, 16),
+    );
+  await page
+    .getByLabel("理由・優先順位・期限・依存の確認", { exact: true })
+    .fill("前工程の後に配置");
+  await page
+    .getByRole("button", { name: "承認範囲内で反映", exact: true })
+    .click();
+  await expect(page.locator("#run-detail")).toContainText(
+    "採用済み指示：承認範囲内で原典と照合する",
+  );
+  await page.screenshot({
+    path: new URL("../test-artifacts/workflow/future-plan.png", import.meta.url)
+      .pathname,
+    fullPage: true,
+  });
+  await page.locator("[data-close=run-dialog]").click();
+  await page.waitForFunction(() => !history.state?.workflowModal);
+  await page
+    .getByText("dot の交通整理（実行は開始しません）", { exact: true })
+    .click();
+  await page.getByRole("button", { name: "配分案を計算", exact: true }).click();
+  await expect(page.locator("#planning-status")).toContainText(
+    "未反映の配分案",
+  );
+  await page
+    .getByRole("button", { name: "事前承認の範囲内で配分", exact: true })
+    .click();
+  await expect(page.locator("#planning-status")).toContainText("配分を更新");
+  assert.equal(
+    (await env.DB.prepare("SELECT count(*) AS n FROM wf_runs").first()).n,
+    runCount,
+  );
   assert.deepEqual(errors, []);
   console.log(
     "Workflow desktop/mobile, dark theme, XSS, owner publish, stop/resume, verification gate, schedule status, home navigation passed; synthetic writes=" +
