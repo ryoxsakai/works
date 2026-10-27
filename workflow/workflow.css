@@ -463,3 +463,19 @@ body {
     max-width: 100%;
   }
 }
+
+/* Three primary steps; auxiliary controls live in named native dialogs. */
+#workflow-steps {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:20px 0;}
+#workflow-steps button {min-height:52px;white-space:normal;text-align:left;}
+#workflow-steps [aria-current="step"] {border:2px solid var(--accent,#5368d5);background:var(--bg-elevated);font-weight:700;}
+#setup-guide {padding:16px;border:1px solid var(--border);border-radius:12px;margin:16px 0;background:var(--bg-elevated);}
+#setup-guide h3 {margin-top:0;}
+#setup-guide .wf-row {justify-content:flex-start;}
+.wf-tools {margin:16px 0;}
+#safety-status:empty {display:none;}
+#safety-status {padding:12px;border:1px solid var(--accent,#5368d5);border-radius:8px;}
+.workflow-workspace [hidden] {display:none!important;}
+.wf-dialog {max-height:90dvh;overflow:auto;}
+.wf-dialog button,#setup-guide button,#workflow-steps button {min-height:44px;}
+.wf-dialog :is(input,select,textarea) {max-width:100%;min-width:0;}
+@media(max-width:600px){#workflow-steps{gap:6px;}#workflow-steps button{padding:10px 6px;font-size:13px;}.wf-tools{display:flex;flex-wrap:wrap;}.wf-tools button{flex:1 1 40%;}#step-1 .wf-definition{overflow-wrap:anywhere;}}

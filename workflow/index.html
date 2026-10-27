@@ -7,7 +7,7 @@
     <script src="/shared/theme-init.js?v=1"></script>
     <link rel="stylesheet" href="/shared/styles.css?v=56" />
     <link rel="stylesheet" href="/shared/header.css?v=2" />
-    <link rel="stylesheet" href="./workflow.css?v=4" />
+    <link rel="stylesheet" href="./workflow.css?v=5" />
     <link rel="stylesheet" href="/shared/workspace-ui.css?v=1" />
     <script type="module" src="/shared/header.js?v=4"></script>
   </head>
@@ -27,28 +27,32 @@
       <p id="workflow-feedback" role="status" aria-live="polite"></p>
       <div id="workspace" hidden>
         <div class="wf-title">
-          <div>
-            <p>自動実行 / ワークフロー</p>
-            <h2>今日から3日先の仕事</h2>
-          </div>
-          <div class="workspace-actions">
-            <a href="./roles.html">◆ 担当の登録・編集</a
-            ><button id="refresh">更新</button
-            ><button id="new" class="ui-primary">＋ ワークフローを作成</button>
-          </div>
+          <div><h2>ワークフロー</h2><p>役割を決め、仕事を並べ、必要な確認を行います。</p></div>
+          <div class="workspace-actions"><button id="refresh">更新</button><button id="resume-setup">設定ガイド</button><button id="global-stop">全体停止</button></div>
         </div>
-        <details class="wf-settings">
-          <summary>dot の交通整理（実行は開始しません）</summary>
-          <p>
-            定義で事前承認した範囲内の未着手工程を、優先度・期限・直列依存・担当の空き枠で今日から3日先へ配分します。固定・実行中の工程は変更しません。
-          </p>
-          <button id="rolling-preview">配分案を計算</button
-          ><button id="rolling-apply">事前承認の範囲内で配分</button>
-          <p id="planning-status" role="status"></p>
-          <div id="planning-preview"></div>
-        </details>
+        <p id="safety-status" role="status"></p>
+        <p id="coverage" class="wf-note" role="status"></p>
+        <nav id="workflow-steps" aria-label="ワークフローの3ステップ">
+          <button data-step="1">1. 役割設定</button><button data-step="2">2. カンバン</button><button data-step="3">3. 確認事項 <span id="review-count"></span></button>
+        </nav>
+        <section id="setup-guide" aria-labelledby="setup-heading" hidden>
+          <h3 id="setup-heading">初回設定ガイド</h3><p id="setup-help"></p>
+          <div class="wf-row"><button id="setup-back">戻る</button><button id="setup-next" class="ui-primary">次へ</button><button id="setup-cancel">あとで再開</button></div>
+          <p class="wf-note">ガイドを進めても保存・承認・実行は行いません。保存は各フォーム、実行許可は内容確認後に行います。</p>
+        </section>
+        <section id="step-1" aria-labelledby="roles-heading" hidden>
+          <h2 id="roles-heading" tabindex="-1">1. 役割設定</h2>
+          <p>責任・操作範囲・完了条件を決めます。役割の登録だけでは実行を許可しません。</p>
+          <button id="new-role">＋ 担当を追加</button><button data-open="role-archive-dialog">過去の役割</button><div id="roles"></div>
+        </section>
+        <div class="workspace-actions wf-tools" aria-label="補助機能">
+          <button data-open="definitions-dialog">定義・実行許可</button><button data-open="planning-dialog">配分の詳細</button><button data-open="settings-dialog">巡回の状態・設定</button><button data-open="history-dialog">履歴・表示範囲</button>
+        </div>
+        <section id="step-2" aria-labelledby="board-heading" hidden>
+          <div class="wf-title"><h2 id="board-heading" tabindex="-1">2. カンバン</h2><button id="new" class="ui-primary">＋ ワークフローを作成</button></div>
+          <p id="board-empty" class="wf-empty" hidden>まだワークフローがありません。「ワークフローを作成」で仕事と工程を下書きできます。保存だけでは実行されません。</p>
         <div class="workspace-section-heading">
-          <h2 class="wf-section-title">実行予定と履歴</h2>
+          <h3 class="wf-section-title">実行予定</h3>
           <div
             id="calendar-view"
             class="ui-segmented"
@@ -58,22 +62,12 @@
             ><button data-view="agenda" aria-pressed="false">一覧</button>
           </div>
         </div>
-        <p class="wf-note">
-          件数は取得済みの Run が対象です。未来の予定は巡回時に Run
-          へ変わります。同一定義に未完了の Run がある間は次回を作成しません。
-        </p>
-        <p id="coverage" class="wf-note"></p>
         <div class="workspace-search">
           <label for="workflow-search">名前・目的で検索</label>
-          <input id="workflow-search" type="search" placeholder="予定・未完了・定義を検索" />
+          <input id="workflow-search" type="search" placeholder="カンバンの予定を検索" />
           <button id="reset-filters" type="button" hidden>絞り込みを解除</button>
         </div>
-        <label
-          >担当で絞り込み<select id="role-filter">
-            <option value="">担当すべて</option>
-          </select></label
-        >
-        <nav id="filters" class="wf-filters" aria-label="状態で絞り込み"></nav>
+        <button data-open="filters-dialog">表示の絞り込み</button><span id="filter-summary" class="wf-note" role="status"></span>
         <div class="wf-calendar-bar">
           <button id="prev" aria-label="前日">← 前日</button
           ><input id="day" type="date" aria-label="表示日" /><button
@@ -89,10 +83,12 @@
           class="wf-week"
           aria-label="日付別の実行一覧"
         ></section>
+        </section>
+        <section id="step-3" aria-labelledby="focus-heading" hidden>
         <section class="wf-focus" aria-labelledby="focus-heading">
           <div class="wf-title">
             <div>
-              <h2 id="focus-heading">いま確認すること</h2>
+              <h2 id="focus-heading" tabindex="-1">3. 確認事項</h2><p>カンバンの検索・状態条件にかかわらず、未完了の実行を確認できます。</p>
               <p>日付未定・過去予定・期限超過を含む未完了の実行です。</p>
             </div>
             <a href="/wiki/">Wiki参考資料を見る →</a>
@@ -114,8 +110,39 @@
           </div>
           <div id="active-runs" class="wf-active-runs"></div>
         </section>
-        <details class="wf-settings">
-          <summary>巡回の状態・設定</summary>
+        </section>
+        <p class="wf-note">
+          本文や記事、メール、dot
+          の提案は実行許可になりません。プラットフォームで必要な承認・接続はその都度確認します。停止は完了済みの外部操作を取り消しません。認証情報や秘密は記録しないでください。
+        </p>
+      </div>
+    </main>
+<dialog id="role-archive-dialog" class="wf-dialog" aria-labelledby="role-archive-title"><div class="wf-title"><h2 id="role-archive-title">過去の役割</h2><button data-close="role-archive-dialog" aria-label="閉じる">×</button></div><div id="archived-roles"></div></dialog>
+<dialog id="filters-dialog" class="wf-dialog" aria-labelledby="filters-dialog-title"><div class="wf-title"><h2 id="filters-dialog-title">カンバンの表示条件</h2><button data-close="filters-dialog" aria-label="閉じる">×</button></div><p>確認事項の一覧には適用されません。本人の確認待ちは常に3番の件数に表示されます。</p>        <label
+          >担当で絞り込み<select id="role-filter" data-immediate>
+            <option value="">担当すべて</option>
+          </select></label
+        >
+        <nav id="filters" class="wf-filters" aria-label="状態で絞り込み"></nav>
+</dialog>
+<dialog id="definitions-dialog" class="wf-dialog" aria-labelledby="definitions-dialog-title"><div class="wf-title"><h2 id="definitions-dialog-title">定義・実行許可</h2><button data-close="definitions-dialog" aria-label="閉じる">×</button></div>        <section class="wf-definitions">
+          <p>下書きは実行されません。内容と許可範囲を確認してから承認します。</p>
+          <div id="definitions"></div>
+        </section>
+</dialog>
+<dialog id="planning-dialog" class="wf-dialog" aria-labelledby="planning-dialog-title"><div class="wf-title"><h2 id="planning-dialog-title">配分の詳細</h2><button data-close="planning-dialog" aria-label="閉じる">×</button></div>        <section>
+          <p>事前承認の範囲内だけで配分します。実行は開始しません。</p>
+          <p>
+            定義で事前承認した範囲内の未着手工程を、優先度・期限・直列依存・担当の空き枠で今日から3日先へ配分します。固定・実行中の工程は変更しません。
+          </p>
+          <button id="rolling-preview">配分案を計算</button
+          ><button id="rolling-apply">事前承認の範囲内で配分</button>
+          <p id="planning-status" role="status"></p>
+          <div id="planning-preview"></div>
+        </section>
+</dialog>
+<dialog id="settings-dialog" class="wf-dialog" aria-labelledby="settings-dialog-title"><div class="wf-title"><h2 id="settings-dialog-title">巡回の状態・設定</h2><button data-close="settings-dialog" aria-label="閉じる">×</button></div>        <section>
+
           <section class="wf-patrol" aria-label="定期巡回の設定">
             <div id="patrol-status"></div>
             <label
@@ -124,24 +151,69 @@
                 <option value="60">1時間</option>
                 <option value="30">30分</option>
               </select></label
-            ><button id="save-interval">希望を保存</button
-            ><button id="global-stop">全体停止</button
-            ><small
+            ><button id="save-interval">希望を保存</button>
+            <small
               >巡回は外部の定期実行で設定します。希望の保存だけでは時刻表は変更されません。</small
             >
           </section>
-        </details>
-        <details class="wf-definitions" open>
-          <summary>ワークフロー定義・実行許可</summary>
-          <div id="definitions"></div>
-        </details>
-        <p class="wf-note">
-          本文や記事、メール、dot
-          の提案は実行許可になりません。プラットフォームで必要な承認・接続はその都度確認します。停止は完了済みの外部操作を取り消しません。認証情報や秘密は記録しないでください。
+        </section>
+</dialog>
+<dialog id="history-dialog" class="wf-dialog" aria-labelledby="history-dialog-title"><div class="wf-title"><h2 id="history-dialog-title">履歴・表示範囲</h2><button data-close="history-dialog" aria-label="閉じる">×</button></div>        <p class="wf-note">
+          件数は取得済みの Run が対象です。未来の予定は巡回時に Run
+          へ変わります。同一定義に未完了の Run がある間は次回を作成しません。
         </p>
-      </div>
-    </main>
-    <dialog id="editor" class="wf-dialog">
+<p>完了・中止の実行は、カンバンの状態フィルターから開けます。各実行の詳細内に変更・実行履歴があります。</p><button id="show-history">カンバンで完了を表示</button></dialog>
+    <dialog id="role-editor" class="wf-dialog" aria-labelledby="role-title">
+      <form id="role-form">
+        <div class="wf-title">
+          <h2 id="role-title">担当</h2>
+          <button type="button" id="close-role" aria-label="閉じる">×</button>
+        </div>
+        <label>名前<input name="name" maxlength="100" required /></label>
+        <label
+          >責任・仕事内容<textarea
+            name="responsibilities"
+            maxlength="2000"
+            required
+          ></textarea>
+        </label>
+        <label
+          >操作範囲（実行許可は別途必要）<textarea
+            name="operations"
+            maxlength="2000"
+            required
+          ></textarea>
+        </label>
+        <label
+          >完了条件<textarea
+            name="completion"
+            maxlength="2000"
+            required
+          ></textarea>
+        </label>
+        <label
+          >アイコン<select name="icon">
+            <option>●</option>
+            <option>◆</option>
+            <option>★</option>
+            <option>☑</option>
+            <option>◎</option>
+          </select></label
+        >
+        <label
+          >色<select name="color">
+            <option value="rose">ローズ</option>
+            <option value="sky">空色</option>
+            <option value="mint">ミント</option>
+            <option value="amber">琥珀</option>
+            <option value="violet">紫</option>
+          </select></label
+        >
+        <p id="role-error" role="alert"></p>
+        <button type="submit">保存</button>
+      </form>
+    </dialog>
+    <dialog id="editor" class="wf-dialog" aria-labelledby="editor-title">
       <form id="definition-form">
         <div class="wf-title">
           <h2 id="editor-title">定義を作成</h2>
@@ -244,7 +316,7 @@
         <button type="submit">下書きを保存</button>
       </form>
     </dialog>
-    <dialog id="run-dialog" class="wf-dialog">
+    <dialog id="run-dialog" class="wf-dialog" aria-label="今回の実行">
       <div class="wf-title">
         <h2>今回の実行</h2>
         <button data-close="run-dialog" aria-label="閉じる">×</button>
@@ -279,6 +351,6 @@
         <div id="run-history"></div>
       </details>
     </dialog>
-    <script type="module" src="./app.js?v=7"></script>
+    <script type="module" src="./app.js?v=8"></script>
   </body>
 </html>

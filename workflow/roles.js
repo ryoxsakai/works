@@ -1,4 +1,4 @@
-import { showDialog, closeDialog } from "./dialogs.mjs";
+import { showDialog, closeDialog, markDialogSaved } from "./dialogs.mjs?v=2";
 import {
   watchAuth,
   signIn,
@@ -54,12 +54,22 @@ function open(role, button) {
 }
 async function load() {
   const data = await api();
+  renderRoles(data);
+  if(document.querySelector("#workflow-steps")) document.dispatchEvent(new Event("workflow-roles-changed"));
+}
+export function renderRoles(data) {
   roles = data.roles || [];
   $("#roles").replaceChildren();
+  $("#archived-roles")?.replaceChildren();
+  $("#new-role").disabled=data.roles===null;
   if (data.roles === null) {
     $("#error").textContent = "担当機能は migration 0002 の適用が必要です";
     $("#new-role").disabled = true;
   }
+  if (!roles.some(role => !role.archived) && data.roles !== null) {
+    $("#roles").append(node("p", "現在利用できる担当はありません。担当を追加するか、あとで設定できます。"));
+  }
+  if($("#archived-roles")&&!roles.some(r=>r.archived)) $("#archived-roles").append(node("p","過去の役割はありません。"));
   for (const role of roles) {
     const card = node("article", "");
     card.className = "wf-definition";
@@ -99,7 +109,7 @@ async function load() {
         });
       card.append(edit, archive);
     }
-    $("#roles").append(card);
+    (role.archived && $("#archived-roles") ? $("#archived-roles") : $("#roles")).append(card);
   }
 }
 $("#new-role").onclick = (e) => open(null, e.target);
@@ -114,11 +124,11 @@ form.onsubmit = (e) => {
       ...(editing ? { role_id: editing.id, revision: editing.revision } : {}),
       content,
     });
-    closeDialog(dialog);
+    markDialogSaved(dialog);closeDialog(dialog);
     await load();
   }, "#role-error");
 };
-watchAuth({
+if (!document.querySelector("#workflow-steps")) watchAuth({
   onSignedIn: () => {
     $("#workspace").hidden = false;
     $("#auth").textContent = "ログアウト";
@@ -127,7 +137,7 @@ watchAuth({
   },
   onSignedOut: () => {
     $("#workspace").hidden = true;
-    closeDialog(dialog);
+    markDialogSaved(dialog);closeDialog(dialog);
     roles = [];
     $("#roles").replaceChildren();
     $("#auth").textContent = "ログイン";
