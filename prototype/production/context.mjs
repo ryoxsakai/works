@@ -1,8 +1,9 @@
+import {recordDateRange} from '../../tutor/record-date.js';
 export function createProductionContext(auth,{fetcher=fetch,onExpired=()=>{},onLogout=()=>location.replace('/app/'),storage}={}) {
   let active=false,epoch=0,initialization;
   const controllers=new Set();
   const metrics={authInitializations:0,mounts:0,unmounts:0,reads:0};
-  function invalidate(message){context.viewState=null;context.workspaceState=null;context.serviceState=null;active=false;epoch++;for(const controller of controllers)controller.abort();controllers.clear();onExpired(message);}
+  function invalidate(message){context.viewState=null;context.workspaceState=null;context.serviceState=null;context.teachingState=null;active=false;epoch++;for(const controller of controllers)controller.abort();controllers.clear();onExpired(message);}
   const context={
     demo:false,metrics,
     get active(){return active;},
@@ -29,7 +30,7 @@ export function createProductionContext(auth,{fetcher=fetch,onExpired=()=>{},onL
       }finally{controllers.delete(controller);signal?.removeEventListener('abort',abort);}
     },
     async request(path,{method='GET',body,signal}={}) {
-      if(!/^\/api\/(?:todo|memo|workflow|admissions(?:\/[^/?]+(?:\/guarded)?)?|material-library\/(?:folders|files)(?:\/[^/?]+(?:\/guarded)?)?|wiki\/pages(?:\/[^/?]+(?:\/save)?)?)(?:\?.*)?$/.test(path))throw new Error('Unsupported API');
+      if(!/^\/api\/(?:settings|student-prefs|student-materials|lesson-record|next-lesson-plan|curriculum\/[^/?]+|todo|memo|workflow|admissions(?:\/[^/?]+(?:\/guarded)?)?|material-library\/(?:folders|files)(?:\/[^/?]+(?:\/guarded)?)?|wiki\/pages(?:\/[^/?]+(?:\/save)?)?)(?:\?.*)?$/.test(path))throw new Error('Unsupported API');
       await context.session.init();
       if(!active||!auth.getSessionToken())throw Object.assign(new Error('再ログインが必要です'),{status:401});
       const generation=epoch,controller=new AbortController();controllers.add(controller);
@@ -44,6 +45,29 @@ export function createProductionContext(auth,{fetcher=fetch,onExpired=()=>{},onL
         return result;
       }finally{controllers.delete(controller);signal?.removeEventListener('abort',abort);}
     },
+    async calendarDay(day,{signal}={}) {
+      const settings=await context.request('/api/settings',{signal});
+      const ids=[...new Set((settings.selected_calendars||[]).filter(value=>typeof value==='string'&&value))];
+      if(!ids.length)return {settings,events:[]};
+      const generation=epoch,controller=new AbortController();controllers.add(controller);
+      const abort=()=>controller.abort();signal?.addEventListener('abort',abort,{once:true});if(signal?.aborted)controller.abort();
+      const check=()=>{if(!active||generation!==epoch||controller.signal.aborted)throw new DOMException('Session changed','AbortError');};
+      try {
+        const token=await auth.getGoogleAccessToken();check();if(!token)throw new Error('予定の認証を確認できません。');
+        const [timeMin,timeMax]=recordDateRange(day),events=[];
+        for(const calendarId of ids){let pageToken='',pages=0;const seen=new Set();
+          do {if(++pages>20||seen.has(pageToken))throw new Error('予定が多いため従来画面で確認してください。');seen.add(pageToken);check();
+            const query=new URLSearchParams({timeMin,timeMax,singleEvents:'true',orderBy:'startTime',maxResults:'250',...(pageToken?{pageToken}:{})});
+            const response=await fetcher('https://www.googleapis.com/calendar/v3/calendars/'+encodeURIComponent(calendarId)+'/events?'+query,{method:'GET',redirect:'error',cache:'no-store',headers:{Authorization:'Bearer '+token},signal:controller.signal});check();
+            if(!response.ok)throw new Error('カレンダーの予定を取得できません。更新または従来画面で確認してください。');
+            const data=await response.json();check();if(!Array.isArray(data.items))throw new Error('予定の応答を確認できません。');
+            events.push(...data.items.filter(event=>event.status!=='cancelled').map(event=>({...event,calendar_id:calendarId})));
+            pageToken=data.nextPageToken||'';
+          }while(pageToken);
+        }
+        return {settings,events:events.sort((a,b)=>(a.start?.dateTime||a.start?.date||'').localeCompare(b.start?.dateTime||b.start?.date||''))};
+      }finally{controllers.delete(controller);signal?.removeEventListener('abort',abort);}
+    },
     invalidate,
     async logout(){invalidate('ログアウトしています…');try{await auth.signOutUser();}catch{}finally{onLogout();}},
     readSort(){try{const value=JSON.parse((storage??globalThis.localStorage)?.getItem('works_ss_sort')||'null');if(['name','status','deadline','remaining'].includes(value?.key)&&['asc','desc'].includes(value.direction))return value;}catch{}return {key:'deadline',direction:'asc'};},
@@ -56,6 +80,8 @@ export function safeShellRoute(value){
  if(/^\/material\/(?:files|folders)\/[A-Za-z0-9_-]{1,200}\/$/.test(value||''))return value;
  if(/^\/flow\/(?:roles|board|checks)\/$/.test(value||''))return value;
  if(/^\/flow\/(?:roles|definitions|runs)\/[A-Za-z0-9_-]{1,200}\/$/.test(value||''))return value;
+ const teaching=/^\/teaching\/(\d{4}-\d{2}-\d{2})\/(?:([^/]{1,6144})\/([^/]{1,3072})\/)?$/.exec(value||'');
+ if(teaching){try{if(new Date(teaching[1]+'T12:00:00Z').toISOString().slice(0,10)===teaching[1]&&[teaching[2],teaching[3]].filter(Boolean).every(part=>!/[\u0000-\u001f]/.test(decodeURIComponent(part))))return value;}catch{}}
  const match=/^\/(?:ss|todo|memo|wiki|material|admission)\/([^/]{1,200})\/$/.exec(value||'');
  try{if(match&&!['.','..'].includes(decodeURIComponent(match[1]))&&/^[A-Za-z0-9_.-]{1,200}$/.test(decodeURIComponent(match[1])))return value;}catch{}
  return '/home/';
