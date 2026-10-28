@@ -6,8 +6,9 @@
     "dev": "vite --config vite.config.mjs",
     "build": "vite build --config vite.config.mjs",
     "test": "node --test test/*.test.mjs",
-    "test:browser": "node test/shell.browser.mjs && node test/auth.browser.mjs",
-    "preview": "vite preview --config vite.config.mjs --host 127.0.0.1 --port 4174 --strictPort"
+    "test:browser": "node test/run-browser.mjs",
+    "preview": "vite preview --config vite.config.mjs --host 127.0.0.1 --port 4174 --strictPort",
+    "build:app": "vite build --config vite.app.config.mjs"
   },
   "dependencies": {
     "framework7": "9.2.0"

@@ -1,0 +1,36 @@
+name: Test unified app shell
+on:
+  pull_request:
+    branches: [main]
+    paths: ['app/**', 'prototype/**', 'shared/auth.js', 'shared/theme*', 'tutor/app.js', '.github/workflows/app-shell.yml']
+permissions:
+  contents: read
+jobs:
+  app-shell:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            prototype/package-lock.json
+            worker/package-lock.json
+      - run: npm ci --prefix prototype --ignore-scripts
+      - run: npm ci --prefix worker --ignore-scripts
+      - run: npm --prefix prototype test
+      - name: Verify reproducible static app assets
+        run: |
+          npm --prefix prototype run build:app
+          git diff --exit-code -- app/
+          test -z "$(git ls-files --others --exclude-standard app/)"
+      - run: node worker/node_modules/playwright/cli.js install --with-deps chromium
+      - run: npm --prefix prototype run test:browser
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: works-unified-shell-synthetic-screenshots
+          path: prototype/test-artifacts
+          if-no-files-found: ignore
