@@ -636,7 +636,7 @@ function renderLessonPlans() {
     input.hidden = !!sourceKey && !state;
     if (input.value !== (state?.value || "")) input.value = state?.value || "";
     const message = sourceKey && linkStatus !== "ready" ? reasons[linkStatus] : states[state?.pending ? "saving" : state?.status];
-    status.textContent = (state?.attributionStatus?.startsWith("legacy_") ? "旧記録・所属未確認。 " : "") + (message || "");
+    status.textContent = message || "";
     status.dataset.error = String(!!conflict || state?.status === "error" || (sourceKey && linkStatus === "error"));
     if (sourceKey) {
       const target = conflict ? link?.current?.target || link?.target : link?.target;
@@ -3679,9 +3679,7 @@ document.addEventListener("click",async event => {
 
 
 function lessonAttributionNotice(record) {
-  return record?.attribution_status?.startsWith("legacy_")
-    ? '<small class="legacy-record-notice" role="status" style="display:block">旧記録・所属未確認（保存時の生徒名は不明）</small>'
-    : lessonRecordNeedsReview(record) ? '<small role="status">予定名の対応確認が必要です</small>' : '';
+  return lessonRecordNeedsReview(record) ? '<small role="status">予定名の対応確認が必要です</small>' : '';
 }
 async function readRecordEntries(events,context=null) {
   const targets=[...new Map(events.map(event=>{const ref=lessonEventRef(event);return [lessonEventKey(ref),ref];})).values()];
