@@ -6231,6 +6231,29 @@ export default {
         return json({ ok: true }, headers);
       }
 
+      if (["/api/student-prefs/guarded","/api/chapter-progress/guarded"].includes(url.pathname)) {
+        if (browserSession.aud || browserSession.scope || browserSession.fid) throw httpError(401,"browser session required");
+        if (!["GET","PUT"].includes(request.method)) return json({error:"method not allowed"},headers,405);
+        let writeInput;
+        if(request.method==="PUT") {
+          if(request.headers.get("Origin")!==env.ALLOWED_ORIGIN||!request.headers.get("Content-Type")?.startsWith("application/json")) throw httpError(403,"same-origin JSON required");
+          const raw=await request.text();if(new TextEncoder().encode(raw).length>1000000)throw httpError(413,"input too large");
+          try{writeInput=JSON.parse(raw);}catch{throw httpError(400,"invalid JSON");}
+        }
+        const linked=await import("./teaching-linked.js");
+        const {readLessonPlan}=await import("./lesson-plan.js");
+        const dependencies={
+          target:ref=>request.method==="PUT"?verifiedLessonTarget(env,ref):readLessonPlan(env,ref.calendar_id,ref.id,{
+            settings:()=>readSettings(env),token:()=>mintGoogleAccessToken(env),event:fetchCalendarEventWithToken,events:fetchCalendarEventsForSchedule,
+          }).then(result=>result.target),
+          excluded:async()=> (await readSettings(env)).excluded_titles || [],
+        };
+        const input=request.method==="PUT"?writeInput:{calendar_id:url.searchParams.get("calendar_id"),id:url.searchParams.get("event_id")};
+        const profile=url.pathname==="/api/student-prefs/guarded";
+        const result=request.method==="GET"?await (profile?linked.readLinkedProfile:linked.readLinkedProgress)(env,input,dependencies):await (profile?linked.writeLinkedProfile:linked.writeLinkedProgress)(env,input,dependencies);
+        return json(result,{...headers,"Cache-Control":"no-store"});
+      }
+
       if (url.pathname === "/api/lesson-plan" || url.pathname === "/api/next-lesson-plan") {
         const { readLessonPlan, readNextLessonPlan, writeLessonPlan } = await import("./lesson-plan.js");
         if (browserSession.aud || browserSession.scope || browserSession.fid) throw httpError(401, "browser session required");
