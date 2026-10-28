@@ -30,6 +30,7 @@ export function installNavigationGuard(currentModule, currentRouter) {
       if(approvedUrl===to.url){approvedUrl=null;resolve();return;}
       if(!currentModule()||currentModule().canLeave())resolve();else reject();
     },
+    allowOnce(url){approvedUrl=url;},
     settled(){approvedUrl=null;},
     dispose(){history.pushState=nativePush;history.replaceState=nativeReplace;window.removeEventListener('popstate',popstate,true);},
   };
