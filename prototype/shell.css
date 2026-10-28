@@ -53,3 +53,12 @@ html[data-theme=dark]{--f7-page-bg-color:var(--paper)}html[data-theme=dark] :is(
 .teaching-related>[data-linked]{margin-block:24px}
 .linked-editor fieldset{border:1px solid var(--border,#dce6f4);border-radius:8px;padding:16px;min-width:0}
 .linked-editor pre{white-space:pre-wrap;overflow-wrap:anywhere}
+
+/* Tutor form parity: content-sized inputs, four aligned fields, nearby linked editors. */
+.record-print-copy{display:none}.record-print-copy.record-reading{display:block}.record-toolbar{align-items:center;justify-content:flex-start}.record-toolbar h3{margin-right:auto}.record-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.record-fields label{min-width:0;margin:0!important}.record-editor textarea,.linked-editor textarea{resize:vertical;overflow-y:hidden;min-height:72px;line-height:1.6}.record-editor>label{display:flex;align-items:center}.record-editor [data-record-save-state]{margin-bottom:16px}.teaching-related{min-width:0}.teaching-related [data-linked]{padding:16px;background:var(--surface);border:1px solid var(--line);border-radius:12px}.teaching-related .workspace-actions{margin-bottom:0}
+@media(min-width:1280px){.teaching-workspace{display:grid;grid-template-columns:minmax(0,1.8fr) minmax(280px,1fr);gap:24px;align-items:start}.teaching-related{margin-top:24px;padding-top:0;border-top:0}.record-fields{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:650px){.record-fields{grid-template-columns:1fr;gap:16px}.record-editor textarea,.linked-editor textarea{font-size:16px}.record-toolbar{gap:8px}.record-toolbar h3{width:100%;margin:0}}
+@media print{.record-print-copy{display:block!important}.record-toolbar,.record-input-host,.teaching-related button{display:none!important}.teaching-workspace{display:block}.teaching-related [data-linked]{border:0;padding:0}}
+.teaching-print-name{display:none}
+@media print{.teaching-event-title,.teaching-related [data-linked=profile]{display:none!important}.teaching-print-name{display:block}}
+.teaching-record .record-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:8px 0 16px}.teaching-record .record-toolbar h3{width:auto;flex:1 1 auto;margin:0}.teaching-record .record-toolbar button{display:inline-flex;width:auto;flex:0 0 auto;align-items:center;gap:4px}.teaching-workspace button:disabled{opacity:.55;cursor:not-allowed}.teaching-legacy-note{font-size:13px;margin:8px 0}.teaching-legacy-note summary{cursor:pointer;min-height:32px}.teaching-legacy-note p{margin:8px 0}.teaching-dates{margin-block:8px 16px}

@@ -19,7 +19,7 @@ export function createSidebarController(panel,{background,openerSelector='.page-
   previousBackground=background.map(node=>[node,node.inert,node.getAttribute('aria-hidden')]);for(const [node]of previousBackground){node.inert=true;node.setAttribute('aria-hidden','true');}
   buttons().forEach(button=>button.setAttribute('aria-expanded','true'));
  }
- function opened(){if(media.matches){release(false);return;}lock();(element.querySelector('[aria-current=page]')||focusables()[0])?.focus();}
+ function opened(){if(media.matches||!panel.opened||!element.classList.contains('panel-in')){release(false);return;}lock();(element.querySelector('[aria-current=page]')||focusables()[0])?.focus();}
  function closed(){release(restoreFocus);restoreFocus=true;}
  function close({restore=true,animate=false}={}){if(media.matches)return;restoreFocus=restore;panel.close(animate);if(!panel.opened)release(restore);}
  function resize(){
@@ -29,6 +29,9 @@ export function createSidebarController(panel,{background,openerSelector='.page-
   else if(focused)requestAnimationFrame(()=>document.querySelector(openerSelector)?.focus());
  }
  panel.on('open',lock);panel.on('opened',opened);panel.on('closed',closed);panel.on('breakpoint',resize);
+ // A backdrop tap can arrive during the opening transition. Use the same
+ // synchronous close as Escape so a missing transitionend cannot retain inert/scroll locks.
+ panel.backdropEl?.addEventListener('click',()=>{if(modal)close();},{capture:true,signal:lifetime.signal});
  media.addEventListener('change',resize,{signal:lifetime.signal});
  document.addEventListener('keydown',event=>{if(!modal)return;if(event.key==='Escape'){event.preventDefault();close();return;}if(event.key==='Tab'){const items=focusables();if(!items.length){event.preventDefault();return;}const first=items[0],last=items.at(-1);if(event.shiftKey&&(document.activeElement===first||!element.contains(document.activeElement))){event.preventDefault();last.focus();}else if(!event.shiftKey&&(document.activeElement===last||!element.contains(document.activeElement))){event.preventDefault();first.focus();}}},{capture:true,signal:lifetime.signal});
  document.addEventListener('focusin',event=>{if(modal&&!element.contains(event.target))focusables()[0]?.focus();},{signal:lifetime.signal});
