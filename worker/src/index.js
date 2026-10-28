@@ -5053,6 +5053,27 @@ async function createAdmissionEvent(env, body) {
   ).first();
 }
 
+// Optional snapshot predicates protect new clients while retaining legacy request contracts.
+function guardedUpdateInput(match, body) {
+  if (match[2] && body.expected === undefined) throw httpError(400, "expected snapshot is required");
+  return body;
+}
+function snapshotPredicate(body, fields) {
+  if (body.expected === undefined) return { sql: "", values: [] };
+  const expected = body.expected;
+  if (!expected || typeof expected !== "object" || Array.isArray(expected) ||
+      fields.some(key => !Object.hasOwn(expected, key) ||
+        !(expected[key] === null || typeof expected[key] === "string" ||
+          (typeof expected[key] === "number" && Number.isFinite(expected[key])))))
+    throw httpError(400, "complete expected snapshot is required");
+  return { sql: fields.map(key => " AND " + key + " IS ?").join(""), values: fields.map(key => expected[key]) };
+}
+async function snapshotResult(statement, predicate) {
+  const row = await statement.first();
+  if (!row && predicate.sql) throw httpError(409, "record changed or removed; reload before saving");
+  return row;
+}
+
 async function updateAdmissionEvent(env, id, body) {
   await ensureAdmissionSchema(env);
   const current = await env.DB.prepare("SELECT * FROM admission_events WHERE id = ?").bind(id).first();
@@ -5068,15 +5089,16 @@ async function updateAdmissionEvent(env, id, body) {
   if (endDate && !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
     throw new Error("end_date must be YYYY-MM-DD");
   }
-  return env.DB.prepare(
-    "UPDATE admission_events SET university = ?, selection_type = ?, stage = ?, schedule_date = ?, end_date = ?, notes = ?, source_url = ?, color = ?, updated_at = datetime('now') WHERE id = ? RETURNING *"
+  const predicate = snapshotPredicate(body, ["university", "selection_type", "stage", "schedule_date", "end_date", "notes", "source_url", "color"]);
+  return snapshotResult(env.DB.prepare(
+    "UPDATE admission_events SET university = ?, selection_type = ?, stage = ?, schedule_date = ?, end_date = ?, notes = ?, source_url = ?, color = ?, updated_at = datetime('now') WHERE id = ?" + predicate.sql + " RETURNING *"
   ).bind(
     university, selectionType, stage, scheduleDate, endDate,
     body.notes === undefined ? current.notes : (body.notes ? String(body.notes).trim() : null),
     body.source_url === undefined ? current.source_url : (body.source_url ? String(body.source_url).trim() : null),
     body.color === undefined ? current.color : (body.color ? String(body.color).trim() : null),
-    id
-  ).first();
+    id, ...predicate.values
+  ), predicate);
 }
 
 async function deleteAdmissionEvent(env, id) {
@@ -5212,9 +5234,10 @@ async function updateMaterialFolder(env, id, body) {
     ).bind(parentId, parentId).first();
     sortOrder = Number(next.value || 0);
   }
-  return db.prepare(
-    "UPDATE material_folders SET name = ?, parent_id = ?, sort_order = ? WHERE id = ? RETURNING *"
-  ).bind(name, parentId, sortOrder, id).first();
+  const predicate = snapshotPredicate(body, ["name", "parent_id", "sort_order"]);
+  return snapshotResult(db.prepare(
+    "UPDATE material_folders SET name = ?, parent_id = ?, sort_order = ? WHERE id = ?" + predicate.sql + " RETURNING *"
+  ).bind(name, parentId, sortOrder, id, ...predicate.values), predicate);
 }
 
 async function reorderMaterialFolders(env, body) {
@@ -5372,10 +5395,11 @@ async function updateMaterialFile(env, id, body) {
     }
   }
   if (!fields.length) throw new Error("変更内容がありません");
-  values.push(id);
-  return db.prepare(
-    "UPDATE material_files SET " + fields.join(", ") + " WHERE id = ? RETURNING *"
-  ).bind(...values).first();
+  const predicate = snapshotPredicate(body, ["name", "material_code", "folder_id", "sort_order"]);
+  values.push(id, ...predicate.values);
+  return snapshotResult(db.prepare(
+    "UPDATE material_files SET " + fields.join(", ") + " WHERE id = ?" + predicate.sql + " RETURNING *"
+  ).bind(...values), predicate);
 }
 
 async function reorderMaterialFiles(env, body) {
@@ -6366,15 +6390,15 @@ export default {
         return json(await createAdmissionEvent(env, await request.json()), headers, 201);
       }
 
-      const admissionMatch = url.pathname.match(/^\/api\/admissions\/([^/]+)$/);
+      const admissionMatch = url.pathname.match(/^\/api\/admissions\/([^/]+)(\/guarded)?$/);
       if (admissionMatch && request.method === "PUT") {
         return json(
-          await updateAdmissionEvent(env, decodeURIComponent(admissionMatch[1]), await request.json()),
+          await updateAdmissionEvent(env, decodeURIComponent(admissionMatch[1]), guardedUpdateInput(admissionMatch, await request.json())),
           headers
         );
       }
 
-      if (admissionMatch && request.method === "DELETE") {
+      if (admissionMatch && !admissionMatch[2] && request.method === "DELETE") {
         await deleteAdmissionEvent(env, decodeURIComponent(admissionMatch[1]));
         return json({ ok: true }, headers);
       }
@@ -6392,16 +6416,16 @@ export default {
         return json(await reorderMaterialFolders(env, await request.json()), headers);
       }
 
-      const materialFolderMatch = url.pathname.match(/^\/api\/material-library\/folders\/([^/]+)$/);
+      const materialFolderMatch = url.pathname.match(/^\/api\/material-library\/folders\/([^/]+)(\/guarded)?$/);
       if (materialFolderMatch && request.method === "PUT") {
         const body = await request.json();
         return json(
-          await updateMaterialFolder(env, decodeURIComponent(materialFolderMatch[1]), body),
+          await updateMaterialFolder(env, decodeURIComponent(materialFolderMatch[1]), guardedUpdateInput(materialFolderMatch, body)),
           headers
         );
       }
 
-      if (materialFolderMatch && request.method === "DELETE") {
+      if (materialFolderMatch && !materialFolderMatch[2] && request.method === "DELETE") {
         await deleteMaterialFolder(env, decodeURIComponent(materialFolderMatch[1]));
         return json({ ok: true }, headers);
       }
@@ -6450,16 +6474,16 @@ export default {
         return response;
       }
 
-      const materialFileMatch = url.pathname.match(/^\/api\/material-library\/files\/([^/]+)$/);
+      const materialFileMatch = url.pathname.match(/^\/api\/material-library\/files\/([^/]+)(\/guarded)?$/);
       if (materialFileMatch && request.method === "PUT") {
         const body = await request.json();
         return json(
-          await updateMaterialFile(env, decodeURIComponent(materialFileMatch[1]), body),
+          await updateMaterialFile(env, decodeURIComponent(materialFileMatch[1]), guardedUpdateInput(materialFileMatch, body)),
           headers
         );
       }
 
-      if (materialFileMatch && request.method === "DELETE") {
+      if (materialFileMatch && !materialFileMatch[2] && request.method === "DELETE") {
         await deleteMaterialFile(env, decodeURIComponent(materialFileMatch[1]));
         return json({ ok: true }, headers);
       }
