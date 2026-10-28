@@ -21,4 +21,4 @@ Calculated white-background contrast for the source colors: audio primary 3.23:1
 
 No fonts, images, JavaScript, storage, third-party calls or dependencies are copied from Audio. Works retains zoom support, reduced-motion handling, 48px control targets, navigation labels, safe-area spacing and its existing authentication/API behavior.
 
-Validation: build reproducibility, existing unit/browser regressions, exact computed header-gradient endpoints/height, light/dark navigation/save contrast and mobile/desktop screenshots. Live audio appearance and physical iPhone QA remain unverified. Stage 3 remains local pending publication approval.
+Validation: build reproducibility, existing unit/browser regressions, exact computed header-gradient endpoints/height, light/dark navigation/save contrast and mobile/desktop screenshots. Live audio appearance and physical iPhone QA remain unverified. Publication state is recorded in repository PRs and deployment workflows.
