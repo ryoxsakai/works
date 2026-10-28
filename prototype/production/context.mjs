@@ -2,7 +2,7 @@ export function createProductionContext(auth,{fetcher=fetch,onExpired=()=>{},onL
   let active=false,epoch=0,initialization;
   const controllers=new Set();
   const metrics={authInitializations:0,mounts:0,unmounts:0,reads:0};
-  function invalidate(message){context.viewState=null;context.workspaceState=null;active=false;epoch++;for(const controller of controllers)controller.abort();controllers.clear();onExpired(message);}
+  function invalidate(message){context.viewState=null;context.workspaceState=null;context.serviceState=null;active=false;epoch++;for(const controller of controllers)controller.abort();controllers.clear();onExpired(message);}
   const context={
     demo:false,metrics,
     get active(){return active;},
@@ -29,7 +29,7 @@ export function createProductionContext(auth,{fetcher=fetch,onExpired=()=>{},onL
       }finally{controllers.delete(controller);signal?.removeEventListener('abort',abort);}
     },
     async request(path,{method='GET',body,signal}={}) {
-      if(!/^\/api\/(?:todo|memo|wiki\/pages(?:\/[^/?]+(?:\/save)?)?)(?:\?.*)?$/.test(path))throw new Error('Unsupported API');
+      if(!/^\/api\/(?:todo|memo|workflow|admissions(?:\/[^/?]+(?:\/guarded)?)?|material-library\/(?:folders|files)(?:\/[^/?]+(?:\/guarded)?)?|wiki\/pages(?:\/[^/?]+(?:\/save)?)?)(?:\?.*)?$/.test(path))throw new Error('Unsupported API');
       await context.session.init();
       if(!active||!auth.getSessionToken())throw Object.assign(new Error('再ログインが必要です'),{status:401});
       const generation=epoch,controller=new AbortController();controllers.add(controller);
@@ -52,8 +52,11 @@ export function createProductionContext(auth,{fetcher=fetch,onExpired=()=>{},onL
   return context;
 }
 export function safeShellRoute(value){
- if(/^\/(?:home|teaching|operations|workflow|more|ss|todo|memo|wiki)\/$/.test(value||''))return value;
- const match=/^\/(?:ss|todo|memo|wiki)\/([^/]{1,200})\/$/.exec(value||'');
+ if(/^\/(?:home|teaching|operations|workflow|more|ss|todo|memo|wiki|material|admission|flow)\/$/.test(value||''))return value;
+ if(/^\/material\/(?:files|folders)\/[A-Za-z0-9_-]{1,200}\/$/.test(value||''))return value;
+ if(/^\/flow\/(?:roles|board|checks)\/$/.test(value||''))return value;
+ if(/^\/flow\/(?:roles|definitions|runs)\/[A-Za-z0-9_-]{1,200}\/$/.test(value||''))return value;
+ const match=/^\/(?:ss|todo|memo|wiki|material|admission)\/([^/]{1,200})\/$/.exec(value||'');
  try{if(match&&!['.','..'].includes(decodeURIComponent(match[1]))&&/^[A-Za-z0-9_.-]{1,200}$/.test(decodeURIComponent(match[1])))return value;}catch{}
  return '/home/';
 }

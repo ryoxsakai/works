@@ -10,5 +10,5 @@ try {
   for(let i=0;i<60&&!await ready();i++)await new Promise(resolve=>setTimeout(resolve,200));
   if(!await ready())throw new Error('Local shell server did not become ready');
  }
- for(const file of ['test/shell.browser.mjs','test/auth.browser.mjs','test/production.browser.mjs','test/workspace.browser.mjs'])await run(file);
+ for(const file of ['test/shell.browser.mjs','test/auth.browser.mjs','test/production.browser.mjs','test/workspace.browser.mjs','test/services.browser.mjs'])await run(file);
 }finally{if(server){server.kill('SIGTERM');await new Promise(resolve=>server.once('exit',resolve));}}
