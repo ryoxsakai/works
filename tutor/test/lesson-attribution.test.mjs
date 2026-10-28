@@ -21,3 +21,15 @@ test('list cards apply the same safe comparison as lesson tables',()=>{
  const row={calendar_event_id:'event',record_exists:1,record_title:null,record_observed_calendar_id:'a',record_observed_title:'Original',lesson_plan:'old'};
  assert.equal(attributedLessonRecord(row,{id:'event',calendar_id:'a',title:'Replacement'}).lesson_plan,null);
 });
+
+test('ordinary legacy labels are hidden while review warnings and attribution state are retained',()=>{
+ const start=source.indexOf('function lessonAttributionNotice(');
+ const state=vm.createContext({lessonRecordNeedsReview:row=>['title_changed','known_change','id_collision','target_unavailable'].includes(row?.attribution_status)});
+ vm.runInContext(source.slice(start,source.indexOf('\n}',start)+2),state);
+ for(const status of ['legacy_unverified','legacy_historical','confirmed','new'])assert.equal(state.lessonAttributionNotice({attribution_status:status}),'');
+ for(const status of ['title_changed','known_change','id_collision','target_unavailable'])assert.match(state.lessonAttributionNotice({attribution_status:status}),/予定名の対応確認が必要です/);
+ const row={calendar_event_id:'event',record_exists:1,record_title:null,record_observed_calendar_id:'a',record_observed_title:'Original',lesson_plan:'retained'};
+ const same=attributedLessonRecord(row,{id:'event',calendar_id:'a',title:'Original'});assert.equal(same.attribution_status,'legacy_unverified');assert.equal(same.lesson_plan,'retained');
+ const changed=attributedLessonRecord(row,{id:'event',calendar_id:'a',title:'Replacement'});assert.equal(changed.attribution_status,'title_changed');assert.equal(changed.lesson_plan,null);
+ assert.ok(!source.includes('旧記録・所属未確認'));
+});

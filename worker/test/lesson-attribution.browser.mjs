@@ -38,7 +38,7 @@ try {
   await expect(page.getByRole('button',{name:'記録の対応・履歴'})).toHaveCount(0);
   // Legacy source remains available and explicitly unverified, without blanket quarantine.
   await fixture.DB.prepare("UPDATE lesson_record_identity SET title=NULL,calendar_id=NULL,revision=revision+1 WHERE event_id='b'").run();
-  await page.reload();await expect(record('b')).toContainText('旧記録・所属未確認');
+  await page.reload();await expect(record('b')).not.toContainText('旧記録・所属未確認');await expect(page.locator('.legacy-record-notice')).toHaveCount(0);
   await expect(record('b').locator('.record-plan')).toHaveValue('新しい生徒の予定');
   await expect(page.getByRole('button',{name:'記録の対応・履歴'})).toHaveCount(0);
   const baselineEvent=fixture.events.find(e=>e.id==='b');

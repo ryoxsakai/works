@@ -15,7 +15,7 @@ try {
  await fixture.DB.batch(sql.split('\n').filter(line=>line&&!line.startsWith('--')).map(line=>fixture.DB.prepare(line)));
  await page.route('**/*',route=>new URL(route.request().url()).origin===fixture.base?route.continue():route.abort());
  await page.goto(fixture.base+'/tutor/');await page.locator('[data-page-tab="record"]').click();
- await expect(row('b').locator('.record-plan')).toHaveValue('既存の次回予定');await expect(row('b')).toContainText('旧記録・所属未確認');
+ await expect(row('b').locator('.record-plan')).toHaveValue('既存の次回予定');await expect(row('b')).not.toContainText('旧記録・所属未確認');await expect(page.locator('.legacy-record-notice')).toHaveCount(0);
  await expect(row('a').locator('.record-next-plan textarea')).toHaveValue('既存の次回予定');
  assert.equal((await fixture.DB.prepare("SELECT title FROM lesson_record_identity WHERE event_id='b'").first()).title,null);
  assert.equal((await fixture.DB.prepare("SELECT title FROM lesson_record_baseline WHERE event_id='b'").first()).title,'サンプル生徒');
