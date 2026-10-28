@@ -23,7 +23,7 @@ const PASTEL_FALLBACK_COLORS = [
 
 const API_BASE = "/api";
 const PENDING_DESTINATION_KEY = "works_pending_destination";
-const SAFE_DESTINATION_RE = /^(?:\/|\/(?:tutor|material|material-print|admission|ss|todo|kdp|memo|workflow)\/|\/wiki\/(?:\?(?:folder=[A-Za-z0-9_-]{1,100}(?:&page=[A-Za-z0-9_-]{1,100})?|page=[A-Za-z0-9_-]{1,100}(?:&folder=[A-Za-z0-9_-]{1,100})?))?)$/;
+const SAFE_DESTINATION_RE = /^(?:\/|\/(?:app|tutor|material|material-print|admission|ss|todo|kdp|memo|workflow)\/|\/wiki\/(?:\?(?:folder=[A-Za-z0-9_-]{1,100}(?:&page=[A-Za-z0-9_-]{1,100})?|page=[A-Za-z0-9_-]{1,100}(?:&folder=[A-Za-z0-9_-]{1,100})?))?)$/;
 
 function consumePendingDestination() {
   const value = localStorage.getItem(PENDING_DESTINATION_KEY);
