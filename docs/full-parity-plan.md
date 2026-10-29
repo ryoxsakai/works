@@ -81,11 +81,11 @@ Block 2 now restores immediate shared-memo and next-plan blur autosave, using th
 
 ### ToDo (`todo/index.html`, `todo/todo.js`)
 
-- [ ] Original dashboard/group/card/detail structure, status/progress/priority/deadline/category/role fields and defaults.
-- [ ] Create/edit/archive/delete/completion and all steps/checklists with original modal/back/cancel/focus behavior.
-- [ ] Role and category management, ordering, assignment and any owner confirmation conditions.
-- [ ] Search/filter/sort/group visibility and persistence; mobile interactions and remaining-day display.
-- [ ] Duplicate/clone date preview and confirmation, pending-operation recovery/export, revision conflicts, preserved unrelated fields/receipts.
+- [x] Original ToDo dashboard/date groups/cards/detail forms, status/legacy progress/priority/deadline/planned-day/category/role fields and defaults; see `todo-original-parity.md` for the exact flat-array semantics.
+- [x] ToDo create/edit/delete/complete/reopen and checklist add/check/remove, original explicit-save semantics, native stable detail URL/reload/Back/Forward, guarded modal cancel/Escape/focus. Original tasks have no archive or parent/child hierarchy; role archive/resume is retained.
+- [x] ToDo role add/edit/archive/resume and category add/rename/up/down/delete with explicit reassignment confirmation; original personal-role meaning does not grant workflow execution rights.
+- [x] ToDo search/role/category filters, clear/count, original focus/date/board ordering and all-task deadline guardrail; shell-session filter/mode retention. Original has explicit dates/overdue badges, no separate numeric remaining-day or manual task-order control. Actual iPhone QA remains unverified.
+- [x] ToDo direct/custom independent clone/JST preview/explicit deadline copy, original stable-request receipt recovery, disabled-input draft export, full-document CAS/unknown stop/inspection/explicit discard, unrelated task fields and server receipt preservation.
 
 ### Memo (`memo/index.html`, `memo/app.js`)
 
@@ -264,7 +264,7 @@ Verification covers civil-date/leap/year boundaries, union/gap filtering, descri
 | Module | Remaining original parity work (not certified complete by this release) |
 |---|---|
 | Lesson management | L13d arbitrary saved aliases need an explicit guarded mapping; L13d arbitrary alias/profile-key mapping remains read-only pending an explicit safe mapping workflow. L19b local search/classification and L20 native attribution/history/preparation are covered by the later native lesson phase; old routes remain available. |
-| ToDo | Original dashboard/group/card layout, all fields/checklists and lifecycle actions, category/role management, clone preview, preferences and operation recovery; use the detailed unchecked list above. |
+| ToDo | Source-inventoried native controls now covered by the ToDo phase below. Actual iPhone/authenticated-production interaction and complete visual/device comparison remain unverified; no original task hierarchy/manual task reorder is invented. |
 | Memo | Original multi-body/supplementary editor, tags/category operations, reorder/display/search preferences and complete lifecycle/recovery. |
 | Wiki | Folder hierarchy CRUD/move, full page/source/proposal/history/review/export controls and reading/preview modes. |
 | Workflow | Full original role/definition/task/run controls, calendar/agenda and confirmation/history/settings/planning dialogs; all existing authorization/stop/lease gates remain required. |
@@ -316,3 +316,14 @@ Synthetic validation: 87 app tests; real-D1 browser coverage for per-calendar cl
 Remaining lesson gap: L13d arbitrary alias mapping, plus supplied-image/actual-device/physical-print comparison of final original-layout fidelity. Old routes stay available throughout. The next non-lesson phase is original ToDo dashboard/group/card/detail and complete steps/category/role/filter/clone/recovery parity. Memo, Wiki, workflows, material-library files/tree/uploads, admissions calendars/gantt/table/print, native KDP and SS original-column/preferences/detail/print audit all remain explicitly in the overall checklist; this release does not certify the complete Works migration.
 
 A failed or conflicting fresh review read also invalidates the cached current editor until a deliberate reload; previously loaded values must not remain presented as verified current content after a collision or changed target is discovered. The synthetic collision case checks editor/print suppression as well as absence of old content inside the dialog.
+
+
+## Original ToDo native parity (2026-10-29)
+
+Source inventory and acceptance: [todo-original-parity.md](todo-original-parity.md). Replaced the reduced existing-item editor with the original creation/dashboard/date groups/board/detail/checklist/roles/categories/clone/recovery interactions. The scoped adapter retains original markup constraints and CSS, renames conflicting generic classes, and uses the shell's single authentication/router lifecycle. Existing `/todo/` stays untouched. No task parent/child tree, manual task drag order or task archive is present in the original; category ordering, ordered steps and role archives are carried over precisely.
+
+Whole-document mutations freeze the original displayed revision. Conflict/unknown/bad acknowledgement stops all old-snapshot mutation, retains disabled input for export and supports read-only inspection followed by explicit discard/reload. Initial read failure disables mutations; a concurrently deleted task returns safely to the list. Clone recovery shares original per-request durable keys and reads the server receipt before an idempotent POST. No production task creation/completion/deletion/reorder or settings changes were performed. Worker/database/credential/permission/scheduling changes are absent.
+
+Validation checkpoint: 89 unit tests and seven original ToDo Worker tests pass; the original page's synthetic browser suite passes at390/1440 widths in light/dark with stale revision, category, midnight and receipt recovery cases. The native real-D1 synthetic suite covers create/defaults, all detail fields, partial progress preservation, steps, date/deadline distinction, roles/category order/reassignment, clone reset/receipt recovery, competing writes, lost responses, draft export, deletion elsewhere, busy/unsaved guards, direct routes/reload/Back/Forward, 320/390/768/1440 widths and auth lifecycle. All13 local app browser suites passed, including the final native ToDo and existing lesson suites. Native and original390px synthetic screenshots were inspected and a Framework7 close-button stretching conflict corrected with scoped CSS plus dialog/heading bounds assertions. Exact-head CI and deployment remain required publication gates.
+
+Next non-lesson phase: original Memo multi-body/supplementary/tags/categories/reordering/lifecycle and recovery. Lesson L13d arbitrary alias mapping remains read-only pending explicit safe mapping; Wiki, workflows, material-library files/tree/uploads, admissions calendar/gantt/table/print, native KDP and SS original columns/preferences/detail/print all remain in scope. Actual iPhone, authenticated production UI, physical printing and supplied-image pixel comparison remain unverified. This is not full Works migration completion.

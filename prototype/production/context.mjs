@@ -32,7 +32,7 @@ export function createProductionContext(auth,{fetcher=fetch,onExpired=()=>{},onL
     },
     async request(path,{method='GET',body,signal}={}) {
       if(/^\/api\/(?:terms|periods|years|students)(?:\?|$)/.test(path)&&method!=='GET')throw new Error('Unsupported API');
-      if(!/^\/api\/(?:settings|terms|periods|years|students|student-prefs(?:\/guarded)?|chapter-progress\/guarded|lesson-plan|student-planning\/guarded|tutor-settings\/guarded|lesson-baseline\/initialize|student-materials|lesson-record|next-lesson-plan|curriculum\/[^/?]+|todo|memo|workflow|admissions(?:\/[^/?]+(?:\/guarded)?)?|material-library\/(?:folders|files)(?:\/[^/?]+(?:\/guarded)?)?|wiki\/pages(?:\/[^/?]+(?:\/save)?)?)(?:\?.*)?$/.test(path))throw new Error('Unsupported API');
+      if(!/^\/api\/(?:settings|terms|periods|years|students|student-prefs(?:\/guarded)?|chapter-progress\/guarded|lesson-plan|student-planning\/guarded|tutor-settings\/guarded|lesson-baseline\/initialize|student-materials|lesson-record|next-lesson-plan|curriculum\/[^/?]+|todo(?:\/clone)?|memo|workflow|admissions(?:\/[^/?]+(?:\/guarded)?)?|material-library\/(?:folders|files)(?:\/[^/?]+(?:\/guarded)?)?|wiki\/pages(?:\/[^/?]+(?:\/save)?)?)(?:\?.*)?$/.test(path))throw new Error('Unsupported API');
       await context.session.init();
       if(!active||!auth.getSessionToken())throw Object.assign(new Error('再ログインが必要です'),{status:401});
       const generation=epoch,controller=new AbortController();controllers.add(controller);
