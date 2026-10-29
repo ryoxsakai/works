@@ -27,6 +27,6 @@ The version1 allowlisted layout uses `works-home-dashboard-v1:<SHA256 authentica
 
 `BROWSER_EXECUTABLE=/usr/bin/chromium node dashboard/test/browser.mjs`
 
-The browser suite intercepts **all** requests at synthetic origins and never uses production credentials/data. It captures desktop, mobile, edit, reordered and dark states under `test-artifacts/dashboard`. CI installs the existing worker dev dependencies and uploads that directory as an artifact. Existing header/theme and KDP tests adapt only their root-menu fixture/selectors; original feature-page assertions remain.
+The browser suite intercepts **all** requests at synthetic origins and never uses production credentials/data. It captures desktop, mobile, edit, reordered and dark states under `test-artifacts/dashboard`. CI installs the existing worker dev dependencies and uploads that directory as an artifact. Existing header/theme, KDP and workflow tests adapt only their root-menu fixture/selectors; original feature-page assertions remain.
 
 Reference-image download currently failed in this consuming environment. Rendered screenshots were inspected, but no claim of reference-pixel comparison or real iPhone/live-authenticated QA is made. See `design-qa.md`. This is draft-review-only; no merge/deployment is authorized in this stage.
