@@ -54,6 +54,7 @@ function render() {
   els.empty.querySelector("p").textContent = projects.length && !els.showCompleted.checked
     ? "進行中のプロジェクトはありません。完了案件は「完了を表示」で確認できます。"
     : "登録中のプロジェクトはありません。";
+  if(prefs.query.trim()&&!visible.length)els.empty.querySelector("p").textContent="検索条件に一致する案件はありません。";
   renderSortControls();
   els.list.innerHTML = visible.map((project) => {
     const remainingState = remaining(project);
