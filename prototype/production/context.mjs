@@ -30,9 +30,11 @@ export function createProductionContext(auth,{fetcher=fetch,onExpired=()=>{},onL
         return data.map(({id,name,status,deadline,memo,remaining_days})=>({id,name,status,deadline,memo:typeof memo==='string'?memo:'',remaining_days}));
       }finally{controllers.delete(controller);signal?.removeEventListener('abort',abort);}
     },
-    async request(path,{method='GET',body,signal}={}) {
+    async request(path,{method='GET',body,signal,responseType='json'}={}) {
+      if(!['json','blob'].includes(responseType)||responseType==='blob'&&(method!=='GET'||!/^\/api\/wiki\/pages\/[^/?]+\/export\?format=(?:markdown|json)$/.test(path)))throw new Error('Unsupported response type');
       if(/^\/api\/(?:terms|periods|years|students)(?:\?|$)/.test(path)&&method!=='GET')throw new Error('Unsupported API');
-      if(!/^\/api\/(?:settings|terms|periods|years|students|student-prefs(?:\/guarded)?|chapter-progress\/guarded|lesson-plan|student-planning\/guarded|tutor-settings\/guarded|lesson-baseline\/initialize|student-materials|lesson-record|next-lesson-plan|curriculum\/[^/?]+|todo(?:\/clone)?|memo|workflow|admissions(?:\/[^/?]+(?:\/guarded)?)?|material-library\/(?:folders|files)(?:\/[^/?]+(?:\/guarded)?)?|wiki\/pages(?:\/[^/?]+(?:\/save)?)?)(?:\?.*)?$/.test(path))throw new Error('Unsupported API');
+      if(!/^\/api\/(?:settings|terms|periods|years|students|student-prefs(?:\/guarded)?|chapter-progress\/guarded|lesson-plan|student-planning\/guarded|tutor-settings\/guarded|lesson-baseline\/initialize|student-materials|lesson-record|next-lesson-plan|curriculum\/[^/?]+|todo(?:\/clone)?|memo|workflow|admissions(?:\/[^/?]+(?:\/guarded)?)?|material-library\/(?:folders|files)(?:\/[^/?]+(?:\/guarded)?)?|wiki\/(?:folders(?:\/[^/?]+)?|pages(?:\/[^/?]+(?:\/(?:save|proposals|archive|history|accept|reject|restore|move|export))?)?))(?:\?.*)?$/.test(path))throw new Error('Unsupported API');
+      if(path.startsWith('/api/wiki/')){const clean=path.split('?')[0],read=/^\/api\/wiki\/(?:folders|pages(?:\/[^/?]+(?:\/(?:history|export))?)?)$/.test(clean),write=/^\/api\/wiki\/(?:folders(?:\/[^/?]+)?|pages(?:\/[^/?]+\/(?:save|proposals|archive|accept|reject|restore|move))?)$/.test(clean);if(!(method==='GET'&&read||method==='POST'&&write))throw new Error('Unsupported Wiki method');}
       await context.session.init();
       if(!active||!auth.getSessionToken())throw Object.assign(new Error('再ログインが必要です'),{status:401});
       const generation=epoch,controller=new AbortController();controllers.add(controller);
@@ -41,8 +43,8 @@ export function createProductionContext(auth,{fetcher=fetch,onExpired=()=>{},onL
         const response=await fetcher(path,{method,cache:'no-store',headers:{Authorization:'Bearer '+auth.getSessionToken(),...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{}),signal:controller.signal});
         if(!active||generation!==epoch)throw new DOMException('Session changed','AbortError');
         if(response.status===401||response.status===403){invalidate('再度ログインしてください。');throw Object.assign(new Error('再ログインが必要です'),{status:response.status});}
-        if(!response.ok)throw Object.assign(new Error(response.status===409?'別の画面で更新されています。入力は保持しています。':response.status===429?'アクセスが集中しています。':'通信に失敗しました。'),{status:response.status});
-        const result=await response.json();
+        if(!response.ok){let message=response.status===409?'別の画面で更新されています。入力は保持しています。':response.status===429?'アクセスが集中しています。':'通信に失敗しました。';if(path.startsWith('/api/wiki/')&&[400,413].includes(response.status)){const error=await response.json().catch(()=>null);if(!active||generation!==epoch||controller.signal.aborted)throw new DOMException('Session changed','AbortError');if(typeof error?.error==='string')message=error.error.slice(0,500).replace(/[\u0000-\u001f]/g,' ');}throw Object.assign(new Error(message),{status:response.status});}
+        const result=await (responseType==='blob'?response.blob():response.json());
         if(!active||generation!==epoch||controller.signal.aborted)throw new DOMException('Session changed','AbortError');
         return result;
       }finally{controllers.delete(controller);signal?.removeEventListener('abort',abort);}
@@ -90,6 +92,8 @@ export function createProductionContext(auth,{fetcher=fetch,onExpired=()=>{},onL
   return context;
 }
 export function safeShellRoute(value){
+ if((value||'').startsWith('/wiki/')&&value.includes('?')){const [base,query,...extra]=value.split('?'),params=new URLSearchParams(query),keys=[...params.keys()];if(!extra.length&&keys.length>0&&keys.length<=2&&new Set(keys).size===keys.length&&keys.every(key=>['folder',...(base==='/wiki/'?['page']:[])].includes(key)&&/^[A-Za-z0-9_-]{1,100}$/.test(params.get(key)))&&safeShellRoute(base)===base)return value;return '/home/';}
+
  if(value==='/teaching/setup/')return value;
  if(/^\/teaching\/settings\/(?:\?panel=(?:materials|calendar|terms|periods|excluded|appearance))?$/.test(value||''))return value;
  if(/^\/teaching\/\d{4}-\d{2}-\d{2}\/schedule\/\?/.test(value||'')){const [path,query,...extra]=value.split('?'),params=new URLSearchParams(query),names=[...params.keys()];if(!extra.length&&names.length>0&&names.length<=4&&new Set(names).size===names.length&&safeShellRoute(path)===path&&names.every(key=>key==='view'?['list','calendar'].includes(params.get(key)):key==='week'||key==='month'?validDay(params.get(key)):key==='filter'?params.get(key).length<=2000&&!/[\u0000-\u001f]/.test(params.get(key)):false))return value;return '/home/';}
