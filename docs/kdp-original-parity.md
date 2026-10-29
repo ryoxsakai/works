@@ -20,3 +20,5 @@ Verification:113 app unit tests and15 actual isolated KDP Worker tests pass loca
 Remaining full migration: SS original-feature audit and explicit safe lesson-alias mapping. KDP does not add third-party publishing or communications.
 
 Image API safety finding fixed: a lost put/INSERT response now returns typed502 with exact operation reference and retains potentially committed bytes. Synthetic fault tests prove no compensating delete after a committed INSERT. Uncertain unreferenced objects are retained for later explicit reconciliation; no cleanup job or deletion was added.
+
+Compatibility: image-upload failures are conservatively held even on legacy400/413 responses; they are not proof of an uncommitted upload. This prevents replay if frontend and additive API error handling deploy in either order. Successful API contracts stay unchanged. Header logout uses the same unsaved/busy guard as route navigation.

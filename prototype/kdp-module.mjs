@@ -410,7 +410,7 @@ $("image-upload").onchange = () =>
     setBusy(true);
     try {
       attempt={path:'books/'+idPath(state.book.id)+'/images',method:'POST',file:{name:file.name,size:file.size,type:file.type},acknowledged:false};
-      let data;try{data=await context.request('/api/kdp/'+attempt.path,{method:'POST',rawBody:file,signal:lifecycle.signal});if(!alive)throw new DOMException('Unmounted','AbortError');attempt.result=data;assertKdpImage(state.book.id,file,data);attempt.acknowledged=true;}catch(error){if(attempt&&error.kdpOperation)attempt.reference=error.kdpOperation;if(alive&&![400,413].includes(error.status)){stopped=true;recovery();}throw error;}
+      let data;try{data=await context.request('/api/kdp/'+attempt.path,{method:'POST',rawBody:file,signal:lifecycle.signal});if(!alive)throw new DOMException('Unmounted','AbortError');attempt.result=data;assertKdpImage(state.book.id,file,data);attempt.acknowledged=true;}catch(error){if(attempt&&error.kdpOperation)attempt.reference=error.kdpOperation;if(alive){stopped=true;recovery();}throw error;}
       if (state.section?.id !== sectionId)
         throw new Error("節が変更されたため画像を挿入できませんでした。");
       const textarea = $("section-content");
