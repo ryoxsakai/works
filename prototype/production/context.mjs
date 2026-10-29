@@ -1,3 +1,4 @@
+import {validDay} from '../teaching-model.mjs';
 import {recordDateRange} from '../../tutor/record-date.js';
 export function createProductionContext(auth,{fetcher=fetch,onExpired=()=>{},onLogout=()=>location.replace('/app/'),storage}={}) {
   let active=false,epoch=0,initialization;
@@ -30,7 +31,8 @@ export function createProductionContext(auth,{fetcher=fetch,onExpired=()=>{},onL
       }finally{controllers.delete(controller);signal?.removeEventListener('abort',abort);}
     },
     async request(path,{method='GET',body,signal}={}) {
-      if(!/^\/api\/(?:settings|student-prefs(?:\/guarded)?|chapter-progress\/guarded|lesson-plan|student-materials|lesson-record|next-lesson-plan|curriculum\/[^/?]+|todo|memo|workflow|admissions(?:\/[^/?]+(?:\/guarded)?)?|material-library\/(?:folders|files)(?:\/[^/?]+(?:\/guarded)?)?|wiki\/pages(?:\/[^/?]+(?:\/save)?)?)(?:\?.*)?$/.test(path))throw new Error('Unsupported API');
+      if(/^\/api\/(?:terms|periods|years|students)(?:\?|$)/.test(path)&&method!=='GET')throw new Error('Unsupported API');
+      if(!/^\/api\/(?:settings|terms|periods|years|students|student-prefs(?:\/guarded)?|chapter-progress\/guarded|lesson-plan|student-materials|lesson-record|next-lesson-plan|curriculum\/[^/?]+|todo|memo|workflow|admissions(?:\/[^/?]+(?:\/guarded)?)?|material-library\/(?:folders|files)(?:\/[^/?]+(?:\/guarded)?)?|wiki\/pages(?:\/[^/?]+(?:\/save)?)?)(?:\?.*)?$/.test(path))throw new Error('Unsupported API');
       await context.session.init();
       if(!active||!auth.getSessionToken())throw Object.assign(new Error('再ログインが必要です'),{status:401});
       const generation=epoch,controller=new AbortController();controllers.add(controller);
@@ -45,8 +47,20 @@ export function createProductionContext(auth,{fetcher=fetch,onExpired=()=>{},onL
         return result;
       }finally{controllers.delete(controller);signal?.removeEventListener('abort',abort);}
     },
-    async calendarDay(day,{signal}={}) {
-      const settings=await context.request('/api/settings',{signal});
+    async calendarList({signal}={}) {
+      await context.session.init();if(!active||!auth.getSessionToken())throw Object.assign(new Error('再ログインが必要です'),{status:401});
+      const generation=epoch,controller=new AbortController();controllers.add(controller);const abort=()=>controller.abort();signal?.addEventListener('abort',abort,{once:true});if(signal?.aborted)controller.abort();
+      const check=()=>{if(!active||generation!==epoch||controller.signal.aborted)throw new DOMException('Session changed','AbortError');};
+      try {check();const token=await auth.getGoogleAccessToken();check();if(!token)throw new Error('カレンダー一覧の認証を確認できません。');const items=[],seen=new Set();let pageToken='';
+       do {if(seen.has(pageToken)||seen.size>=20)throw new Error('カレンダー一覧が多いため取得を停止しました。');seen.add(pageToken);const query=new URLSearchParams({maxResults:'250',...(pageToken?{pageToken}:{})});const response=await fetcher('https://www.googleapis.com/calendar/v3/users/me/calendarList?'+query,{method:'GET',redirect:'error',cache:'no-store',headers:{Authorization:'Bearer '+token},signal:controller.signal});check();if(!response.ok)throw new Error('カレンダー名・色を取得できません。');const data=await response.json();check();if(!Array.isArray(data.items))throw new Error('カレンダー一覧の応答を確認できません。');items.push(...data.items.filter(row=>typeof row.id==='string'&&!row.deleted));pageToken=data.nextPageToken||'';}while(pageToken);return items;
+      }finally{controllers.delete(controller);signal?.removeEventListener('abort',abort);}
+    },
+    calendarDay(day,options={}){return context.calendarRange(day,day,options);},
+    async calendarRange(first,last,{signal,settings:providedSettings}={}) {
+      if(signal?.aborted)throw new DOMException('Session changed','AbortError');
+      await context.session.init();if(!active||!auth.getSessionToken())throw Object.assign(new Error('再ログインが必要です'),{status:401});
+      if(!validDay(first)||!validDay(last)||first>last)throw new Error('予定の期間を確認してください。');
+      const settings=providedSettings||await context.request('/api/settings',{signal});
       const ids=[...new Set((settings.selected_calendars||[]).filter(value=>typeof value==='string'&&value))];
       if(!ids.length)return {settings,events:[]};
       const generation=epoch,controller=new AbortController();controllers.add(controller);
@@ -54,7 +68,7 @@ export function createProductionContext(auth,{fetcher=fetch,onExpired=()=>{},onL
       const check=()=>{if(!active||generation!==epoch||controller.signal.aborted)throw new DOMException('Session changed','AbortError');};
       try {
         const token=await auth.getGoogleAccessToken();check();if(!token)throw new Error('予定の認証を確認できません。');
-        const [timeMin,timeMax]=recordDateRange(day),events=[];
+        const [timeMin,timeMax]=recordDateRange(first,last),events=[];
         for(const calendarId of ids){let pageToken='',pages=0;const seen=new Set();
           do {if(++pages>20||seen.has(pageToken))throw new Error('予定が多いため従来画面で確認してください。');seen.add(pageToken);check();
             const query=new URLSearchParams({timeMin,timeMax,singleEvents:'true',orderBy:'startTime',maxResults:'250',...(pageToken?{pageToken}:{})});
@@ -76,10 +90,15 @@ export function createProductionContext(auth,{fetcher=fetch,onExpired=()=>{},onL
   return context;
 }
 export function safeShellRoute(value){
+ if((value||'').startsWith('/teaching/')&&value.includes('?')){const [path,query,...extra]=value.split('?'),params=new URLSearchParams(query),keys=[...params.keys()];if(!extra.length&&keys.length>0&&keys.length<=2&&new Set(keys).size===keys.length&&keys.every(key=>['year','term'].includes(key)&&/^\d{0,12}$/.test(params.get(key)))&&safeShellRoute(path)===path)return value;return '/home/';}
+
  if(/^\/(?:home|teaching|operations|workflow|more|ss|todo|memo|wiki|material|admission|flow)\/$/.test(value||''))return value;
  if(/^\/material\/(?:files|folders)\/[A-Za-z0-9_-]{1,200}\/$/.test(value||''))return value;
  if(/^\/flow\/(?:roles|board|checks)\/$/.test(value||''))return value;
  if(/^\/flow\/(?:roles|definitions|runs)\/[A-Za-z0-9_-]{1,200}\/$/.test(value||''))return value;
+ const student=/^\/teaching\/(\d{4}-\d{2}-\d{2})\/(?:student\/(?:([^/]{1,6144})\/([^/?]{1,3072})\/)?|schedule\/)(?:\?term=([0-9]{1,12}))?$/.exec(value||'');
+ if(student){try{if(validDay(student[1])&&[student[2],student[3]].filter(Boolean).every(part=>!/[\u0000-\u001f]/.test(decodeURIComponent(part))))return value;}catch{}}
+ if(/^\/teaching\/\d{4}-\d{2}-\d{2}\/\?term=[0-9]{1,12}$/.test(value||'')){const base=value.split('?')[0];if(safeShellRoute(base)===base)return value;}
  const teaching=/^\/teaching\/(\d{4}-\d{2}-\d{2})\/(?:([^/]{1,6144})\/([^/]{1,3072})\/)?$/.exec(value||'');
  if(teaching){try{if(new Date(teaching[1]+'T12:00:00Z').toISOString().slice(0,10)===teaching[1]&&[teaching[2],teaching[3]].filter(Boolean).every(part=>!/[\u0000-\u001f]/.test(decodeURIComponent(part))))return value;}catch{}}
  const match=/^\/(?:ss|todo|memo|wiki|material|admission)\/([^/]{1,200})\/$/.exec(value||'');
