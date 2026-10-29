@@ -6231,7 +6231,7 @@ export default {
         return json({ ok: true }, headers);
       }
 
-      if (["/api/student-prefs/guarded","/api/chapter-progress/guarded"].includes(url.pathname)) {
+      if (["/api/student-prefs/guarded","/api/chapter-progress/guarded","/api/student-planning/guarded"].includes(url.pathname)) {
         if (browserSession.aud || browserSession.scope || browserSession.fid) throw httpError(401,"browser session required");
         if (!["GET","PUT"].includes(request.method)) return json({error:"method not allowed"},headers,405);
         let writeInput;
@@ -6248,7 +6248,8 @@ export default {
           }).then(result=>result.target),
           excluded:async()=> (await readSettings(env)).excluded_titles || [],
         };
-        const input=request.method==="PUT"?writeInput:{calendar_id:url.searchParams.get("calendar_id"),id:url.searchParams.get("event_id"),...(url.searchParams.has("profile_context")?{profile_context:url.searchParams.get("profile_context"),name:url.searchParams.get("name")}:{})};
+        const input=request.method==="PUT"?writeInput:{calendar_id:url.searchParams.get("calendar_id"),id:url.searchParams.get("event_id"),...(url.pathname==="/api/student-planning/guarded"?{resource:url.searchParams.get("resource")}:{ }),...(url.searchParams.has("profile_context")?{profile_context:url.searchParams.get("profile_context"),name:url.searchParams.get("name")}:{})};
+        if(url.pathname==="/api/student-planning/guarded") {const planning=await import("./student-planning.js");return json(await (request.method==="GET"?planning.readStudentPlanning:planning.writeStudentPlanning)(env,input,dependencies),{...headers,"Cache-Control":"no-store"});}
         const profile=url.pathname==="/api/student-prefs/guarded";
         const result=request.method==="GET"?await (profile?linked.readLinkedProfile:linked.readLinkedProgress)(env,input,dependencies):await (profile?linked.writeLinkedProfile:linked.writeLinkedProgress)(env,input,dependencies);
         return json(result,{...headers,"Cache-Control":"no-store"});

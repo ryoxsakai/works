@@ -130,7 +130,7 @@ export async function readCommittedRecord(env, ref, expected) {
   return currentRecord(row,ref);
 }
 export async function commitRecords(env, statements) {
-  try { await env.DB.batch(statements); }
+  try { return await env.DB.batch(statements); }
   catch(error) {
     if (/CHECK constraint failed/.test(error.message)) throw fail('別の画面で記録が変更されました。入力を残して再読み込みしてください','LESSON_RECORD_CONFLICT');
     throw error;
