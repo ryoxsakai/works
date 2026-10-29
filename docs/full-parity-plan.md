@@ -125,7 +125,7 @@ Block 2 now restores immediate shared-memo and next-plan blur autosave, using th
 ### Admission (`admission/index.html`, `admission/app.js`, `admission/admission.js`)
 
 - [ ] Original list/month calendar/continuous calendar/gantt/table views and date navigation.
-- [ ] University aliases, selection type/stage/month filters, search, select all/clear and preference persistence.
+- [ ] University aliases, selection-type and primary-month filters, stage labels, search, select all/clear and preference persistence.
 - [ ] Dates/ranges/remaining-day/colors/source links and row/university summaries.
 - [ ] Active-view printing, printable gantt/table and cleanup; empty/error states. Preserve registered source records and existing editor/API semantics.
 
@@ -384,4 +384,4 @@ Native original file-library controls are now implemented and locally verified: 
 
 Source inventory: `admission/index.html` loads `admission/app.js` (838 lines); the older `admission/admission.js` tab-only IIFE is not loaded. Original Works admissions is a read-only schedule viewer, separate from Exam. It has no year selector, create/edit/delete form, import/export or student-choice writes. It exposes list/month/continuous/gantt/table, university aliases/readings, type and earliest-primary-month filters, local preference migration, remaining days, stage/type colors, and active-view printing including per-university gantt sheets. Existing integrated guarded detail editing and safe source links remain available through detail routes; no new write endpoints are required.
 
-Native port now preserves original render/filter/date/print functions, scopes DOM to the mounted view and cancels late reads on unmount; shared auth initializes once. Direct detail routes retain existing conflict/unknown-outcome protection. Original URL remains. Unit tests108 and app build pass. New native browser suite and updated existing services suite are prepared but not yet verified: local Chromium executable is absent. Production records/settings remain untouched. Admissions checklist is not marked complete until browser/CI verification. Remaining: KDP, SS original audit, explicit safe lesson-alias mapping and actual iPhone/authenticated production/physical print/user-attachment checks.
+Native port now preserves original render/filter/date/print functions, scopes DOM to the mounted view and cancels late reads on unmount; shared auth initializes once. Direct detail routes retain existing conflict/unknown-outcome protection. Original URL remains. Unit tests110 and app build pass. New native browser suite and updated existing services suite are prepared but not yet verified: local Chromium executable is absent. Production records/settings remain untouched. Admissions checklist is not marked complete until browser/CI verification. Remaining: KDP, SS original audit, explicit safe lesson-alias mapping and actual iPhone/authenticated production/physical print/user-attachment checks.

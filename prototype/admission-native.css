@@ -1407,3 +1407,16 @@
 
 .admission-native{--bg-elevated:var(--surface,#fff);--border:var(--line,#dbe3ee);min-width:0}.admission-native .admission-main{padding:0;margin:0;max-width:none}.admission-native .admission-view-tabs{top:0}.admission-native [hidden]{display:none!important}.admission-native button{min-height:44px}.admission-native dialog{color:var(--text);background:var(--bg-elevated);max-height:85dvh;overflow:auto;border:1px solid var(--border);border-radius:16px}.admission-native .modal-header{display:flex;justify-content:space-between;align-items:center}.admission-native .admission-panel{padding:0}.admission-native .admission-calendar-shell,.admission-native .admission-table-shell{max-width:100%;overflow:auto}
 @media print{body[data-admission-print-view] .app-sidebar,body[data-admission-print-view] .app-tabs,body[data-admission-print-view] .navbar,body[data-admission-print-view] .page:not(.page-current){display:none!important}body[data-admission-print-view] .page-content{height:auto!important;overflow:visible!important;padding:0!important}body[data-admission-print-view] .admission-native>p{display:none}}
+/* Shared original dialog conventions, scoped to the mounted module. */
+.admission-native{--fg:var(--ink);--bg-hover:var(--paper);--card-shadow:none;color:var(--ink)}
+.admission-native dialog.app-modal{padding:0;width:min(760px,calc(100vw - 24px));color:var(--ink);box-shadow:0 10px 30px #1e293b33}
+.admission-native dialog::backdrop{background:#10182888}
+.admission-native .modal-header{padding:16px;border-bottom:1px solid var(--border);gap:12px}
+.admission-native .modal-header h2{margin:0;font-size:1.1rem;min-width:0}
+.admission-native .modal-close{flex:0 0 44px;width:44px;padding:8px}
+.admission-native .modal-tabs{gap:8px;padding:0 16px;border-bottom:1px solid var(--border)}
+.admission-native [role=tab][aria-selected=true]{font-weight:700;border-bottom:3px solid var(--accent)}
+.admission-native input[type=search]{font-size:16px}
+.admission-native .error{color:#b42318;white-space:pre-wrap;overflow-wrap:anywhere}
+:root[data-theme=dark] .admission-native .error{color:#ffb4ab}
+@media print{.admission-native{--bg-elevated:white;--fg:#111;--muted:#444;--border:#ccc}.admission-native #admission-list a{display:none}}
