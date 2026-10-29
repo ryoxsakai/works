@@ -2,7 +2,7 @@ import {parseMemoAction} from './memo-model.mjs';
 // Source-derived adapter of memo/app.js; no global handlers or duplicate authentication.
 import view from './memo-view.html?raw';import './memo-native.css';
 export function mountMemo(root,context,{id:routeId,navigate}){
-let alive=true,loaded=false,editorSaving=false,editorBase='',switching=false,previousOverflow;const lifecycle=new AbortController(),timers=new Set(),remembered=context.memoState ||= {tag:null,edit:null};
+let alive=true,loaded=false,editorSaving=false,editorBase='',switching=false,previousOverflow;const lifecycle=new AbortController(),timers=new Set(),remembered=(context.workspaceState ||= {}).memo ||= {tag:null};
 root.classList.add('memo-native');root.innerHTML='<p><a class="external" href="/memo/">従来のメモ画面へ ↗</a></p>'+view;
 const $=id=>root.querySelector('#'+CSS.escape(id)),page=root.closest('.page-content');
 function editorSnapshot(){return JSON.stringify({fields:[...$('memo-modal').querySelectorAll('input,select,textarea')].map(el=>[el.id,el.value]),tags:modalTags});}
@@ -48,7 +48,6 @@ const categoryUI={open(){showDialog($('category-modal'));$('new-category-input')
 
     // ─── Memo modal ───────────────────────────────────────────
     function openMemoModal(id) {
-      if(id&&id!==routeId){remembered.edit=id;navigate('/memo/'+encodeURIComponent(id)+'/');return;}
       editingMemoId = id;
       const inputTitle = $('modal-title');
       const datesEl    = $('modal-dates');
@@ -623,7 +622,7 @@ root.addEventListener('keydown',event=>{if(event.target===$('modal-tag-input'))h
 for(const d of root.querySelectorAll('dialog')){const heading=d.querySelector('h3');if(heading)d.setAttribute('aria-labelledby',heading.id);}
 // Replace inline boundary styling with native disabled semantics after each render.
 const observer=new MutationObserver(()=>{for(const b of root.querySelectorAll('button[disabled]')){if(!b.disabled)continue;if(b.classList.contains('pointer-events-none'))b.dataset.fixedDisabled='';}controls();});observer.observe(root,{childList:true,subtree:true});
-async function initial(){controls();status('読み込み中…');try{await loadData();if(!alive)return;status('');if(routeId){if(remembered.edit===routeId){remembered.edit=null;openMemoModal(routeId);}else openMemoView(routeId);if(!memos.some(m=>m.id===routeId))status('このメモは削除されたか、見つかりません。');}}catch(e){if(!alive)return;status('読み込みに失敗しました。');const b=document.createElement('button');b.textContent='再試行';b.dataset.memoSafe='';b.onclick=()=>{b.remove();initial();};$('save-status').append(b);}}
+async function initial(){controls();status('読み込み中…');try{await loadData();if(!alive)return;status('');if(routeId){openMemoView(routeId);if(!memos.some(m=>m.id===routeId))status('このメモは削除されたか、見つかりません。');}}catch(e){if(!alive)return;status('読み込みに失敗しました。');const b=document.createElement('button');b.textContent='再試行';b.dataset.memoSafe='';b.onclick=()=>{b.remove();initial();};$('save-status').append(b);}}
 initial();
 return {get dirty(){return pendingSaves>0||saveFailed||validationFailed||editorDirty()||categoryDirty();},canLeave(){return !pendingSaves&&!editorSaving&&(!(saveFailed||validationFailed||editorDirty()||categoryDirty())||confirm('未保存または保存結果未確認の内容を破棄して移動しますか？'));},unmount(){alive=false;lifecycle.abort();observer.disconnect();clearTimeout(toastTimer);for(const timer of timers)clearTimeout(timer);for(const d of root.querySelectorAll('dialog[open]'))d.close();if(page)page.style.overflow=previousOverflow||'';root.replaceChildren();memos=categories=[];savedState=null;context.metrics.unmounts++;}};
 }
