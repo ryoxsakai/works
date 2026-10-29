@@ -6231,6 +6231,15 @@ export default {
         return json({ ok: true }, headers);
       }
 
+      if(url.pathname==="/api/tutor-settings/guarded") {
+        if(browserSession.aud||browserSession.scope||browserSession.fid)throw httpError(401,"browser session required");
+        if(!["GET","PUT"].includes(request.method))return json({error:"method not allowed"},headers,405);
+        const settingsModule=await import("./tutor-settings.js");let result;
+        if(request.method==="GET")result=await settingsModule.readTutorSettings(env,url.searchParams.get("resource"));
+        else {if(request.headers.get("Origin")!==env.ALLOWED_ORIGIN||!request.headers.get("Content-Type")?.startsWith("application/json"))throw httpError(403,"same-origin JSON required");const raw=await request.text();if(new TextEncoder().encode(raw).length>1000000)throw httpError(413,"input too large");let body;try{body=JSON.parse(raw);}catch{throw httpError(400,"invalid JSON");}result=await settingsModule.writeTutorSettings(env,body);}
+        return json(result,{...headers,"Cache-Control":"no-store"});
+      }
+
       if (["/api/student-prefs/guarded","/api/chapter-progress/guarded","/api/student-planning/guarded"].includes(url.pathname)) {
         if (browserSession.aud || browserSession.scope || browserSession.fid) throw httpError(401,"browser session required");
         if (!["GET","PUT"].includes(request.method)) return json({error:"method not allowed"},headers,405);
