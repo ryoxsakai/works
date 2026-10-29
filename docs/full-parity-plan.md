@@ -105,14 +105,14 @@ Block 2 now restores immediate shared-memo and next-plan blur autosave, using th
 
 ### Workflow (`workflow/index.html`, `workflow/app.js`, `workflow/roles.*`, `workflow/planning.mjs`, `workflow/steps.mjs`, `workflow/dialogs.mjs`)
 
-- [ ] Original three numbered steps, wizard back/next/cancel/resume and empty state.
-- [ ] Roles create/edit/order/archive, allowed assignments and existing role lifecycle restrictions.
-- [ ] Definitions/task structure, drafts/versioning/sources, human confirmation and execution authorization.
-- [ ] Kanban/calendar/agenda, day/today/previous/next, responsive day range, text/status filters and persisted selection.
-- [ ] Confirmation panel independent of board filters; pending/overdue/running/review information and original actions.
-- [ ] Run/task detail, artifacts/receipts/logs, stop/pause/hold/approval/reassignment and history scope.
-- [ ] Planning/rolling/future-slot details and settings/status dialogs; no real claims/dispatches or automatic permission changes for tests.
-- [ ] Unknown outcomes, leases/ownership, terminal states and original retry/reconciliation gates preserved end to end.
+- [x] Original three numbered steps, wizard back/next/cancel/resume and empty state.
+- [x] Roles create/edit/archive, allowed assignments and existing role lifecycle restrictions; no role ordering control exists in the original source.
+- [x] Definitions/task structure, drafts/versioning/sources, human confirmation and execution authorization.
+- [x] Kanban/calendar/agenda, day/today/previous/next, responsive day range, text/status filters and persisted selection.
+- [x] Confirmation panel independent of board filters; pending/overdue/running/review information and original actions.
+- [x] Run/task detail, artifacts/receipts/logs, stop/pause/hold/approval/reassignment and history scope.
+- [x] Planning/rolling/future-slot details and settings/status dialogs; no real claims/dispatches or automatic permission changes for tests.
+- [x] Unknown outcomes, leases/ownership, terminal states and original retry/reconciliation gates preserved end to end.
 
 ### Material library (`material/index.html`, `material/app.js`)
 
@@ -267,7 +267,7 @@ Verification covers civil-date/leap/year boundaries, union/gap filtering, descri
 | ToDo | Source-inventoried native controls now covered by the ToDo phase below. Actual iPhone/authenticated-production interaction and complete visual/device comparison remain unverified; no original task hierarchy/manual task reorder is invented. |
 | Memo | Source-inventoried native controls covered by Memo phase below; actual iPhone/authenticated-production interaction and final full-device visual comparison remain unverified. Original has category/tag filtering, no standalone full-text search or archive. |
 | Wiki | Original controls covered by the Wiki phase below; actual iPhone/authenticated-production interaction and final full-device visual comparison remain unverified. Original has create/rename/move folders and archive/restore pages, with no permanent delete control. |
-| Workflow | Full original role/definition/task/run controls, calendar/agenda and confirmation/history/settings/planning dialogs; all existing authorization/stop/lease gates remain required. |
+| Workflow | Native original controls implemented and locally validated; exact-head CI/deployment pending. Actual iPhone/authenticated production checks remain unverified. Existing authorization/stop/lease gates remain unchanged. |
 | Material library | Original tree/tags tabs, folder/file lifecycle and classification, multi-file upload/retry/cancel, preview/download/move/delete and expansion preferences. |
 | Admission | All original calendar/continuous/gantt/table views, filters/selection preferences, summaries and active-view print/export. |
 | KDP | Still a clearly marked original-screen route; full native books/sections/sources/proposals/history/export migration remains. |
@@ -349,3 +349,14 @@ All mutations freeze source/destination revisions, validate acknowledgements and
 Current validation:96 unit tests and10 Wiki Worker tests pass; original Wiki desktop/mobile suite passes creation, citations, proposals, comparison, conflict retention, restore, archive, search and exports. Native actual Worker/isolated-D1 tests cover hierarchy/revisions/cycle exclusions, pagination, full edit/source/preview, explicit adoption/rejection, forged and stale review prevention, immutable restore, binary exports, unknown creation/proposal no replay, acknowledged-write/failed-refresh recovery, input diagnostics, unsafe legacy HTML/URLs, repeated read failure recovery, native routes/keyboard/responsive layout and auth teardown. All14 local app browser suites and the final focused Wiki rerun passed, including source removal/editing and recovery focus restoration. Exact-head CI and deployment are monitored until terminal success. Actual iPhone, authenticated live UI, physical print and user-attachment pixel comparison remain unverified.
 
 Next overall module: full original workflows, preserving definitions/roles/runs, explicit human confirmation, execution/claim permissions, stop/hold and lease conditions. Material-library files/tree/uploads, admissions calendar/gantt/table/print, native KDP and SS original columns/preferences/detail/print remain open; lesson L13d arbitrary alias mapping remains read-only pending explicit safe mapping. This is not full Works migration completion.
+
+
+## Original Workflow native parity (2026-10-29)
+
+Inventory and exact acceptance: [workflow-original-parity.md](workflow-original-parity.md). Native implementation replaces the reduced service viewer with original role/definition/task/run/calendar/checks/planning/settings controls and the three-step guide. Source code has no manual role/task reordering or role-unarchive control; task insertion order and original chronological display remain. Browser UI cannot call claim/patrol/checkpoint/external dispatch. Publication, planning suggestion/adoption, manual start, pause/cancel/resume, evidence and independent task/whole-workflow verification remain distinct. Requested interval is only desired state; the actual external schedule/heartbeat is displayed separately and is never installed by saving a preference.
+
+Shared serialization, frozen revisions and action-specific acknowledgements protect all source writes. Conflict/unknown/bad acknowledgement and acknowledged-write/failed-refresh stop further mutations, retain forms/request refs and require read-only inspection followed by explicit discard/reload; there is no automatic replay. Source lease/generation/ownership, external reference/outcome, terminal-state, planning bounds/epoch and idempotency checks remain server-owned and unchanged. Untrusted definitions/Wiki references never become authority. Native dialogs use the shell's child-view Back hook and dirty/focus/scroll protection, with no competing standalone history router.
+
+Current local validation includes102 unit tests,35 existing Worker tests and the original desktop/mobile Workflow browser regression. Native tests use the actual Worker and isolated D1 only: complete source forms, explicit permission and criteria, terminal/global-stop isolation, desired/actual schedule separation, staged future suggestion/apply without Run creation, rolling preview, stale revision and lost-response/failed-refresh recovery, and responsive/keyboard/native navigation. All15 final-source shell browser suites pass locally; exact-head CI/deployment remain publication gates. No production Workflow/settings/catalog/automation test writes or Worker/schema/dependency/permission changes are made.
+
+Remaining overall modules: original material-library tree/tags/files/uploads, admissions calendar/gantt/table/print, native KDP and SS original-column/preferences/detail/print audit. Lesson L13d arbitrary-alias mapping stays read-only pending explicit safe mapping. Actual iPhone, authenticated production UI, physical print and supplied-image pixels remain unverified. This is not full Works migration completion.
