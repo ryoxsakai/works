@@ -24,7 +24,10 @@ async function lookup(deps, calendarId, eventId) {
 async function uniqueRecordId(deps, context, ref) {
   // Legacy curriculum entries use event ID alone. Refuse a known cross-calendar collision.
   const others = [...new Set(context.settings.selected_calendars)].filter((id) => id !== ref.calendar_id);
-  const copies = await Promise.all(others.map((id) => deps.event(context.token, id, ref.id)));
+  const copies = deps.eventCopies && others.length>8
+    ? await deps.eventCopies(context.token,others,ref.id)
+    : await Promise.all(others.map((id) => deps.event(context.token, id, ref.id)));
+  if(!Array.isArray(copies)||copies.length!==others.length)throw failure(502, "カレンダー確認が完了していません");
   if (copies.some((event) => event && event.status !== "cancelled")) {
     throw failure(409, "複数カレンダーに同じ予定IDがあります。安全に連動できません", "LESSON_ID_COLLISION");
   }

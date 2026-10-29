@@ -408,3 +408,7 @@ Exact implementation gaps now remaining: L13d explicit safe lesson-alias mapping
 L13d now has local explicit per-event mapping UI/API and append-only audit implementation; production activation and browser certification remain pending, so its checkbox stays open. No inferred identity, profile merging, hold resolution or real student binding occurs. See `lesson-alias-mapping-plan.md` and the exact additive SQL/backup prerequisite in `lesson-profile-mapping-rollout.md`.
 
 The five global checks are individually enumerated in `full-parity-cross-cutting.md`: source/unit/API evidence is available and a twentieth browser suite is prepared; local browser execution is unavailable.118 app units,9 mapping API tests,1 migration test and22 existing linked/planning regressions pass. No PR/CI/deployment exists for this checkpoint yet. Actual iPhone, authenticated production, physical print and supplied-image pixel verification remain distinct open checks.
+
+### Calendar-count alias validation follow-up (draft PR157)
+
+The existing guarded calendar-setting maximum1000 and legacy1001 stress case are covered, together with cold/warm paths, no alias/schema, malformed/unavailable mappings, collision and concurrent unlink/save. All collision checks remain; no calendar cap, permission or identity inference is added. See `lesson-profile-load-validation.md` for exact budgets and tests. Fresh backup/schema activation and authenticated production/device/output verification remain pending; this is not a production release.

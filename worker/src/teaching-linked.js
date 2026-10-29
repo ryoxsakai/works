@@ -8,6 +8,7 @@ export function profileSnapshot(row){return {exists:!!row,print_name:row?.print_
 function snapshotGuard(env,predicate,values){const id=crypto.randomUUID();return [env.DB.prepare(`INSERT INTO lesson_record_guard(id,ok) VALUES (?,CASE WHEN ${predicate} THEN 1 ELSE 0 END)`).bind(id,...values),env.DB.prepare('DELETE FROM lesson_record_guard WHERE id=?').bind(id)];}
 async function sourceContext(env,ref,deps,writing=false,selection=ref){
  if(!ref||typeof ref.calendar_id!=='string'||!ref.calendar_id||typeof ref.id!=='string'||!ref.id)throw fail(400,'授業の参照が必要です。');
+ if(selection?.profile_context==='alias')await(await import('./lesson-profile-mapping.js')).preflightProfileMapping(env,ref,selection);
  const target=await deps.target(ref);
  if(writing&&!sameLessonEvent(ref,target))throw fail(409,'授業予定が変更されています。入力を残して確認してください。');
  const excluded=await deps.excluded();if(!isScheduledLesson(target,excluded))throw fail(409,'授業対象を確認してください。');
