@@ -11,4 +11,4 @@ Original source: `admission/index.html`, `admission/app.js`, `admission/admissio
 - Shared auth/request lifecycle is used, no second login observer. Unmount aborts reads and removes print listeners; late responses cannot render into a new route.
 - No schema/data migration or production test writes.
 
-Verification pending: native browser/regression suite. Unit110/build passed. Local Chromium is absent; no successful screenshot/device/live claim is made.
+Verification: the native browser/regression suite is a mandatory exact-head CI gate; consult PR154 for its terminal result. Unit110/build passed. Local Chromium is absent; no successful screenshot/device/live claim is made.
