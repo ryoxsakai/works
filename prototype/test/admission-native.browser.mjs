@@ -15,7 +15,8 @@ await context.route('**/*',async route=>{const u=new URL(route.request().url());
  if(u.pathname.startsWith('/api/material-library/')){const row=u.pathname.includes('/folders/')?folders[0]:files[0];for(const key of Object.keys(body.expected))assert.equal(body.expected[key],row[key]);const {expected,...changes}=body;Object.assign(row,changes);return route.fulfill({json:row});}
  if(u.pathname==='/api/admissions/event/guarded'){for(const key of Object.keys(body.expected))assert.equal(body.expected[key],admissions[0][key]);const {expected,...changes}=body;Object.assign(admissions[0],changes);return route.fulfill({json:admissions[0]});}throw new Error('unexpected mutation '+u.pathname);
 });
-const current=()=>page.locator('.page-current'),button=name=>current().getByRole('button',{name,exact:true}),fresh=path=>page.goto(base+'/app/#!'+path);
+let visit=0;
+const current=()=>page.locator('.page-current'),button=name=>current().getByRole('button',{name,exact:true}),fresh=path=>page.goto(base+'/app/?admissionFixture='+ ++visit+'#!'+path);
 try{
 await fresh('/admission/');await expect(current().locator('#admission-list')).toContainText('Synthetic university');
 for(const name of ['calendar','gantt','table','list']){await current().locator(`[data-admission-view-tab=${name}]`).click();await expect(current().locator(`[data-admission-view=${name}]`)).toBeVisible();}
