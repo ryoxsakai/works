@@ -50,6 +50,21 @@ async function fixture(options = {}) {
     { name: "完了した作業", plannedDay: "2026-10-29", progress: 100 },
     { name: "次週の予定", plannedDay: "2026-11-02" },
   ];
+  if (options.large)
+    tasks.push(
+      ...Array.from({ length: 4 }, (_, i) => ({
+        name: `本日締切追加 ${i + 1}`,
+        deadline: "2026-10-29",
+      })),
+      ...Array.from({ length: 7 }, (_, i) => ({
+        name: `期限超過追加 ${i + 1}`,
+        deadline: "2026-10-27",
+      })),
+      ...Array.from({ length: 7 }, (_, i) => ({
+        name: `予定追加 ${i + 1}`,
+        plannedDay: "2026-10-29",
+      })),
+    );
   await ctx.route("**/*", async (r) => {
     const u = new URL(r.request().url());
     requests.push({ url: u.pathname + u.search, method: r.request().method() });
@@ -227,6 +242,19 @@ try {
         requestAnimationFrame(() => requestAnimationFrame(resolve)),
       ),
   );
+  await expect(page.locator(".dashboard-widget").first()).toHaveAttribute(
+    "data-id",
+    "lessons",
+  );
+  assert.ok(
+    (
+      await page
+        .locator('[data-content="lessons"] strong')
+        .first()
+        .boundingBox()
+    ).y < 700,
+    "lesson content visible in mobile first screen",
+  );
   await page.screenshot({
     path: path.join(artifacts, "mobile-default-390.png"),
     fullPage: true,
@@ -255,6 +283,45 @@ try {
   await expect(page.locator('[data-content="ss"]')).not.toContainText(
     "完了案件",
   );
+  await expect(page.locator(".dashboard-widget")).toHaveCount(6);
+  await page.screenshot({
+    path: path.join(artifacts, "desktop-all-widgets-1440.png"),
+    fullPage: true,
+  });
+  for (const width of [320, 390, 768, 1440]) {
+    await page.setViewportSize({ width, height: 844 });
+    assert.equal(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth > innerWidth,
+      ),
+      false,
+      `full catalog overflow ${width}`,
+    );
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator("#dashboard-editor").scrollIntoViewIfNeeded();
+  await page.screenshot({
+    path: path.join(artifacts, "mobile-edit-390.png"),
+    fullPage: false,
+  });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.locator("#open-home-settings").click();
+  await page.locator('input[name="home-theme"][value="dark"]').check();
+  await page.locator("#home-settings-close").click();
+  await page.evaluate(() => scrollTo(0, 0));
+  await page.evaluate(
+    () =>
+      new Promise((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(resolve)),
+      ),
+  );
+  await page.screenshot({
+    path: path.join(artifacts, "desktop-dark-all-widgets-1440.png"),
+    fullPage: true,
+  });
+  await page.locator("#open-home-settings").click();
+  await page.locator('input[name="home-theme"][value="light"]').check();
+  await page.locator("#home-settings-close").click();
   await page.locator('[data-move="memo"][data-step="-1"]').click();
   await expect(page.locator(".dashboard-widget").nth(2)).toHaveAttribute(
     "data-id",
@@ -301,7 +368,7 @@ try {
         .locator(".dashboard-widget")
         .evaluateAll((es) => es.map((e) => e.dataset.id).join(",")),
     )
-    .not.toBe("todo,lessons,shortcuts");
+    .not.toBe("lessons,todo,shortcuts");
   await page.locator("#dashboard-cancel").click();
   await page.setViewportSize({ width: 1440, height: 1000 });
   passed.push(
@@ -341,7 +408,7 @@ try {
   await expect(page.locator("#dashboard-edit")).toBeEnabled();
   assert.equal(
     await page.locator(".dashboard-widget").first().getAttribute("data-id"),
-    "todo",
+    "lessons",
   );
   await page.evaluate(() =>
     window.qaAuth.onSignedIn({ email: "dashboard@example.test", picture: "" }),
@@ -586,6 +653,31 @@ try {
   passed.push(
     "genuine empty collections, all-hidden layout reload and confirmed initial-layout restore",
   );
+  const large = await fixture({ large: true });
+  await ready(large.page);
+  await large.page.setViewportSize({ width: 390, height: 844 });
+  const dueSection = large.page.locator('[data-content="todo"]');
+  await expect(dueSection).toContainText("期限超過 8件（すべて表示）");
+  for (let i = 1; i <= 7; i++)
+    await expect(dueSection).toContainText(`期限超過追加 ${i}`);
+  await expect(dueSection).toContainText("全13件");
+  for (let i = 1; i <= 4; i++)
+    await expect(dueSection).toContainText(`本日締切追加 ${i}`);
+  await expect(dueSection).toContainText("3件表示");
+  assert.equal(
+    await large.page
+      .locator(".dashboard-widget")
+      .evaluateAll((es) =>
+        es.some((e) =>
+          ["auto", "scroll"].includes(getComputedStyle(e).overflowY),
+        ),
+      ),
+    false,
+  );
+  await large.close();
+  passed.push(
+    "compact three-row summaries expose total counts and retain every overdue deadline without internal scrolling",
+  );
   const touch = await fixture({ touch: true });
   await ready(touch.page);
   await touch.page.setViewportSize({ width: 390, height: 2400 });
@@ -594,9 +686,9 @@ try {
     window.Sortable?.get(document.querySelector("#dashboard-widgets")),
   );
   const h = await touch.page
-      .locator('[data-id="todo"] .drag-handle')
+      .locator('[data-id="lessons"] .drag-handle')
       .boundingBox(),
-    t = await touch.page.locator('[data-id="lessons"]').boundingBox();
+    t = await touch.page.locator('[data-id="todo"]').boundingBox();
   const cdp = await touch.ctx.newCDPSession(touch.page);
   await cdp.send("Input.dispatchTouchEvent", {
     type: "touchStart",
@@ -623,10 +715,37 @@ try {
     .poll(() =>
       touch.page.locator(".dashboard-widget").first().getAttribute("data-id"),
     )
-    .not.toBe("todo");
+    .not.toBe("lessons");
   await touch.page.locator("#dashboard-cancel").click();
   await touch.close();
   passed.push("emulated touch drag on dedicated handle changes draft order");
+  const font = await fixture();
+  await ready(font.page);
+  const fontSession = await font.ctx.newCDPSession(font.page);
+  await fontSession.send("DOM.enable");
+  await fontSession.send("CSS.enable");
+  const dom = await fontSession.send("DOM.getDocument");
+  const node = await fontSession.send("DOM.querySelector", {
+    nodeId: dom.root.nodeId,
+    selector: ".dashboard-heading h2",
+  });
+  const used = await fontSession.send("CSS.getPlatformFontsForNode", {
+    nodeId: node.nodeId,
+  });
+  const fontEvidence = {
+    declaredStack: await font.page.evaluate(
+      () => getComputedStyle(document.body).fontFamily,
+    ),
+    platformFonts: used.fonts,
+    externalFontRequestsBlockedByFixture: true,
+  };
+  assert.ok(fontEvidence.declaredStack.includes("M PLUS 1p"));
+  await fs.writeFile(
+    path.join(artifacts, "font-evidence.json"),
+    JSON.stringify(fontEvidence, null, 2),
+  );
+  console.log("Font evidence: " + JSON.stringify(fontEvidence));
+  await font.close();
   await fs.writeFile(
     path.join(artifacts, "results.json"),
     JSON.stringify({ passed }, null, 2),

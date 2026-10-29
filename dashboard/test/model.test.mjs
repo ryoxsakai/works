@@ -6,6 +6,7 @@ import {
   readLayout,
   dayJst,
   todoSummary,
+  summaryPreview,
   esc,
 } from "../model.mjs";
 import { createReader } from "../data.mjs";
@@ -273,4 +274,20 @@ test("first failed calendar aborts sibling and prevents additional queued calend
   await new Promise((r) => setTimeout(r, 10));
   assert.equal(calls.length, 3);
   assert.equal(aborts, 2);
+});
+
+test("new defaults prioritize lessons without migrating saved user order; compact counts never hide overdue rows", () => {
+  assert.deepEqual(defaults().widgets, ["lessons", "todo", "shortcuts"]);
+  const saved = { ...defaults(), widgets: ["todo", "shortcuts", "lessons"] };
+  assert.deepEqual(
+    readLayout({ getItem: () => JSON.stringify(saved) }, "key").layout.widgets,
+    saved.widgets,
+  );
+  const items = Array.from({ length: 10 }, (_, i) => ({ i, overdue: i < 5 }));
+  const preview = summaryPreview(items, (t) => t.overdue);
+  assert.equal(preview.total, 10);
+  assert.equal(preview.shown.length, 8);
+  assert.equal(preview.hidden, 2);
+  assert.equal(preview.shown.filter((t) => t.overdue).length, 5);
+  assert.equal(summaryPreview(items).shown.length, 3);
 });

@@ -48,7 +48,7 @@ export const WIDGETS = {
 };
 export const defaults = () => ({
   version: 1,
-  widgets: ["todo", "lessons", "shortcuts"],
+  widgets: ["lessons", "todo", "shortcuts"],
   shortcuts: ["/tutor/", "/todo/", "/memo/", "/material/"],
 });
 export function validateLayout(value) {
@@ -119,3 +119,10 @@ export const esc = (value) =>
         c
       ],
   );
+
+// Critical deadline rows remain visible even when the initial summary is compact.
+export function summaryPreview(items, alwaysInclude = () => false, limit = 3) {
+  let remaining = limit;
+  const shown = items.filter((item) => alwaysInclude(item) || remaining-- > 0);
+  return { shown, total: items.length, hidden: items.length - shown.length };
+}

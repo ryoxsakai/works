@@ -6,6 +6,7 @@ import {
   validateLayout,
   dayJst,
   todoSummary,
+  summaryPreview,
   esc,
 } from "./model.mjs";
 import { createReader } from "./data.mjs";
@@ -20,15 +21,12 @@ const time = (value) =>
         minute: "2-digit",
       })
     : "";
-const list = (items, render, empty) =>
-  items.length
-    ? `<ul>${items
-        .slice(0, 5)
-        .map((item) => `<li>${render(item)}</li>`)
-        .join(
-          "",
-        )}</ul>${items.length > 5 ? `<p class="dashboard-muted">ほか${items.length - 5}件は元の画面で確認できます。</p>` : ""}`
+const list = (items, render, empty, alwaysInclude) => {
+  const { shown, total, hidden } = summaryPreview(items, alwaysInclude);
+  return total
+    ? `<p class="dashboard-muted widget-count">全${total}件${hidden ? ` · ${shown.length}件表示` : ""}</p><ul>${shown.map((item) => `<li>${render(item)}</li>`).join("")}</ul>${hidden ? `<p class="dashboard-muted">残り${hidden}件は下のリンクから元の画面で確認できます。</p>` : ""}`
     : `<p class="dashboard-muted">${empty}</p>`;
+};
 
 export function createDashboard({
   getSessionToken,
@@ -120,12 +118,13 @@ export function createDashboard({
             `<strong>${esc(t.name)}</strong><small>${t.plannedDay < date ? "持ち越し · " : ""}予定 ${esc(t.plannedDay)}${t.deadline ? " · 締切 " + esc(t.deadline) : ""}</small>`,
           "今日までの未完了予定はありません。",
         ) +
-        "<h4>締切の確認（7日以内・期限超過）</h4>" +
+        `<h4>締切の確認（7日以内・期限超過）</h4>${due.some((t) => t.deadline < date) ? `<p class="overdue deadline-alert" role="note">期限超過 ${due.filter((t) => t.deadline < date).length}件（すべて表示）</p>` : ""}` +
         list(
           due,
           (t) =>
             `<strong>${esc(t.name)}</strong><small class="${t.deadline < date ? "overdue" : ""}">${t.deadline < date ? "期限超過 · " : ""}締切 ${esc(t.deadline)}</small>`,
           "対象の締切はありません。",
+          (t) => t.deadline <= date,
         )
       );
     }
@@ -148,6 +147,7 @@ export function createDashboard({
       (p) =>
         `<strong>${esc(p.name)}</strong><small class="${p.deadline < date ? "overdue" : ""}">${p.deadline < date ? "期限超過 · " : ""}締切 ${esc(p.deadline)} · ${esc(p.status)}</small>`,
       "未完了の案件はありません。",
+      (p) => p.deadline <= date,
     );
   }
   function content(id) {
