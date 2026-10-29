@@ -126,3 +126,39 @@ export function summaryPreview(items, alwaysInclude = () => false, limit = 3) {
   const shown = items.filter((item) => alwaysInclude(item) || remaining-- > 0);
   return { shown, total: items.length, hidden: items.length - shown.length };
 }
+
+// Memo timestamps are normally date-only. Retain that meaning. Explicit-offset
+// ISO timestamps are instants; material_files.created_at is SQLite datetime('now')
+// (UTC), so only that caller may opt into interpreting its zone-less format.
+export function metadataDateJst(value, { sqliteUtc = false } = {}) {
+  if (typeof value !== "string") return "日時不明";
+  const date = value.match(/^(\d{4})-(\d{2})-(\d{2})(.*)$/);
+  if (!date) return "日時不明";
+  const [_, y, m, d, tail] = date;
+  const calendar = new Date(Date.UTC(Number(y), Number(m) - 1, Number(d)));
+  if (calendar.toISOString().slice(0, 10) !== `${y}-${m}-${d}`)
+    return "日時不明";
+  if (!tail) return `${y}/${m}/${d}（日付のみ）`;
+  let iso = value;
+  if (sqliteUtc && /^ \d{2}:\d{2}:\d{2}(?:\.\d{1,3})?$/.test(tail))
+    iso = value.replace(" ", "T") + "Z";
+  if (
+    !/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d{1,3})?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)$/.test(
+      iso,
+    )
+  )
+    return "日時不明";
+  const instant = new Date(iso);
+  if (!Number.isFinite(instant.getTime())) return "日時不明";
+  return (
+    new Intl.DateTimeFormat("ja-JP", {
+      timeZone: "Asia/Tokyo",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    }).format(instant) + " JST"
+  );
+}

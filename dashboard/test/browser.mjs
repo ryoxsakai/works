@@ -26,6 +26,26 @@ const mime = {
   ".woff2": "font/woff2",
 };
 let passed = [];
+const fullPageEvidence = [];
+async function fullPageAtTop(page, options) {
+  await page.evaluate(() => scrollTo(0, 0));
+  await page.evaluate(
+    () =>
+      new Promise((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(resolve)),
+      ),
+  );
+  const geometry = await page.evaluate(() => ({
+    scrollY,
+    headerTop: document.querySelector(".page-header").getBoundingClientRect()
+      .top,
+  }));
+  fullPageEvidence.push({ file: path.basename(options.path), ...geometry });
+  assert.equal(geometry.scrollY, 0);
+  assert.ok(Math.abs(geometry.headerTop) < 1);
+  return page.screenshot(options);
+}
+
 async function fixture(options = {}) {
   const ctx = await browser.newContext({
     viewport: { width: 1440, height: 1000 },
@@ -118,6 +138,7 @@ async function fixture(options = {}) {
         .fulfill({
           json: {
             memos: [
+              { title: "日付だけのメモ", updatedAt: "2026-10-28" },
               {
                 title: "授業で使う表現",
                 body: "BODY MUST NEVER APPEAR",
@@ -230,7 +251,7 @@ try {
       /\/api\/memo|material-library|ss-projects/.test(r.url),
     ),
   );
-  await page.screenshot({
+  await fullPageAtTop(page, {
     path: path.join(artifacts, "desktop-default-1440.png"),
     fullPage: true,
   });
@@ -255,7 +276,7 @@ try {
     ).y < 700,
     "lesson content visible in mobile first screen",
   );
-  await page.screenshot({
+  await fullPageAtTop(page, {
     path: path.join(artifacts, "mobile-default-390.png"),
     fullPage: true,
   });
@@ -283,8 +304,122 @@ try {
   await expect(page.locator('[data-content="ss"]')).not.toContainText(
     "完了案件",
   );
+  await expect(page.locator('[data-content="memo"]')).toContainText(
+    "更新 2026/10/29 20:00 JST",
+  );
+  await expect(page.locator('[data-content="memo"]')).toContainText(
+    "更新 2026/10/28（日付のみ）",
+  );
+  await expect(page.locator('[data-content="materials"]')).toContainText(
+    "追加 2026/10/28 19:00 JST",
+  );
+  await expect(page.locator('[data-content="todo"]')).toContainText(
+    "締切 2026-10-30",
+  );
   await expect(page.locator(".dashboard-widget")).toHaveCount(6);
-  await page.screenshot({
+  const headerEvidence = [];
+  const captureHeader = async (label, ratio) => {
+    await page.evaluate(
+      (r) =>
+        scrollTo(0, (document.documentElement.scrollHeight - innerHeight) * r),
+      ratio,
+    );
+    await page.evaluate(
+      () =>
+        new Promise((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(resolve)),
+        ),
+    );
+    const metrics = await page.evaluate(() => ({
+      scrollY,
+      viewport: { width: innerWidth, height: innerHeight },
+      headerTop: document.querySelector(".page-header").getBoundingClientRect()
+        .top,
+      headerBottom: document
+        .querySelector(".page-header")
+        .getBoundingClientRect().bottom,
+      position: getComputedStyle(document.querySelector(".page-header"))
+        .position,
+    }));
+    headerEvidence.push({ label, ...metrics });
+    assert.ok(
+      Math.abs(metrics.headerTop) < 1,
+      label + " header remains at viewport top",
+    );
+    await page.screenshot({
+      path: path.join(artifacts, "viewport-header-" + label + ".png"),
+      fullPage: false,
+    });
+  };
+  headerEvidence.push({
+    label: "after all-widget edit actions before recapture",
+    scrollY: await page.evaluate(() => scrollY),
+  });
+  for (const [label, ratio] of [
+    ["top", 0],
+    ["middle", 0.5],
+    ["bottom", 1],
+  ])
+    await captureHeader(label, ratio);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await captureHeader("after-resize-edit", 0.5);
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await expect(page.locator('#home-navigation a[href="/todo/"]')).toBeVisible();
+  const coverage = [];
+  const controls = page.locator(
+    "a[href],button:not(:disabled),input:not(:disabled),summary",
+  );
+  for (const width of [390, 1440]) {
+    await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 });
+    await page.evaluate(
+      () =>
+        new Promise((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(resolve)),
+        ),
+    );
+    await page.locator("#home-navigation").evaluate((el) => (el.open = true));
+    for (let i = 0; i < (await controls.count()); i++) {
+      const c = controls.nth(i);
+      if (!(await c.isVisible())) continue;
+      await c.focus();
+      const m = await c.evaluate((el) => {
+        const r = el.getBoundingClientRect(),
+          hit = document.elementFromPoint(
+            r.x + r.width / 2,
+            r.y + r.height / 2,
+          );
+        return {
+          control:
+            el.getAttribute("aria-label") || el.textContent.trim() || el.id,
+          top: r.top,
+          bottom: r.bottom,
+          covered: !(hit === el || el.contains(hit)),
+          cover: hit?.tagName,
+        };
+      });
+      coverage.push({ width, ...m });
+    }
+  }
+  await fs.writeFile(
+    path.join(artifacts, "header-viewport-evidence.json"),
+    JSON.stringify({ headerEvidence, coverage }, null, 2),
+  );
+  assert.deepEqual(
+    coverage.filter((c) => c.covered),
+    [],
+    "focused controls must be reachable without an overlay",
+  );
+  passed.push(
+    "actual top/middle/bottom/resized viewport header stays at top; all visible focused controls remain unobscured",
+  );
+  await page.evaluate(() => scrollTo(0, 0));
+  await page.evaluate(
+    () =>
+      new Promise((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(resolve)),
+      ),
+  );
+  await fullPageAtTop(page, {
     path: path.join(artifacts, "desktop-all-widgets-1440.png"),
     fullPage: true,
   });
@@ -315,14 +450,15 @@ try {
         requestAnimationFrame(() => requestAnimationFrame(resolve)),
       ),
   );
-  await page.screenshot({
+  await fullPageAtTop(page, {
     path: path.join(artifacts, "desktop-dark-all-widgets-1440.png"),
     fullPage: true,
   });
   await page.locator("#open-home-settings").click();
   await page.locator('input[name="home-theme"][value="light"]').check();
   await page.locator("#home-settings-close").click();
-  await page.locator('[data-move="memo"][data-step="-1"]').click();
+  await page.locator('[data-move="memo"][data-step="-1"]').focus();
+  await page.locator('[data-move="memo"][data-step="-1"]').press("Enter");
   await expect(page.locator(".dashboard-widget").nth(2)).toHaveAttribute(
     "data-id",
     "memo",
@@ -344,7 +480,7 @@ try {
   await page.waitForFunction(() =>
     window.Sortable?.get(document.querySelector("#dashboard-widgets")),
   );
-  await page.screenshot({
+  await fullPageAtTop(page, {
     path: path.join(artifacts, "desktop-edit-1440.png"),
     fullPage: true,
   });
@@ -455,7 +591,7 @@ try {
   await expect(page.locator('#home-navigation a[href="/wiki/"]')).toBeFocused();
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.locator("#home-navigation summary")).toBeFocused();
-  await page.screenshot({
+  await fullPageAtTop(page, {
     path: path.join(artifacts, "mobile-reordered-390.png"),
     fullPage: true,
   });
@@ -477,7 +613,7 @@ try {
   await page.locator('input[name="home-theme"][value="dark"]').check();
   await page.locator("#home-settings-close").click();
   await expect(page.locator("#open-home-settings")).toBeFocused();
-  await page.screenshot({
+  await fullPageAtTop(page, {
     path: path.join(artifacts, "mobile-dark-390.png"),
     fullPage: true,
   });
@@ -746,6 +882,10 @@ try {
   );
   console.log("Font evidence: " + JSON.stringify(fontEvidence));
   await font.close();
+  await fs.writeFile(
+    path.join(artifacts, "fullpage-capture-evidence.json"),
+    JSON.stringify(fullPageEvidence, null, 2),
+  );
   await fs.writeFile(
     path.join(artifacts, "results.json"),
     JSON.stringify({ passed }, null, 2),

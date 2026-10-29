@@ -7,6 +7,7 @@ import {
   dayJst,
   todoSummary,
   summaryPreview,
+  metadataDateJst,
   esc,
 } from "../model.mjs";
 import { createReader } from "../data.mjs";
@@ -290,4 +291,26 @@ test("new defaults prioritize lessons without migrating saved user order; compac
   assert.equal(preview.hidden, 2);
   assert.equal(preview.shown.filter((t) => t.overdue).length, 5);
   assert.equal(summaryPreview(items).shown.length, 3);
+});
+
+test("metadata timestamps format explicit instants as JST, SQLite material dates as UTC, and preserve date-only semantics", () => {
+  assert.equal(metadataDateJst("2026-10-29T11:00:00Z"), "2026/10/29 20:00 JST");
+  assert.equal(
+    metadataDateJst("2026-10-29T23:30:00-04:00"),
+    "2026/10/30 12:30 JST",
+  );
+  assert.equal(
+    metadataDateJst("2026-10-28 10:00:00", { sqliteUtc: true }),
+    "2026/10/28 19:00 JST",
+  );
+  assert.equal(metadataDateJst("2026-10-29"), "2026/10/29（日付のみ）");
+  for (const value of [
+    null,
+    "bad",
+    "2026-02-30",
+    "2026-10-29 10:00:00",
+    "2026-10-29T10:00:00",
+    "2026-10-29T24:00:00Z",
+  ])
+    assert.equal(metadataDateJst(value), "日時不明");
 });

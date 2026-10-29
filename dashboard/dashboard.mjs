@@ -7,6 +7,7 @@ import {
   dayJst,
   todoSummary,
   summaryPreview,
+  metadataDateJst,
   esc,
 } from "./model.mjs";
 import { createReader } from "./data.mjs";
@@ -132,14 +133,14 @@ export function createDashboard({
       return list(
         data,
         (m) =>
-          `<strong>${esc(m.title || "(無題)")}</strong><small>更新 ${esc(m.updatedAt || "日時不明")}</small>`,
+          `<strong>${esc(m.title || "(無題)")}</strong><small>更新 ${esc(metadataDateJst(m.updatedAt))}</small>`,
         "メモはありません。",
       );
     if (id === "materials")
       return list(
         data,
         (m) =>
-          `<strong>${esc(m.name)}</strong><small>追加 ${esc(m.created_at || "日時不明")}</small>`,
+          `<strong>${esc(m.name)}</strong><small>追加 ${esc(metadataDateJst(m.created_at, { sqliteUtc: true }))}</small>`,
         "教材はありません。",
       );
     return list(
