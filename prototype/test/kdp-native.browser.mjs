@@ -151,7 +151,7 @@ try {
       );
     const saveDialog = async () => {
       await page.locator("#dialog-form button[type=submit]").click();
-      await page.locator("#modal").waitFor({ state: "hidden" });
+      await page.locator("#modal").waitFor({ state: "hidden" });await expect(page.locator(".kdp-native")).toHaveAttribute("aria-busy","false");
     };
     await page.goto(origin + '/app/#!/kdp/');
     await page.locator("#new-book").waitFor();
@@ -185,7 +185,7 @@ try {
       "pending dialog cannot close",
     );
     await page.locator("#dialog-form input[name=title]").press("Enter");
-    await page.locator("#modal").waitFor({ state: "hidden" });
+    await page.locator("#modal").waitFor({ state: "hidden" });await expect(page.locator(".kdp-native")).toHaveAttribute("aria-busy","false");
     delayBookCreate = false;
     assert.equal(
       bookCreateRequests,
@@ -265,7 +265,7 @@ try {
     await page.locator("#proposals button").first().click();
     await width();
     await page.locator("#accept-proposal").click();
-    await page.locator("#modal").waitFor({ state: "hidden" });
+    await page.locator("#modal").waitFor({ state: "hidden" });await expect(page.locator(".kdp-native")).toHaveAttribute("aria-busy","false");
     await expect(page.locator("#section-content")).toHaveValue(
       "改訂版 / Revised text",
     );
@@ -282,7 +282,7 @@ try {
       .getByRole("button")
       .click();
     await page.locator("#reject-proposal").click();
-    await page.locator("#modal").waitFor({ state: "hidden" });
+    await page.locator("#modal").waitFor({ state: "hidden" });await expect(page.locator(".kdp-native")).toHaveAttribute("aria-busy","false");
     await expect(page.locator("#section-content")).toHaveValue(
       "改訂版 / Revised text",
     );
@@ -316,7 +316,7 @@ try {
     await page.locator('[data-restore="2"]').waitFor();
     page.once("dialog", (d) => d.accept());
     await page.locator('[data-restore="2"]').click();
-    await page.locator("#modal").waitFor({ state: "hidden" });
+    await page.locator("#modal").waitFor({ state: "hidden" });await expect(page.locator(".kdp-native")).toHaveAttribute("aria-busy","false");
     await expect(page.locator("#section-content")).toHaveValue(original);
     await expect(page.locator("#section-title")).toBeEnabled();
     await page.locator("#section-archive").click();
@@ -376,9 +376,9 @@ try {
     });
     await page.locator('#book-settings').click();await page.locator('#dialog-form [name=subtitle]').fill('Synthetic subtitle');await saveDialog();assert.equal((await api('books/'+book.id)).book.subtitle,'Synthetic subtitle');
     await page.locator('#new-chapter').click();await page.getByLabel('章タイトル').fill('Second synthetic chapter');await saveDialog();const two=(await api('books/'+book.id)).chapters;assert.equal(two.length,2);await page.locator('[data-move-chapter="'+two[0].id+'"][data-direction="1"]').click();await expect(page.locator('.kdp-native')).toHaveAttribute('aria-busy','false');assert.equal((await api('books/'+book.id)).chapters[0].id,two[1].id);
-    await page.locator('[data-edit-chapter="'+two[1].id+'"]').click();await page.locator('#dialog-form [name=title]').fill('Renamed chapter');await saveDialog();await page.locator('[data-edit-chapter="'+two[1].id+'"]').click();await page.locator('#archive-chapter').click();await expect(page.locator('#modal')).toBeHidden();assert.equal((await api('books/'+book.id)).chapters.find(c=>c.id===two[1].id).archived,1);await page.locator('[data-edit-chapter="'+two[1].id+'"]').click();await page.locator('#archive-chapter').click();await expect(page.locator('#modal')).toBeHidden();
+    await page.locator('[data-edit-chapter="'+two[1].id+'"]').click();await page.locator('#dialog-form [name=title]').fill('Renamed chapter');await saveDialog();await page.locator('[data-edit-chapter="'+two[1].id+'"]').click();await page.locator('#archive-chapter').click();await expect(page.locator('#modal')).toBeHidden();await expect(page.locator('.kdp-native')).toHaveAttribute('aria-busy','false');assert.equal((await api('books/'+book.id)).chapters.find(c=>c.id===two[1].id).archived,1);await page.locator('[data-edit-chapter="'+two[1].id+'"]').click();await page.locator('#archive-chapter').click();await expect(page.locator('#modal')).toBeHidden();await expect(page.locator('.kdp-native')).toHaveAttribute('aria-busy','false');
     await page.locator('#sources [data-edit-source]').first().click();await page.locator('#dialog-form [name=notes]').fill('Synthetic source note');await saveDialog();await expect(page.locator('#sources')).toContainText('Synthetic source note');
-    await page.locator('#new-proposal').click();await page.locator('#dialog-form [name=title]').fill('Native UI draft');await page.locator('#dialog-form [name=body]').fill('Not adopted');await saveDialog();const acceptedBefore=(await api('sections/'+section.id)).section.body;await page.locator('#proposals .item').filter({hasText:'Native UI draft'}).getByRole('button').click();await expect(page.locator('#modal .diff')).toContainText('Not adopted');assert.equal((await api('sections/'+section.id)).section.body,acceptedBefore);await page.locator('#reject-proposal').click();await expect(page.locator('#modal')).toBeHidden();assert.equal((await api('sections/'+section.id)).section.body,acceptedBefore);
+    await page.locator('#new-proposal').click();await page.locator('#dialog-form [name=title]').fill('Native UI draft');await page.locator('#dialog-form [name=body]').fill('Not adopted');await saveDialog();const acceptedBefore=(await api('sections/'+section.id)).section.body;await page.locator('#proposals .item').filter({hasText:'Native UI draft'}).getByRole('button').click();await expect(page.locator('#modal .diff')).toContainText('Not adopted');assert.equal((await api('sections/'+section.id)).section.body,acceptedBefore);await page.locator('#reject-proposal').click();await expect(page.locator('#modal')).toBeHidden();await expect(page.locator('.kdp-native')).toHaveAttribute('aria-busy','false');assert.equal((await api('sections/'+section.id)).section.body,acceptedBefore);
     // Lost committed save stops writes and preserves exact input/receipt, never replaying.
     await page.locator('#section-content').fill('Unknown committed text');lostPatch=true;const before=requests.filter(r=>r.method==='PATCH').length;await page.locator('#save').click();await expect(page.locator('[data-kdp-recovery]')).toBeVisible();await expect(page.locator('#save')).toBeDisabled();await expect(page.locator('#section-content')).toHaveValue('Unknown committed text');assert.equal((await api('sections/'+section.id)).section.body,'Unknown committed text');await page.locator('[data-inspect]').click();await expect(page.locator('[data-kdp-recovery] pre')).toContainText('Unknown committed text');assert.equal(requests.filter(r=>r.method==='PATCH').length,before+1);const receipt=page.waitForEvent('download');await page.locator('[data-receipt]').click();assert.equal(await(await receipt).failure(),null);
     await reopen();const latest=(await api('sections/'+section.id)).section;await api('sections/'+section.id,{revision:latest.revision,body:'Other synthetic writer'},'PATCH');await page.locator('#section-content').fill('Stale local text');await page.locator('#save').click();await expect(page.locator('[data-kdp-recovery]')).toBeVisible();await expect(page.locator('#section-content')).toHaveValue('Stale local text');assert.equal((await api('sections/'+section.id)).section.body,'Other synthetic writer');
