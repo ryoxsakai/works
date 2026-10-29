@@ -51,7 +51,7 @@ export async function writeLinkedProgress(env,body,deps){
  const context=await sourceContext(env,body?.target,deps,true,body);writeContext(context,body);
  if(!Array.isArray(body.changes)||!body.changes.length||body.changes.length>8||new Set(body.changes.map(row=>row?.chapter_id)).size!==body.changes.length)throw fail(400,'進捗は重複なく1〜8項目を保存してください。');
  const before=await materials(env,context.name);if(before.ambiguous_assignment)throw fail(409,'教材の割当が重複しています。従来画面で確認してください。');
- const statements=[...guardStatements(env,context.target.id,body.record_revision)];
+ const statements=[...guardStatements(env,context.target.id,body.record_revision),...context.mapping_guards];
  for(const change of body.changes){if(!change||typeof change!=='object')throw fail(400,'進捗の形式を確認してください。');const expected=change.expected;
   if(!Number.isSafeInteger(change.link_id)||!Number.isSafeInteger(change.material_id)||!Number.isSafeInteger(change.chapter_id)||typeof change.completed!=='boolean'||typeof change.material_name!=='string'||typeof change.chapter_name!=='string'||!expected||typeof expected.exists!=='boolean'||typeof expected.completed!=='boolean'||!(expected.updated_at===null||typeof expected.updated_at==='string'))throw fail(400,'取得時の教材・章・進捗が必要です。');
   const assigned='(SELECT COUNT(*) FROM student_materials WHERE name=? AND material_id=?)=1 AND EXISTS(SELECT 1 FROM student_materials sm JOIN materials m ON m.id=sm.material_id JOIN material_chapters c ON c.material_id=sm.material_id WHERE sm.id=? AND sm.name=? AND sm.material_id=? AND c.id=? AND c.name IS ? AND m.name IS ?)';

@@ -12,8 +12,10 @@ The settings entry opens metadata-only association history with pagination and e
 
 ## Verification
 
-Local results:118 app unit tests;7 actual isolated-D1 mapping tests;1 exact additive migration test;22 existing linked-profile/planning regression tests pass. Tests cover wrong/changed sources, recurring/cross-calendar isolation, holds/generations, profile CAS, concurrent binding, revocation-before-commit, immutable history, lost acknowledgements, replay identity, partial schema, ordinary API compatibility and browser-session/Origin/method gates.
+Local results:118 app unit tests;8 actual isolated-D1 mapping tests;1 exact additive migration test;22 existing linked-profile/planning regression tests pass. Tests cover wrong/changed sources, recurring/cross-calendar isolation, holds/generations, profile CAS, concurrent binding, revocation-before-commit, immutable history, lost acknowledgements, replay identity, partial schema, ordinary API compatibility and browser-session/Origin/method gates.
 
 The existing native lesson browser suite is extended for explicit confirmation, in-flight navigation, mapped edits, disable, history and unknown-outcome inspection. A twentieth cross-module suite is prepared. These browser tests have **not run in this checkpoint**: the local Chromium executable is absent. Exact-head CI must pass before publication. No real student mapping or production test save was performed.
 
 See [rollout prerequisites](lesson-profile-mapping-rollout.md) and [cross-cutting verification](full-parity-cross-cutting.md). This checkpoint does not declare full migration or live activation complete.
+
+Independent review found a missing in-transaction revocation check in chapter-progress writes. The same mapping guard used by profiles/planning is now included before progress mutations, and a synthetic revoke-before-batch regression verifies zero progress changes. The schema-absent test exercises successful ordinary full-title/curriculum profile, goal and progress writes, not just availability metadata.
