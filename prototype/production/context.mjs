@@ -90,6 +90,9 @@ export function createProductionContext(auth,{fetcher=fetch,onExpired=()=>{},onL
   return context;
 }
 export function safeShellRoute(value){
+ if(/^\/teaching\/settings\/(?:\?panel=(?:materials|calendar|terms|periods|excluded|appearance))?$/.test(value||''))return value;
+ if(/^\/teaching\/\d{4}-\d{2}-\d{2}\/schedule\/\?/.test(value||'')){const [path,query,...extra]=value.split('?'),params=new URLSearchParams(query),names=[...params.keys()];if(!extra.length&&names.length>0&&names.length<=4&&new Set(names).size===names.length&&safeShellRoute(path)===path&&names.every(key=>key==='view'?['list','calendar'].includes(params.get(key)):key==='week'||key==='month'?validDay(params.get(key)):key==='filter'?params.get(key).length<=2000&&!/[\u0000-\u001f]/.test(params.get(key)):false))return value;return '/home/';}
+
  if((value||'').startsWith('/teaching/')&&value.includes('?')){const [path,query,...extra]=value.split('?'),params=new URLSearchParams(query),keys=[...params.keys()];if(!extra.length&&keys.length>0&&keys.length<=2&&new Set(keys).size===keys.length&&keys.every(key=>['year','term'].includes(key)&&/^\d{0,12}$/.test(params.get(key)))&&safeShellRoute(path)===path)return value;return '/home/';}
 
  if(/^\/(?:home|teaching|operations|workflow|more|ss|todo|memo|wiki|material|admission|flow)\/$/.test(value||''))return value;

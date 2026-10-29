@@ -263,7 +263,7 @@ Verification covers civil-date/leap/year boundaries, union/gap filtering, descri
 
 | Module | Remaining original parity work (not certified complete by this release) |
 |---|---|
-| Lesson management | L13d arbitrary saved aliases need an explicit guarded mapping; L19 calendar/exclusion/year/term/period/slot and material catalog settings; L20 native explicit attribution resolution/history remains through old-screen conflict routes. |
+| Lesson management | L13d arbitrary saved aliases need an explicit guarded mapping; L19b local individual/group/student-search settings; L20 native attribution resolution/history/baseline preparation remains through explicit old-screen routes. L19a global settings/catalog controls are covered by the later settings phase. |
 | ToDo | Original dashboard/group/card layout, all fields/checklists and lifecycle actions, category/role management, clone preview, preferences and operation recovery; use the detailed unchecked list above. |
 | Memo | Original multi-body/supplementary editor, tags/category operations, reorder/display/search preferences and complete lifecycle/recovery. |
 | Wiki | Folder hierarchy CRUD/move, full page/source/proposal/history/review/export controls and reading/preview modes. |
@@ -297,3 +297,5 @@ Validation includes nine isolated D1 API tests (racing writers, parent/date/time
 Release order: backward-compatible API first, automatic Worker deployment verified, then frontend PR rebased on current main and exact-head tests/Pages verification. Reuse the already deployed `lesson_record_guard`; there is no migration, backup/export prerequisite, new credential, permission or external scheduling change. Old screens and APIs remain available; a missing new API fails without an unsafe legacy-write fallback. Frontend rollback can restore the prior Pages commit while leaving the additive API.
 
 Remaining across the full application: L13d explicit safe alias mapping, L19b local student-kind/search settings, L20 native attribution/history/baseline controls; all unchecked ToDo, Memo, Wiki, Workflow, Material library, Admission, KDP and SS audit items in the module lists and the remaining-migration table above remain open. Material-library files/R2 upload/tree operations are different from this curriculum catalog and are unchanged. Actual iPhone, physical printer and attachment-pixel QA remain unverified. Next phase: finish L19b and assess L20 as a separate identity-sensitive release, then continue the original non-lesson interaction checklists. Do not call this full migration complete.
+
+Authentication-return checks also preserve the bounded settings-tab and schedule cursor/filter URLs through the existing re-login flow. Unknown tabs, duplicate/unrelated query parameters, invalid dates and control characters remain rejected; no callback origin or authentication permission is broadened.
