@@ -47,3 +47,5 @@ Official references checked2026-10-29:
 - [Google Calendar batch semantics, response correlation and quota](https://developers.google.com/workspace/calendar/api/guides/batch)
 - [Workers subrequests and connection limits](https://developers.cloudflare.com/workers/platform/limits/#subrequests)
 - [D1 query limits](https://developers.cloudflare.com/d1/platform/limits/)
+
+CI follow-up: an unchanged material-library browser test exposed its initial requestAnimationFrame focus racing synthetic immediate typing (name became the intended code). The test now waits two animation frames for the existing initial-focus work and asserts both input values before saving; no material-library production code or behavior is changed. The complete exact-head suites remain the gate.
