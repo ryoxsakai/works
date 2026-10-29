@@ -131,11 +131,11 @@ Block 2 now restores immediate shared-memo and next-plan blur autosave, using th
 
 ### KDP (`kdp/index.html`, `kdp/app.js`)
 
-- [ ] Books and section hierarchy create/edit/order/archive as supported by the original controls.
-- [ ] Section text/metadata editing, navigation and unsaved/back/cancel behavior.
-- [ ] Sources, proposal generation/submission, explicit accept/reject and immutable revision checks.
-- [ ] History/diff/recovery, reference details and every original export action.
-- [ ] Preserve browser ownership and separate write/human approval requirements; no accepting proposals or creating real books for tests.
+- [x] Books and section hierarchy create/edit/order/archive as supported by the original controls.
+- [x] Section text/metadata editing, navigation and unsaved/back/cancel behavior.
+- [x] Sources, proposal creation/submission, explicit accept/reject and immutable revision checks.
+- [x] History/diff/recovery, reference details and every original export action.
+- [x] Preserve browser ownership and separate write/human approval requirements; no accepting proposals or creating real books for tests.
 
 ### SS (`ss/index.html`, `ss/app.js`)
 
@@ -385,3 +385,13 @@ Native original file-library controls are now implemented and locally verified: 
 Source inventory: `admission/index.html` loads `admission/app.js` (838 lines); the older `admission/admission.js` tab-only IIFE is not loaded. Original Works admissions is a read-only schedule viewer, separate from Exam. It has no year selector, create/edit/delete form, import/export or student-choice writes. It exposes list/month/continuous/gantt/table, university aliases/readings, type and earliest-primary-month filters, local preference migration, remaining days, stage/type colors, and active-view printing including per-university gantt sheets. Existing integrated guarded detail editing and safe source links remain available through detail routes; no new write endpoints are required.
 
 Native port now preserves original render/filter/date/print functions, scopes DOM to the mounted view and cancels late reads on unmount; shared auth initializes once. Direct detail routes retain existing conflict/unknown-outcome protection. Original URL remains. Unit tests110 and app build pass. New native browser suite and updated existing services suite are prepared but not yet verified: local Chromium executable is absent. Production records/settings remain untouched. Admissions controls are implemented; exact-head browser CI remains the release gate, recorded in PR154. Remaining: KDP, SS original audit, explicit safe lesson-alias mapping and actual iPhone/authenticated production/physical print/user-attachment checks.
+
+### KDP original manuscript UI implementation (release CI gate)
+
+Original KDP is manuscript management, not external publishing: book/chapter/section settings/create/archive/order, explicit Markdown body saves and private PNG/JPEG insertion, sources, separate proposals/escaped comparison/explicit accept-reject, paginated immutable history/confirmed restore, EPUB/JSON/Markdown ZIP. Native `/app/#!/kdp/` now ports every original control, retaining `/kdp/`, shared authentication, server revision/ancestor/order gates and original field/export semantics. Module lifetime fences late reads/uploads/downloads; one operation freezes inputs; uncertain/conflicting writes and failed post-save refresh stop without replay, retaining receipt/draft and read-only inspection/export/reset. Reviewed proposals do not confer execution authority. No account/pricing/submission/communication features, new permissions, schema or dependencies. Tests use isolated synthetic D1/R2 only.
+
+112 app units and13 KDP Worker tests pass locally; local Chromium is absent, so exact-head CI must verify native browser coverage plus all regressions. Checklist implementation is complete for KDP; verification remains gated by PR checks. SS original columns/preferences/detail/print audit and lesson L13d explicit safe arbitrary-alias mapping remain open. Actual iPhone/authenticated live/physical output/user-attachment pixels remain unverified.
+
+### SS source audit (remaining implementation)
+
+`ss/index.html`/`ss/app.js` have a read-only five-column table (project/status/JST date/remaining/memo), both column sort buttons with aria-sort and select/direction controls, persisted `works_ss_sort`, active/total summary, completed toggle, status/weekly urgency colors, full memo and original print layout. Unified cards/details preserve read-only data, visible count, sorting preferences, memo and detail print but still lack the original table/column sort controls and full filtered-list print. Numeric/case-insensitive name comparator and JST date-label/urgency presentation also differ and require dedicated source-comparison fixtures. No original business execution/edit controls exist. SS is not marked complete; no SS writes were introduced.

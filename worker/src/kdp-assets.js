@@ -54,18 +54,20 @@ export async function handleAssets(request, env, url, headers = {}) {
       fail(413, "本ごとの画像上限は20MB・40枚です。");
     const id = crypto.randomUUID(),
       key = `kdp/${book.id}/${id}`;
-    await env.MATERIALS_BUCKET.put(key, bytes, {
+    const uncertain = () => new Response(JSON.stringify({error:'KDP image result is unknown; preserve this reference and do not replay automatically',kdp_operation:{id,book_id:book.id,object_key:key}}),{status:502,headers:{...headers,'Content-Type':'application/json','Cache-Control':'private, no-store'}});
+    try { await env.MATERIALS_BUCKET.put(key, bytes, {
       httpMetadata: { contentType: type },
-    });
+    }); } catch { return uncertain(); }
     try {
       await env.DB.prepare(
         "INSERT INTO kdp_assets(id,book_id,content_type,extension,size) VALUES (?,?,?,?,?)",
       )
         .bind(id, book.id, type, extension, bytes.length)
         .run();
-    } catch (error) {
-      await env.MATERIALS_BUCKET.delete(key);
-      throw error;
+    } catch {
+      // A lost DB response may follow a committed INSERT. Never remove bytes
+      // that might already belong to an accepted manuscript asset.
+      return uncertain();
     }
     return new Response(
       JSON.stringify({
