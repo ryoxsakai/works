@@ -32,10 +32,30 @@ Baseline `d08ecae292e629ad120a03d52f9a647fe4d8e440`. This is the file/R2 library
 - [x] Original feature inventory and safe split.
 - [x] Additive metadata guard implemented without schema changes.
 - [x] Synthetic guarded-operation/HTTP auth/CSRF/legacy regression:9 tests pass locally, using isolated D1/R2 only.
-- [ ] Exact-head backend CI/PR/merge/Worker deployment.
-- [ ] Native Library/Tree/Tags, complete metadata/placement controls, binary preview/download.
-- [ ] Native uploads/progress and unknown-outcome hold/reconciliation.
+- [x] Backend PR152 merged and Worker deployed; exact evidence below.
+- [x] Native Library/Tree/Tags, metadata/placement controls and binary preview/download implemented; first synthetic suite passes locally.
+- [x] Native explicit sequential uploads/progress and unknown-outcome hold/inspection implemented; first synthetic suite passes.
 - [ ] Full synthetic browser/keyboard/mobile/navigation/teardown and original-source regression.
 - [ ] Frontend exact-head CI/PR/merge/Pages deployment.
 
 No real user library operations have been used as tests. Remaining overall modules: admissions calendar/gantt/table/print, native KDP and SS original-column/preferences/detail/print audit. Lesson arbitrary-alias mapping remains read-only pending explicit safe mapping. This is not full Works migration completion.
+
+## Published backend prerequisite
+
+PR152: https://github.com/ryoxsakai/works/pull/152 . Tested `dbcddf10b625687045eb48e2ba9f1b71ac3a0100`; merge `9982d38f2d0ba9f36455ac15216c31b4f12b912f`; matching tree `1de0e7db089983cae00fa5c875140dc2a98211f6`. App CI40837089804 and OAuth/Worker CI40837089819 pass. Local complete Worker run186 tests and app102 tests pass. Actual automatic production Worker build7de93ce4-a433-469a-816c-7dfad888f4d2 succeeds with Version `fec29436-8bd8-4a43-a122-d3b7f06ee390`; Pages run40837950725 also succeeds. No manual redeploy or production data operation. The first CI's module-loader incompatibility was fixed using the existing `.js`/lazy-import convention; the Workflow recovery test now waits for its actual busy guard before Reset, retaining all assertions.
+
+## Unpublished native UI checkpoint
+
+The native scoped original controller/template/CSS is implemented on `feat/material-library-original-parity`. Existing auth initializes once, metadata writes freeze original snapshots and validate target/field/object-reference acknowledgements, and keyboard/touch placement uses the same atomic operation as pointer drag. Binary view/download remains local; HTML/JS/XML is literal text. Blob and XHR responses use session/abort fences. Uploads require explicit Start, retain queue progress and halt on any uncertain response without dispatching the remaining queue. The legacy raw upload endpoint does not distinguish all pre-write versus post-write errors, so even raw400 is held rather than assumed safe to retry. A known receipt survives a later refresh failure. Same-name files are never treated as proof of successful upload.
+
+Four new model/context tests pass (106 total app unit tests). The first native browser suite passes using the actual Worker and isolated D1/R2: tabs/search/tags/tree, direct/reloaded folders, create/edit/code/byte preservation, keyboard move/order, explicit delete/nonempty/stale protections, sequential synthetic upload, committed-but-lost response stopping the rest of the queue, no replay during inspect/reset, literal unsafe HTML and local unsupported download, acknowledged-create/failed-refresh recovery, 320/390/768/1440 layout, focus/dirty Back and repeated mounting with one auth initialization. Native390/1440 screenshots were actually inspected. Source button layout/decorative-icon accessibility collisions were corrected.
+
+**Not yet a frontend release.** Remaining before its PR/publication:
+
+- Adapt the existing `services.browser.mjs` Material cases from the reduced viewer to the native implementation; keep admission coverage intact. The full16-suite run has not passed or been claimed.
+- Extend native regression for pointer drag/cross-parent placement, all supported media/PDF branches, queue duplicate selection/removal, in-flight responses, abort/auth expiry, late preview fencing, known validation recovery and dark theme.
+- Add transport-specific XHR generation/cancellation coverage; review recovery serialization and progress behavior under interleaved events.
+- Review legacy raw upload versus concurrent destination deletion and legacy folder-delete race. These old routes are unchanged by the published metadata prerequisite; a safe conditional insert/delete or explicit native hold must prevent orphaned/misleading placement. No schema or ownership inference is needed. Also classify unexpected guarded SQL failures as unknown500 rather than inheriting the old generic400 fallback.
+- Rebase/verify against current published main, reproduce built assets, run all relevant Worker/browser regressions, then draft PR, exact-head CI, merge and Pages/Worker verification under existing authorization. No new permission question is required within this scope.
+
+Actual authenticated production UI/iPhone and physical print remain unavailable/unverified; those are QA limits, distinct from the implementation/test items above. No real library file has been uploaded, edited, deleted or shared as a test.
