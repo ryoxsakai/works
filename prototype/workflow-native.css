@@ -1,0 +1,486 @@
+.workflow-native{--fg:var(--ink);--bg-elevated:var(--surface);--border:var(--line);--bg-hover:var(--paper);color:var(--fg);font:inherit;min-width:0}.workflow-native [hidden]{display:none!important}.workflow-native button,.workflow-native input,.workflow-native textarea,.workflow-native select{font:inherit;color:var(--fg);max-width:100%;box-sizing:border-box}.workflow-native button{background:var(--surface);border:1px solid var(--line);border-radius:8px;min-height:44px;padding:8px 12px}.workflow-native :is(button,input,select,textarea):focus-visible{outline:2px solid var(--accent);outline-offset:2px}.workflow-native button:disabled{opacity:.6}.workflow-native dialog{color:var(--fg);background:var(--surface);border:1px solid var(--line);box-sizing:border-box;max-width:calc(100vw - 24px);max-height:calc(100dvh - 32px);overflow:auto;overscroll-behavior:contain}.workflow-native dialog::backdrop{background:#10182888}.workflow-native :is(p,pre,h2,h3,small){overflow-wrap:anywhere}.workflow-native pre{white-space:pre-wrap}.workflow-native :is(input,textarea,select){background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:8px}.workflow-native label{display:block}.workflow-native label:not(.wf-check)>:is(input,textarea,select){display:block;width:100%}.workflow-native textarea{min-height:90px}.workflow-native a{color:var(--accent)}.workflow-native button.ui-primary{background:var(--accent);color:white}.workflow-native :is(main,dialog) button{letter-spacing:normal}.workflow-native dialog form{margin:0}.workflow-native main{padding:0!important}.workflow-native [data-workflow-recovery]{border:2px solid var(--accent);padding:12px;margin:12px 0}.workflow-native dialog .wf-title{position:static}.workflow-native .wf-title h2{flex:1}.workflow-native .wf-title button{flex:0 0 auto}.workflow-native .wf-dialog-error{color:var(--fg);font-weight:600}
+.workflow-native main {
+  max-width: 1600px;
+  margin: auto;
+  padding: 24px;
+}
+.workflow-native .wf-heading {
+  font-size: 16px;
+  margin-left: 20px;
+  font-weight: 400;
+}
+.workflow-native .wf-title,
+.workflow-native .wf-row,
+.workflow-native .wf-calendar-bar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+.workflow-native .wf-title p {
+  color: var(--muted);
+  margin: 0;
+}
+.workflow-native .wf-title h2 {
+  margin: 8px 0 20px;
+}
+.workflow-native .wf-patrol {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: var(--bg-elevated);
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  margin-bottom: 20px;
+}
+.workflow-native .wf-patrol small {
+  flex-basis: 100%;
+}
+.workflow-native .wf-filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+.workflow-native .wf-filters button[aria-pressed="true"] {
+  background: var(--accent, #5368d5);
+  color: white;
+}
+.workflow-native .wf-calendar-bar {
+  justify-content: flex-start;
+  margin-bottom: 16px;
+}
+.workflow-native .wf-calendar-bar span,
+.workflow-native .wf-note {
+  font-size: 12px;
+  color: var(--muted);
+}
+.workflow-native .wf-week {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 10px;
+}
+.workflow-native .wf-day {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  min-height: 230px;
+}
+.workflow-native .wf-day h3 {
+  font-size: 14px;
+  margin-top: 0;
+}
+.workflow-native .wf-day.today {
+  border-color: var(--accent, #5368d5);
+}
+.workflow-native .wf-day summary {
+  font-size: 12px;
+  margin: 12px 0;
+  cursor: pointer;
+}
+.workflow-native .wf-run {
+  display: block;
+  text-align: left;
+  width: 100%;
+  padding: 12px;
+  margin: 8px 0;
+  border-radius: 10px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.workflow-native .wf-run small {
+  display: block;
+  margin-top: 8px;
+}
+.workflow-native .wf-definitions {
+  margin: 24px 0;
+}
+.workflow-native .wf-definition {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border);
+}
+.workflow-native button {
+  cursor: pointer;
+}
+.workflow-native button:disabled {
+  cursor: wait;
+  opacity: 0.5;
+}
+.workflow-native .wf-dialog {
+  width: min(760px, 94vw);
+  max-height: 90vh;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--bg-elevated);
+  color: inherit;
+  padding: 24px;
+}
+.workflow-native .wf-dialog::backdrop {
+  background: #0008;
+}
+.workflow-native .wf-dialog label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 12px 0;
+  flex: 1;
+  min-width: 150px;
+}
+.workflow-native .wf-dialog input,
+.workflow-native .wf-dialog textarea,
+.workflow-native .wf-dialog select {
+  width: 100%;
+  box-sizing: border-box;
+}
+.workflow-native .wf-dialog textarea {
+  min-height: 72px;
+}
+.workflow-native .wf-dialog .wf-check {
+  flex-direction: row;
+  align-items: center;
+}
+.workflow-native .wf-check input {
+  width: auto;
+}
+.workflow-native .wf-task {
+  border: 1px solid var(--border);
+  padding: 12px;
+  border-radius: 10px;
+  margin-bottom: 12px;
+}
+.workflow-native .wf-dialog pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.workflow-native .wf-dialog ol {
+  padding-left: 24px;
+}
+.workflow-native .wf-dialog li {
+  margin: 12px 0;
+}
+.workflow-native .wf-dialog a {
+  overflow-wrap: anywhere;
+}
+.workflow-native #error,
+.workflow-native #editor-error,
+.workflow-native #run-error {
+  color: var(--danger, #c54c4c);
+}
+.workflow-native [hidden] {
+  display: none !important;
+}
+@media (max-width: 760px) {
+  .workflow-native main {
+    padding: 16px;
+  }
+  .workflow-native .wf-heading {
+    margin-left: 8px;
+    font-size: 14px;
+  }
+  .workflow-native .wf-week {
+    grid-template-columns: 1fr;
+  }
+  .workflow-native .wf-day {
+    display: none;
+    min-height: 200px;
+  }
+  .workflow-native .wf-day.selected {
+    display: block;
+  }
+  .workflow-native .wf-calendar-bar span {
+    flex-basis: 100%;
+  }
+  .workflow-native .wf-dialog {
+    padding: 16px;
+  }
+  .workflow-native .wf-row {
+    align-items: stretch;
+  }
+  .workflow-native .wf-row label {
+    min-width: 120px;
+  }
+  .workflow-native .wf-patrol {
+    gap: 8px;
+  }
+}
+.workflow-native #workspace button,
+.workflow-native .wf-dialog button {
+  color: var(--fg);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 12px;
+  line-height: 1.4;
+}
+.workflow-native #workspace button:hover,
+.workflow-native .wf-dialog button:hover {
+  background: var(--bg-hover);
+}
+.workflow-native #workspace #new,
+.workflow-native .wf-dialog button[type="submit"] {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+.workflow-native #workspace .wf-filters button[aria-pressed="true"] {
+  background: var(--accent);
+  color: #fff;
+}
+.workflow-native .wf-day {
+  background: var(--bg-elevated);
+}
+.workflow-native .wf-row {
+  justify-content: flex-start;
+}
+.workflow-native .wf-patrol #patrol-status {
+  margin-right: 12px;
+}
+.workflow-native .wf-note {
+  line-height: 1.7;
+}
+.workflow-native .wf-run small {
+  color: var(--muted);
+}
+.workflow-native html {
+  background: var(--bg);
+}
+.workflow-native body {
+  background-attachment: scroll;
+}
+.workflow-native #workspace input,
+.workflow-native #workspace select,
+.workflow-native .wf-dialog input,
+.workflow-native .wf-dialog select,
+.workflow-native .wf-dialog textarea {
+  background: var(--bg-elevated);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px;
+}
+.workflow-native #auth {
+  color: var(--fg);
+}
+.workflow-native .wf-patrol small {
+  color: var(--fg);
+}
+.workflow-native .wf-upcoming {
+  padding: 12px;
+  margin: 8px 0;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  overflow-wrap: anywhere;
+}
+.workflow-native .wf-upcoming small {
+  display: block;
+  margin-top: 8px;
+  font-size: 11px;
+}
+
+/* Overview keeps work visible across calendar dates. */
+.workflow-native .wf-focus {
+  margin: 12px 0 24px;
+}
+.workflow-native .wf-focus h2,
+.workflow-native .wf-section-title {
+  font-size: 18px;
+  margin: 0 0 8px;
+}
+.workflow-native .wf-focus .wf-title {
+  margin-bottom: 16px;
+}
+.workflow-native .wf-focus a {
+  color: var(--fg);
+  text-underline-offset: 4px;
+  font-size: 13px;
+}
+.workflow-native .wf-active-runs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: 12px;
+}
+.workflow-native #workspace .wf-active-card {
+  margin: 0;
+  padding: 18px;
+  border-left: 4px solid var(--accent);
+  line-height: 1.7;
+}
+.workflow-native #workspace .wf-run[data-status="review"] {
+  border-left: 4px solid #b7791f;
+}
+.workflow-native #workspace .wf-run[data-status="paused"],
+.workflow-native #workspace .wf-run[data-status="waiting"] {
+  border-left: 4px solid var(--muted);
+}
+.workflow-native .wf-status {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.workflow-native .wf-active-card progress {
+  display: block;
+  width: 100%;
+  height: 6px;
+  margin: 12px 0;
+  accent-color: var(--accent);
+}
+.workflow-native .wf-empty {
+  padding: 20px;
+  margin: 0;
+  color: var(--muted);
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+}
+.workflow-native .wf-settings {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin: 20px 0 28px;
+  background: var(--bg-elevated);
+}
+.workflow-native .wf-settings > summary,
+.workflow-native .wf-definitions > summary {
+  padding: 14px 16px;
+  cursor: pointer;
+  font-weight: 600;
+}
+.workflow-native .wf-settings .wf-patrol {
+  margin: 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+}
+.workflow-native .wf-definitions {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-elevated);
+}
+.workflow-native #definitions {
+  padding: 0 20px 12px;
+}
+.workflow-native .wf-definition:last-child {
+  border-bottom: 0;
+}
+.workflow-native .wf-definition > p {
+  line-height: 1.8;
+  max-width: 90ch;
+}
+.workflow-native .wf-definition h3 {
+  font-size: 16px;
+}
+.workflow-native #workspace :is(button, input, select, a):focus-visible, .workflow-native .wf-dialog :is(button, input, select, textarea, a):focus-visible {
+  outline: 2px solid var(--fg);
+  outline-offset: 3px;
+}
+.workflow-native .wf-dialog {
+  overscroll-behavior: contain;
+}
+@media (min-width: 761px) and (max-width: 1100px) {
+  .workflow-native .wf-week {
+    overflow-x: auto;
+    grid-template-columns: repeat(7, minmax(160px, 1fr));
+    padding-bottom: 12px;
+  }
+}
+@media (max-width: 760px) {
+  .workflow-native #workspace button {
+    min-height: 44px;
+  }
+  .workflow-native .wf-title h2 {
+    font-size: 22px;
+  }
+  .workflow-native .wf-filters {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding: 4px 2px 12px;
+  }
+  .workflow-native .wf-filters button {
+    flex-shrink: 0;
+  }
+  .workflow-native .wf-calendar-bar {
+    gap: 8px;
+  }
+  .workflow-native .wf-calendar-bar input {
+    min-width: 0;
+    flex: 1;
+  }
+  .workflow-native #definitions {
+    padding: 0 14px 12px;
+  }
+}
+.workflow-native body {
+  background: var(--bg);
+}
+/* Four date columns; mobile keeps one selected date and explicit date controls. */
+.workflow-native .wf-week {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  overflow: visible;
+}
+.workflow-native .wf-day,
+.workflow-native .wf-run {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.workflow-native .wf-role {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #20252c;
+  background: #e8e8ed;
+}
+.workflow-native .role-rose {
+  background: #f8dce5;
+}
+.workflow-native .role-sky {
+  background: #d7eafb;
+}
+.workflow-native .role-mint {
+  background: #d7eee2;
+}
+.workflow-native .role-amber {
+  background: #f7e8bf;
+}
+.workflow-native .role-violet {
+  background: #e6ddf7;
+}
+.workflow-native .wf-dialog textarea {
+  width: 100%;
+  box-sizing: border-box;
+}
+@media (max-width: 760px) {
+  .workflow-native .wf-week {
+    display: block;
+  }
+  .workflow-native .wf-day:not(.selected) {
+    display: none;
+  }
+  .workflow-native .wf-role {
+    max-width: 100%;
+  }
+}
+
+/* Three primary steps; auxiliary controls live in named native dialogs. */
+.workflow-native #workflow-steps {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:20px 0;}
+.workflow-native #workflow-steps button {min-height:52px;white-space:normal;text-align:left;}
+.workflow-native #workflow-steps [aria-current="step"] {border:2px solid var(--accent,#5368d5);background:var(--bg-elevated);font-weight:700;}
+.workflow-native #setup-guide {padding:16px;border:1px solid var(--border);border-radius:12px;margin:16px 0;background:var(--bg-elevated);}
+.workflow-native #setup-guide h3 {margin-top:0;}
+.workflow-native #setup-guide .wf-row {justify-content:flex-start;}
+.workflow-native .wf-tools {margin:16px 0;}
+.workflow-native #safety-status:empty {display:none;}
+.workflow-native #safety-status {padding:12px;border:1px solid var(--accent,#5368d5);border-radius:8px;}
+.workflow-native .workflow-workspace [hidden] {display:none!important;}
+.workflow-native .wf-dialog {max-height:90dvh;overflow:auto;}
+.workflow-native .wf-dialog button,.workflow-native #setup-guide button,.workflow-native #workflow-steps button {min-height:44px;}
+.workflow-native .wf-dialog :is(input,select,textarea) {max-width:100%;min-width:0;}
+@media(max-width:600px){.workflow-native #workflow-steps{gap:6px;}.workflow-native #workflow-steps button{padding:10px 6px;font-size:13px;}.workflow-native .wf-tools{display:flex;flex-wrap:wrap;}.workflow-native .wf-tools button{flex:1 1 40%;}.workflow-native #step-1 .wf-definition{overflow-wrap:anywhere;}}
+
+/* Explicit heading geometry overrides inherited shell/control sizing. */
+.workflow-native dialog .wf-title{display:flex;flex-flow:row nowrap;align-items:center;gap:12px;}
+.workflow-native dialog .wf-title h2{flex:1 1 auto;min-width:0;margin:0 0 12px;}
+.workflow-native dialog .wf-title>button{flex:0 0 44px;width:44px;min-width:44px;max-width:44px;min-height:44px;align-self:flex-start;}

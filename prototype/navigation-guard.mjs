@@ -12,7 +12,7 @@ export function installNavigationGuard(currentModule, currentRouter) {
     // A pasted hash/deep link can create a same-document entry with null state.
     if(!Number.isInteger(next))next=index+1;
     const module=currentModule();
-    if(module&&!module.canLeave()) {
+    if(module&&(module.beforeHistoryLeave?.()===false||!module.canLeave())) {
       event.stopImmediatePropagation();restoring=true;history.go(index-next);return;
     }
     index=next;
