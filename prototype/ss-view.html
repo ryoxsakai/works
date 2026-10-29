@@ -1,0 +1,53 @@
+  <main class="ss-main">
+    <section id="signed-in">
+      <p id="ss-error" class="error" role="alert"></p>
+      <section class="ss-panel" aria-labelledby="ss-title">
+        <div class="ss-heading">
+          <div>
+            <p class="eyebrow">PROJECT TRACKER</p>
+            <h2 id="ss-title"><i class="bx bx-briefcase-alt-2"></i> SS案件</h2>
+          </div>
+          <p id="ss-summary" class="ss-summary" aria-live="polite"></p>
+        </div>
+
+        <label class="ss-completed-toggle">
+          <input id="show-completed" type="checkbox" />
+          <span>完了を表示</span>
+        </label>
+
+        <div class="ss-sort-toolbar" aria-label="案件の並べ替え">
+          <label for="project-sort">並べ替え</label>
+          <select id="project-sort">
+            <option value="name">案件</option>
+            <option value="status">進捗</option>
+            <option value="deadline" selected>締切日</option>
+            <option value="remaining">残り期間</option>
+          </select>
+          <button id="sort-direction" type="button" aria-label="降順に切り替える">
+            <i class="bx bx-sort-up" aria-hidden="true"></i>
+            <span>昇順</span>
+          </button>
+        </div>
+
+        <label class="search">案件を検索<input id="project-search" type="search" placeholder="案件名・メモで検索"></label><p data-project-count aria-live="polite"></p><button id="print-ss-list" type="button"><i class="bx bx-printer" aria-hidden="true"></i>一覧を印刷</button><div class="ss-table-shell">
+          <table class="ss-table">
+            <thead>
+              <tr>
+                <th aria-sort="none"><button class="ss-sort-button" type="button" data-sort-key="name">案件<i class="bx bx-sort-alt-2" aria-hidden="true"></i></button></th>
+                <th aria-sort="none"><button class="ss-sort-button" type="button" data-sort-key="status">進捗<i class="bx bx-sort-alt-2" aria-hidden="true"></i></button></th>
+                <th aria-sort="ascending"><button class="ss-sort-button" type="button" data-sort-key="deadline">締切日<i class="bx bx-sort-up" aria-hidden="true"></i></button></th>
+                <th aria-sort="none"><button class="ss-sort-button" type="button" data-sort-key="remaining">残り期間<i class="bx bx-sort-alt-2" aria-hidden="true"></i></button></th>
+                <th>メモ</th>
+              </tr>
+            </thead>
+            <tbody id="ss-project-list"></tbody>
+          </table>
+          <div id="ss-empty" class="ss-empty" hidden>
+            <i class="bx bx-inbox"></i>
+            <p>登録中のプロジェクトはありません。</p>
+          </div>
+        </div>
+      </section>
+    </section>
+  </main>
+

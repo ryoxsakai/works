@@ -1,5 +1,7 @@
+import {mountSSNative} from './ss-native-module.mjs';
 import {visibleProjects,remainingLabel,escapeHtml as esc} from './ss-model.mjs';
 export function mountSS(root,context,{id,navigate}) {
+  if(context.demo===false&&!id)return mountSSNative(root,context,{navigate});
   const lifecycle=new AbortController();
   context.metrics.mounts++;
   let disposed=false,dirty=false,saving=false,projects=[],requestId=crypto.randomUUID();

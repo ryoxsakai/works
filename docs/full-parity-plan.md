@@ -139,9 +139,9 @@ Block 2 now restores immediate shared-memo and next-plan blur autosave, using th
 
 ### SS (`ss/index.html`, `ss/app.js`)
 
-- [ ] Original table columns (project/status/deadline/remaining), sort-key/direction/column-button behavior and preference storage.
-- [ ] Completed visibility/counts and full original project memo/details; correct empty/failure/mobile/print behavior.
-- [ ] Preserve the original read-only browser contract; do not invent new editing flows to replace original behavior.
+- [x] Original table columns (project/status/deadline/remaining), sort-key/direction/column-button behavior and preference storage.
+- [x] Completed visibility/counts and full original project memo/details; correct empty/failure/mobile/print behavior.
+- [x] Preserve the original read-only browser contract; do not invent new editing flows to replace original behavior.
 
 ## Test and release gates
 
@@ -395,3 +395,9 @@ Original KDP is manuscript management, not external publishing: book/chapter/sec
 ### SS source audit (remaining implementation)
 
 `ss/index.html`/`ss/app.js` have a read-only five-column table (project/status/JST date/remaining/memo), both column sort buttons with aria-sort and select/direction controls, persisted `works_ss_sort`, active/total summary, completed toggle, status/weekly urgency colors, full memo and original print layout. Unified cards/details preserve read-only data, visible count, sorting preferences, memo and detail print but still lack the original table/column sort controls and full filtered-list print. Numeric/case-insensitive name comparator and JST date-label/urgency presentation also differ and require dedicated source-comparison fixtures. No original business execution/edit controls exist. SS is not marked complete; no SS writes were introduced.
+
+### SS native original controls (exact-head CI release gate)
+
+Original five-column table, header/select/direction sorting, stored preferences, numeric/case/tie comparisons, JST date/remaining buckets and visibility refresh, completed/active/visible counts, full multiline memos and responsive rows are implemented. Integrated search/detail/deep links/detail print remain; a current-list print control prints all visible fields with repeatable headers. No production write controls, APIs, data changes or external operations.115 app units pass, source-comparison and synthetic browser tests are the release gate. Original `/ss/` remains. See `ss-original-parity.md`.
+
+Exact implementation gaps now remaining: L13d explicit safe lesson-alias mapping and the five global whole-app certification checkboxes above. All module feature groups have implementations; this does not certify complete visual fidelity or actual iPhone/authenticated production/physical output/supplied-image QA. `lesson-alias-mapping-plan.md` prepares the next phase without implementing a mapping, inferring identity or changing real profiles.
