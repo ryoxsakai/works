@@ -8,7 +8,7 @@ Adds exactly one table `lesson_profile_mapping`, index `lesson_profile_mapping_s
 
 ## Required release steps
 
-1. Verify final exact-head CI and source/migration hashes.
+1. Verify final exact-head CI and source/migration hashes. Validate the selected-calendar request budget before activation: the cold alias-progress synthetic test measures40 D1 statements +5 external requests for four selected calendars; arbitrary calendar counts are not certified. Alias progress is capped at4 changed chapters; ordinary operations remain8.
 2. Have the existing authorized Mac release helper take a fresh private tutor-db backup, verify bytes/hash and a local restore/integrity check. This cloud environment has no configured production D1 connection; do not introduce alternate credentials or export destinations.
 3. Rehearse this exact SQL on that restored copy; compare existing lesson/profile/planning/material/progress counts and content aggregates before/after without displaying student content.
 4. Only after those prerequisites, use the existing release connection to apply the additive SQL. Expected command shape (NOT executed here): `wrangler d1 execute tutor-db --remote --file worker/migrations/20261029_lesson_profile_mapping.sql`.

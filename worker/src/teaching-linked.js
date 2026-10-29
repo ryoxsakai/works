@@ -49,7 +49,8 @@ async function materials(env,name){
 export async function readLinkedProgress(env,ref,deps){const context=await sourceContext(env,ref,deps),value=await materials(env,context.name);await confirmSource(env,context);return {target:context.target,name:context.name,...profileContextFields(context),record_revision:context.record_revision,...value};}
 export async function writeLinkedProgress(env,body,deps){
  const context=await sourceContext(env,body?.target,deps,true,body);writeContext(context,body);
- if(!Array.isArray(body.changes)||!body.changes.length||body.changes.length>8||new Set(body.changes.map(row=>row?.chapter_id)).size!==body.changes.length)throw fail(400,'進捗は重複なく1〜8項目を保存してください。');
+ const changeLimit=context.mapping?4:8;
+ if(!Array.isArray(body.changes)||!body.changes.length||body.changes.length>changeLimit||new Set(body.changes.map(row=>row?.chapter_id)).size!==body.changes.length)throw fail(400,`進捗は重複なく1〜${changeLimit}項目を保存してください。`);
  const before=await materials(env,context.name);if(before.ambiguous_assignment)throw fail(409,'教材の割当が重複しています。従来画面で確認してください。');
  const statements=[...guardStatements(env,context.target.id,body.record_revision),...context.mapping_guards];
  for(const change of body.changes){if(!change||typeof change!=='object')throw fail(400,'進捗の形式を確認してください。');const expected=change.expected;
