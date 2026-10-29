@@ -1,0 +1,548 @@
+/* Scoped original todo/todo.css; no global shell selectors. */
+.todo-native {
+  --bg: #f4f6f9;
+  --panel: #fff;
+  --ink: #243347;
+  --muted: #56657a;
+  --line: #d5dce5;
+  --accent: #3d587c;
+  background: var(--bg);
+  color: var(--ink);
+  font-family:
+    system-ui,
+    -apple-system,
+    sans-serif;
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.6;
+  color-scheme: light;
+}
+html[data-theme="dark"] .todo-native {
+  --bg: #111925;
+  --panel: #1b2737;
+  --ink: #e7edf6;
+  --muted: #b3c0d2;
+  --line: #45556c;
+  --accent: #bbd3f4;
+  color-scheme: dark;
+}
+.todo-native * {
+  box-sizing: border-box;
+}
+.todo-native button,
+.todo-native input,
+.todo-native select,
+.todo-native textarea {
+  font: inherit;
+}
+.todo-native button,
+.todo-native input,
+.todo-native select,
+.todo-native textarea {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--ink);
+  padding: 10px 12px;
+  max-width: 100%;
+}
+.todo-native button {
+  cursor: pointer;
+  min-height: 44px;
+}
+.todo-native button:hover {
+  border-color: var(--accent);
+}
+.todo-native button:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+.todo-native input,
+.todo-native textarea {
+  width: 100%;
+  font-size: 16px;
+}
+.todo-native input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--accent);
+}
+.todo-native button:focus-visible,
+.todo-native input:focus-visible,
+.todo-native select:focus-visible,
+.todo-native textarea:focus-visible {
+  outline: 3px solid #699ee8;
+  outline-offset: 3px;
+}
+.todo-native .primary {
+  background: #35557e;
+  border-color: #35557e;
+  color: white;
+}
+.todo-native .danger {
+  color: #c43f46;
+}
+.todo-native .todo-main {
+  max-width: 1050px;
+  margin: auto;
+  padding: 28px 20px 64px;
+}
+.todo-native .heading,
+.todo-native .toolbar,
+.todo-native .dialog-head,
+.todo-native .dialog-actions,
+.todo-native .inline,
+.todo-native .task-top,
+.todo-native .task-meta,
+.todo-native .role-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+.todo-native .heading {
+  margin-bottom: 20px;
+}
+.todo-native h2 {
+  font-size: 26px;
+  margin: 3px 0;
+}
+.todo-native h3 {
+  font-size: 18px;
+  margin: 0 0 8px;
+}
+.todo-native h4 {
+  margin: 0;
+}
+.todo-native .eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.17em;
+  color: var(--muted);
+  margin: 0;
+}
+.todo-native .muted,
+.todo-native .hint {
+  color: var(--muted);
+}
+.todo-native .hint {
+  font-size: 13px;
+  margin: 8px 0 16px;
+}
+.todo-native .todo-surface {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 20px;
+}
+.todo-native .capture {
+  display: flex;
+  gap: 10px;
+}
+.todo-native .capture input {
+  border: none;
+  background: transparent;
+}
+.todo-native .capture button {
+  white-space: nowrap;
+}
+.todo-native .toolbar {
+  flex-wrap: wrap;
+  margin: 24px 0 18px;
+}
+.todo-native .toolbar label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.todo-native .view-switch {
+  display: flex;
+  gap: 4px;
+}
+.todo-native .view-switch [aria-pressed="true"] {
+  background: #35557e;
+  color: white;
+}
+.todo-native .deadline-panel {
+  border-left: 4px solid #ca8645;
+  margin: 18px 0 28px;
+}
+.todo-native .deadline-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  border-top: 1px solid var(--line);
+  padding: 8px 0;
+}
+.todo-native .deadline-row button {
+  border: 0;
+  text-align: left;
+}
+.todo-native .overdue {
+  color: #bd3d42;
+  font-weight: 600;
+}
+.todo-native .group {
+  margin: 24px 0;
+}
+.todo-native .group-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.todo-native .count {
+  font-size: 13px;
+  color: var(--muted);
+}
+.todo-native .task-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 10px;
+  min-width: 0;
+}
+.todo-native .task-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+  margin: 0;
+}
+.todo-native .task-top {
+  align-items: flex-start;
+  justify-content: flex-start;
+}
+.todo-native .task-top > div {
+  flex: 1;
+  min-width: 0;
+}
+.todo-native .task-top > .done-toggle {
+  flex: none;
+  padding: 8px;
+  min-width: 44px;
+}
+.todo-native .task-meta {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 9px 0;
+}
+.todo-native .badge {
+  font-size: 12px;
+  border-radius: 7px;
+  padding: 3px 8px;
+  border: 1px solid var(--line);
+}
+.todo-native .role-blue {
+  background: #dce9ff;
+  color: #243f70;
+}
+.todo-native .role-green {
+  background: #dcefe1;
+  color: #234e33;
+}
+.todo-native .role-pink {
+  background: #f8e0e8;
+  color: #733247;
+}
+.todo-native .role-purple {
+  background: #e9dff8;
+  color: #513876;
+}
+.todo-native .role-yellow {
+  background: #f7edcc;
+  color: #604d1a;
+}
+.todo-native .task-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+.todo-native .clone-fast {
+  font-size: 12px;
+  padding: 8px;
+}
+.todo-native .clone-fast span {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+}
+.todo-native .task-actions > button {
+  flex-grow: 1;
+}
+.todo-native .board {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+.todo-native .board .task-actions {
+  display: flex;
+}
+.todo-native .board .detail-button {
+  display: block;
+}
+.todo-native .board-column {
+  min-width: 0;
+}
+.todo-native .board .task-top {
+  flex-wrap: wrap;
+}
+.todo-native .empty {
+  padding: 18px;
+  color: var(--muted);
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+}
+.todo-native .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+}
+.todo-native dialog {
+  width: min(600px, calc(100% - 24px));
+  max-height: 90dvh;
+  overflow: auto;
+  background: var(--panel);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 24px;
+}
+.todo-native dialog::backdrop {
+  background: #10203999;
+}
+.todo-native dialog label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 12px 0;
+}
+.todo-native dialog .check-label {
+  flex-direction: row;
+  align-items: center;
+}
+.todo-native .form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 14px;
+}
+.todo-native .dialog-head {
+  margin-bottom: 16px;
+}
+.todo-native .dialog-head h2 {
+  font-size: 22px;
+}
+.todo-native .dialog-head button {
+  font-size: 23px;
+}
+.todo-native .dialog-actions {
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  margin-top: 22px;
+}
+.todo-native fieldset {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+}
+.todo-native .step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.todo-native .step span {
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+.todo-native .role-row {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+.todo-native .role-row .role-name {
+  flex: 1;
+  min-width: 120px;
+}
+.todo-native .role-row input {
+  min-width: 80px;
+}
+.todo-native .login {
+  max-width: 420px;
+  margin: 60px auto;
+  text-align: center;
+}
+.todo-native #todo-native-notice:not(:empty),
+.todo-native #todo-native-recovery:not(:empty) {
+  padding: 14px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  margin: 14px 0;
+}
+.todo-native #todo-native-recovery button {
+  margin: 8px;
+}
+.todo-native #todo-native-detail-error,
+.todo-native #todo-native-role-error,
+.todo-native #todo-native-clone-error {
+  color: #bd3d42;
+}
+.todo-native .__unused_original_body_lock {
+  overflow: hidden;
+}
+.todo-native [hidden] {
+  display: none !important;
+}
+@media (max-width: 700px) {
+  .todo-native .todo-main {
+    padding: 20px 12px 44px;
+  }
+  .todo-native .heading {
+    align-items: flex-start;
+  }
+  .todo-native .heading h2 {
+    font-size: 22px;
+  }
+  .todo-native .heading button {
+    font-size: 13px;
+    white-space: nowrap;
+  }
+  .todo-native .todo-surface {
+    padding: 16px;
+  }
+  .todo-native .toolbar {
+    gap: 10px;
+  }
+  .todo-native .toolbar label {
+    flex: 1;
+    min-width: 130px;
+  }
+  .todo-native .toolbar select {
+    min-width: 0;
+    flex: 1;
+  }
+  .todo-native .view-switch {
+    width: 100%;
+  }
+  .todo-native .view-switch button {
+    flex: 1;
+  }
+  .todo-native .board {
+    grid-template-columns: 1fr;
+  }
+  .todo-native .board .task-actions {
+    display: flex;
+  }
+  .todo-native .form-grid {
+    grid-template-columns: 1fr;
+  }
+  .todo-native dialog {
+    padding: 18px;
+  }
+  .todo-native .capture {
+    padding: 10px;
+    gap: 4px;
+  }
+  .todo-native .capture input {
+    min-width: 0;
+    padding: 8px;
+  }
+  .todo-native .capture button {
+    padding: 8px 10px;
+  }
+  .todo-native .deadline-row {
+    align-items: flex-start;
+  }
+  .todo-native .deadline-row span {
+    white-space: nowrap;
+    font-size: 13px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .todo-native * {
+    scroll-behavior: auto !important;
+    transition: none !important;
+  }
+}
+/* Keep input surfaces and 16px mobile text consistent over the shared stylesheet. */
+.todo-native input:not([type="checkbox"]):not([type="radio"]),
+.todo-native select,
+.todo-native textarea,
+.todo-native input:not([type="checkbox"]):not([type="radio"]):focus,
+.todo-native select:focus,
+.todo-native textarea:focus {
+  background: var(--panel);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 16px;
+  box-shadow: none;
+}
+.todo-native .capture input:not([type="checkbox"]):not([type="radio"]) {
+  background: transparent;
+  border: none;
+}
+html[data-theme="dark"] .todo-native .overdue,
+html[data-theme="dark"] .todo-native .danger,
+html[data-theme="dark"] .todo-native #todo-native-detail-error,
+html[data-theme="dark"] .todo-native #todo-native-clone-error,
+html[data-theme="dark"] .todo-native #todo-native-role-error {
+  color: #ff9298;
+}
+.todo-native .category-row {
+  border-bottom: 1px solid var(--line);
+  padding: 12px 0;
+  margin-bottom: 12px;
+}
+.todo-native .category-row .inline {
+  justify-content: flex-start;
+}
+
+/* Keep compact category ordering controls usable on touch screens. */
+.todo-native .category-row [data-category-action="up"],
+.todo-native .category-row [data-category-action="down"] {
+  min-width: 44px;
+}
+.todo-native dialog button {
+  min-width: 44px;
+  min-height: 44px;
+  flex-shrink: 0;
+}
+
+/* Keep direct clone actions compact, with dates in their accessible descriptions. */
+.todo-native .task-search { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:20px 0 12px; }
+.todo-native .task-search label { font-weight:600; }
+.todo-native .task-search input { flex:1; min-width:160px; }
+.todo-native .task-actions { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); }
+.todo-native .task-actions .clone-fast { min-width:0; padding:6px 2px; }
+.todo-native .task-actions > button:not(.clone-fast) { grid-column:span 2; font-size:12px; padding:6px; }
+.todo-native .task-actions .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+.todo-native .task-card { padding:12px; }
+.todo-native .task-meta { margin:6px 0; }
+.todo-native .task-card .hint { margin:4px 0; font-size:12px; }
+@media(max-width:600px) { .todo-native .task-search label { width:100%; } .todo-native .task-top { gap:8px; } }
+
+.todo-native .capture-destination { display:flex; align-items:center; gap:10px; font-size:13px; margin:10px 0; color:var(--muted); }
+.todo-native .capture-destination select { min-height:44px; color:var(--ink); }
+
+.todo-native .board .task-actions { display:grid; }
+
+.todo-native .clone-caption { margin:10px 0 0; color:var(--muted); font-size:12px; }
+.todo-native .clone-caption + .task-actions { margin-top:4px; }
+/* Reserve useful reading width for long task names on narrow screens. */
+.todo-native .deadline-row button { min-width:0; overflow-wrap:anywhere; }
+@media(max-width:600px) {
+  .todo-native .deadline-row { flex-direction:column; align-items:stretch; gap:2px; }
+  .todo-native .deadline-row button { width:100%; padding:8px 0; }
+  .todo-native .deadline-row > span { align-self:flex-end; }
+}
+
+.todo-native .todo-main{padding:16px 0 40px}.todo-native dialog{margin:auto;overscroll-behavior:contain}.todo-native pre{white-space:pre-wrap;overflow-wrap:anywhere}.todo-native .task-name{white-space:pre-wrap}
+/* F7's form-control reset must not stretch original compact action buttons. */
+.todo-native button{width:auto}
+.todo-native .dialog-head h2{flex:1;min-width:0;overflow-wrap:anywhere}
+.todo-native .dialog-head button{flex:0 0 48px;width:48px;min-width:48px;padding:8px}

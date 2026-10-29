@@ -1,0 +1,217 @@
+    <main id="todo-native-app" class="todo-main">
+      <div class="heading">
+        <div>
+          <p class="eyebrow">ONE THING AT A TIME</p>
+          <h2>今日から、ひとつずつ。</h2>
+          <p id="todo-native-today-label" class="muted"></p>
+        </div>
+        <button id="todo-native-roles-open">役割を管理</button>
+      </div>
+      <form id="todo-native-capture" class="todo-surface capture">
+        <label for="todo-native-quick-title" class="sr-only">タスク名</label
+        ><input
+          id="todo-native-quick-title"
+          maxlength="500"
+          required
+          placeholder="思いついたことを、ひとこと"
+        /><button class="primary" type="submit">＋ 追加</button>
+      </form>
+      <label class="capture-destination">追加先<select id="todo-native-capture-day"><option value="">予定なし · インボックス</option><option value="0">今日の予定</option><option value="1">明日の予定</option></select></label>
+      <p class="hint">
+        タイトルだけで登録できます。役割・予定日・締切などは、あとから「詳細」で。
+      </p>
+      <div class="task-search"><label for="todo-native-task-search">タスクを探す</label><input id="todo-native-task-search" type="search" placeholder="タイトル・メモで検索" /><button id="todo-native-clear-filters" type="button" hidden>絞り込みを解除</button></div>
+      <div class="toolbar">
+        <label
+          >役割
+          <select id="todo-native-role-filter">
+            <option value="">すべて</option>
+          </select></label
+        ><label
+          >カテゴリ
+          <select id="todo-native-category-filter">
+            <option value="">すべて</option>
+          </select></label
+        >
+        <button id="todo-native-categories-open" type="button">カテゴリを管理</button>
+        <div class="view-switch" role="group" aria-label="表示切替">
+          <button id="todo-native-list-view" aria-pressed="true">日付リスト</button
+          ><button id="todo-native-board-view" aria-pressed="false">カンバン</button>
+        </div>
+      </div>
+      <div id="todo-native-notice" role="status" aria-live="polite"></div>
+      <div id="todo-native-recovery"></div>
+      <section class="todo-surface deadline-panel" aria-labelledby="todo-native-deadline-heading">
+        <h3 id="todo-native-deadline-heading">締切の確認</h3>
+        <p class="hint">
+          期限超過・7日以内の締切をすべて表示。予定日を動かしても締切は変わりません。
+        </p>
+        <div id="todo-native-deadlines"></div>
+      </section>
+      <p id="todo-native-task-count" class="hint" role="status"></p><div id="todo-native-tasks" aria-label="タスク一覧"></div>
+      <p class="hint">
+        役割はあなた自身の担当です。会話からも同じToDoを更新できます。自動監視や繰り返しは設定されません。
+      </p>
+    </main>
+    <dialog id="todo-native-detail" aria-labelledby="todo-native-detail-heading">
+      <form id="todo-native-detail-form">
+        <div class="dialog-head">
+          <h2 id="todo-native-detail-heading">タスクの詳細</h2>
+          <button type="button" data-close aria-label="詳細を閉じる">×</button>
+        </div>
+        <label>タスク名<input name="name" maxlength="500" required /></label>
+        <div class="form-grid">
+          <label>役割<select name="roleId"></select></label
+          ><label>カテゴリ<select name="category"></select></label
+          ><label
+            >予定日（取り組む日）<input type="date" name="plannedDay" /></label
+          ><label>締切（守る期限）<input type="date" name="deadline" /></label
+          ><label
+            >進み具合<select name="status">
+              <option value="pending">未着手</option>
+              <option value="doing">進行中</option>
+              <option value="waiting">待ち</option>
+              <option value="done">完了</option>
+            </select></label
+          ><label
+            >重要度の詳細（任意）<select name="priority">
+              <option value="">指定なし</option>
+              <option value="1">低</option>
+              <option value="2">中</option>
+              <option value="3">高</option>
+            </select></label
+          >
+        </div>
+        <label class="check-label"
+          ><input type="checkbox" name="important" /> ★ 大切なタスク</label
+        ><label
+          >このタスクだけのメモ<textarea
+            name="memo"
+            maxlength="10000"
+            rows="3"
+          ></textarea>
+        </label>
+        <label
+          >複製にも引き継ぐ説明（任意）<textarea
+            name="reusableDescription"
+            maxlength="10000"
+            rows="2"
+          ></textarea>
+        </label>
+        <fieldset>
+          <legend>小さなステップ</legend>
+          <div id="todo-native-checklist-editor"></div>
+          <div class="inline">
+            <input
+              id="todo-native-step-text"
+              maxlength="500"
+              aria-label="新しいステップ"
+              placeholder="ステップを追加"
+            /><button type="button" id="todo-native-step-add">追加</button>
+          </div>
+        </fieldset>
+        <p class="hint">
+          完了履歴は元のタスクに残ります。複製ではステップも未チェックに戻ります。
+        </p>
+        <div class="dialog-actions">
+          <button type="button" id="todo-native-task-delete" class="danger">削除</button
+          ><button type="button" data-close>キャンセル</button
+          ><button class="primary" type="submit">保存</button>
+        </div>
+        <p id="todo-native-detail-error" role="alert"></p>
+      </form>
+    </dialog>
+    <dialog id="todo-native-role-dialog" aria-labelledby="todo-native-roles-heading">
+      <div class="dialog-head">
+        <h2 id="todo-native-roles-heading">自分の役割</h2>
+        <button data-close aria-label="役割管理を閉じる">×</button>
+      </div>
+      <p class="hint">
+        例：生徒管理・授業管理・模試作成。カテゴリとは別に管理します。使った役割はアーカイブして履歴を残せます。
+      </p>
+      <div id="todo-native-role-list"></div>
+      <form id="todo-native-role-form">
+        <label
+          >役割名<input
+            name="name"
+            maxlength="100"
+            required
+            placeholder="例：生徒管理"
+        /></label>
+        <div class="form-grid">
+          <label
+            >アイコン<select name="icon">
+              <option>📚</option>
+              <option>👥</option>
+              <option>📝</option>
+              <option>🏠</option>
+              <option>💼</option>
+              <option>⭐</option>
+            </select></label
+          ><label
+            >色<select name="color">
+              <option value="blue">ブルー</option>
+              <option value="green">グリーン</option>
+              <option value="pink">ピンク</option>
+              <option value="purple">パープル</option>
+              <option value="yellow">イエロー</option>
+            </select></label
+          >
+        </div>
+        <button class="primary">役割を追加</button>
+      </form>
+      <p id="todo-native-role-error" role="alert"></p>
+    </dialog>
+    <dialog id="todo-native-clone-dialog" aria-labelledby="todo-native-clone-heading">
+      <form id="todo-native-clone-form">
+        <div class="dialog-head">
+          <h2 id="todo-native-clone-heading">未来に複製</h2>
+          <button type="button" data-close aria-label="複製設定を閉じる">
+            ×
+          </button>
+        </div>
+        <p id="todo-native-clone-source"></p>
+        <div class="form-grid">
+          <label
+            >いくつ後？<input
+              name="amount"
+              type="number"
+              min="1"
+              max="3650"
+              value="1"
+              required /></label
+          ><label
+            >単位<select name="unit">
+              <option value="1">日後</option>
+              <option value="7">週間後</option>
+            </select></label
+          >
+        </div>
+        <p id="todo-native-clone-target"></p>
+        <label>新しい締切（任意）<input type="date" name="deadline" /></label
+        ><button type="button" id="todo-native-copy-deadline">
+          元の締切を明示的にコピー
+        </button>
+        <p id="todo-native-deadline-preview" class="hint"></p>
+        <p class="hint">
+          締切の初期値は「なし」。元の完了記録は変わりません。自動繰り返しではありません。
+        </p>
+        <button class="primary" type="submit">この日へ複製</button>
+        <p id="todo-native-clone-error" role="alert"></p>
+      </form>
+    </dialog>
+    <dialog id="todo-native-categories-dialog" aria-labelledby="todo-native-categories-heading">
+      <div class="dialog-head">
+        <h2 id="todo-native-categories-heading">カテゴリを管理</h2>
+        <button data-close aria-label="カテゴリ管理を閉じる">×</button>
+      </div>
+      <p class="hint">
+        従来のカテゴリです。役割とは別に保持します。使用中のカテゴリを削除する場合は、移動先を選んでください。
+      </p>
+      <div id="todo-native-categories-list"></div>
+      <form id="todo-native-categories-form">
+        <label
+          >新しいカテゴリ<input name="name" maxlength="100" required /></label
+        ><button class="primary">カテゴリを追加</button>
+      </form>
+    </dialog>
