@@ -32,7 +32,7 @@ export function createProductionContext(auth,{fetcher=fetch,onExpired=()=>{},onL
     },
     async request(path,{method='GET',body,signal}={}) {
       if(/^\/api\/(?:terms|periods|years|students)(?:\?|$)/.test(path)&&method!=='GET')throw new Error('Unsupported API');
-      if(!/^\/api\/(?:settings|terms|periods|years|students|student-prefs(?:\/guarded)?|chapter-progress\/guarded|lesson-plan|student-planning\/guarded|student-materials|lesson-record|next-lesson-plan|curriculum\/[^/?]+|todo|memo|workflow|admissions(?:\/[^/?]+(?:\/guarded)?)?|material-library\/(?:folders|files)(?:\/[^/?]+(?:\/guarded)?)?|wiki\/pages(?:\/[^/?]+(?:\/save)?)?)(?:\?.*)?$/.test(path))throw new Error('Unsupported API');
+      if(!/^\/api\/(?:settings|terms|periods|years|students|student-prefs(?:\/guarded)?|chapter-progress\/guarded|lesson-plan|student-planning\/guarded|tutor-settings\/guarded|student-materials|lesson-record|next-lesson-plan|curriculum\/[^/?]+|todo|memo|workflow|admissions(?:\/[^/?]+(?:\/guarded)?)?|material-library\/(?:folders|files)(?:\/[^/?]+(?:\/guarded)?)?|wiki\/pages(?:\/[^/?]+(?:\/save)?)?)(?:\?.*)?$/.test(path))throw new Error('Unsupported API');
       await context.session.init();
       if(!active||!auth.getSessionToken())throw Object.assign(new Error('再ログインが必要です'),{status:401});
       const generation=epoch,controller=new AbortController();controllers.add(controller);
@@ -90,6 +90,9 @@ export function createProductionContext(auth,{fetcher=fetch,onExpired=()=>{},onL
   return context;
 }
 export function safeShellRoute(value){
+ if(/^\/teaching\/settings\/(?:\?panel=(?:materials|calendar|terms|periods|excluded|appearance))?$/.test(value||''))return value;
+ if(/^\/teaching\/\d{4}-\d{2}-\d{2}\/schedule\/\?/.test(value||'')){const [path,query,...extra]=value.split('?'),params=new URLSearchParams(query),names=[...params.keys()];if(!extra.length&&names.length>0&&names.length<=4&&new Set(names).size===names.length&&safeShellRoute(path)===path&&names.every(key=>key==='view'?['list','calendar'].includes(params.get(key)):key==='week'||key==='month'?validDay(params.get(key)):key==='filter'?params.get(key).length<=2000&&!/[\u0000-\u001f]/.test(params.get(key)):false))return value;return '/home/';}
+
  if((value||'').startsWith('/teaching/')&&value.includes('?')){const [path,query,...extra]=value.split('?'),params=new URLSearchParams(query),keys=[...params.keys()];if(!extra.length&&keys.length>0&&keys.length<=2&&new Set(keys).size===keys.length&&keys.every(key=>['year','term'].includes(key)&&/^\d{0,12}$/.test(params.get(key)))&&safeShellRoute(path)===path)return value;return '/home/';}
 
  if(/^\/(?:home|teaching|operations|workflow|more|ss|todo|memo|wiki|material|admission|flow)\/$/.test(value||''))return value;
