@@ -1,0 +1,1422 @@
+/* 入試管理: 表示切替の共通UI */
+.admission-main {
+  max-width: 1120px;
+}
+
+.admission-panel {
+  padding: 1rem;
+}
+
+.admission-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: .75rem;
+}
+
+.admission-heading-copy {
+  min-width: 0;
+}
+
+.admission-heading .eyebrow {
+  margin: 0 0 .2rem;
+}
+
+.admission-heading h2 {
+  margin: 0;
+}
+
+.admission-view-tabs {
+  position: sticky;
+  top: 3.35rem;
+  z-index: 5;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: .25rem;
+  margin: 1rem 0;
+  padding: .3rem;
+  border: 1px solid var(--border);
+  border-radius: .5rem;
+  background: color-mix(in srgb, var(--bg-elevated) 94%, transparent);
+  box-shadow: var(--card-shadow);
+  backdrop-filter: blur(12px);
+}
+
+.admission-view-tab {
+  min-width: 0;
+  min-height: 2.25rem;
+  padding: .4rem .55rem;
+  border-radius: .36rem;
+  color: var(--muted);
+  font-size: .78rem;
+  white-space: nowrap;
+}
+
+.admission-view-tab i {
+  font-size: .98rem;
+}
+
+.admission-view-tab[aria-selected="true"] {
+  background: var(--bg-hover);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.admission-view {
+  min-height: 20rem;
+}
+
+.admission-view[hidden] {
+  display: none !important;
+}
+
+.admission-empty-state {
+  display: grid;
+  min-height: 17rem;
+  place-items: center;
+  padding: 1.25rem;
+  border: 1px dashed color-mix(in srgb, var(--accent) 42%, var(--border));
+  border-radius: .44rem;
+  background: color-mix(in srgb, var(--accent) 3%, var(--bg-elevated));
+  color: var(--muted);
+  text-align: center;
+}
+
+.admission-empty-state > div {
+  max-width: 28rem;
+}
+
+.admission-empty-state i {
+  display: block;
+  margin-bottom: .45rem;
+  color: var(--accent);
+  font-size: 2rem;
+}
+
+.admission-empty-state p {
+  margin: 0;
+  color: var(--fg);
+  font-size: .88rem;
+  font-weight: 600;
+}
+
+.admission-empty-state small {
+  display: block;
+  margin-top: .3rem;
+  font-size: .72rem;
+  line-height: 1.6;
+}
+
+.admission-calendar-shell,
+.admission-gantt-shell,
+.admission-table-shell {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: .44rem;
+  background: var(--bg-elevated);
+  -webkit-overflow-scrolling: touch;
+}
+
+.admission-calendar-grid {
+  display: grid;
+  min-width: 640px;
+  grid-template-columns: repeat(7, minmax(4.8rem, 1fr));
+  grid-template-rows: 2rem repeat(5, 5.6rem);
+}
+
+.admission-calendar-weekday,
+.admission-calendar-cell {
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.admission-calendar-weekday {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-size: .7rem;
+  font-weight: 600;
+}
+
+.admission-calendar-weekday:nth-child(7n),
+.admission-calendar-cell:nth-child(7n) {
+  border-right: 0;
+}
+
+.admission-calendar-cell {
+  padding: .35rem;
+  color: var(--muted);
+  font-size: .68rem;
+}
+
+.admission-calendar-cell.empty {
+  background: color-mix(in srgb, var(--bg-hover) 36%, transparent);
+}
+
+.admission-calendar-cell.current {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.admission-gantt-inner {
+  min-width: 760px;
+  padding: .8rem;
+}
+
+.admission-gantt-axis {
+  display: grid;
+  grid-template-columns: 9rem repeat(6, 1fr);
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+  font-size: .7rem;
+}
+
+.admission-gantt-axis span {
+  padding: .3rem .35rem;
+  text-align: center;
+}
+
+.admission-gantt-axis span:first-child {
+  text-align: left;
+}
+
+.admission-gantt-empty {
+  display: grid;
+  min-height: 13rem;
+  place-items: center;
+  color: var(--muted);
+  font-size: .78rem;
+}
+
+.admission-table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+  font-size: .78rem;
+}
+
+.admission-table th,
+.admission-table td {
+  padding: .65rem .7rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+
+.admission-table th {
+  color: var(--muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.admission-table-empty td {
+  padding: 4rem 1rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  .admission-main {
+    padding: 1rem;
+  }
+
+  .admission-view-tabs {
+    top: 2.9rem;
+    grid-template-columns: repeat(4, minmax(4.2rem, 1fr));
+    margin-right: -.1rem;
+    margin-left: -.1rem;
+    overflow-x: auto;
+  }
+
+  .admission-view-tab {
+    padding-right: .35rem;
+    padding-left: .35rem;
+    font-size: .7rem;
+  }
+
+  .admission-view-tab i {
+    display: none;
+  }
+}
+
+
+/* 入試管理: 日程入力・一覧・表 */
+.admission-auth {
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: .52rem;
+  background: var(--bg-elevated);
+  box-shadow: var(--card-shadow);
+}
+
+.admission-auth p {
+  margin: 0 0 .7rem;
+  font-size: .82rem;
+}
+
+.admission-add {
+  min-height: 2.2rem;
+  padding: .35rem .6rem;
+  border-radius: .38rem;
+  color: var(--accent);
+  font-size: .75rem;
+}
+
+.admission-form {
+  display: grid;
+  gap: .7rem;
+}
+
+.admission-form label {
+  display: grid;
+  gap: .28rem;
+  color: var(--muted);
+  font-size: .76rem;
+}
+
+.admission-form input,
+.admission-form select,
+.admission-form textarea {
+  width: 100%;
+  border-radius: .38rem;
+  background: #fbfbfc;
+  font-size: .82rem;
+}
+
+.admission-form textarea {
+  resize: vertical;
+}
+
+.admission-form-actions {
+  justify-content: flex-end;
+}
+
+.admission-list-item {
+  --admission-color: #2563eb;
+  display: flex;
+  align-items: center;
+  gap: .7rem;
+  margin-bottom: .45rem;
+  padding: .7rem .75rem;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--admission-color);
+  border-radius: .42rem;
+  background: var(--bg-elevated);
+  box-shadow: var(--card-shadow);
+}
+
+.admission-list-item time {
+  width: 7.4rem;
+  flex: 0 0 7.4rem;
+  color: var(--muted);
+  font-size: .72rem;
+}
+
+.admission-list-copy {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: .1rem;
+}
+
+.admission-list-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  min-width: 0;
+  gap: .75rem;
+}
+
+.admission-list-title strong {
+  min-width: 0;
+}
+
+.admission-list-copy .admission-countdown {
+  flex-shrink: 0;
+  color: var(--admission-color);
+  font-size: .7rem;
+  font-weight: 700;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.admission-list-copy strong {
+  overflow: hidden;
+  color: var(--fg);
+  font-size: .86rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admission-list-copy span,
+.admission-list-copy small {
+  color: var(--muted);
+  font-size: .68rem;
+}
+
+.admission-list-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admission-stage-badge {
+  flex-shrink: 0;
+  padding: .2rem .38rem;
+  border-radius: .28rem;
+  color: var(--admission-color);
+  background: color-mix(in srgb, var(--admission-color) 9%, var(--bg-elevated));
+  font-size: .64rem;
+  font-weight: 600;
+}
+
+.admission-stage-primary { --admission-color: #2563eb; }
+.admission-stage-first_result { --admission-color: #8b5cf6; }
+.admission-stage-secondary { --admission-color: #d97706; }
+.admission-stage-final_result { --admission-color: #16a34a; }
+
+:root[data-theme="dark"] .admission-form input,
+:root[data-theme="dark"] .admission-form select,
+:root[data-theme="dark"] .admission-form textarea {
+  background: color-mix(in srgb, var(--bg-elevated) 94%, #fff 6%);
+}
+
+@media (max-width: 640px) {
+  .admission-heading {
+    align-items: center;
+  }
+
+  .admission-list-item {
+    align-items: flex-start;
+    gap: .45rem;
+  }
+
+  .admission-list-item time {
+    width: 4.55rem;
+    flex-basis: 4.55rem;
+    line-height: 1.4;
+  }
+
+  .admission-stage-badge {
+    display: none;
+  }
+}
+
+
+/* 入試管理: 月間カレンダー・ガントチャート */
+.admission-calendar-nav {
+  display: grid;
+  grid-template-columns: 2.2rem 1fr 2.2rem;
+  align-items: center;
+  max-width: 18rem;
+  margin: 0 auto .65rem;
+  text-align: center;
+}
+
+.admission-calendar-nav button {
+  min-width: 2.1rem;
+  min-height: 2.1rem;
+  padding: .25rem;
+  border: 1px solid var(--border);
+  border-radius: .36rem;
+}
+
+.admission-calendar-nav strong {
+  font-size: .86rem;
+}
+
+.admission-calendar-grid {
+  min-width: 710px;
+  grid-template-rows: 2rem;
+  gap: 0;
+}
+
+.admission-calendar-cell {
+  min-height: 6.25rem;
+  padding: .3rem;
+  overflow: hidden;
+}
+
+.admission-calendar-cell > time {
+  display: block;
+  margin-bottom: .2rem;
+  color: var(--muted);
+  font-size: .64rem;
+  font-weight: 600;
+}
+
+.admission-calendar-event {
+  --admission-color: #2563eb;
+  display: block;
+  margin-top: .16rem;
+  padding: .18rem .22rem .18rem .32rem;
+  overflow: hidden;
+  border-left: 3px solid var(--admission-color);
+  border-radius: .2rem;
+  background: color-mix(in srgb, var(--admission-color) 7%, var(--bg-elevated));
+  color: var(--fg);
+  line-height: 1.2;
+}
+
+.admission-calendar-event b,
+.admission-calendar-event small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admission-calendar-event b {
+  font-size: .57rem;
+  font-weight: 600;
+}
+
+.admission-calendar-event small {
+  margin-top: .05rem;
+  color: var(--admission-color);
+  font-size: .52rem;
+}
+
+.admission-view-note {
+  margin: .55rem 0 0;
+  color: var(--muted);
+  font-size: .74rem;
+  text-align: center;
+}
+
+.admission-gantt-shell {
+  border-radius: .44rem;
+}
+
+.admission-gantt-inner {
+  min-width: 920px;
+  padding: .65rem .75rem .9rem;
+}
+
+.admission-gantt-axis {
+  display: grid;
+  grid-template-columns: 11rem minmax(0, 1fr);
+  gap: .55rem;
+  margin-bottom: .25rem;
+  padding-bottom: .35rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+  font-size: .64rem;
+  font-weight: 600;
+}
+
+.admission-gantt-axis > span {
+  padding-left: .15rem;
+}
+
+.admission-gantt-axis > div {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(5.5rem, 1fr));
+}
+
+.admission-gantt-axis > div span {
+  padding-left: .3rem;
+  border-left: 1px solid var(--border);
+}
+
+.admission-gantt-rows {
+  display: grid;
+}
+
+.admission-gantt-row {
+  display: grid;
+  grid-template-columns: 11rem minmax(0, 1fr);
+  gap: .55rem;
+  min-height: 4rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.admission-gantt-row > strong {
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  padding: .4rem .15rem;
+  color: var(--fg);
+  font-size: .67rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admission-gantt-track {
+  position: relative;
+  min-height: 4rem;
+  background-image: repeating-linear-gradient(
+    to right,
+    transparent 0,
+    transparent calc(16.666% - 1px),
+    color-mix(in srgb, var(--border) 82%, transparent) calc(16.666% - 1px),
+    color-mix(in srgb, var(--border) 82%, transparent) 16.666%
+  );
+}
+
+.admission-gantt-marker {
+  --admission-color: #2563eb;
+  position: absolute;
+  max-width: 5.1rem;
+  padding: .12rem .22rem;
+  transform: translateX(-1px);
+  overflow: hidden;
+  border-left: 3px solid var(--admission-color);
+  border-radius: .18rem;
+  background: color-mix(in srgb, var(--admission-color) 12%, var(--bg-elevated));
+  color: var(--admission-color);
+  font-size: .52rem;
+  font-weight: 600;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .admission-calendar-shell,
+  .admission-gantt-shell {
+    margin-right: -.15rem;
+    margin-left: -.15rem;
+  }
+
+  .admission-calendar-cell {
+    min-height: 5.7rem;
+  }
+}
+
+
+/* 入試管理: 日付単位のガント軸 */
+.admission-gantt-inner {
+  min-width: max-content;
+}
+
+.admission-gantt-axis,
+.admission-gantt-row {
+  width: max-content;
+  grid-template-columns: 11rem max-content;
+}
+
+.admission-gantt-axis > div {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 38px;
+  grid-template-columns: none;
+}
+
+.admission-gantt-axis > div span {
+  display: grid;
+  width: 38px;
+  min-height: 2.35rem;
+  padding: .16rem 0;
+  place-items: center;
+  border-left: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+  font-size: .48rem;
+  line-height: 1.1;
+  text-align: center;
+}
+
+.admission-gantt-axis > div span b,
+.admission-gantt-axis > div span small {
+  display: block;
+}
+
+.admission-gantt-axis > div span small {
+  color: var(--muted);
+  font-size: .43rem;
+  font-weight: 400;
+}
+
+.admission-gantt-axis > div span.is-month-start {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+  font-weight: 700;
+}
+
+.admission-gantt-track {
+  background-image: repeating-linear-gradient(
+    to right,
+    transparent 0,
+    transparent 37px,
+    color-mix(in srgb, var(--border) 75%, transparent) 37px,
+    color-mix(in srgb, var(--border) 75%, transparent) 38px
+  );
+}
+
+
+/* 入試管理: 共通フィルター */
+.admission-filters {
+  display: grid;
+  grid-template-columns: minmax(11rem, 1fr) minmax(7rem, .55fr) minmax(7rem, .55fr) auto;
+  gap: .45rem;
+  margin: .85rem 0;
+  padding: .55rem;
+  border: 1px solid var(--border);
+  border-radius: .46rem;
+  background: color-mix(in srgb, var(--bg-elevated) 92%, var(--bg-hover));
+}
+
+.admission-filters label {
+  display: grid;
+  min-width: 0;
+  gap: .15rem;
+  color: var(--muted);
+  font-size: .63rem;
+}
+
+.admission-filters input,
+.admission-filters select {
+  width: 100%;
+  min-height: 2rem;
+  padding: .28rem .45rem;
+  border-radius: .32rem;
+  background: #fbfbfc;
+  font-size: .75rem;
+}
+
+.admission-filter-search {
+  position: relative;
+  display: flex !important;
+  align-items: flex-end;
+}
+
+.admission-filter-search i {
+  position: absolute;
+  bottom: .57rem;
+  left: .52rem;
+  color: var(--muted);
+  font-size: .95rem;
+  pointer-events: none;
+}
+
+.admission-filter-search input {
+  padding-left: 1.75rem;
+}
+
+.admission-filters > button {
+  align-self: end;
+  min-width: auto;
+  min-height: 2rem;
+  padding: .28rem .5rem;
+  border: 1px solid var(--border);
+  border-radius: .32rem;
+  color: var(--muted);
+  font-size: .7rem;
+}
+
+:root[data-theme="dark"] .admission-filters input,
+:root[data-theme="dark"] .admission-filters select {
+  background: color-mix(in srgb, var(--bg-elevated) 94%, #fff 6%);
+}
+
+@media (max-width: 640px) {
+  .admission-filters {
+    grid-template-columns: 1fr 1fr auto;
+  }
+
+  .admission-filter-search {
+    grid-column: 1 / -1;
+  }
+
+  .admission-filters > button {
+    font-size: 0;
+  }
+
+  .admission-filters > button i {
+    font-size: .85rem;
+  }
+}
+
+
+/* 入試管理: 複数選択フィルターモーダル */
+.admission-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: .55rem;
+  margin: .85rem 0;
+  min-width: 0;
+}
+
+.admission-filter-open {
+  display: inline-flex;
+  min-height: 2.15rem;
+  align-items: center;
+  gap: .32rem;
+  padding: .34rem .58rem;
+  border-radius: .38rem;
+  color: var(--accent);
+  font-size: .74rem;
+  white-space: nowrap;
+}
+
+.admission-filter-count {
+  display: inline-grid;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  padding: 0 .25rem;
+  place-items: center;
+  border-radius: .58rem;
+  background: var(--accent);
+  color: #fff;
+  font-size: .58rem;
+  font-weight: 700;
+}
+
+.admission-filter-summary {
+  min-width: 0;
+  flex: 1;
+  margin: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: .7rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admission-filter-reset {
+  display: grid;
+  width: 2rem;
+  min-width: 2rem;
+  height: 2rem;
+  padding: 0;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: .34rem;
+  color: var(--muted);
+  font-size: .9rem;
+}
+
+.admission-filter-modal {
+  width: min(35rem, 94vw) !important;
+  max-height: min(42rem, 88vh);
+  padding: 0;
+  overflow: hidden;
+}
+
+.admission-filter-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.admission-filter-tabs button {
+  min-width: 0;
+  padding-right: .35rem;
+  padding-left: .35rem;
+  font-size: .72rem;
+  white-space: nowrap;
+}
+
+.admission-filter-form {
+  display: grid;
+  grid-template-rows: minmax(15rem, 1fr) auto;
+  min-height: 22rem;
+}
+
+.admission-filter-panel {
+  max-height: 50vh;
+  padding: .85rem 1rem;
+  overflow: auto;
+}
+
+.admission-filter-help {
+  margin: 0 0 .62rem;
+  color: var(--muted);
+  font-size: .67rem;
+}
+
+.admission-filter-modal-search {
+  display: flex;
+  min-height: 2.2rem;
+  align-items: center;
+  gap: .4rem;
+  margin-bottom: .55rem;
+  padding: 0 .52rem;
+  border: 1px solid var(--border);
+  border-radius: .36rem;
+  background: #fbfbfc;
+}
+
+.admission-filter-modal-search i {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: .95rem;
+}
+
+.admission-filter-modal-search input {
+  width: 100%;
+  min-width: 0;
+  min-height: 2.05rem;
+  padding: .25rem 0;
+  border: 0 !important;
+  outline: 0;
+  background: transparent !important;
+  box-shadow: none !important;
+  font-size: .76rem;
+}
+
+.admission-filter-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .35rem;
+}
+
+.admission-filter-option {
+  display: flex;
+  min-width: 0;
+  min-height: 2.2rem;
+  align-items: center;
+  gap: .48rem;
+  padding: .42rem .5rem;
+  border: 1px solid var(--border);
+  border-radius: .34rem;
+  background: color-mix(in srgb, var(--bg-elevated) 96%, var(--bg-hover));
+  color: var(--fg);
+  cursor: pointer;
+  font-size: .72rem;
+}
+
+.admission-filter-option:hover {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  background: color-mix(in srgb, var(--accent) 4%, var(--bg-elevated));
+}
+
+.admission-filter-option input {
+  width: .95rem;
+  height: .95rem;
+  flex: 0 0 .95rem;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.admission-filter-option span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admission-filter-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .6rem;
+  padding: .7rem 1rem;
+  border-top: 1px solid var(--border);
+  background: var(--bg-elevated);
+}
+
+.admission-filter-actions button {
+  min-height: 2.15rem;
+  padding: .34rem .62rem;
+  border-radius: .36rem;
+  font-size: .72rem;
+}
+
+.admission-filter-actions button:first-child {
+  color: var(--muted);
+}
+
+:root[data-theme="dark"] .admission-filter-modal-search {
+  background: color-mix(in srgb, var(--bg-elevated) 94%, #fff 6%);
+}
+
+@media (max-width: 640px) {
+  .admission-filter-bar {
+    gap: .4rem;
+  }
+
+  .admission-filter-summary {
+    font-size: .64rem;
+  }
+
+  .admission-filter-modal {
+    width: calc(100vw - 1rem) !important;
+  }
+
+  .admission-filter-panel {
+    padding: .75rem;
+  }
+
+  .admission-filter-options {
+    grid-template-columns: 1fr;
+  }
+
+  .admission-filter-month-options {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admission-filter-tabs button {
+    font-size: .66rem;
+  }
+
+  .admission-filter-tabs button i {
+    font-size: .84rem;
+  }
+}
+
+
+/* 入試管理: フィルタータブ単位の一括選択 */
+.admission-filter-panel-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .65rem;
+  margin-bottom: .62rem;
+}
+
+.admission-filter-panel-tools .admission-filter-help {
+  margin: 0;
+}
+
+.admission-filter-panel-tools > div {
+  display: flex;
+  flex: 0 0 auto;
+  gap: .25rem;
+}
+
+.admission-filter-panel-tools button {
+  min-height: 1.8rem;
+  padding: .22rem .38rem;
+  border: 1px solid var(--border);
+  border-radius: .3rem;
+  color: var(--muted);
+  background: var(--bg-elevated);
+  font-size: .6rem;
+  white-space: nowrap;
+}
+
+.admission-filter-panel-tools button:hover {
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
+  color: var(--accent);
+}
+
+@media (max-width: 640px) {
+  .admission-filter-panel-tools {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: .4rem;
+  }
+}
+
+
+/* 入試管理: 表示中タブの印刷 */
+.admission-print {
+  display: grid;
+  width: 2rem;
+  min-width: 2rem;
+  height: 2rem;
+  padding: 0;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: .34rem;
+  color: var(--accent);
+  background: var(--bg-elevated);
+  box-shadow: var(--card-shadow);
+}
+
+.admission-print i {
+  font-size: .95rem;
+}
+
+.admission-gantt-print {
+  display: none;
+}
+
+@page {
+  size: A4 landscape;
+  margin: 8mm;
+}
+
+@media print {
+  .admission-native {
+    background: #fff !important;
+    color: #111 !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .admission-back,
+  #admission-error,
+  .admission-print,
+  .admission-filter-bar,
+  .admission-view-tabs,
+  .admission-native dialog {
+    display: none !important;
+  }
+
+  .admission-main {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: 0 !important;
+  }
+
+  .admission-native #signed-in {
+    display: block !important;
+  }
+
+  .admission-panel {
+    padding: 0;
+    border: 0;
+    background: #fff;
+    box-shadow: none;
+  }
+
+  .admission-heading {
+    margin: 0 0 5mm;
+  }
+
+  .admission-heading h2 {
+    color: #111;
+    font-size: 16pt;
+  }
+
+  .admission-heading .eyebrow {
+    color: #2563eb;
+    font-size: 8pt;
+  }
+
+  .admission-view {
+    min-height: 0;
+  }
+
+  .admission-list-item {
+    margin-bottom: 2mm;
+    padding: 3mm;
+    break-inside: avoid;
+    border-color: #d7dbe2;
+    background: #fff;
+    box-shadow: none;
+  }
+
+  .admission-calendar-shell,
+  .admission-table-shell {
+    overflow: visible;
+    border-color: #cfd4dc;
+    background: #fff;
+    box-shadow: none;
+  }
+
+  .admission-calendar-shell {
+    width: 98.5%;
+    margin-right: auto;
+    margin-left: auto;
+    box-sizing: border-box;
+  }
+
+  .admission-calendar-nav button {
+    display: none;
+  }
+
+  .admission-calendar-grid {
+    min-width: 0;
+  }
+
+  .admission-calendar-cell {
+    min-height: 22mm;
+  }
+
+  .admission-table {
+    min-width: 0;
+    font-size: 7pt;
+  }
+
+  .admission-table th,
+  .admission-table td {
+    padding: 2mm;
+    border-color: #d7dbe2;
+  }
+
+  body[data-admission-print-view="gantt"] .admission-gantt-shell,
+  body[data-admission-print-view="gantt"] .admission-gantt-empty {
+    display: none !important;
+  }
+
+  body[data-admission-print-view="gantt"] .admission-gantt-print {
+    display: block;
+  }
+
+  .admission-gantt-print-university {
+    margin: 0 0 4mm;
+    break-inside: avoid;
+    border: 1px solid #cfd4dc;
+  }
+
+  .admission-gantt-print-university h3 {
+    margin: 0;
+    padding: 2mm 2.5mm;
+    border-bottom: 1px solid #cfd4dc;
+    background: #f4f6f9;
+    color: #111;
+    font-size: 9pt;
+    font-weight: 700;
+  }
+
+  .admission-gantt-print-month {
+    display: grid;
+    grid-template-columns: 19mm minmax(0, 1fr);
+    border-bottom: 1px solid #d7dbe2;
+  }
+
+  .admission-gantt-print-month:last-child {
+    border-bottom: 0;
+  }
+
+  .admission-gantt-print-month > strong {
+    display: grid;
+    padding: 1.2mm;
+    place-items: center;
+    border-right: 1px solid #d7dbe2;
+    color: #333;
+    font-size: 6.5pt;
+    text-align: center;
+  }
+
+  .admission-gantt-print-days {
+    display: grid;
+    grid-template-columns: repeat(var(--admission-print-days), minmax(0, 1fr));
+  }
+
+  .admission-gantt-print-day {
+    min-width: 0;
+    min-height: 12mm;
+    padding: .5mm .25mm;
+    border-right: 1px solid #e2e5ea;
+    background: #fff;
+  }
+
+  .admission-gantt-print-day:last-child {
+    border-right: 0;
+  }
+
+  .admission-gantt-print-day.is-sunday {
+    background: #fff4f4;
+  }
+
+  .admission-gantt-print-day.is-saturday {
+    background: #f2f6ff;
+  }
+
+  .admission-gantt-print-day > time {
+    display: block;
+    margin-bottom: .5mm;
+    color: #666;
+    font-size: 5pt;
+    text-align: center;
+  }
+
+  .admission-gantt-print-event {
+    --admission-color: #2563eb;
+    display: block;
+    margin-top: .4mm;
+    padding: .35mm .2mm;
+    overflow: hidden;
+    border-left: 1.5px solid var(--admission-color);
+    background: color-mix(in srgb, var(--admission-color) 9%, #fff);
+    color: var(--admission-color);
+    font-size: 4.5pt;
+    line-height: 1.05;
+    text-align: center;
+  }
+
+  .admission-gantt-print-event b,
+  .admission-gantt-print-event small {
+    display: block;
+    overflow: hidden;
+    font-size: inherit;
+    text-overflow: clip;
+    white-space: nowrap;
+  }
+}
+
+
+/* 入試管理: 試験段階・方式の配色 */
+.admission-calendar-event.admission-stage-primary,
+.admission-gantt-marker.admission-stage-primary,
+.admission-gantt-print-event.admission-stage-primary {
+  --admission-color: #2563eb;
+}
+
+.admission-calendar-event.admission-stage-first_result,
+.admission-gantt-marker.admission-stage-first_result,
+.admission-gantt-print-event.admission-stage-first_result {
+  --admission-color: #8b5cf6;
+}
+
+.admission-calendar-event.admission-stage-secondary,
+.admission-gantt-marker.admission-stage-secondary,
+.admission-gantt-print-event.admission-stage-secondary {
+  --admission-color: #d97706;
+}
+
+.admission-calendar-event.admission-stage-final_result,
+.admission-gantt-marker.admission-stage-final_result,
+.admission-gantt-print-event.admission-stage-final_result {
+  --admission-color: #16a34a;
+}
+
+.admission-table tbody tr.admission-type-general {
+  --admission-type-color: #4f7ee8;
+}
+
+.admission-table tbody tr.admission-type-ct {
+  --admission-type-color: #16a3a3;
+}
+
+.admission-table tbody tr.admission-type-recommendation {
+  --admission-type-color: #e879a0;
+}
+
+.admission-table tbody tr.admission-type-regional {
+  --admission-type-color: #59a86b;
+}
+
+.admission-table tbody tr.admission-type-comprehensive {
+  --admission-type-color: #9a6dde;
+}
+
+.admission-table tbody tr[class*="admission-type-"] > td {
+  background: color-mix(in srgb, var(--admission-type-color) 11%, var(--bg-elevated));
+}
+
+.admission-table tbody tr[class*="admission-type-"] > td:first-child {
+  box-shadow: inset 3px 0 0 var(--admission-type-color);
+}
+
+:root[data-theme="dark"] .admission-table tbody tr[class*="admission-type-"] > td {
+  background: color-mix(in srgb, var(--admission-type-color) 16%, var(--bg-elevated));
+}
+
+
+/* 入試管理: 印刷時のカレンダー年月 */
+@media print {
+  .admission-calendar-nav {
+    display: block;
+    width: 100%;
+    max-width: none;
+    margin: 0 0 4mm;
+    text-align: center;
+  }
+
+  .admission-calendar-nav strong {
+    display: inline-block;
+    font-size: 11pt;
+    line-height: 1.2;
+    white-space: nowrap;
+    word-break: keep-all;
+  }
+}
+
+
+/* 入試管理: 連続カレンダー */
+.admission-calendar-controls {
+  display: grid;
+  gap: .55rem;
+  margin-bottom: .65rem;
+}
+
+.admission-calendar-mode {
+  display: inline-grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: min(100%, 15rem);
+  margin: 0 auto;
+  padding: .2rem;
+  border: 1px solid var(--border);
+  border-radius: .42rem;
+  background: var(--bg-elevated);
+}
+
+.admission-calendar-mode button {
+  min-height: 1.9rem;
+  padding: .28rem .45rem;
+  border: 0;
+  border-radius: .28rem;
+  background: transparent;
+  color: var(--muted);
+  font-size: .68rem;
+  font-weight: 600;
+}
+
+.admission-calendar-mode button i {
+  margin-right: .15rem;
+  font-size: .86rem;
+}
+
+.admission-calendar-mode button[aria-pressed="true"] {
+  background: var(--bg-hover);
+  color: var(--accent);
+}
+
+.admission-calendar-continuous {
+  min-width: 640px;
+}
+
+.admission-calendar-continuous-grid {
+  grid-template-rows: 2rem;
+  grid-auto-rows: minmax(6.25rem, auto);
+}
+
+.admission-calendar-continuous-grid .admission-calendar-cell {
+  min-height: 6.25rem;
+  padding-top: .45rem;
+}
+
+.admission-calendar-continuous-grid .admission-calendar-cell.is-month-start {
+  box-shadow: inset 2px 0 var(--accent);
+}
+
+.admission-calendar-continuous-grid .admission-calendar-cell > time {
+  display: flex;
+  align-items: baseline;
+  gap: .2rem;
+}
+
+.admission-calendar-continuous-grid .admission-calendar-cell > time b {
+  font-size: inherit;
+}
+
+.admission-calendar-month-label {
+  color: var(--accent);
+  font-size: .5rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+@media print {
+  .admission-calendar-mode {
+    display: none !important;
+  }
+
+  .admission-calendar-controls {
+    margin-bottom: 3mm;
+  }
+
+  .admission-calendar-continuous {
+    min-width: 0;
+  }
+
+  .admission-calendar-continuous-grid {
+    grid-template-rows: 2rem;
+    grid-auto-rows: minmax(22mm, auto);
+  }
+
+  .admission-calendar-month-label {
+    color: #2563eb;
+    font-size: 5.5pt;
+  }
+}
+
+.admission-native{--bg-elevated:var(--surface,#fff);--border:var(--line,#dbe3ee);min-width:0}.admission-native .admission-main{padding:0;margin:0;max-width:none}.admission-native .admission-view-tabs{top:0}.admission-native [hidden]{display:none!important}.admission-native button{min-height:44px}.admission-native dialog{color:var(--text);background:var(--bg-elevated);max-height:85dvh;overflow:auto;border:1px solid var(--border);border-radius:16px}.admission-native .modal-header{display:flex;justify-content:space-between;align-items:center}.admission-native .admission-panel{padding:0}.admission-native .admission-calendar-shell,.admission-native .admission-table-shell{max-width:100%;overflow:auto}
+@media print{body[data-admission-print-view] .app-sidebar,body[data-admission-print-view] .app-tabs,body[data-admission-print-view] .navbar,body[data-admission-print-view] .page:not(.page-current){display:none!important}body[data-admission-print-view] .page-content{height:auto!important;overflow:visible!important;padding:0!important}body[data-admission-print-view] .admission-native>p{display:none}}
+/* Shared original dialog conventions, scoped to the mounted module. */
+.admission-native{--fg:var(--ink);--bg-hover:var(--paper);--card-shadow:none;color:var(--ink)}
+.admission-native dialog.app-modal{padding:0;width:min(760px,calc(100vw - 24px));color:var(--ink);box-shadow:0 10px 30px #1e293b33}
+.admission-native dialog::backdrop{background:#10182888}
+.admission-native .modal-header{padding:16px;border-bottom:1px solid var(--border);gap:12px}
+.admission-native .modal-header h2{margin:0;font-size:1.1rem;min-width:0}
+.admission-native .modal-close{flex:0 0 44px;width:44px;padding:8px}
+.admission-native .modal-tabs{gap:8px;padding:0 16px;border-bottom:1px solid var(--border)}
+.admission-native [role=tab][aria-selected=true]{font-weight:700;border-bottom:3px solid var(--accent)}
+.admission-native input[type=search]{font-size:16px}
+.admission-native .error{color:#b42318;white-space:pre-wrap;overflow-wrap:anywhere}
+:root[data-theme=dark] .admission-native .error{color:#ffb4ab}
+@media print{.admission-native{--bg-elevated:white;--fg:#111;--muted:#444;--border:#ccc}.admission-native #admission-list a{display:none}}
