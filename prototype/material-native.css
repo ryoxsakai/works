@@ -1482,3 +1482,6 @@
 .material-native .material-breadcrumb-btn{display:inline-flex;flex:0 0 auto;width:auto;}
 .material-native .material-file-item{flex-wrap:wrap;}
 @media(max-width:640px){.material-native .page-tab-btn{font-size:13px;gap:4px;}.material-native .material-folder-open{flex-basis:calc(100% - 36px);}.material-native .material-folder-card>.material-icon-btn:first-of-type{margin-left:auto;}}
+/* Keep upload copy readable in both Works themes. */
+.material-native .material-dropzone{background:var(--surface);color:var(--ink);}
+.material-native .material-dropzone.is-dragging{background:color-mix(in srgb,var(--accent) 10%,var(--surface));}

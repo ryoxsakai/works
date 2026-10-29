@@ -62,7 +62,7 @@ export function createProductionContext(auth,{fetcher=fetch,onExpired=()=>{},onL
         const params=new URLSearchParams({name:file.name,size:String(file.size)});if(folderId)params.set('folder_id',folderId);
         xhr.open('POST','/api/material-library/files?'+params);xhr.setRequestHeader('Authorization','Bearer '+auth.getSessionToken());xhr.setRequestHeader('Content-Type',file.type||'application/octet-stream');xhr.responseType='json';
         xhr.upload.onprogress=event=>{if(check()&&event.lengthComputable)onProgress(Math.min(100,Math.max(0,Math.round(event.loaded/event.total*100))));};
-        xhr.onload=()=>{if(!check()){cancel();return;}if([401,403].includes(xhr.status)){invalidate('再度ログインしてください。');finish(reject,Object.assign(Error('再ログインが必要です'),{status:xhr.status}));return;}if(xhr.status<200||xhr.status>=300){finish(reject,Object.assign(Error('アップロードの保存結果を確認できません。'),{status:xhr.status}));return;}finish(resolve,xhr.response);};
+        xhr.onload=()=>{if(!check()){cancel();return;}if([401,403].includes(xhr.status)){invalidate('再度ログインしてください。');finish(reject,Object.assign(Error('再ログインが必要です'),{status:xhr.status}));return;}if(xhr.status<200||xhr.status>=300){finish(reject,Object.assign(Error('アップロードの保存結果を確認できません。'),{status:xhr.status,...(xhr.response?.material_operation?{material_operation:xhr.response.material_operation}:{})}));return;}finish(resolve,xhr.response);};
         xhr.onerror=()=>finish(reject,Error('アップロードの通信結果を確認できません。'));xhr.onabort=()=>finish(reject,new DOMException('Upload result unknown','AbortError'));xhr.send(file);
       });}finally{controllers.delete(controller);signal?.removeEventListener('abort',abort);}
     },
