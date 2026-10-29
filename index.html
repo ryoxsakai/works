@@ -1,97 +1,171 @@
 <!doctype html>
 <html lang="ja">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=M+PLUS+1p:wght@400;500;700&display=swap" rel="stylesheet" />
-  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
-  <meta http-equiv="Pragma" content="no-cache" />
-  <meta http-equiv="Expires" content="0" />
-  <title>Works</title>
-  <script src="/shared/theme-init.js?v=1"></script>
-  <link rel="apple-touch-icon" href="/shared/logo.png" />
-  <link rel="stylesheet" href="/shared/styles.css?v=56" />
-  <link rel="stylesheet" href="/home.css?v=2" />
-  <link rel="stylesheet" href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" />
-  <link rel="stylesheet" href="/shared/header.css?v=2" />
-  <script type="module" src="/shared/header.js?v=4"></script>
-</head>
-<body>
-  <header class="page-header works-header">
-    <h1><a class="works-home" href="/" aria-label="Works ホーム"><span class="page-header-icon" aria-hidden="true">W</span><span>Works</span></a></h1>
-    <div class="works-header-actions">
-      <div class="user-bar">
-      <button id="open-home-settings" type="button" aria-label="設定" title="設定">
-        <i class="bx bx-cog"></i>
-      </button>
-      <button id="home-auth-action" type="button" class="user-icon-btn" aria-label="Googleでログイン" title="Googleでログイン">
-        <img id="user-avatar" alt="" hidden />
-        <i class="bx bx-user-circle" id="user-avatar-fallback"></i>
-      </button>
-    </div>
-    </div>
-  </header>
-
-  <main>
-    <p id="home-auth-error" class="error home-auth-error" role="alert"></p>
-    <div class="home-intro">
-      <p class="home-location">ホーム / メニュー</p>
-      <h2>今日は何を進めますか？</h2>
-      <p>授業・教材、業務、制作から使いたい機能を選べます。</p>
-    </div>
-    <nav class="category-nav" aria-label="メニューのカテゴリ">
-      <a href="#teaching">授業・教材 <span>3</span></a>
-      <a href="#operations">業務 <span>2</span></a>
-      <a href="#automation">自動実行 <span>2</span></a>
-      <a href="#creation">制作 <span>2</span></a>
-    </nav>
-    <section class="module-section" id="teaching" aria-labelledby="teaching-title">
-      <h2 id="teaching-title" class="category-title"><i class="bx bx-book-reader" aria-hidden="true"></i> 授業・教材</h2>
-      <ul class="module-grid">
-        <li><a class="module-card" href="/tutor/"><h3><i class="bx bx-book-reader" aria-hidden="true"></i> 授業管理</h3><p>生徒ごとの授業予定と進捗を管理します</p></a></li>
-        <li><a class="module-card" href="/material/"><h3><i class="bx bx-library" aria-hidden="true"></i> 教材管理</h3><p>教材を保管し、分類・整理します</p></a></li>
-        <li><a class="module-card" href="/admission/"><h3><i class="bx bx-calendar-event" aria-hidden="true"></i> 入試管理</h3><p>大学入試の日程と予定を管理します</p></a></li>
-      </ul>
-    </section>
-    <section class="module-section" id="operations" aria-labelledby="operations-title">
-      <h2 id="operations-title" class="category-title"><i class="bx bx-list-check" aria-hidden="true"></i> 業務</h2>
-      <ul class="module-grid">
-        <li><a class="module-card" href="/memo/"><h3><i class="bx bx-note" aria-hidden="true"></i> メモ</h3><p>本文、補足、タグを整理して記録します</p></a></li>
-        <li><a class="module-card" href="/todo/"><h3><i class="bx bx-list-check" aria-hidden="true"></i> ToDo管理</h3><p>タスクの優先度、締切、進捗を管理します</p></a></li>
-      </ul>
-    </section>
-    <section class="module-section" id="automation" aria-labelledby="automation-title">
-      <h2 id="automation-title" class="category-title"><i class="bx bx-git-branch" aria-hidden="true"></i> 自動実行</h2>
-      <ul class="module-grid">
-        <li><a class="module-card" href="/workflow/"><h3><i class="bx bx-git-branch" aria-hidden="true"></i> ワークフロー</h3><p>許可した仕事を順番に進め、成果物と履歴を確認します</p></a></li>
-        <li><a class="module-card" href="/wiki/"><h3><i class="bx bx-library" aria-hidden="true"></i> Wiki</h3><p>知識と出典、改稿案、履歴を管理します</p></a></li>
-      </ul>
-    </section>
-    <section class="module-section" id="creation" aria-labelledby="creation-title">
-      <h2 id="creation-title" class="category-title"><i class="bx bx-pencil" aria-hidden="true"></i> 制作</h2>
-      <ul class="module-grid">
-        <li><a class="module-card" href="/kdp/"><h3><i class="bx bx-book-open" aria-hidden="true"></i> KDP管理</h3><p>本の構成、原稿、出典、改稿案を管理します</p></a></li>
-        <li><a class="module-card" href="/ss/"><h3><i class="bx bx-briefcase-alt-2" aria-hidden="true"></i> SS管理</h3><p>問題作成案件の進行状況と締切を管理します</p></a></li>
-      </ul>
-    </section>
-  </main>
-
-  <dialog id="home-settings-modal" class="app-modal home-settings-modal">
-    <div class="modal-header">
-      <h2><i class="bx bx-cog"></i> 設定</h2>
-      <button type="button" id="home-settings-close" class="modal-close" aria-label="閉じる"><i class="bx bx-x"></i></button>
-    </div>
-    <div class="modal-tab-panel">
-      <div class="theme-options">
-        <label><input type="radio" name="home-theme" value="system" /> OS設定</label>
-        <label><input type="radio" name="home-theme" value="light" /> ライト</label>
-        <label><input type="radio" name="home-theme" value="dark" /> ダーク</label>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=M+PLUS+1p:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <meta
+      http-equiv="Cache-Control"
+      content="no-store, no-cache, must-revalidate, max-age=0"
+    />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <title>Works</title>
+    <script src="/shared/theme-init.js?v=1"></script>
+    <link rel="apple-touch-icon" href="/shared/logo.png" />
+    <link rel="stylesheet" href="/shared/styles.css?v=56" />
+    <link rel="stylesheet" href="/home.css?v=3" />
+    <link rel="stylesheet" href="/dashboard/vendor/boxicons-2.1.4.min.css" />
+    <link rel="stylesheet" href="/shared/header.css?v=2" />
+  </head>
+  <body class="dashboard-home">
+    <a class="skip-link" href="#dashboard-main">本文へ</a>
+    <header class="page-header works-header">
+      <h1>
+        <a class="works-home" href="/" aria-label="Works ホーム"
+          ><span class="page-header-icon" aria-hidden="true">W</span
+          ><span>Works</span></a
+        >
+      </h1>
+      <div class="works-header-actions">
+        <div class="user-bar">
+          <button
+            id="open-home-settings"
+            type="button"
+            aria-label="設定"
+            title="設定"
+          >
+            <i class="bx bx-cog"></i>
+          </button>
+          <button
+            id="home-auth-action"
+            type="button"
+            class="user-icon-btn"
+            aria-label="Googleでログイン"
+            title="Googleでログイン"
+          >
+            <img id="user-avatar" alt="" hidden />
+            <i class="bx bx-user-circle" id="user-avatar-fallback"></i>
+          </button>
+        </div>
       </div>
-    </div>
-  </dialog>
+    </header>
 
-  <script type="module" src="/home.js?v=8"></script>
-</body>
+    <div class="dashboard-shell">
+      <details id="home-navigation" class="dashboard-navigation" open>
+        <summary>全メニュー</summary>
+        <nav aria-label="Worksの全機能">
+          <a href="/" aria-current="page"
+            ><i class="bx bx-home-alt" aria-hidden="true"></i> ホーム</a
+          >
+          <a href="/tutor/"
+            ><i class="bx bx-book-reader" aria-hidden="true"></i> 授業管理</a
+          >
+          <a href="/material/"
+            ><i class="bx bx-library" aria-hidden="true"></i> 教材管理</a
+          >
+          <a href="/admission/"
+            ><i class="bx bx-calendar-event" aria-hidden="true"></i> 入試管理</a
+          >
+          <a href="/todo/"
+            ><i class="bx bx-list-check" aria-hidden="true"></i> ToDo</a
+          >
+          <a href="/memo/"
+            ><i class="bx bx-note" aria-hidden="true"></i> メモ</a
+          >
+          <a href="/workflow/"
+            ><i class="bx bx-git-branch" aria-hidden="true"></i> ワークフロー</a
+          >
+          <a href="/wiki/"
+            ><i class="bx bx-library" aria-hidden="true"></i> Wiki</a
+          >
+          <a href="/kdp/"
+            ><i class="bx bx-book-open" aria-hidden="true"></i> KDP管理</a
+          >
+          <a href="/ss/"
+            ><i class="bx bx-briefcase-alt-2" aria-hidden="true"></i> SS管理</a
+          >
+        </nav>
+      </details>
+      <main id="dashboard-main" tabindex="-1">
+        <p id="home-auth-error" class="error home-auth-error" role="alert"></p>
+        <div class="dashboard-heading">
+          <div>
+            <p id="dashboard-date" class="dashboard-muted"></p>
+            <h2>おかえりなさい</h2>
+            <p class="dashboard-muted">今日の予定と、よく使う機能をここに。</p>
+          </div>
+          <div class="dashboard-actions">
+            <button id="dashboard-refresh" type="button">更新</button
+            ><button id="dashboard-edit" type="button" class="primary">
+              表示を編集
+            </button>
+          </div>
+        </div>
+        <p id="dashboard-message" role="status" aria-live="polite"></p>
+        <div id="dashboard-editor" class="dashboard-editor" hidden>
+          <p>
+            このユーザー・ブラウザだけの配置です。非表示にしても元のデータは削除されません。
+          </p>
+          <div class="dashboard-actions">
+            <button id="dashboard-save" type="button" class="primary">
+              配置を保存</button
+            ><button id="dashboard-cancel" type="button">キャンセル</button
+            ><button id="dashboard-reset" type="button">初期配置に戻す</button>
+          </div>
+          <h3>ウィジェットを追加</h3>
+          <div id="dashboard-catalog" class="dashboard-catalog"></div>
+          <fieldset id="dashboard-shortcuts">
+            <legend>よく使う機能に表示するリンク</legend>
+          </fieldset>
+        </div>
+        <div id="dashboard-widgets" class="dashboard-widgets"></div>
+        <noscript
+          >ダッシュボードの表示にはJavaScriptが必要です。全メニューから従来の画面に移動できます。</noscript
+        >
+      </main>
+    </div>
+
+    <dialog
+      aria-labelledby="home-settings-title"
+      id="home-settings-modal"
+      class="app-modal home-settings-modal"
+    >
+      <div class="modal-header">
+        <h2 id="home-settings-title">
+          <i class="bx bx-cog" aria-hidden="true"></i> 設定
+        </h2>
+        <button
+          type="button"
+          id="home-settings-close"
+          class="modal-close"
+          aria-label="閉じる"
+        >
+          <i class="bx bx-x"></i>
+        </button>
+      </div>
+      <div class="modal-tab-panel">
+        <div class="theme-options">
+          <label
+            ><input type="radio" name="home-theme" value="system" />
+            OS設定</label
+          >
+          <label
+            ><input type="radio" name="home-theme" value="light" />
+            ライト</label
+          >
+          <label
+            ><input type="radio" name="home-theme" value="dark" /> ダーク</label
+          >
+        </div>
+      </div>
+    </dialog>
+
+    <script type="module" src="/home.js?v=9"></script>
+  </body>
 </html>

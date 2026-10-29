@@ -131,8 +131,8 @@ async function selectedTheme(page) {
             const rect = h.getBoundingClientRect();
             const children = [...h.querySelectorAll('h1, .works-header-actions, select, summary, button:not([hidden])')].filter(e=>e.getBoundingClientRect().width);
             const menu = h.querySelector('.works-navigation');
-            const style = getComputedStyle(menu);
-            const summary = menu.querySelector('summary').getBoundingClientRect();
+            const style = menu ? getComputedStyle(menu) : {marginTop:'0px',paddingTop:'0px',borderTopWidth:'0px'};
+            const summary = (menu?.querySelector('summary') || h.querySelector('button[aria-label="設定"]')).getBoundingClientRect();
             const themeControl = h.querySelector('button[aria-label="設定"]').getBoundingClientRect();
             return {menuTop:style.marginTop,menuPadding:style.paddingTop,menuBorder:style.borderTopWidth,
               menuCenter:summary.y+summary.height/2,themeCenter:themeControl.y+themeControl.height/2,
@@ -147,8 +147,9 @@ async function selectedTheme(page) {
           assert.equal(geometry.menuBorder, '0px', `${path} menu top border`);
           assert.ok(Math.abs(geometry.menuCenter - geometry.themeCenter) < 2, `${path} menu alignment`);
           assert.deepEqual(geometry.clipped,[],`${path} ${width} clipped controls`);
-          await page.locator('.works-navigation summary').click();
-          const nav = await page.locator('.works-navigation nav').boundingBox();
+          if (new URL(page.url()).pathname !== '/') await page.locator('.works-navigation summary').click();
+          else await page.locator('#home-navigation').evaluate(el=>el.open=true);
+          const nav = await page.locator(new URL(page.url()).pathname === '/' ? '#home-navigation nav' : '.works-navigation nav').boundingBox();
           assert(nav.x>=0 && nav.x+nav.width<=width+1,`${path} ${width} clipped menu`);
           await page.keyboard.press('Escape');
           if (width===375 || width===1440) {
@@ -164,8 +165,8 @@ async function selectedTheme(page) {
   }
   await page.goto(base + '/');
   assert.equal(await page.locator('.module-card[href="/material-print/"]').count(),0);
-  assert.equal(await page.locator('#automation a[href="/wiki/"] h3').innerText(),'Wiki');
-  assert.deepEqual(await page.locator('.module-section').evaluateAll(es=>es.map(e=>e.id)),['teaching','operations','automation','creation']);
+  assert.equal(await page.locator('#home-navigation a[href="/wiki/"]').innerText(),'Wiki');
+  assert.equal(await page.locator('#home-navigation a:not([aria-current])').count(),9);
   await selectTheme(page,'dark');
   await page.reload();
   assert.equal(await selectedTheme(page),'dark');

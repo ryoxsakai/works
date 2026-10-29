@@ -1,5 +1,19 @@
-import { signIn, signOutUser, watchAuth } from "./shared/auth.js?v=12";
+import {
+  signIn,
+  signOutUser,
+  watchAuth,
+  getSessionToken,
+  getGoogleAccessToken,
+} from "./shared/auth.js?v=12";
 import { getTheme, setTheme } from "./shared/theme.js?v=6";
+
+import { createDashboard } from "./dashboard/dashboard.mjs";
+const dashboard = createDashboard({
+  getSessionToken,
+  getGoogleAccessToken,
+  onExpired: () =>
+    showSignedOut("ログイン状態が変わりました。再読み込みしてください。"),
+});
 
 const els = {
   authAction: document.querySelector("#home-auth-action"),
@@ -10,12 +24,13 @@ const els = {
   settingsModal: document.querySelector("#home-settings-modal"),
   settingsClose: document.querySelector("#home-settings-close"),
   themeRadios: [...document.querySelectorAll('input[name="home-theme"]')],
-  moduleLinks: [...document.querySelectorAll(".module-card")],
 };
 
 const PENDING_DESTINATION_KEY = "works_pending_destination";
-const SAFE_DESTINATION_RE = /^(?:\/|\/(?:tutor|material|material-print|admission|ss|todo|kdp|wiki|memo|workflow)\/)$/;
+const SAFE_DESTINATION_RE =
+  /^(?:\/|\/(?:tutor|material|material-print|admission|ss|todo|kdp|wiki|memo|workflow)\/)$/;
 
+let authBusy = false;
 let authState = "checking";
 let resolveAuthState;
 const authStateReady = new Promise((resolve) => {
@@ -40,16 +55,26 @@ function isSafeDestination(value) {
 
 function savePendingDestination(value) {
   if (!isSafeDestination(value)) return;
-  localStorage.setItem(PENDING_DESTINATION_KEY, value);
+  try {
+    localStorage.setItem(PENDING_DESTINATION_KEY, value);
+  } catch {
+    /* Navigation still works without local storage. */
+  }
 }
 
 function consumePendingDestination() {
-  const value = localStorage.getItem(PENDING_DESTINATION_KEY);
-  localStorage.removeItem(PENDING_DESTINATION_KEY);
+  let value;
+  try {
+    value = localStorage.getItem(PENDING_DESTINATION_KEY);
+    localStorage.removeItem(PENDING_DESTINATION_KEY);
+  } catch {
+    return "";
+  }
   return isSafeDestination(value) ? value : "";
 }
 
 function showSignedOut(message = "") {
+  dashboard.signedOut();
   settleAuthState("signed-out");
   els.authError.textContent = message;
   els.authAction.setAttribute("aria-label", "Googleでログイン");
@@ -60,6 +85,7 @@ function showSignedOut(message = "") {
 }
 
 function showSignedIn(user) {
+  dashboard.signedIn(user);
   settleAuthState("signed-in");
   els.authError.textContent = "";
   els.authAction.setAttribute("aria-label", "ログアウト");
@@ -77,31 +103,48 @@ function showSignedIn(user) {
   if (pendingDestination) window.location.assign(pendingDestination);
 }
 
-els.moduleLinks.forEach((link) => {
-  link.addEventListener("click", async (event) => {
-    if (authState === "signed-in") return;
-    event.preventDefault();
-    const destination = new URL(link.href, window.location.origin).pathname;
-    savePendingDestination(destination);
-
-    try {
-      const state = await waitForAuthState();
-      if (state === "signed-in") {
-        window.location.assign(destination);
-        return;
-      }
-      signIn("/tutor/");
-    } catch (error) {
-      els.authError.textContent = error instanceof Error ? error.message : String(error);
+document.addEventListener("click", async (event) => {
+  const link = event.target.closest("a[href]");
+  if (
+    event.defaultPrevented ||
+    !link ||
+    link.origin !== location.origin ||
+    !isSafeDestination(link.pathname) ||
+    link.pathname === "/" ||
+    authState === "signed-in"
+  )
+    return;
+  event.preventDefault();
+  if (authBusy) return;
+  authBusy = true;
+  const destination = link.pathname;
+  savePendingDestination(destination);
+  try {
+    const state = await waitForAuthState();
+    if (state === "signed-in") {
+      window.location.assign(destination);
+      return;
     }
-  });
+    signIn("/tutor/");
+  } catch (error) {
+    els.authError.textContent =
+      error instanceof Error ? error.message : String(error);
+  } finally {
+    setTimeout(() => {
+      authBusy = false;
+    }, 1500);
+  }
 });
 
 els.authAction.addEventListener("click", async () => {
+  if (authBusy || !dashboard.canLeave()) return;
+  authBusy = true;
+  els.authAction.disabled = true;
   els.authError.textContent = "";
   try {
     const state = await waitForAuthState();
     if (state === "signed-in") {
+      dashboard.clear();
       await signOutUser();
       showSignedOut();
       return;
@@ -109,7 +152,11 @@ els.authAction.addEventListener("click", async () => {
     savePendingDestination("/");
     signIn("/tutor/");
   } catch (error) {
-    els.authError.textContent = error instanceof Error ? error.message : String(error);
+    els.authError.textContent =
+      error instanceof Error ? error.message : String(error);
+  } finally {
+    authBusy = false;
+    els.authAction.disabled = false;
   }
 });
 
