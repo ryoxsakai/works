@@ -6,6 +6,9 @@ export function createSidebarController(panel,{background,openerSelector='.page-
  const focusables=()=>[...element.querySelectorAll('button,a[href],input,select,textarea,[tabindex]')].filter(node=>!node.disabled&&node.tabIndex>=0&&node.getClientRects().length);
  function release(restore=true){
   const wasModal=modal;modal=false;document.documentElement.classList.remove('drawer-open');
+  // Framework7 can retain its backdrop after an interrupted opening transition.
+  // Releasing a genuinely closed panel must release that owned overlay as well.
+  if(!panel.opened||!element.classList.contains('panel-in'))panel.backdropEl?.classList.remove('panel-backdrop-in');
   buttons().forEach(button=>button.setAttribute('aria-expanded','false'));
   if(previousOverflow){[document.documentElement.style.overflow,document.body.style.overflow]=previousOverflow;previousOverflow=null;}
   for(const [node,inert,hidden] of previousBackground){node.inert=inert;if(hidden===null)node.removeAttribute('aria-hidden');else node.setAttribute('aria-hidden',hidden);}previousBackground=[];
@@ -20,7 +23,7 @@ export function createSidebarController(panel,{background,openerSelector='.page-
   buttons().forEach(button=>button.setAttribute('aria-expanded','true'));
  }
  function opened(){if(media.matches||!panel.opened||!element.classList.contains('panel-in')){release(false);return;}lock();(element.querySelector('[aria-current=page]')||focusables()[0])?.focus();}
- function closed(){release(restoreFocus);restoreFocus=true;}
+ function closed(){if(!media.matches&&panel.opened&&element.classList.contains('panel-in')){lock();return;}release(restoreFocus);restoreFocus=true;}
  function close({restore=true,animate=false}={}){if(media.matches)return;restoreFocus=restore;panel.close(animate);if(!panel.opened)release(restore);}
  function resize(){
   const focused=element.contains(document.activeElement);panel.close(false);release(false);
