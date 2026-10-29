@@ -1,4 +1,3 @@
-import {mutateMaterialLibrary} from "./material-library-guarded.mjs";
 import { workflowTools, callWorkflowTool, handleWorkflow, handleWorkflowExecution } from "./workflow.js";
 import { wikiTools, callWikiTool, handleWiki } from "./wiki.js";
 import { kdpTools, kdpWriteTools, availableKdpTools, callKdpTool, handleKdp } from "./kdp-services.js";
@@ -6443,6 +6442,7 @@ export default {
         if(request.headers.get("Origin")!==env.ALLOWED_ORIGIN||!request.headers.get("Content-Type")?.startsWith("application/json"))throw httpError(403,"same-origin JSON required");
         const raw=await request.text();if(new TextEncoder().encode(raw).length>1000000)throw httpError(413,"material input too large");
         let body;try{body=JSON.parse(raw);}catch{throw httpError(400,"invalid JSON");}
+        const {mutateMaterialLibrary}=await import("./material-library-guarded.js");
         await ensureMaterialSchema(env);
         return json(await mutateMaterialLibrary(env,body),{...headers,"Cache-Control":"no-store"});
       }

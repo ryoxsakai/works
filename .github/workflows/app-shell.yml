@@ -2,7 +2,7 @@ name: Test unified app shell
 on:
   pull_request:
     branches: [main]
-    paths: ['app/**', 'prototype/**', 'shared/**', 'tutor/app.js', 'worker/src/material-library-guarded.mjs', 'worker/test/material-library-guarded.test.mjs', 'worker/src/index.js', '.github/workflows/app-shell.yml']
+    paths: ['app/**', 'prototype/**', 'shared/**', 'tutor/app.js', 'worker/src/material-library-guarded.js', 'worker/test/material-library-guarded.test.mjs', 'worker/src/index.js', '.github/workflows/app-shell.yml']
 permissions:
   contents: read
 jobs:
