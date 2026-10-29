@@ -61,7 +61,7 @@ document.addEventListener('click',event=>{
  const opener=event.target.closest('[data-menu-open]');if(opener)drawer.open(opener);
  const menuLink=event.target.closest('#works-side-menu a:not(.external)');if(menuLink&&menuLink.getAttribute('href')===view.router.currentRoute.path)drawer.close();
  const link=event.target.closest('a.external');if(link&&mounted&&!mounted.canLeave())event.preventDefault();
- if(event.target.closest('[data-sign-out]'))context.logout();
+ if(event.target.closest('[data-sign-out]')&&(!mounted||mounted.canLeave()))context.logout();
  if(event.target.closest('[data-theme-toggle]'))context.toggleTheme?.();
  if(event.target.closest('[data-refresh]')&&(!mounted||mounted.canLeave())){navigation.allowOnce(view.router.currentRoute.url);view.router.navigate(view.router.currentRoute.url,{reloadCurrent:true});}
 },{capture:true,signal:lifetime.signal});

@@ -230,6 +230,7 @@ try {
       .getByText("Official source", { exact: true })
       .waitFor();
     await page.locator("#section-content").fill(original + " unsaved");
+    let logoutPrompt=false;page.once('dialog',async d=>{logoutPrompt=true;await d.dismiss();});await page.locator('[data-sign-out]').click();assert.ok(logoutPrompt);await expect(page.locator('#section-content')).toHaveValue(original+' unsaved');
     let seen = false;
     page.once("dialog", async (d) => {
       seen = true;
