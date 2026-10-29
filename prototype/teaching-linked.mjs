@@ -1,4 +1,4 @@
-import {studentProfileName,studentProfileFields,studentProfileQuery} from '../shared/student-profile-key.js';
+import {profileBindingMatches,studentProfileName,studentProfileFields,studentProfileQuery} from '../shared/student-profile-key.js';
 import {mountMemoInput,mountNextInput} from './teaching-linked-inputs.mjs';
 import {escapeHtml as esc} from './ss-model.mjs';
 import {sameLessonEvent,findNextLesson} from '../shared/lesson-plan.js';
@@ -12,7 +12,7 @@ export function mountLinkedTeaching(host,{target,api,store,alive,canEdit,changed
  const ref=structuredClone(target),profileName=studentProfileName(ref,profileBinding),query=new URLSearchParams({calendar_id:ref.calendar_id,event_id:ref.id});
  const available=()=>!disposed&&alive();
  const endpoints={profile:'/api/student-prefs/guarded',progress:'/api/chapter-progress/guarded',next:'/api/next-lesson-plan'};
- const valid=(kind,value)=>sameLessonEvent(ref,kind==='next'?value?.source:value?.target)&&(kind==='next'||(value.name===profileName&&(!profileBinding||value.profile_context==='curriculum')));
+ const valid=(kind,value)=>sameLessonEvent(ref,kind==='next'?value?.source:value?.target)&&(kind==='next'||(value.name===profileName&&profileBindingMatches(profileBinding,value)));
  const nextSafe=value=>!lessonRecordNeedsReview(value)&&value?.target&&!!findNextLesson(ref,[value.target]).target&&value.target.calendar_id===ref.calendar_id&&typeof value.target.id==='string'&&Number.isFinite(Date.parse(value.target.start))&&allowed.includes(value.attribution_status)&&Number.isSafeInteger(value.record_revision)&&typeof value.lesson_plan==='string';
  function update(){changed();}
  function cancel(kind){if(busy||widgets.some(widget=>widget.busy))return;if(dirty&&!confirm('未保存の入力を破棄しますか？'))return;active=dirty=stopped=false;store.unlockProfile(ref,token,profileBinding);store.refreshViews();update();load(kind);}

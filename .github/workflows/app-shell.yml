@@ -2,7 +2,7 @@ name: Test unified app shell
 on:
   pull_request:
     branches: [main]
-    paths: ['app/**', 'prototype/**', 'shared/**', 'tutor/app.js', 'worker/src/material-library-guarded.js', 'worker/test/material-library-guarded.test.mjs', 'worker/test/material-upload-races.test.mjs', 'worker/test/material-library-fixture.mjs', 'worker/src/index.js', '.github/workflows/app-shell.yml']
+    paths: ['app/**', 'prototype/**', 'shared/**', 'tutor/app.js', 'worker/src/material-library-guarded.js', 'worker/test/material-library-guarded.test.mjs', 'worker/test/material-upload-races.test.mjs', 'worker/test/material-library-fixture.mjs', 'worker/src/index.js', 'worker/src/lesson-profile-mapping.js', 'worker/src/teaching-linked.js', 'worker/src/student-planning.js', 'worker/test/lesson-profile-mapping.test.mjs', 'worker/test/lesson-profile-mapping-fixture.mjs', 'worker/test/lesson-profile-migration.test.mjs', 'worker/migrations/20261029_lesson_profile_mapping.sql', '.github/workflows/app-shell.yml']
 permissions:
   contents: read
 jobs:
@@ -20,7 +20,7 @@ jobs:
             worker/package-lock.json
       - run: npm ci --prefix prototype --ignore-scripts
       - run: npm ci --prefix worker --ignore-scripts
-      - run: node --test worker/test/material-library-guarded.test.mjs worker/test/material-upload-races.test.mjs worker/test/material-code.test.mjs
+      - run: node --test worker/test/material-library-guarded.test.mjs worker/test/material-upload-races.test.mjs worker/test/material-code.test.mjs worker/test/lesson-profile-mapping.test.mjs worker/test/lesson-profile-migration.test.mjs
       - run: npm --prefix prototype test
       - name: Verify reproducible static app assets
         run: |

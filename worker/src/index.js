@@ -6244,6 +6244,15 @@ export default {
         return json(result,{...headers,"Cache-Control":"no-store"});
       }
 
+      if(url.pathname==='/api/lesson-profile-mapping'){
+        if(browserSession.aud||browserSession.scope||browserSession.fid)throw httpError(401,'browser session required');
+        if(!['GET','PUT'].includes(request.method))return json({error:'method not allowed'},headers,405);
+        const mapping=await import('./lesson-profile-mapping.js');const {readLessonPlan}=await import('./lesson-plan.js');
+        const deps={actor:browserSession.email||'browser-owner',target:ref=>request.method==='PUT'?verifiedLessonTarget(env,ref):readLessonPlan(env,ref.calendar_id,ref.id,{settings:()=>readSettings(env),token:()=>mintGoogleAccessToken(env),event:fetchCalendarEventWithToken,events:fetchCalendarEventsForSchedule}).then(v=>v.target),excluded:async()=>(await readSettings(env)).excluded_titles||[]};
+        let input;if(request.method==='PUT'){if(request.headers.get('Origin')!==env.ALLOWED_ORIGIN||!request.headers.get('Content-Type')?.startsWith('application/json'))throw httpError(403,'same-origin JSON required');const raw=await request.text();if(new TextEncoder().encode(raw).length>1000000)throw httpError(413,'input too large');try{input=JSON.parse(raw);}catch{throw httpError(400,'invalid JSON');}}else input={calendar_id:url.searchParams.get('calendar_id'),id:url.searchParams.get('event_id'),...(url.searchParams.has('target_name')?{target_name:url.searchParams.get('target_name')}:{}),...(url.searchParams.has('operation_id')?{operation_id:url.searchParams.get('operation_id')}:{}),...(url.searchParams.has('history_before')?{history_before:Number(url.searchParams.get('history_before'))}:{}),...(url.searchParams.has('list')?{list:true,before:url.searchParams.get('before')||''}:{})};
+        try{return json(await(request.method==='GET'?mapping.readProfileMappings:mapping.writeProfileMapping)(env,input,deps),{...headers,'Cache-Control':'private, no-store'});}catch(error){if(!error.status)error.status=500;throw error;}
+      }
+
       if (["/api/student-prefs/guarded","/api/chapter-progress/guarded","/api/student-planning/guarded"].includes(url.pathname)) {
         if (browserSession.aud || browserSession.scope || browserSession.fid) throw httpError(401,"browser session required");
         if (!["GET","PUT"].includes(request.method)) return json({error:"method not allowed"},headers,405);
@@ -6261,11 +6270,13 @@ export default {
           }).then(result=>result.target),
           excluded:async()=> (await readSettings(env)).excluded_titles || [],
         };
-        const input=request.method==="PUT"?writeInput:{calendar_id:url.searchParams.get("calendar_id"),id:url.searchParams.get("event_id"),...(url.pathname==="/api/student-planning/guarded"?{resource:url.searchParams.get("resource")}:{ }),...(url.searchParams.has("profile_context")?{profile_context:url.searchParams.get("profile_context"),name:url.searchParams.get("name")}:{})};
+        const input=request.method==="PUT"?writeInput:{calendar_id:url.searchParams.get("calendar_id"),id:url.searchParams.get("event_id"),...(url.pathname==="/api/student-planning/guarded"?{resource:url.searchParams.get("resource")}:{ }),...(url.searchParams.has("profile_context")?{profile_context:url.searchParams.get("profile_context"),name:url.searchParams.get("name"),...(url.searchParams.has("mapping_id")?{mapping_id:url.searchParams.get("mapping_id"),mapping_revision:Number(url.searchParams.get("mapping_revision"))}:{})}:{})};
+        try {
         if(url.pathname==="/api/student-planning/guarded") {const planning=await import("./student-planning.js");return json(await (request.method==="GET"?planning.readStudentPlanning:planning.writeStudentPlanning)(env,input,dependencies),{...headers,"Cache-Control":"no-store"});}
         const profile=url.pathname==="/api/student-prefs/guarded";
         const result=request.method==="GET"?await (profile?linked.readLinkedProfile:linked.readLinkedProgress)(env,input,dependencies):await (profile?linked.writeLinkedProfile:linked.writeLinkedProgress)(env,input,dependencies);
         return json(result,{...headers,"Cache-Control":"no-store"});
+        } catch(error){if(!error.status)error.status=500;throw error;}
       }
 
       if (url.pathname === "/api/lesson-plan" || url.pathname === "/api/next-lesson-plan") {

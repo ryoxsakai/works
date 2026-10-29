@@ -401,3 +401,10 @@ Original KDP is manuscript management, not external publishing: book/chapter/sec
 Original five-column table, header/select/direction sorting, stored preferences, numeric/case/tie comparisons, JST date/remaining buckets and visibility refresh, completed/active/visible counts, full multiline memos and responsive rows are implemented. Integrated search/detail/deep links/detail print remain; a current-list print control prints all visible fields with repeatable headers. No production write controls, APIs, data changes or external operations.115 app units pass, source-comparison and synthetic browser tests are the release gate. Original `/ss/` remains. See `ss-original-parity.md`.
 
 Exact implementation gaps now remaining: L13d explicit safe lesson-alias mapping and the five global whole-app certification checkboxes above. All module feature groups have implementations; this does not certify complete visual fidelity or actual iPhone/authenticated production/physical output/supplied-image QA. `lesson-alias-mapping-plan.md` prepares the next phase without implementing a mapping, inferring identity or changing real profiles.
+
+
+### Explicit alias and global verification checkpoint (unpublished)
+
+L13d now has local explicit per-event mapping UI/API and append-only audit implementation; production activation and browser certification remain pending, so its checkbox stays open. No inferred identity, profile merging, hold resolution or real student binding occurs. See `lesson-alias-mapping-plan.md` and the exact additive SQL/backup prerequisite in `lesson-profile-mapping-rollout.md`.
+
+The five global checks are individually enumerated in `full-parity-cross-cutting.md`: source/unit/API evidence is available and a twentieth browser suite is prepared; local browser execution is unavailable.118 app units,7 mapping API tests,1 migration test and22 existing linked/planning regressions pass. No PR/CI/deployment exists for this checkpoint yet. Actual iPhone, authenticated production, physical print and supplied-image pixel verification remain distinct open checks.

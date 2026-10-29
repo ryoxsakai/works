@@ -1,0 +1,18 @@
+<p data-mapping-status role="status" aria-live="polite">保存先の対応を確認しています…</p>
+<div data-mapping-list hidden></div><button data-list-more hidden>次の対応を表示</button>
+<div data-source-tools><button data-mapping-open type="button" disabled>生徒情報の保存先を明示確認</button><a href="/teaching/mappings/">保存先の対応一覧・解除</a></div>
+<dialog data-mapping-dialog aria-labelledby="mapping-title">
+<header><h2 id="mapping-title">生徒情報の保存先</h2><button data-close type="button" aria-label="閉じる">×</button></header>
+<p>名前は保存先のキーです。同名の別人を識別するものではありません。内容の移動・統合や、旧記録の所属確認は行いません。</p>
+<h3>元の予定</h3><pre data-source></pre><div data-current></div>
+<div data-bind><label>選択中の保存先キーを正確に入力<input data-target-name maxlength="200" autocomplete="off"></label><p>選択中のキー：<strong data-selected-name></strong></p><button data-preview type="button">この保存先の現在の内容を確認</button></div>
+<div data-preview-result hidden><h3>保存先キーの内容（本人・所属の確認を意味しません）</h3><pre></pre></div>
+<fieldset data-confirm hidden><legend>元の予定と正確な保存先を明示確認</legend>
+<label><input type="checkbox" data-ack-source>上記のカレンダー・予定ID・予定名・日時を確認しました</label>
+<label><input type="checkbox" data-ack-target>表示された保存先キーを自分で選び、変更先を確認しました</label>
+<label><input type="checkbox" data-ack-shared>同じ名前キーを使う全授業と情報が共有されることを確認しました</label>
+</fieldset>
+<button data-bind-save type="button" hidden>この予定に、この保存先を設定</button><button data-disable type="button" hidden>この対応を解除（内容は残す）</button>
+<div data-recovery hidden role="alert"><p>競合または結果未確認のため更新を停止しました。自動再送せず、入力と操作IDを保持しています。</p><button data-inspect type="button">操作結果を読み取りで確認</button><button data-export type="button">入力と操作情報を保存</button><button data-reload type="button">入力を破棄して再読込</button><pre hidden></pre></div>
+<details><summary>対応履歴（内容は移動しません）</summary><ol data-history></ol><button data-history-more type="button" hidden>以前の対応履歴を表示</button></details>
+</dialog>
