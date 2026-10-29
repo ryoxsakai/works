@@ -92,7 +92,7 @@ await context.route("**/*", async (route) => {
   if (url.pathname === "/shared/auth.js")
     return route.fulfill({
       contentType: "text/javascript",
-      body: `export const getSessionToken=()=>${JSON.stringify(token)};export const signIn=()=>{};export const signOutUser=async()=>{};export const watchAuth=({onSignedIn})=>onSignedIn({email:'owner@example.test'});`,
+      body: `export const getGoogleAccessToken=async()=> 'fixture-google';export const getSessionToken=()=>${JSON.stringify(token)};export const signIn=()=>{};export const signOutUser=async()=>{};export const watchAuth=({onSignedIn})=>onSignedIn({email:'owner@example.test'});`,
     });
   if (url.pathname.startsWith("/api/")) {
     if (url.pathname === "/api/workflow" && request.method() === "GET" && !url.search && failNextWorkflowRead) {
@@ -455,9 +455,9 @@ try {
     .click();
   await expect(page.locator("#patrol-status")).not.toContainText("全体停止中");
   await page.goto(origin + "/");
-  await expect(page.locator("#automation")).toContainText("ワークフロー");
-  await expect(page.locator('#automation a[href="/wiki/"]')).toHaveCount(1);
-  await expect(page.locator('#operations a[href="/wiki/"]')).toHaveCount(0);
+  await expect(page.locator("#home-navigation")).toContainText("ワークフロー");
+  await expect(page.locator('#home-navigation a[href="/wiki/"]')).toHaveCount(1);
+  await expect(page.locator('#home-navigation a[href="/workflow/"]')).toHaveCount(1);
   // Regression: repeated explicit closes consume the history entry; no phantom Back stops.
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto(origin + "/workflow/roles.html");

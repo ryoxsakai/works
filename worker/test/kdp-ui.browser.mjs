@@ -89,7 +89,7 @@ try {
         if (u.pathname === "/shared/auth.js")
           return route.fulfill({
             contentType: "text/javascript",
-            body: `export const getSessionToken=()=>${JSON.stringify(token)};export function watchAuth(o){queueMicrotask(()=>localStorage.fixtureSignedOut?o.onSignedOut():o.onSignedIn({email:'fixture@example.test'}))}export function signIn(path){localStorage.fixtureSignInPath=path;localStorage.fixtureDestination=localStorage.works_pending_destination}export async function signOutUser(){}`,
+            body: `export const getGoogleAccessToken=async()=> 'fixture-google';export const getSessionToken=()=>${JSON.stringify(token)};export function watchAuth(o){queueMicrotask(()=>localStorage.fixtureSignedOut?o.onSignedOut():o.onSignedIn({email:'fixture@example.test'}))}export function signIn(path){localStorage.fixtureSignInPath=path;localStorage.fixtureDestination=localStorage.works_pending_destination}export async function signOutUser(){}`,
           });
         if (u.pathname.startsWith("/api/")) {
           if (u.pathname === "/api/kdp/books" && req.method() === "POST")
@@ -129,7 +129,7 @@ try {
           : u.pathname;
         await route.fulfill({
           body: await readFile(new URL("." + path, root)),
-          contentType: path.endsWith(".js")
+          contentType: (path.endsWith(".js") || path.endsWith(".mjs"))
             ? "text/javascript"
             : path.endsWith(".css")
               ? "text/css"
@@ -155,14 +155,16 @@ try {
       await page.locator("#modal").waitFor({ state: "hidden" });
     };
     await page.goto(origin + "/");
-    assert.equal(await page.locator(".module-card").count(), 9);
-    assert.equal(await page.locator(".module-section").count(), 4);
+    assert.equal(await page.locator("#home-navigation a:not([aria-current])").count(), 9);
+    await page.locator("#dashboard-widgets .dashboard-widget").first().waitFor();
+    assert.equal(await page.locator("#dashboard-widgets .dashboard-widget").count(), 3);
     await width();
     await page.screenshot({
       path: `test-artifacts/menu-${name}.png`,
       fullPage: true,
     });
-    await page.locator('.module-card[href="/kdp/"]').click();
+    await page.locator('#home-navigation').evaluate(el=>el.open=true);
+    await page.locator('#home-navigation a[href="/kdp/"]').click();
     await page.locator("#new-book").waitFor();
     await page.locator("#new-book").click();
     await page
@@ -387,12 +389,16 @@ try {
       localStorage.fixtureSignedOut = "1";
     });
     await page.reload();
-    await page.locator('.module-card[href="/kdp/"]').click();
+    await page.locator('#home-navigation').evaluate(el=>el.open=true);
+    await page.locator('#home-navigation a[href="/kdp/"]').click();
     assert.equal(
       await page.evaluate(() => localStorage.fixtureDestination),
       "/kdp/",
     );
-    await page.locator('.module-card[href="/todo/"]').click();
+    await page.locator('#home-navigation').evaluate(el=>el.open=true);
+    // A sign-in redirect is coalesced briefly to ignore accidental double taps.
+    await page.waitForTimeout(1550);
+    await page.locator('#home-navigation a[href="/todo/"]').click();
     assert.equal(
       await page.evaluate(() => localStorage.fixtureDestination),
       "/todo/",
