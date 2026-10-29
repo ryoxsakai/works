@@ -36,7 +36,7 @@ Fixtures enforce SQL<=50, outgoing fetches<=50 and binding calls+outgoing fetche
 - Duplicate event in another calendar:409 before progress mutation; unavailable batch part:502 before mutation.
 - Unlink before progress commit:409, zero chapter writes; append-only unlink history retained.
 - Save commits before unlink: subsequent confirmation409 preserves committed progress and unlink audit; stale repeat stops in preflight with0 outgoing calls and no replay.
-- Batch parser rejects partial/duplicate/wrong/invalid response IDs, invalid JSON, incomplete MIME and403/429/500; no automatic retry. Sequential1000-event lookup uses10 batches, preserving all requested IDs.
+- Batch parser rejects partial/duplicate/wrong/invalid response IDs, invalid JSON, incomplete MIME and403/429/500; valid repeated non-identity HTTP headers (such as Vary) are accepted, while duplicate Content-ID/Content-Type remain blocked. No automatic retry. Sequential1000-event lookup uses10 batches, preserving all requested IDs.
 
 ## Remaining checks
 
