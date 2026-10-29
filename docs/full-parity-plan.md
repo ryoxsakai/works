@@ -274,3 +274,6 @@ Verification covers civil-date/leap/year boundaries, union/gap filtering, descri
 | Common shell | Existing logo/Boxicons/desktop sidebar/mobile drawer and five bottom items preserved; final complete-original interaction audit and real-iPhone QA remain. |
 
 Next coherent implementation: L19 original settings/catalog operations with corresponding source/CAS guards where student-scoped, then continue the non-lesson lists in original feature order. No remaining item is silently replaced by a simplified feature.
+
+
+Release regression: the first CI run detected an interrupted mobile drawer transition leaving the backdrop after accessibility/background locks had been released. The controller now removes an orphaned owned backdrop when genuinely closed and ignores a stale close notification while a new opening is active. Deterministic regressions cover both states in addition to the original rapid open/backdrop/Escape/resize loops. The first CI run was not retried blindly; the final code is revalidated at a new exact head. Local Chrome 153 download was blocked by the cloud network policy (HTTP 403 Domain forbidden), so no alternate download path was attempted; local Chrome 151 and the existing GitHub CI browser are the verification paths.
