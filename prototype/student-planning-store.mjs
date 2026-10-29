@@ -1,11 +1,11 @@
 import {sameLessonEvent} from '../shared/lesson-plan.js';
-import {studentProfileName,studentProfileFields,studentProfileQuery} from '../shared/student-profile-key.js';
+import {profileBindingMatches,studentProfileName,studentProfileFields,studentProfileQuery} from '../shared/student-profile-key.js';
 const clone=value=>structuredClone(value),fail=(message,status=409)=>Object.assign(new Error(message),{status});
 export function createStudentPlanningStore({target,binding,api,records,available=()=>true,canEdit=()=>true,changed=()=>{}}){
  const ref=clone(target),key=studentProfileName(ref,binding),states=new Map(['goals','templates','schools','materials'].map(resource=>[resource,{resource,base:null,loading:false,blocked:false,error:null,attempt:null,version:0}]));let busy=false,disposed=false,ack=false,sharedAck=false;
  const live=()=>{if(disposed||!available())throw new DOMException('Student view closed','AbortError');};
  const notify=()=>{if(!disposed)changed();};
- const valid=(value,resource)=>sameLessonEvent(ref,value?.target)&&value.name===key&&(!binding||value.profile_context==='curriculum')&&(!resource||(value.resource===resource&&Array.isArray(value.rows)));
+ const valid=(value,resource)=>sameLessonEvent(ref,value?.target)&&value.name===key&&profileBindingMatches(binding,value)&&(!resource||(value.resource===resource&&Array.isArray(value.rows)));
  const path=resource=>'/api/student-planning/guarded?'+studentProfileQuery(ref,binding)+'&resource='+resource;
  async function read(resource,{reset=false,inspect=false}={}){const state=states.get(resource);live();if(!state)throw fail('情報の種類を確認してください。',400);if(busy&&reset)throw fail('保存完了を待ってください。');const version=state.version;state.loading=true;state.refreshing=reset;notify();try{const value=await api(path(resource));live();if(!valid(value,resource))throw fail('元の予定と名前キーを確認できません。');if(inspect)return value;if(state.version!==version)throw fail('取得中に変更されました。');if(!state.blocked||reset){Object.assign(state,{base:clone(value),blocked:false,error:null,attempt:null});state.version++;}return value;}catch(error){if(!inspect)state.error=error;throw error;}finally{state.loading=false;state.refreshing=false;notify();}}
  async function send(resource,action,{progress=false}={}){live();const state=states.get(resource),owner=records.getRecord(ref);if(busy||!canEdit()||!state?.base||state.blocked||state.refreshing||!owner||owner.unavailable||owner.blocked||owner.refreshing||!sameLessonEvent(owner.ref,ref))throw fail('元の授業と未保存の入力を確認してください。');if(!ack)throw fail('共有される名前キーへの変更を確認してください。',400);if(resource==='templates'&&!sharedAck)throw fail('全生徒共通のテンプレートへの変更を確認してください。',400);

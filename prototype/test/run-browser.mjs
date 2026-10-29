@@ -10,7 +10,7 @@ try {
   for(let i=0;i<60&&!await ready();i++)await new Promise(resolve=>setTimeout(resolve,200));
   if(!await ready())throw new Error('Local shell server did not become ready');
  }
- const files=['test/shell.browser.mjs','test/auth.browser.mjs','test/production.browser.mjs','test/wiki-native.browser.mjs','test/workflow-native.browser.mjs','test/material-native.browser.mjs','test/ss-native.browser.mjs','test/kdp-native.browser.mjs','test/admission-native.browser.mjs','test/services.browser.mjs','test/logo.browser.mjs','test/drawer.browser.mjs','test/teaching.browser.mjs','test/student-planning.browser.mjs','test/teaching-schedule.browser.mjs','test/tutor-settings.browser.mjs','test/lesson-native.browser.mjs','test/todo-native.browser.mjs','test/memo-native.browser.mjs'];
+ const files=['test/lesson-native.browser.mjs','test/cross-module.browser.mjs','test/shell.browser.mjs','test/auth.browser.mjs','test/production.browser.mjs','test/wiki-native.browser.mjs','test/workflow-native.browser.mjs','test/material-native.browser.mjs','test/ss-native.browser.mjs','test/kdp-native.browser.mjs','test/admission-native.browser.mjs','test/services.browser.mjs','test/logo.browser.mjs','test/drawer.browser.mjs','test/teaching.browser.mjs','test/student-planning.browser.mjs','test/teaching-schedule.browser.mjs','test/tutor-settings.browser.mjs','test/todo-native.browser.mjs','test/memo-native.browser.mjs'];
  const requested=process.argv.slice(2);if(requested.some(file=>!files.includes(file)))throw new Error('Unknown browser suite');
  for(const file of requested.length?requested:files)await run(file);
 }finally{if(server){server.kill('SIGTERM');await new Promise(resolve=>server.once('exit',resolve));}}

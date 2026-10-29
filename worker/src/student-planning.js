@@ -1,4 +1,4 @@
-import {linkedSourceContext,linkedWriteContext,linkedConfirmSource,linkedSnapshotGuard,linkedMaterials} from './teaching-linked.js';
+import {profileContextFields,linkedSourceContext,linkedWriteContext,linkedConfirmSource,linkedSnapshotGuard,linkedMaterials} from './teaching-linked.js';
 import {guardStatements,commitRecords} from './lesson-attribution.js';
 import {PRIVATE_MED_SCHOOLS,goalCategories} from '../../shared/student-planning-catalog.js';
 const fail=(status,message)=>Object.assign(new Error(message),{status});
@@ -20,13 +20,13 @@ function category(value){if(!goalCategories.includes(value))throw fail(400,'短�
 function nextOrder(before,kind){return Math.max(-1,...before.filter(row=>!kind||row.category===kind).map(row=>Number(row.sort_order)||0))+1;}
 const equalRows=(resource,a,b)=>JSON.stringify(canonicalRows(definition(resource),a))===JSON.stringify(canonicalRows(definition(resource),b));
 async function readValue(env,context,resource){const value={rows:await rows(env,resource,context.name)};if(resource==='materials'){const [catalog,categories,progress]=await Promise.all([env.DB.prepare('SELECT id,name,category_id,sort_order FROM materials ORDER BY sort_order,id').all(),env.DB.prepare('SELECT id,name,sort_order FROM material_categories ORDER BY sort_order,id').all(),linkedMaterials(env,context.name)]);Object.assign(value,{catalog:catalog.results,categories:categories.results,...progress});}return value;}
-function response(context,resource,value){return {target:context.target,name:context.name,...(context.profile_context?{profile_context:context.profile_context}:{}),record_revision:context.record_revision,resource,...value};}
+function response(context,resource,value){return {target:context.target,name:context.name,...profileContextFields(context),record_revision:context.record_revision,resource,...value};}
 export async function readStudentPlanning(env,input,deps){const resource=input?.resource;definition(resource);const context=await linkedSourceContext(env,input,deps),value=await readValue(env,context,resource);await linkedConfirmSource(env,context);if(!equalRows(resource,value.rows,await rows(env,resource,context.name)))throw fail(409,'取得中に一覧が変更されました。再読み込みしてください。');return response(context,resource,value);}
 export async function writeStudentPlanning(env,body,deps){
  const resource=body?.resource,def=definition(resource),context=await linkedSourceContext(env,body?.target,deps,true,body);linkedWriteContext(context,body);
  if(resource==='templates'&&body.shared_catalog_acknowledged!==true)throw fail(400,'全生徒に共通するテンプレートへの変更を確認してください。');
  const expected=canonicalRows(def,body.expected),before=await rows(env,resource,context.name),action=body.action;if(!action||typeof action.type!=='string')throw fail(400,'操作を確認してください。');
- const statements=[...guardStatements(env,context.target.id,body.record_revision),...listGuard(env,resource,context.name,expected)];
+ const statements=[...guardStatements(env,context.target.id,body.record_revision),...context.mapping_guards,...listGuard(env,resource,context.name,expected)];
  const bind=(sql,...values)=>env.DB.prepare(sql).bind(...values);
  if(resource==='goals'||resource==='templates'){
   const scoped=resource==='goals',table=def.table;
