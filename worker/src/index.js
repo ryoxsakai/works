@@ -5268,7 +5268,8 @@ async function deleteMaterialFolder(env, id) {
     db.prepare("SELECT id FROM material_files WHERE folder_id = ? LIMIT 1").bind(id).first(),
   ]);
   if (child || file) throw new Error("中身のあるフォルダは削除できません");
-  await db.prepare("DELETE FROM material_folders WHERE id = ?").bind(id).run();
+  const removed=await db.prepare("DELETE FROM material_folders WHERE id=? AND NOT EXISTS(SELECT 1 FROM material_folders c WHERE c.parent_id=material_folders.id) AND NOT EXISTS(SELECT 1 FROM material_files f WHERE f.folder_id=material_folders.id) RETURNING id").bind(id).first();
+  if(!removed&&await db.prepare("SELECT id FROM material_folders WHERE id=?").bind(id).first())throw httpError(409,"フォルダの内容が更新されました。読み直してください");
 }
 
 async function readMaterialFiles(env, folderId) {
@@ -5313,22 +5314,25 @@ async function uploadMaterialFile(request, env, url) {
   ).bind(folderId, folderId).first();
   const id = crypto.randomUUID();
   const objectKey = "materials/" + id;
-  await bucket.put(objectKey, request.body || new Uint8Array(), {
-    httpMetadata: { contentType: mimeType },
-    customMetadata: { originalName: name },
-  });
+  try{await bucket.put(objectKey,request.body||new Uint8Array(),{httpMetadata:{contentType:mimeType},customMetadata:{originalName:name}});}
+  catch{const error=httpError(502,"アップロードの保存結果が不明です。再送せず最新を確認してください");error.material_operation={id,object_key:objectKey,folder_id:folderId};throw error;}
 
   try {
-    return await db
+    const saved=await db
       .prepare(
         "INSERT INTO material_files (id, folder_id, name, object_key, mime_type, size, sort_order) " +
-          "VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *"
+          "SELECT ?,?,?,?,?,?,? WHERE ? IS NULL OR EXISTS(SELECT 1 FROM material_folders WHERE id=?) RETURNING *"
       )
-      .bind(id, folderId, name, objectKey, mimeType, Number.isFinite(size) ? size : 0, Number(next.value || 0))
+      .bind(id, folderId, name, objectKey, mimeType, Number.isFinite(size) ? size : 0, Number(next.value || 0),folderId,folderId)
       .first();
+    if(!saved){await bucket.delete(objectKey);throw httpError(409,"保存先フォルダが更新されました。読み直してください");}
+    return saved;
   } catch (err) {
-    await bucket.delete(objectKey);
-    throw err;
+    // A D1 transport error is not proof of rollback. Retain bytes and the exact
+    // operation reference; never erase an object that may have a committed row.
+    if(err.status===409)throw err;
+    const failure=httpError(502,"アップロードの保存結果が不明です。再送せず最新を確認してください");
+    failure.material_operation={id,object_key:objectKey,folder_id:folderId};throw failure;
   }
 }
 
@@ -6443,8 +6447,8 @@ export default {
         const raw=await request.text();if(new TextEncoder().encode(raw).length>1000000)throw httpError(413,"material input too large");
         let body;try{body=JSON.parse(raw);}catch{throw httpError(400,"invalid JSON");}
         const {mutateMaterialLibrary}=await import("./material-library-guarded.js");
-        await ensureMaterialSchema(env);
-        return json(await mutateMaterialLibrary(env,body),{...headers,"Cache-Control":"no-store"});
+        try{await ensureMaterialSchema(env);return json(await mutateMaterialLibrary(env,body),{...headers,"Cache-Control":"no-store"});}
+        catch(error){if(error.material_guard_error!==true)error.status=500;throw error;}
       }
 
       if (url.pathname === "/api/material-library/folders" && request.method === "GET") {
@@ -6545,7 +6549,7 @@ export default {
         if (status === 413) return authJson(url.pathname, headers, { error: "authentication input too large" }, 413);
         return authJson(url.pathname, headers, { error: "authentication request failed" }, status === 502 ? 502 : 400);
       }
-      return json({ error: err.message }, headers, status);
+      return json({error:err.message,...(err.material_operation?{material_operation:err.material_operation}:{})},headers,status);
     }
   },
 };

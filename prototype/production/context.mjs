@@ -31,23 +31,40 @@ export function createProductionContext(auth,{fetcher=fetch,onExpired=()=>{},onL
       }finally{controllers.delete(controller);signal?.removeEventListener('abort',abort);}
     },
     async request(path,{method='GET',body,signal,responseType='json'}={}) {
-      if(!['json','blob'].includes(responseType)||responseType==='blob'&&(method!=='GET'||!/^\/api\/wiki\/pages\/[^/?]+\/export\?format=(?:markdown|json)$/.test(path)))throw new Error('Unsupported response type');
+      if(!['json','blob'].includes(responseType)||responseType==='blob'&&(method!=='GET'||!(/^\/api\/wiki\/pages\/[^/?]+\/export\?format=(?:markdown|json)$/.test(path)||/^\/api\/material-library\/files\/[^/?]+\/(?:view|download)$/.test(path))))throw new Error('Unsupported response type');
       if(/^\/api\/(?:terms|periods|years|students)(?:\?|$)/.test(path)&&method!=='GET')throw new Error('Unsupported API');
-      if(!/^\/api\/(?:settings|terms|periods|years|students|student-prefs(?:\/guarded)?|chapter-progress\/guarded|lesson-plan|student-planning\/guarded|tutor-settings\/guarded|lesson-baseline\/initialize|student-materials|lesson-record|next-lesson-plan|curriculum\/[^/?]+|todo(?:\/clone)?|memo|workflow|admissions(?:\/[^/?]+(?:\/guarded)?)?|material-library\/(?:folders|files)(?:\/[^/?]+(?:\/guarded)?)?|wiki\/(?:folders(?:\/[^/?]+)?|pages(?:\/[^/?]+(?:\/(?:save|proposals|archive|history|accept|reject|restore|move|export))?)?))(?:\?.*)?$/.test(path))throw new Error('Unsupported API');
+      if(!/^\/api\/(?:settings|terms|periods|years|students|student-prefs(?:\/guarded)?|chapter-progress\/guarded|lesson-plan|student-planning\/guarded|tutor-settings\/guarded|lesson-baseline\/initialize|student-materials|lesson-record|next-lesson-plan|curriculum\/[^/?]+|todo(?:\/clone)?|memo|workflow|admissions(?:\/[^/?]+(?:\/guarded)?)?|material-library\/(?:guarded|folders|files)(?:\/[^/?]+(?:\/(?:guarded|view|download))?)?|wiki\/(?:folders(?:\/[^/?]+)?|pages(?:\/[^/?]+(?:\/(?:save|proposals|archive|history|accept|reject|restore|move|export))?)?))(?:\?.*)?$/.test(path))throw new Error('Unsupported API');
       if(path.startsWith('/api/wiki/')){const clean=path.split('?')[0],read=/^\/api\/wiki\/(?:folders|pages(?:\/[^/?]+(?:\/(?:history|export))?)?)$/.test(clean),write=/^\/api\/wiki\/(?:folders(?:\/[^/?]+)?|pages(?:\/[^/?]+\/(?:save|proposals|archive|accept|reject|restore|move))?)$/.test(clean);if(!(method==='GET'&&read||method==='POST'&&write))throw new Error('Unsupported Wiki method');}
       await context.session.init();
       if(!active||!auth.getSessionToken())throw Object.assign(new Error('再ログインが必要です'),{status:401});
       const generation=epoch,controller=new AbortController();controllers.add(controller);
       const abort=()=>controller.abort();signal?.addEventListener('abort',abort,{once:true});if(signal?.aborted)controller.abort();
       try {
-        const response=await fetcher(path,{method,cache:'no-store',headers:{Authorization:'Bearer '+auth.getSessionToken(),...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{}),signal:controller.signal});
+        const response=await fetcher(path,{method,cache:'no-store',...(path.startsWith('/api/material-library/')?{redirect:'error'}:{}),headers:{Authorization:'Bearer '+auth.getSessionToken(),...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{}),signal:controller.signal});
         if(!active||generation!==epoch)throw new DOMException('Session changed','AbortError');
         if(response.status===401||response.status===403){invalidate('再度ログインしてください。');throw Object.assign(new Error('再ログインが必要です'),{status:response.status});}
-        if(!response.ok){let message=response.status===409?'別の画面で更新されています。入力は保持しています。':response.status===429?'アクセスが集中しています。':'通信に失敗しました。';if((path.startsWith('/api/wiki/')||path.split('?')[0]==='/api/workflow')&&[400,413].includes(response.status)){const error=await response.json().catch(()=>null);if(!active||generation!==epoch||controller.signal.aborted)throw new DOMException('Session changed','AbortError');if(typeof error?.error==='string')message=error.error.slice(0,500).replace(/[\u0000-\u001f]/g,' ');}throw Object.assign(new Error(message),{status:response.status});}
+        if(!response.ok){let message=response.status===409?'別の画面で更新されています。入力は保持しています。':response.status===429?'アクセスが集中しています。':'通信に失敗しました。';if((path.startsWith('/api/wiki/')||path.startsWith('/api/material-library/')||path.split('?')[0]==='/api/workflow')&&[400,413].includes(response.status)){const error=await response.json().catch(()=>null);if(!active||generation!==epoch||controller.signal.aborted)throw new DOMException('Session changed','AbortError');if(typeof error?.error==='string')message=error.error.slice(0,500).replace(/[\u0000-\u001f]/g,' ');}throw Object.assign(new Error(message),{status:response.status});}
         const result=await (responseType==='blob'?response.blob():response.json());
         if(!active||generation!==epoch||controller.signal.aborted)throw new DOMException('Session changed','AbortError');
         return result;
       }finally{controllers.delete(controller);signal?.removeEventListener('abort',abort);}
+    },
+    async uploadMaterial(file,folderId,{signal,onProgress=()=>{}}={}) {
+      await context.session.init();if(!active||!auth.getSessionToken())throw Object.assign(Error('再ログインが必要です'),{status:401});
+      const generation=epoch,controller=new AbortController();controllers.add(controller);
+      const abort=()=>controller.abort();signal?.addEventListener('abort',abort,{once:true});if(signal?.aborted)controller.abort();
+      try {return await new Promise((resolve,reject)=>{
+        const xhr=new XMLHttpRequest();let settled=false;
+        const finish=(fn,value)=>{if(settled)return;settled=true;controller.signal.removeEventListener('abort',cancel);fn(value);};
+        const check=()=>active&&generation===epoch&&!controller.signal.aborted;
+        const cancel=()=>{xhr.abort();finish(reject,new DOMException('Upload result unknown','AbortError'));};
+        controller.signal.addEventListener('abort',cancel,{once:true});if(!check()){cancel();return;}
+        const params=new URLSearchParams({name:file.name,size:String(file.size)});if(folderId)params.set('folder_id',folderId);
+        xhr.open('POST','/api/material-library/files?'+params);xhr.setRequestHeader('Authorization','Bearer '+auth.getSessionToken());xhr.setRequestHeader('Content-Type',file.type||'application/octet-stream');xhr.responseType='json';
+        xhr.upload.onprogress=event=>{if(check()&&event.lengthComputable)onProgress(Math.min(100,Math.max(0,Math.round(event.loaded/event.total*100))));};
+        xhr.onload=()=>{if(!check()){cancel();return;}if([401,403].includes(xhr.status)){invalidate('再度ログインしてください。');finish(reject,Object.assign(Error('再ログインが必要です'),{status:xhr.status}));return;}if(xhr.status<200||xhr.status>=300){finish(reject,Object.assign(Error('アップロードの保存結果を確認できません。'),{status:xhr.status,...(xhr.response?.material_operation?{material_operation:xhr.response.material_operation}:{})}));return;}finish(resolve,xhr.response);};
+        xhr.onerror=()=>finish(reject,Error('アップロードの通信結果を確認できません。'));xhr.onabort=()=>finish(reject,new DOMException('Upload result unknown','AbortError'));xhr.send(file);
+      });}finally{controllers.delete(controller);signal?.removeEventListener('abort',abort);}
     },
     async calendarList({signal}={}) {
       await context.session.init();if(!active||!auth.getSessionToken())throw Object.assign(new Error('再ログインが必要です'),{status:401});

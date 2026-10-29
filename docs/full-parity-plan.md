@@ -116,11 +116,11 @@ Block 2 now restores immediate shared-memo and next-plan blur autosave, using th
 
 ### Material library (`material/index.html`, `material/app.js`)
 
-- [ ] Original Library / Tree search / Tags tabs, folder breadcrumbs and selected-folder searches.
-- [ ] Folder create/rename/move/delete and file metadata/code/classification/tag editing with original validation.
-- [ ] Multiple-file selection, upload queue/start/progress/cancel/failure/retry and duplicate handling.
-- [ ] File preview/open/download, original safe URLs and browser defaults; file move/reorder/delete with confirmation.
-- [ ] Nested hierarchy/cycle protection, tree/tag search and expansion/state persistence; preserve existing R2 objects and links.
+- [x] Original Library / Tree search / Tags tabs, folder breadcrumbs and selected-folder searches.
+- [x] Folder create/rename/move/delete and file metadata/code and folder placement editing with original validation.
+- [x] Multiple-file selection, upload queue/start/progress, removal of pending selections, failure/reconciliation and duplicate handling (source has no active-upload Cancel control).
+- [x] File preview/open/download, original safe URLs and browser defaults; file move/reorder/delete with confirmation.
+- [x] Nested hierarchy/cycle protection, tree/tag search and original expansion defaults and persisted tab selection; preserve existing R2 objects and links.
 
 ### Admission (`admission/index.html`, `admission/app.js`, `admission/admission.js`)
 
@@ -369,3 +369,13 @@ Inventory and acceptance: [material-library-original-parity.md](material-library
 The first coherent backend prerequisite adds a browser-owner, same-origin JSON metadata endpoint using a complete atomic comparison of observed folder/file metadata. Folder placement and destination sibling ordering commit together. Stale/partial snapshots, changed membership, missing destinations, cycles, duplicates and nonempty folder deletions stop before writing. No schema/data migration or new binding/credential/permission is required; legacy endpoints are retained. Exact object cleanup after a conditional file deletion is reported as confirmed or uncertain and never automatically replayed. Nine local synthetic tests cover actual D1/R2 plus owner/browser/CSRF HTTP gates, legacy reads/codes, concurrent before-commit changes and uncertain cleanup.
 
 Native file-library UI and uploads remain in progress; this prerequisite alone does not replace the reduced /app/ view or declare library parity complete. Publication requires exact-head CI and actual Worker deployment before the frontend is connected. No real file upload, edit, deletion, sharing or third-party transmission is used for QA. Admissions, KDP, SS and explicit safe lesson-alias mapping remain open, together with actual iPhone/authenticated live/physical-print/user-image verification.
+
+
+### Material-library native checkpoint after PR152
+
+The additive guarded metadata API is published at main `9982d38f2d0ba9f36455ac15216c31b4f12b912f` (tested `dbcddf10b625687045eb48e2ba9f1b71ac3a0100`), with both CI workflows and actual Worker Version `fec29436-8bd8-4a43-a122-d3b7f06ee390` confirmed. Native Library/Tree/Tags, original CRUD/move/order, local preview/download and explicit upload queue are implemented locally, with106 unit tests and the first actual-D1/R2 native browser suite passing. Screenshots at390/1440 were inspected and source control-sizing/accessibility collisions corrected. This native UI is not published or fully certified yet: old service-test adaptation, additional in-flight/auth/media/drag cases, legacy upload/folder-deletion race hardening and full16-suite/exact-head CI/deployment remain. See the detailed library checklist for exact next actions; no production file operations were used for QA. Admissions, KDP, SS audit and explicit safe lesson-alias mapping remain open.
+
+
+### Material-library native release validation
+
+Native original file-library controls are now implemented and locally verified: all16 app browser suites,108 app tests and191 Worker tests pass. The final focused native rerun also verifies settled light/dark upload-copy contrast after a scoped CSS adjustment. The reduced services tests were migrated without removing admission safety coverage; native library tests use actual isolated D1/R2, including pointer/keyboard placement, valid media, explicit queue/progress, stale snapshots, lost responses, delayed preview/session expiry, dirty navigation and no replay. Raw upload/folder-delete races now have conditional commit/delete checks; uncertain storage/DB outcomes retain exact references and potentially committed bytes. Guarded SQL internal errors are unknown500, not validation400. Original routes and API contracts remain, with no schema, permission, dependency or external-schedule changes. PR152's API prerequisite is already deployed; the frontend release still requires exact-head CI, merge and deployment verification. Actual iPhone/authenticated live/physical print and supplied-image QA remain unverified. Admissions/KDP/SS and explicit lesson aliases remain open; the entire Works migration is not declared complete.

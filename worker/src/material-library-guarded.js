@@ -1,7 +1,7 @@
 // Native library mutations compare the complete metadata graph atomically.
 // No schema, identity, bucket key or legacy route is changed by deployment.
 const fields={folders:['id','name','parent_id','sort_order','created_at'],files:['id','name','folder_id','object_key','mime_type','size','material_code','sort_order','created_at']};
-const fail=(status,message)=>{throw Object.assign(Error(message),{status});};
+const fail=(status,message)=>{throw Object.assign(Error(message),{status,material_guard_error:true});};
 export const materialSnapshot=(data)=>Object.fromEntries(Object.entries(fields).map(([kind,keys])=>{
  const rows=data?.[kind];if(!Array.isArray(rows)||rows.length>2000)fail(400,'complete material snapshot required (maximum 2000 per kind)');
  const ids=new Set();return [kind,rows.map(row=>{if(!row||typeof row.id!=='string'||!row.id||ids.has(row.id))fail(400,'unique material snapshot IDs required');ids.add(row.id);return keys.map(k=>{if(!Object.hasOwn(row,k)||!(row[k]===null||typeof row[k]==='string'||typeof row[k]==='number'&&Number.isFinite(row[k])))fail(400,'complete material snapshot fields required');return row[k];});}).sort((a,b)=>a[0]<b[0]?-1:a[0]>b[0]?1:0)];
