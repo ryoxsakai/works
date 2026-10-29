@@ -73,7 +73,7 @@ try {
       delayHistory = false,
       delaySection = false,
       delayBookCreate = false,
-      bookCreateRequests = 0, lostPatch=false, expire=false;
+      bookCreateRequests = 0, lostPatch=false, lostCreate=false, expire=false;
     const requests=[];
     const errors = [];
     page.on("pageerror", (e) => errors.push(e.message));
@@ -116,6 +116,7 @@ try {
             }),
             env,
           );
+          if(lostCreate&&u.pathname==='/api/kdp/books'&&req.method()==='POST'&&r.ok){lostCreate=false;return route.fulfill({status:502,json:{error:'Synthetic lost create response'}});}
           if(lostPatch&&req.method()==='PATCH'&&r.ok){lostPatch=false;return route.fulfill({status:502,json:{error:'Synthetic lost response after commit'}});}
           return route.fulfill({
             status: r.status,
@@ -382,7 +383,8 @@ try {
     // Lost committed save stops writes and preserves exact input/receipt, never replaying.
     await page.locator('#section-content').fill('Unknown committed text');lostPatch=true;const before=requests.filter(r=>r.method==='PATCH').length;await page.locator('#save').click();await expect(page.locator('[data-kdp-recovery]')).toBeVisible();await expect(page.locator('#save')).toBeDisabled();await expect(page.locator('#section-content')).toHaveValue('Unknown committed text');assert.equal((await api('sections/'+section.id)).section.body,'Unknown committed text');await page.locator('[data-inspect]').click();await expect(page.locator('[data-kdp-recovery] pre')).toContainText('Unknown committed text');assert.equal(requests.filter(r=>r.method==='PATCH').length,before+1);const receipt=page.waitForEvent('download');await page.locator('[data-receipt]').click();assert.equal(await(await receipt).failure(),null);
     await reopen();const latest=(await api('sections/'+section.id)).section;await api('sections/'+section.id,{revision:latest.revision,body:'Other synthetic writer'},'PATCH');await page.locator('#section-content').fill('Stale local text');await page.locator('#save').click();await expect(page.locator('[data-kdp-recovery]')).toBeVisible();await expect(page.locator('#section-content')).toHaveValue('Stale local text');assert.equal((await api('sections/'+section.id)).section.body,'Other synthetic writer');
-    await reopen();assert.equal(await page.evaluate(()=>authCount),1);expire=true;await page.reload();await expect(page.locator('#auth-screen')).toBeVisible();await expect(page.locator('#app')).toBeHidden();
+    await reopen();assert.equal(await page.evaluate(()=>authCount),1);await page.locator('#back-books').click();await page.locator('#new-book').click();await page.locator('#dialog-form [name=title]').fill('Unknown create '+name);lostCreate=true;const createsBefore=bookCreateRequests;await page.locator('#dialog-form [type=submit]').click();await expect(page.locator('[data-kdp-recovery]')).toBeVisible();assert.equal(bookCreateRequests,createsBefore+1);assert.equal((await api('books')).books.filter(b=>b.title==='Unknown create '+name).length,1);await page.locator('[data-inspect]').click();await expect(page.locator('[data-kdp-recovery] pre')).toContainText('Unknown create '+name);assert.equal(bookCreateRequests,createsBefore+1);await expect(page.locator('#dialog-form [name=title]')).toHaveValue('Unknown create '+name);
+    expire=true;const acceptReload=d=>d.accept();page.on('dialog',acceptReload);await page.reload();page.off('dialog',acceptReload);await expect(page.locator('#auth-screen')).toBeVisible();await expect(page.locator('#app')).toBeHidden();
     assert.deepEqual(errors, []);
     await context.close();
   }
