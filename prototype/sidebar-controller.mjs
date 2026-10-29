@@ -32,6 +32,9 @@ export function createSidebarController(panel,{background,openerSelector='.page-
   else if(focused)requestAnimationFrame(()=>document.querySelector(openerSelector)?.focus());
  }
  panel.on('open',lock);panel.on('opened',opened);panel.on('closed',closed);panel.on('breakpoint',resize);
+ // The panel disables Framework7 closeByBackdropClick: its delegated click
+ // can otherwise begin an animated close before this synchronous handler,
+ // leaving allowOpen false when the next explicit tap arrives.
  // A backdrop tap can arrive during the opening transition. Use the same
  // synchronous close as Escape so a missing transitionend cannot retain inert/scroll locks.
  panel.backdropEl?.addEventListener('click',()=>{if(modal)close();},{capture:true,signal:lifetime.signal});
