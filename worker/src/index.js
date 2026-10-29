@@ -6248,7 +6248,7 @@ export default {
           }).then(result=>result.target),
           excluded:async()=> (await readSettings(env)).excluded_titles || [],
         };
-        const input=request.method==="PUT"?writeInput:{calendar_id:url.searchParams.get("calendar_id"),id:url.searchParams.get("event_id")};
+        const input=request.method==="PUT"?writeInput:{calendar_id:url.searchParams.get("calendar_id"),id:url.searchParams.get("event_id"),...(url.searchParams.has("profile_context")?{profile_context:url.searchParams.get("profile_context"),name:url.searchParams.get("name")}:{})};
         const profile=url.pathname==="/api/student-prefs/guarded";
         const result=request.method==="GET"?await (profile?linked.readLinkedProfile:linked.readLinkedProgress)(env,input,dependencies):await (profile?linked.writeLinkedProfile:linked.writeLinkedProgress)(env,input,dependencies);
         return json(result,{...headers,"Cache-Control":"no-store"});

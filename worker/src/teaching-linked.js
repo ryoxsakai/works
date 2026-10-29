@@ -1,3 +1,4 @@
+import {curriculumSelectionName} from '../../shared/student-profile-key.js';
 import {rawRecord,requireCurrent,guardStatements,commitRecords} from './lesson-attribution.js';
 import {sameLessonEvent,isScheduledLesson} from '../../shared/lesson-plan.js';
 const fail=(status,message)=>Object.assign(new Error(message),{status});
@@ -5,13 +6,15 @@ const own=(object,key)=>Object.prototype.hasOwnProperty.call(object||{},key);
 const fields=['print_name','memo'];
 export function profileSnapshot(row){return {exists:!!row,print_name:row?.print_name??null,memo:row?.memo??null,updated_at:row?.updated_at??null};}
 function snapshotGuard(env,predicate,values){const id=crypto.randomUUID();return [env.DB.prepare(`INSERT INTO lesson_record_guard(id,ok) VALUES (?,CASE WHEN ${predicate} THEN 1 ELSE 0 END)`).bind(id,...values),env.DB.prepare('DELETE FROM lesson_record_guard WHERE id=?').bind(id)];}
-async function sourceContext(env,ref,deps,writing=false){
+async function sourceContext(env,ref,deps,writing=false,selection=ref){
  if(!ref||typeof ref.calendar_id!=='string'||!ref.calendar_id||typeof ref.id!=='string'||!ref.id)throw fail(400,'授業の参照が必要です。');
  const target=await deps.target(ref);
  if(writing&&!sameLessonEvent(ref,target))throw fail(409,'授業予定が変更されています。入力を残して確認してください。');
  const excluded=await deps.excluded();if(!isScheduledLesson(target,excluded))throw fail(409,'授業対象を確認してください。');
  const row=await rawRecord(env,target.id);requireCurrent(row,target);
- return {target,row,name:target.title.trim(),record_revision:row.record_revision};
+ let name=target.title.trim(),profile_context;
+ if(own(selection,'profile_context')){if(selection.profile_context!=='curriculum')throw fail(400,'プロフィールの名前キー種別を確認してください。');name=curriculumSelectionName(target.title);if(!name||selection.name!==name)throw fail(400,'元の予定から決まる名前キーと一致しません。');profile_context='curriculum';}
+ return {target,row,name,profile_context,record_revision:row.record_revision};
 }
 function writeContext(context,body){
  if(body.name!==context.name||body.shared_name_acknowledged!==true)throw fail(400,'固定された名前キーと共有情報の確認が必要です。');
@@ -19,9 +22,9 @@ function writeContext(context,body){
 }
 async function confirmSource(env,context){const row=await rawRecord(env,context.target.id);if(row.record_revision!==context.row.record_revision||row.record_generation!==context.row.record_generation)throw fail(409,'保存後に授業の対応状態が変更されています。再送せず現在の状態を確認してください。');requireCurrent(row,context.target);}
 async function profileRow(env,name){return env.DB.prepare('SELECT * FROM student_prefs WHERE name=?').bind(name).first();}
-export async function readLinkedProfile(env,ref,deps){const context=await sourceContext(env,ref,deps),profile=profileSnapshot(await profileRow(env,context.name));await confirmSource(env,context);return {target:context.target,name:context.name,record_revision:context.record_revision,profile};}
+export async function readLinkedProfile(env,ref,deps){const context=await sourceContext(env,ref,deps),profile=profileSnapshot(await profileRow(env,context.name));await confirmSource(env,context);return {target:context.target,name:context.name,...(context.profile_context?{profile_context:context.profile_context}:{}),record_revision:context.record_revision,profile};}
 export async function writeLinkedProfile(env,body,deps){
- const context=await sourceContext(env,body?.target,deps,true);writeContext(context,body);
+ const context=await sourceContext(env,body?.target,deps,true,body);writeContext(context,body);
  const expected=body.expected;if(!expected||typeof expected.exists!=='boolean'||fields.concat('updated_at').some(key=>!own(expected,key)||!(expected[key]===null||typeof expected[key]==='string')))throw fail(400,'取得時の生徒情報が必要です。');
  if(!fields.some(key=>own(body,key)))throw fail(400,'変更する項目が必要です。');
  const current=await profileRow(env,context.name),next={...profileSnapshot(current)};
@@ -33,7 +36,7 @@ export async function writeLinkedProfile(env,body,deps){
  await commitRecords(env,statements);await confirmSource(env,context);
  const saved=profileSnapshot(await profileRow(env,context.name));
  if(saved.print_name!==next.print_name||saved.memo!==next.memo)throw fail(409,'保存後に生徒情報が変更されています。再送せず確認してください。');
- return {target:context.target,name:context.name,record_revision:context.record_revision,profile:saved};
+ return {target:context.target,name:context.name,...(context.profile_context?{profile_context:context.profile_context}:{}),record_revision:context.record_revision,profile:saved};
 }
 async function materials(env,name){
  const {results}=await env.DB.prepare(`SELECT sm.id AS link_id,sm.material_id,m.name AS material_name,c.id AS chapter_id,c.name AS chapter_name,c.sort_order,p.completed,p.updated_at,CASE WHEN p.name IS NULL THEN 0 ELSE 1 END AS progress_exists FROM student_materials sm JOIN materials m ON m.id=sm.material_id LEFT JOIN material_chapters c ON c.material_id=sm.material_id LEFT JOIN chapter_progress p ON p.chapter_id=c.id AND p.name=sm.name WHERE sm.name=? ORDER BY sm.sort_order,sm.id,c.sort_order,c.id`).bind(name).all();
@@ -41,9 +44,9 @@ async function materials(env,name){
  for(const row of results){if(!grouped.has(row.link_id))grouped.set(row.link_id,{link_id:row.link_id,material_id:row.material_id,material_name:row.material_name,chapters:[]});if(row.chapter_id!=null){if(seen.has(row.chapter_id))ambiguous=true;seen.add(row.chapter_id);grouped.get(row.link_id).chapters.push({chapter_id:row.chapter_id,chapter_name:row.chapter_name,completed:!!row.completed,exists:!!row.progress_exists,updated_at:row.updated_at??null});}}
  return {materials:[...grouped.values()],ambiguous_assignment:ambiguous};
 }
-export async function readLinkedProgress(env,ref,deps){const context=await sourceContext(env,ref,deps),value=await materials(env,context.name);await confirmSource(env,context);return {target:context.target,name:context.name,record_revision:context.record_revision,...value};}
+export async function readLinkedProgress(env,ref,deps){const context=await sourceContext(env,ref,deps),value=await materials(env,context.name);await confirmSource(env,context);return {target:context.target,name:context.name,...(context.profile_context?{profile_context:context.profile_context}:{}),record_revision:context.record_revision,...value};}
 export async function writeLinkedProgress(env,body,deps){
- const context=await sourceContext(env,body?.target,deps,true);writeContext(context,body);
+ const context=await sourceContext(env,body?.target,deps,true,body);writeContext(context,body);
  if(!Array.isArray(body.changes)||!body.changes.length||body.changes.length>8||new Set(body.changes.map(row=>row?.chapter_id)).size!==body.changes.length)throw fail(400,'進捗は重複なく1〜8項目を保存してください。');
  const before=await materials(env,context.name);if(before.ambiguous_assignment)throw fail(409,'教材の割当が重複しています。従来画面で確認してください。');
  const statements=[...guardStatements(env,context.target.id,body.record_revision)];
@@ -57,5 +60,5 @@ export async function writeLinkedProgress(env,body,deps){
  }
  await commitRecords(env,statements);await confirmSource(env,context);const saved=await materials(env,context.name);
  for(const change of body.changes){const chapter=saved.materials.find(row=>row.link_id===change.link_id)?.chapters.find(row=>row.chapter_id===change.chapter_id);if(!chapter||chapter.completed!==change.completed)throw fail(409,'保存後に進捗が変更されています。再送せず確認してください。');}
- return {target:context.target,name:context.name,record_revision:context.record_revision,...saved};
+ return {target:context.target,name:context.name,...(context.profile_context?{profile_context:context.profile_context}:{}),record_revision:context.record_revision,...saved};
 }
