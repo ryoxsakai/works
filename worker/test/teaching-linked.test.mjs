@@ -21,11 +21,11 @@ test('malformed refs, arbitrary/unassigned chapter and duplicate changes fail sa
 test('held source blocks linked profile and progress without changing data',async t=>{const {env,DB,deps}=await setup(t);const profile=profileBody(await readLinkedProfile(env,ref,deps)),progress=progressBody(await readLinkedProgress(env,ref,deps));await DB.prepare("INSERT INTO lesson_record_hold(event_id,calendar_id,reason,resolved_at) VALUES(?,?,'known change',NULL)").bind(ref.id,ref.calendar_id).run();await assert.rejects(writeLinkedProfile(env,profile,deps),e=>e.status===409);await assert.rejects(writeLinkedProgress(env,progress,deps),e=>e.status===409);assert.equal(await DB.prepare('SELECT COUNT(*) AS n FROM student_prefs').first('n'),0);assert.equal(await DB.prepare('SELECT COUNT(*) AS n FROM chapter_progress').first('n'),0);});
 test('new HTTP routes require browser authentication and same-origin JSON; malformed inputs fail before lookups',async()=>{
  const {readFile}=await import('node:fs/promises');let source=await readFile(new URL('../src/index.js',import.meta.url),'utf8');
- for(const file of ['workflow.js','wiki.js','kdp-services.js','mcp-scopes.js','oauth-refresh.js','teaching-linked.js','lesson-plan.js'])source=source.replaceAll('./'+file,new URL('../src/'+file,import.meta.url).href);
+ for(const file of ['workflow.js','wiki.js','kdp-services.js','mcp-scopes.js','oauth-refresh.js','teaching-linked.js','lesson-plan.js','student-planning.js'])source=source.replaceAll('./'+file,new URL('../src/'+file,import.meta.url).href);
  source+='\nexport {createSessionToken};';const functions=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
  const env={ALLOWED_EMAIL:'owner@example.test',SESSION_SECRET:'synthetic-linked-secret',ALLOWED_ORIGIN:'https://works.example.test'},token=await functions.createSessionToken(env,env.ALLOWED_EMAIL);
  const request=(path,method,body,headers={})=>functions.default.fetch(new Request(env.ALLOWED_ORIGIN+path,{method,headers:{Authorization:'Bearer '+token,Origin:env.ALLOWED_ORIGIN,'Content-Type':'application/json',...headers},...(method==='PUT'?{body}: {})}),env,{});
- for(const path of ['/api/student-prefs/guarded','/api/chapter-progress/guarded']){
+ for(const path of ['/api/student-prefs/guarded','/api/chapter-progress/guarded','/api/student-planning/guarded']){
   assert.equal((await request(path,'GET',null,{Authorization:''})).status,401);
   assert.equal((await request(path,'PUT','{}',{Origin:'https://foreign.example.test'})).status,403);
   assert.equal((await request(path,'PUT','{bad')).status,400);

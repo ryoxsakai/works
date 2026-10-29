@@ -62,3 +62,5 @@ export async function writeLinkedProgress(env,body,deps){
  for(const change of body.changes){const chapter=saved.materials.find(row=>row.link_id===change.link_id)?.chapters.find(row=>row.chapter_id===change.chapter_id);if(!chapter||chapter.completed!==change.completed)throw fail(409,'保存後に進捗が変更されています。再送せず確認してください。');}
  return {target:context.target,name:context.name,...(context.profile_context?{profile_context:context.profile_context}:{}),record_revision:context.record_revision,...saved};
 }
+
+export {sourceContext as linkedSourceContext,writeContext as linkedWriteContext,confirmSource as linkedConfirmSource,snapshotGuard as linkedSnapshotGuard,materials as linkedMaterials};
