@@ -2,7 +2,7 @@ name: Test legacy menu dashboard
 on:
   pull_request:
     branches: [main]
-    paths: ['index.html', 'home.js', 'home.css', 'dashboard/**', 'shared/auth.js', 'shared/theme*', '.github/workflows/legacy-dashboard.yml']
+    paths: ['index.html', 'home.js', 'home.css', 'dashboard/**', 'shared/ui/**', 'shared/auth.js', 'shared/theme*', '.github/workflows/legacy-dashboard.yml']
 permissions:
   contents: read
 jobs:
@@ -17,6 +17,9 @@ jobs:
           cache: npm
           cache-dependency-path: worker/package-lock.json
       - run: npm ci --prefix worker --ignore-scripts
+      - run: npm ci --prefix shared/ui --ignore-scripts
+      - run: npm run build --prefix shared/ui
+      - run: git diff --exit-code -- shared/ui/menu-bootstrap.css shared/ui/icons.mjs
       - run: node --test dashboard/test/*.test.mjs
       - run: node worker/node_modules/playwright/cli.js install --with-deps chromium
       - run: node dashboard/test/browser.mjs

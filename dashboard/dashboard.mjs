@@ -12,8 +12,9 @@ import {
 } from "./model.mjs";
 import { createReader } from "./data.mjs";
 
+import { icon } from "../shared/ui/icons.mjs";
+
 const $ = (id) => document.getElementById(id);
-const icon = (name) => `<i class="bx ${name}" aria-hidden="true"></i>`;
 const time = (value) =>
   value
     ? new Date(value).toLocaleTimeString("ja-JP", {
@@ -157,7 +158,7 @@ export function createDashboard({
       return '<p class="dashboard-muted">ログインすると表示できます。</p>';
     const v = cache.get(id);
     if (v?.error)
-      return `<p role="alert">${esc(v.error)}</p><button type="button" data-retry="${id}">再試行</button>`;
+      return `<p class="alert" role="alert">${esc(v.error)}</p><button class="btn btn-outline" type="button" data-retry="${id}">再試行</button>`;
     if (!v) return '<p class="dashboard-muted" role="status">読み込み中…</p>';
     return (
       body(id, v.data) + `<p class="widget-updated">更新 ${esc(time(v.at))}</p>`
@@ -175,20 +176,20 @@ export function createDashboard({
         .filter(([id]) => !current().widgets.includes(id))
         .map(
           ([id, w]) =>
-            `<button type="button" data-add="${id}">${esc(w.title)}を追加</button>`,
+            `<button class="btn btn-outline" type="button" data-add="${id}">${esc(w.title)}を追加</button>`,
         )
         .join("") || '<p class="dashboard-muted">すべて追加済みです。</p>';
     $("dashboard-shortcuts").innerHTML =
       "<legend>よく使う機能に表示するリンク</legend>" +
       MODULES.map(
         (m) =>
-          `<label><input type="checkbox" value="${m[0]}" ${current().shortcuts.includes(m[0]) ? "checked" : ""}>${m[1]}</label>`,
+          `<label><input class="check" type="checkbox" value="${m[0]}" ${current().shortcuts.includes(m[0]) ? "checked" : ""}>${m[1]}</label>`,
       ).join("");
     $("dashboard-widgets").innerHTML =
       current()
         .widgets.map((id, index) => {
           const w = WIDGETS[id];
-          return `<section class="dashboard-widget" data-id="${id}" aria-labelledby="widget-title-${id}">${draft ? `<div class="widget-tools"><button type="button" class="drag-handle" aria-label="${w.title}をドラッグして移動">${icon("bx-move")}移動</button><button type="button" data-move="${id}" data-step="-1" ${index === 0 ? "disabled" : ""} aria-label="${w.title}を前へ">前へ</button><button type="button" data-move="${id}" data-step="1" ${index === current().widgets.length - 1 ? "disabled" : ""} aria-label="${w.title}を後へ">後へ</button><button type="button" data-hide="${id}" aria-label="${w.title}をホームから非表示">非表示</button></div>` : ""}<header><h3 id="widget-title-${id}">${icon(w.icon)}${w.title}</h3></header><p class="dashboard-muted widget-description">${w.description}</p><div data-content="${id}" aria-busy="${user && id !== "shortcuts" && !cache.has(id)}">${content(id)}</div>${w.path ? `<a class="widget-link" href="${w.path}">${w.title === "今日の授業" ? "授業管理" : id === "todo" ? "ToDo" : id === "materials" ? "教材管理" : id === "memo" ? "メモ" : "SS管理"}を開く ${icon("bx-right-arrow-alt")}</a>` : ""}</section>`;
+          return `<section class="dashboard-widget card" data-id="${id}" aria-labelledby="widget-title-${id}">${draft ? `<div class="widget-tools"><button type="button" class="btn btn-outline drag-handle" aria-label="${w.title}をドラッグして移動">${icon("bx-move")}移動</button><button class="btn btn-outline" type="button" data-move="${id}" data-step="-1" ${index === 0 ? "disabled" : ""} aria-label="${w.title}を前へ">前へ</button><button class="btn btn-outline" type="button" data-move="${id}" data-step="1" ${index === current().widgets.length - 1 ? "disabled" : ""} aria-label="${w.title}を後へ">後へ</button><button class="btn btn-outline" type="button" data-hide="${id}" aria-label="${w.title}をホームから非表示">非表示</button></div>` : ""}<header><h3 id="widget-title-${id}">${icon(w.icon)}${w.title}</h3></header><p class="dashboard-muted widget-description">${w.description}</p><div data-content="${id}" aria-busy="${user && id !== "shortcuts" && !cache.has(id)}">${content(id)}</div>${w.path ? `<a class="widget-link" href="${w.path}">${w.title === "今日の授業" ? "授業管理" : id === "todo" ? "ToDo" : id === "materials" ? "教材管理" : id === "memo" ? "メモ" : "SS管理"}を開く ${icon("bx-right-arrow-alt")}</a>` : ""}</section>`;
         })
         .join("") ||
       '<p class="dashboard-muted">ウィジェットは非表示になっています。「表示を編集」から追加できます。全機能はメニューから開けます。</p>';
@@ -196,22 +197,34 @@ export function createDashboard({
     if (draft) enableDrag();
     loadVisible();
   }
-  let sortablePromise;
+  let sortablePromise,
+    printing = false;
+  const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
+  reducedMotion.addEventListener("change", () =>
+    sort?.option("animation", reducedMotion.matches ? 0 : 150),
+  );
+  window.addEventListener("beforeprint", () => {
+    printing = true;
+    sort?.destroy();
+    sort = null;
+  });
+  window.addEventListener("afterprint", () => {
+    printing = false;
+    if (draft && !pagePaused) enableDrag();
+  });
   async function enableDrag() {
     const request = epoch;
     try {
       sortablePromise ||= import("./vendor/Sortable-1.15.6.min.js");
       await sortablePromise;
-      if (!draft || request !== epoch || sort) return;
+      if (!draft || pagePaused || printing || request !== epoch || sort) return;
       sort = new window.Sortable($("dashboard-widgets"), {
         forceFallback: true,
         fallbackOnBody: true,
         fallbackTolerance: 4,
         handle: ".drag-handle",
         draggable: ".dashboard-widget",
-        animation: matchMedia("(prefers-reduced-motion: reduce)").matches
-          ? 0
-          : 150,
+        animation: reducedMotion.matches ? 0 : 150,
         delay: 150,
         delayOnTouchOnly: true,
         onEnd() {
