@@ -17,7 +17,8 @@
   <link rel="stylesheet" href="/shared/task-ui.css?v=2">
   <link rel="stylesheet" href="/memo/memo.css?v=2">
   <link rel="stylesheet" href="/shared/header.css?v=2">
-  <link rel="stylesheet" href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css">
+  <link rel="stylesheet" href="/shared/ui/memo-bootstrap.css?v=1">
+  <link rel="stylesheet" href="/shared/ui/memo-tokens.css?v=1">
   <script type="module" src="/shared/header.js?v=4"></script><style>
     body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
 
@@ -44,12 +45,12 @@
     #tab-list::-webkit-scrollbar { display: none; }
   </style>
 </head>
-<body class="todo-page memo-page min-h-screen">
+<body class="todo-page memo-page memo-bootstrap min-h-screen">
 
   <!-- ── Header ─────────────────────────────────────────────── -->
   <header class="page-header works-header">
     <h1><a class="works-home" href="/" aria-label="Works ホーム"><span class="page-header-icon" aria-hidden="true">W</span><span>Works</span></a><span class="works-page-title">メモ</span></h1>
-    <div class="works-header-actions"><div id="memo-user-bar" class="user-bar" hidden><button class="user-icon-btn" aria-label="ログアウト" onclick="signOutUser()"><i class="bx bx-user-circle" aria-hidden="true"></i></button></div></div>
+    <div class="works-header-actions"><div id="memo-user-bar" class="user-bar" hidden><button class="user-icon-btn" aria-label="ログアウト" onclick="signOutUser()"><span data-works-icon="bx-user-circle"></span></button></div></div>
   </header>
   <main class="todo-main w-full mx-auto px-4 py-5">
 
@@ -60,20 +61,15 @@
 
       <!-- カテゴリタブ + ボタン群 -->
       <div class="flex-shrink-0 px-4 pt-3 border-b border-gray-200 flex items-end gap-2">
-        <div id="tab-list" class="flex gap-0.5 overflow-x-auto flex-1" style="scrollbar-width:none"></div>
+        <div id="tab-list" class="nav flex gap-0.5 overflow-x-auto flex-1" style="scrollbar-width:none"></div>
         <div class="flex items-center gap-2 pb-1 flex-shrink-0">
           <button onclick="openCategoryModal()" title="カテゴリを管理"
             class="icon-btn w-8 h-8 bg-gray-50 hover:bg-gray-100 text-gray-500 border border-gray-200">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-            </svg>
+            <span data-works-icon="memo-settings"></span>
           </button>
           <button onclick="openMemoModal(null)" title="新規メモ"
             class="icon-btn w-8 h-8 bg-slate-700 hover:bg-slate-800 active:bg-slate-900 text-white">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
-            </svg>
+            <span data-works-icon="memo-new"></span>
           </button>
         </div>
       </div>
@@ -102,10 +98,8 @@
 
       <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
         <h3 id="memo-modal-title" class="font-semibold text-gray-700">新規メモ</h3>
-        <button onclick="closeMemoModal()" class="icon-btn text-gray-400 hover:text-gray-600 hover:bg-gray-100">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-          </svg>
+        <button onclick="closeMemoModal()" class="icon-btn text-gray-400 hover:text-gray-600 hover:bg-gray-100" aria-label="閉じる">
+          <span data-works-icon="memo-close"></span>
         </button>
       </div>
 
@@ -127,10 +121,7 @@
             </select>
             <button onclick="openCategoryModal()" title="カテゴリを管理"
               class="px-2.5 py-2 bg-gray-50 hover:bg-gray-100 text-gray-500 rounded-xl border border-gray-200 transition-colors flex items-center justify-center">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-              </svg>
+              <span data-works-icon="memo-settings"></span>
             </button>
           </div>
         </div>
@@ -149,9 +140,7 @@
           <div id="bodies-container" class="flex flex-col gap-3"></div>
           <button type="button" onclick="addModalBody()"
             class="mt-2 flex items-center gap-1 text-xs text-gray-400 hover:text-slate-500 transition-colors">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
-            </svg>
+            <span data-works-icon="memo-new"></span>
             本文を追加
           </button>
         </div>
@@ -161,9 +150,7 @@
           <div id="notes-container" class="flex flex-col gap-2 mb-1"></div>
           <button type="button" onclick="addModalNote()"
             class="flex items-center gap-1 text-xs text-gray-400 hover:text-slate-500 transition-colors">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
-            </svg>
+            <span data-works-icon="memo-new"></span>
             補足を追加
           </button>
         </div>
@@ -177,7 +164,7 @@
 
       <div class="px-6 py-4 border-t border-gray-100 flex justify-end gap-2">
         <button onclick="closeMemoModal()"
-          class="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-colors">
+          class="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-colors" aria-label="閉じる">
           キャンセル
         </button>
         <button onclick="saveMemo()"
@@ -243,10 +230,8 @@
           <p id="view-category" class="text-xs text-slate-400 mb-1"></p>
           <h3 id="view-title" class="font-semibold text-gray-800 leading-snug"></h3>
         </div>
-        <button onclick="closeViewModal()" class="icon-btn text-gray-400 hover:text-gray-600 hover:bg-gray-100 flex-shrink-0">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-          </svg>
+        <button onclick="closeViewModal()" class="icon-btn text-gray-400 hover:text-gray-600 hover:bg-gray-100 flex-shrink-0" aria-label="閉じる">
+          <span data-works-icon="memo-close"></span>
         </button>
       </div>
 
@@ -262,15 +247,15 @@
         <div class="flex gap-1">
           <button onclick="viewCopyMemo()" title="コピー"
             class="icon-btn text-gray-300 hover:text-slate-500 hover:bg-slate-50">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+            <span data-works-icon="memo-copy"></span>
           </button>
           <button onclick="viewEditMemo()" title="編集"
             class="icon-btn text-gray-300 hover:text-slate-500 hover:bg-slate-50">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+            <span data-works-icon="memo-edit"></span>
           </button>
           <button onclick="viewDeleteMemo()" title="削除"
             class="icon-btn text-gray-300 hover:text-red-400 hover:bg-red-50">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+            <span data-works-icon="memo-delete"></span>
           </button>
         </div>
       </div>
@@ -282,6 +267,6 @@
     class="fixed left-1/2 z-50 pointer-events-none bg-gray-800 text-white text-sm px-4 py-2.5 rounded-xl shadow-lg whitespace-nowrap max-w-xs truncate"
     style="top:1rem;transform:translateX(-50%) translateY(-120%);transition:transform 0.3s ease,opacity 0.3s ease;opacity:0"></div>
 
-  <script type="module" src="/memo/app.js?v=2"></script>
+  <script type="module" src="/memo/app.js?v=3"></script>
 </body>
 </html>

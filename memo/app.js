@@ -1,3 +1,5 @@
+import { startMemoPresentation } from "../shared/ui/memo-presentation.mjs";
+startMemoPresentation();
 import { watchAuth, signIn, signOutUser as worksSignOut, getSessionToken } from '../shared/auth.js?v=12';
     import { categoryDialog } from '../shared/category-dialog.js?v=1';
     const categoryUI = categoryDialog(closeCategoryModal);
@@ -455,7 +457,7 @@ import { watchAuth, signIn, signOutUser as worksSignOut, getSessionToken } from 
     }
 
     function handleTagInput(e) {
-      if (e.key !== 'Enter') return;
+      if (e.key !== 'Enter' || e.isComposing) return;
       e.preventDefault();
       const inp = e.target;
       const val = inp.value.trim().replace(/[,#]/g, '');

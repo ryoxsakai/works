@@ -58,3 +58,13 @@ test('Wiki CSS is isolated and presentation explicitly excludes readonly Markdow
  assert.ok(!/fetch\(|localStorage|showModal\(|\.value\s*=|\.disabled\s*=/.test(source));
  assert.ok(!css.includes('@view-transition'));
 });
+
+test('Memo CSS is scoped and utility-hidden/private overlays keep their original controller',async()=>{
+ const css=await load('shared/ui/memo-bootstrap.css');
+ postcss.parse(css).walkRules(rule=>{for(const selector of rule.selectors)assert.ok(selector.startsWith('.memo-bootstrap'),selector);});
+ const source=await load('shared/ui/memo-presentation.mjs');
+ assert.ok(source.includes("el.closest('#view-body-container,#modal-tags-list')"));
+ assert.ok(!/fetch\(|localStorage|showModal\(|\.value\s*=|\.disabled\s*=/.test(source));
+ assert.match(await load('shared/ui/memo-tokens.css'),/\.hidden.*display: none !important/);
+ assert.match(await load('memo/index.html'),/Segoe UI/);
+});
