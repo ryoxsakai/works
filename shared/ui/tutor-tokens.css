@@ -27,3 +27,5 @@
 .tutor-bootstrap .btn { white-space: normal; overflow-wrap: anywhere; min-width: 0; max-width: 100%; }
 .tutor-bootstrap .record-heading { flex-wrap: wrap; }
 .tutor-bootstrap .record-heading h2 { white-space: nowrap; }
+
+@media(prefers-reduced-motion: reduce) { .tutor-bootstrap :is(.section-chevron,.material-chevron) { transition: none; } }

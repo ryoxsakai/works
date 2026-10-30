@@ -10,6 +10,7 @@ export function decorateTutor(root) {
     const template=document.createElement('template');template.innerHTML=icon(key);
     const svg=template.content.firstElementChild;
     for(const attr of old.attributes)if(!['class','aria-hidden'].includes(attr.name))svg.setAttribute(attr.name,attr.value);
+    for(const name of old.classList)if(name!=='bx'&&!name.startsWith('bx-'))svg.classList.add(name);
     old.replaceWith(svg);
   }
   const nodes=[...(root.matches?.(controls)?[root]:[]),...root.querySelectorAll(controls)];
