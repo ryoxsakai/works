@@ -50,3 +50,11 @@ test('KDP isolates official CSS and preserves its own data, upload and native di
  assert.ok(source.includes(':not([type="file"])'));
  assert.ok(!css.includes('@view-transition'));
 });
+test('Wiki CSS is isolated and presentation explicitly excludes readonly Markdown content',async()=>{
+ const css=await load('shared/ui/wiki-bootstrap.css');
+ postcss.parse(css).walkRules(rule=>{for(const selector of rule.selectors)assert.ok(selector.startsWith('.wiki-bootstrap'),selector);});
+ const source=await load('shared/ui/wiki-presentation.mjs');
+ assert.ok(source.includes("el.closest('#body,#editor-preview,.wiki-markdown')"));
+ assert.ok(!/fetch\(|localStorage|showModal\(|\.value\s*=|\.disabled\s*=/.test(source));
+ assert.ok(!css.includes('@view-transition'));
+});

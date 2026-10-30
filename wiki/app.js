@@ -1,3 +1,5 @@
+import { startWikiPresentation } from "../shared/ui/wiki-presentation.mjs";
+startWikiPresentation();
 import {
   watchAuth,
   getSessionToken,
