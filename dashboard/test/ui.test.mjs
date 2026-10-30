@@ -26,3 +26,12 @@ test('SVG allowlist is decorative, named fallback IDs hydrate safely and unknown
  assert.throws(()=>icon('<script>'));
  assert.throws(()=>icon('__proto__'));
 });
+test('SS bundle is isolated; no page transition or save capability introduced',async()=>{
+ const css=await load('shared/ui/ss-bootstrap.css');
+ postcss.parse(css).walkRules(rule=>{for(const selector of rule.selectors)assert.ok(selector.startsWith('.ss-bootstrap'),selector);});
+ const source=await load('ss/app.js');
+ assert.ok(!source.includes('startViewTransition'));
+ assert.ok(!source.includes('method:'));
+ assert.ok(!css.includes('@view-transition'));
+ assert.match(await load('ss/index.html'),/ss-sort-button btn btn-text/);
+});
