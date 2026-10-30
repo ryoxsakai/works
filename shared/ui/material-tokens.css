@@ -1,0 +1,27 @@
+/* Original M PLUS font, library/tree/tags, native file/drop and dialogs remain owners. */
+.material-bootstrap { --fg-body: var(--fg); --fg-1: var(--fg); --fg-2: var(--muted); --bg-body: var(--bg-elevated); --bg-1: var(--bg-hover); --bg-2: var(--bg-hover); --border-color: var(--border); --primary-base: #2563eb; --primary-contrast: #fff; --focus-ring-color: var(--accent); --focus-ring-width: 2px; }
+.material-bootstrap .btn { --btn-min-height: 44px; --btn-padding-x: 12px; --btn-padding-y: 9px; --btn-font-size: inherit; --btn-color: var(--fg); --btn-bg: var(--bg-elevated); --btn-border-color: var(--border); --btn-hover-color: var(--fg); --btn-hover-bg: var(--bg-hover); --btn-hover-border-color: var(--border); --btn-border-radius: 8px; font-family: inherit; }
+.material-bootstrap .btn-solid { --theme-bg: #2563eb; --theme-contrast: #fff; --btn-bg: #2563eb; --btn-color: #fff; --btn-hover-color: #fff; }
+.material-bootstrap .nav-link { min-height: 44px; --nav-link-color: var(--fg); --nav-link-hover-color: var(--fg); --nav-link-hover-bg: var(--bg-hover); --nav-link-padding-x: .55rem; --nav-link-padding-y: .4rem; font-family: inherit; }
+.material-bootstrap .nav-link[aria-selected="true"] { color: var(--accent); background: var(--bg-hover); font-weight: 600; }
+.material-bootstrap .form-control { --control-fg: var(--fg); --control-bg: var(--bg-elevated); --control-border-color: var(--border); --control-placeholder-color: var(--muted); font-family: inherit; min-height: 44px; }
+:root[data-theme="dark"] .material-bootstrap select.form-control { background-image: var(--control-select-bg-dark); }
+.material-bootstrap .card { --card-bg: var(--bg-elevated); --card-color: var(--fg); --card-border-color: var(--border); --card-border-radius: .65rem; }
+.material-bootstrap .alert { --alert-bg: var(--bg-hover); --alert-color: var(--fg); --alert-padding-x: 12px; --alert-padding-y: 10px; }
+.material-bootstrap .alert:empty { display: none; }
+.material-bootstrap [hidden] { display: none !important; }
+.material-bootstrap .works-icon { width: 1.15em; height: 1.15em; flex-shrink: 0; vertical-align: -.125em; }
+.material-bootstrap .works-icon,.material-bootstrap .works-icon * { pointer-events: none; }
+@media(prefers-reduced-motion: reduce) { .material-bootstrap :is(.btn,.nav-link,.form-control,.alert) { transition: none; } }
+@media print { .material-bootstrap :is(.btn,.nav-link,.form-control,.alert) { transition: none; } }
+
+.material-bootstrap .material-icon-btn.btn { min-width: 44px; min-height: 44px; padding: 8px; }
+.material-bootstrap .material-page-tabs .nav-link { gap: 5px; }
+.material-bootstrap .material-preview-body .btn { font-family: inherit; }
+@media(max-width: 640px) {
+ .material-bootstrap .material-page-tabs { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); }
+ .material-bootstrap .material-page-tabs .nav-link { display: flex; flex-direction: column; align-items: center; justify-content: center; padding-inline: 2px; font-size: .75rem; }
+ .material-bootstrap .material-dropzone > .material-inline-upload-action { font-size: 0; }
+ .material-bootstrap .material-inline-upload-action::after { font-size: .72rem; content: "選択"; }
+ .material-bootstrap .material-file-actions { grid-template-columns: repeat(2,44px); gap: 4px; }
+}

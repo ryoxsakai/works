@@ -76,3 +76,8 @@ test('Admission CSS and projector leave calendar, filters, native dialog and pri
  assert.ok(!/fetch\(|localStorage|showModal\(|\.value\s*=|\.disabled\s*=/.test(source));
  assert.ok(!css.includes('@view-transition'));
 });
+
+test('Material CSS and SVG projection preserve native file, preview, drag and persistence owners',async()=>{
+ const css=await load('shared/ui/material-bootstrap.css');postcss.parse(css).walkRules(r=>{for(const s of r.selectors)assert.ok(s.startsWith('.material-bootstrap'),s);});
+ const source=await load('shared/ui/material-presentation.mjs');assert.ok(!/fetch\(|localStorage|showModal\(|\.value\s*=|\.disabled\s*=/.test(source));assert.ok(source.includes('#material-preview-body'));assert.ok(source.includes(':not([type="file"])'));
+});
