@@ -1,3 +1,4 @@
+import { measure } from "../../worker/test/button-contrast-helpers.mjs";
 import {
   chromium,
   expect,
@@ -364,6 +365,7 @@ try {
   await page.setViewportSize({ width: 390, height: 844 });
   await captureHeader("after-resize-edit", 0.5);
   await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.locator("#home-navigation").evaluate(el => el.open = true);
   await expect(page.locator('#home-navigation a[href="/todo/"]')).toBeVisible();
   const coverage = [];
   const controls = page.locator(
@@ -559,6 +561,7 @@ try {
   await page.locator("#dashboard-edit").click();
   await page.locator('[data-add="memo"]').click();
   page.once("dialog", (d) => d.dismiss());
+  await page.locator("#home-navigation").evaluate(el => el.open = true);
   await page.locator('#home-navigation a[href="/todo/"]').click();
   assert.equal(new URL(page.url()).pathname, "/");
   await page.locator("#dashboard-cancel").click();
@@ -580,16 +583,18 @@ try {
     "navigation cancel and storage quota failure preserve saved layout/draft recovery",
   );
   await page.setViewportSize({ width: 390, height: 844 });
-  await expect(page.locator("#home-navigation")).not.toHaveAttribute("open");
+  await page.locator("#home-navigation").evaluate(el => el.open = false);
   await page.locator("#home-navigation summary").click();
   await expect(page.locator('#home-navigation a[href="/kdp/"]')).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.locator("#home-navigation summary")).toBeFocused();
   await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.locator("#home-navigation summary").click();
   await expect(page.locator('#home-navigation a[href="/wiki/"]')).toBeVisible();
   await page.locator('#home-navigation a[href="/wiki/"]').focus();
   await expect(page.locator('#home-navigation a[href="/wiki/"]')).toBeFocused();
   await page.setViewportSize({ width: 390, height: 844 });
+  await page.keyboard.press("Escape");
   await expect(page.locator("#home-navigation summary")).toBeFocused();
   await fullPageAtTop(page, {
     path: path.join(artifacts, "mobile-reordered-390.png"),
@@ -871,6 +876,31 @@ try {
     });
     assert.ok(contrast>=4.5, `${mode} primary text contrast ${contrast}`);
   }
+  assert.deepEqual(await ui.page.locator('#home-navigation nav > span').allTextContents(), ['授業・教材','自動実行','業務','制作']);
+  assert.deepEqual(await ui.page.locator('#home-navigation a').allTextContents(), ['ホーム','授業管理','教材管理','入試管理','ワークフロー','Wiki','ToDo管理','メモ','KDP管理','SS管理']);
+  assert.equal(await ui.page.locator('#home-navigation [aria-current="page"]').getAttribute('href'), '/');
+  for (const width of [390,1440]) for (const theme of ['light','dark']) {
+    await ui.page.setViewportSize({width,height:900});
+    await ui.page.evaluate(async theme => { const {setTheme}=await import('/shared/theme.js?v=6'); setTheme(theme); },theme);
+    await ui.page.locator('#home-navigation').evaluate(el=>el.open=false);
+    await ui.page.locator('#home-navigation summary').focus();
+    await ui.page.keyboard.press('Enter');
+    await expect(ui.page.locator('#home-navigation nav')).toBeVisible();
+    for (const link of await ui.page.locator('#home-navigation a').all()) {
+      await link.hover();
+      assert.ok((await link.evaluate(measure)).ratio>=4.5);
+    }
+    await ui.page.screenshot({path:path.join(artifacts,`shared-menu-${width}-${theme}.png`)});
+    await ui.page.keyboard.press('Escape');
+    await expect(ui.page.locator('#home-navigation summary')).toBeFocused();
+    await expect(ui.page.locator('#home-navigation')).not.toHaveAttribute('open');
+    await ui.page.locator('#home-navigation summary').click({clickCount:2});
+    await expect(ui.page.locator('#home-navigation')).not.toHaveAttribute('open');
+    await ui.page.locator('#home-navigation summary').click();
+    await ui.page.mouse.click(4,850);
+    await expect(ui.page.locator('#home-navigation')).not.toHaveAttribute('open');
+  }
+  passed.push('shared Tutor menu labels/groups/Home current, keyboard/ESC/outside/repeated click and hover contrast at mobile/desktop in both themes');
   await ui.page.locator('#dashboard-edit').click();
   await expect.poll(()=>ui.page.evaluate(()=>!!window.Sortable?.get(document.querySelector('#dashboard-widgets')))).toBe(true);
   await ui.page.emulateMedia({reducedMotion:'reduce'});

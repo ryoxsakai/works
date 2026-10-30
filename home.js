@@ -1,3 +1,4 @@
+import "./shared/header.js?v=4";
 import { hydrateIcons } from "./shared/ui/icons.mjs";
 import {
   signIn,
@@ -8,7 +9,14 @@ import {
 } from "./shared/auth.js?v=12";
 import { getTheme, setTheme } from "./shared/theme.js?v=6";
 
-import { createDashboard } from "./dashboard/dashboard.mjs?v=2";
+import { createDashboard } from "./dashboard/dashboard.mjs?v=3";
+const homeNavigation = document.querySelector(".works-navigation");
+homeNavigation.id = "home-navigation";
+// Keep the shared popover from covering dashboard edit controls when tabbing out.
+document.addEventListener("focusin", (event) => {
+  if (!homeNavigation.contains(event.target)) homeNavigation.open = false;
+});
+window.addEventListener("pagehide", () => { homeNavigation.open = false; });
 hydrateIcons();
 const dashboard = createDashboard({
   getSessionToken,
