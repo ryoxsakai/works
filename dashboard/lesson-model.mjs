@@ -6,13 +6,13 @@ import {offsetDay} from './model.mjs';
 export function lessonApi({session,isCurrent,signal,fetcher=fetch,onUnauthorized=()=>{}}) {
  return async (path,options={})=>{
   if(!isCurrent())throw new DOMException('stale session','AbortError');
-  const write=options.method==='PUT',controller=new AbortController();
+  const write=options.method==='PUT'||path==='/next-lesson-plan/initialize',controller=new AbortController();
   if(!write)signal?.throwIfAborted();
   const abort=()=>controller.abort();if(!write)signal?.addEventListener('abort',abort,{once:true});
   let timer;
   const operation=(async()=>{
    const res=await fetcher('/api'+path,{...options,cache:'no-store',headers:{'Content-Type':'application/json',Authorization:`Bearer ${session}`},...(!write?{signal:controller.signal}:{})});
-   if(!res.ok){if(res.status===401)onUnauthorized();const e=new Error(`取得・保存できません (${res.status})`);e.status=res.status;try{const d=await res.json();e.current=d.current;e.message=d.error||e.message;}catch{}throw e;}
+   if(!res.ok){if(res.status===401)onUnauthorized();const e=new Error(`取得・保存できません (${res.status})`);e.status=res.status;try{const d=await res.json();e.current=d.current;e.code=d.code;e.unknown=d.code==='CALENDAR_WRITE_UNKNOWN';e.message=d.error||e.message;}catch{}throw e;}
    const result=res.status===204?null:await res.json();
    if(!write)signal?.throwIfAborted();
    if(!isCurrent())throw new DOMException('stale session','AbortError');
@@ -50,10 +50,11 @@ export async function homeLessonModel(data,day,{api,googleToken,signal,fetcher=f
  if(sorted.some(e=>typeof e.id!=='string'||!Number.isFinite(Date.parse(e.start?.dateTime||e.start?.date))||!Number.isFinite(Date.parse(e.end?.dateTime||e.end?.date))))throw new Error('期間内の予定を確認できません');
  const rows=dayEvents.map(ev=>{if(typeof ev.id!=='string'||!ev.id||!ids.includes(ev._calendarId)||!Number.isFinite(Date.parse(ev.start?.dateTime||ev.start?.date))||!Number.isFinite(Date.parse(ev.end?.dateTime||ev.end?.date)))throw new Error('予定の識別情報を確認できません');const label=(ev.summary||'(無題)').trim(),ref=lessonEventRef(ev);const series=sorted.filter(e=>e._calendarId===ref.calendar_id&&(e.summary||'').trim()===label);const index=series.findIndex(e=>e.id===ref.id);return {eventId:ev.id,ref,calendarId:ref.calendar_id,label,termId:term?.id||'',n:index+1||1,m:series.length||1,start:ref.start,iconColor:/^#[0-9a-f]{6}$/i.test(calendars.find(c=>c.id===ref.calendar_id)?.backgroundColor||'')?calendars.find(c=>c.id===ref.calendar_id).backgroundColor:'',previous:index>0?series[index-1]:null};});
  const targets=[...new Map(rows.flatMap(r=>[r.ref,...(r.previous?[lessonEventRef(r.previous)]:[])]).map(ref=>[lessonEventKey(ref),ref])).values()];
- let entries=[];const calendarsById=new Map();for(const event of [...rangeEvents,...dayEvents]){const set=calendarsById.get(event.id)||new Set();set.add(event._calendarId);calendarsById.set(event.id,set);}
+ let entries=[];const hydrated=new Map();const calendarsById=new Map();for(const event of [...rangeEvents,...dayEvents]){const set=calendarsById.get(event.id)||new Set();set.add(event._calendarId);calendarsById.set(event.id,set);}
  const collisions=new Set([...calendarsById].filter(([,ids])=>ids.size>1).map(([id])=>id)),unavailable=new Set();
  // Small observations keep each existing Worker invocation bounded; no bulk initialization.
- for(let i=0;i<targets.length;i++){entries=await api('/lesson-records',{method:'POST',body:JSON.stringify({targets:targets.slice(i,i+1)})});if(!Array.isArray(entries))throw new Error('授業記録の応答を確認できません');for(const r of entries){if(r.record_collision)collisions.add(r.calendar_event_id);if(r.record_target_unavailable)unavailable.add(r.calendar_event_id);}}
+ for(let i=0;i<targets.length;i++){entries=await api('/lesson-records',{method:'POST',body:JSON.stringify({targets:targets.slice(i,i+1)})});if(!Array.isArray(entries))throw new Error('授業記録の応答を確認できません');for(const r of entries){if(r.calendar_event_id===targets[i].id)hydrated.set(r.calendar_event_id,r);if(r.record_collision)collisions.add(r.calendar_event_id);if(r.record_target_unavailable)unavailable.add(r.calendar_event_id);}}
+ entries=[...new Map([...entries.map(r=>[r.calendar_event_id,r]),...hydrated]).values()];
  const records=new Map(entries.map(r=>[r.calendar_event_id,{...r,...(collisions.has(r.calendar_event_id)?{record_collision:true}:{}),...(unavailable.has(r.calendar_event_id)?{record_target_unavailable:true}:{})}]));
  for(const r of rows){r.record=attributedLessonRecord(collisions.has(r.eventId)?{...records.get(r.eventId),calendar_event_id:r.eventId,record_collision:true}:records.get(r.eventId),r.ref);if(!Number.isSafeInteger(r.record.record_revision))throw new Error('授業記録の版を確認できません');r.completed=!!r.record.completed;r.lessonPlan=r.record.lesson_plan||'';r.confirmationTest=r.record.confirmation_test||'';r.homework=r.record.homework||'';r.lessonMemo=r.record.lesson_memo||'';r.prevRecord=r.previous?attributedLessonRecord(records.get(r.previous.id),lessonEventRef(r.previous)):{};r.prevLessonPlan=r.prevRecord.lesson_plan||'';}
  return {day,rows,periods,calendars,settings};

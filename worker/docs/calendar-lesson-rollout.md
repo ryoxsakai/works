@@ -4,55 +4,84 @@ User scope: individual lesson events starting 2026-10-20 00:00 Asia/Tokyo onward
 Source: D1 `curriculum_entries`; student memo stays in D1. R2 is unrelated.
 Old `/tutor/`, home widget and all URLs remain. Hidden fields stay hidden.
 
-## Current checkpoint
+## Current implementation (activation remains OFF)
 
-Implemented foundation only: existing-token Google adapter (including paginated ACL), lossless four-field description codec, conservative
-offline dry run, conditional single-instance export, persistent reservation and
-unknown-outcome reconciliation, and explicit empty-next-instance template planner.
-**No runtime routes call these writers. No production feature flag is enabled.**
-The journal guard is opt-in; default production behavior is unchanged.
+Existing-token Google adapter, lossless four-field codec, offline and protected
+browser dry runs, instance-only export, persistent reservation/unknown-outcome
+reconciliation, runtime source readers/writers, original Tutor/home shared editors,
+next-instance explicit template POST, own-save ETag propagation, and explicit
+inherit/separate flows are connected. MCP `get_schedule` and schedule-based
+notifications read the same Calendar fields. Student memo remains DB-only.
 
-The rendered managed content is four newline-separated headings, with values
-immediately after the full-width colon. Empty values remain empty. Hidden HTML
-comment boundaries and binding metadata identify the owned region; unmanaged
-description bytes remain unchanged. Live Google HTML normalization roundtrip is
-not yet verified. A rewritten/malformed region is held rather than guessed.
+Default production behavior remains D1 until the release operator sets activation.
+No schema/record/Calendar mutation was performed by development. Rendered managed
+content has four newline-separated headings; empty values stay empty. Hidden HTML
+comments delimit the region and its binding; unmanaged bytes are preserved. Actual
+Google UI normalization is not verified; malformed regions fail closed.
 
-## Exact access prerequisites (pending)
+Unverified legacy records remain readable/editable under their previous DB guards;
+they are never automatically confirmed or exported. An empty managed template is
+not a lesson plan value. A source rename requires explicit inherited/separate
+confirmation, preserving both DB archive and complete Calendar preimage.
 
-- This cloud environment has no configured production Cloudflare/Google identity,
-  secrets or authenticated browser. Do not discover tokens in files or introduce
-  alternative credentials.
-- `shared/auth.js` requests `calendar.readonly` and `calendar.events`, which allow
-  event reading/writing but **not** `acl.list`. Existing refresh token's actual
-  granted scopes are not inspected. Google requires `calendar`, `calendar.acls`
-  or `calendar.acls.readonly` for ACL inspection. Do not add a grant automatically.
-- Existing authorized connection must obtain fresh private DB backup + event/ACL
-  snapshots, with permission for the private destination. If an already granted
-  ACL-capable connection exists, reuse it; otherwise report the minimum additional
-  scope needed. No activation until sharing can be established reliably.
+## Access and activation prerequisites (pending)
 
-## Required remaining implementation before activation
+This environment has no configured production Cloudflare/Google identity, secrets
+or authenticated browser. Use an existing authorized connection, never discover or
+add credentials. Current requested scopes do not include ACL read. User explicitly
+attested that the three named calendars are private. Provision their **exact IDs**
+privately as `CALENDAR_LESSON_ATTESTED_CALENDARS` JSON array; do not hardcode names,
+IDs or people in source. Evidence basis is `owner_attested`, never `acl_verified`.
+The live CalendarList owner role and event organizer/guest checks remain mandatory.
+Any extra guest/omitted attendee list/non-owner/locked event is held. Unlisted
+calendars require actual complete ACL evidence via an already granted connection;
+an insufficient grant is held, not expanded.
 
-1. Connect the tested Google adapter to existing runtime dependencies; paginate complete ACLs, verify owner and event guests,
-   use existing OAuth only, `PATCH` description on the exact instance ID with
-   `If-Match` and `sendUpdates=none`, then GET it. No series-master mutations.
-2. Wire Calendar source reads + writes through existing attribution/CAS handlers:
-   current lesson, next lesson, curriculum read/write, schedule/MCP notifications,
-   audited update/undo/batch paths. A Calendar/D1 operation is not one transaction:
-   durable reservation and explicit reconciliation are mandatory. D1 mirror and
-   journal finalization must be atomic; source snapshots must remain archived.
-3. Client ETag propagation after its own Calendar save: update both source/target
-   references and serialized memo guards, including queued edits. Do not silently
-   ignore ETags to make repeated saves work.
-4. Explicit browser-only idempotent POST for empty next-instance initialization;
-   GET, schedule reads and notifications must never trigger it. Keep persistent
-   failure/unknown status and input intact. A template is not a lesson plan value.
-5. Tests against actual protected Worker routes, synthetic Google/D1, old Tutor and
-   home UI: four fields/multiline, hidden values, memo untouched, repeated save,
-   next-target changes, instance/series, source rename/generation, collisions,
-   concurrent unlink/attribution/profile edits, 412/403/429/5xx/lost response,
-   reload/partial resume, budgets at supported calendar counts, notifications.
+Required operator settings after fresh backup+restore and additive schema:
+
+- `CALENDAR_LESSON_MIGRATION_JOURNAL=true`: pending reservation guards enabled.
+- `CALENDAR_LESSON_ATTESTED_CALENDARS`: private exact approved calendar IDs only.
+- `CALENDAR_LESSON_BACKUP_SHA256`: full lowercase SHA256 of verified private backup.
+- `CALENDAR_LESSON_BACKUP_CAPTURED_AT`: its actual ISO capture time, within24h.
+- Finally `CALENDAR_LESSON_RECORDS=true`: source reads/writes and browser template
+  initialization enabled, only from the JST cutoff. Enable after reviewed transfer.
+
+No setting is included in wrangler.toml by this change. Missing/expired backup
+blocks apply. Missing journal activation blocks Calendar writes; never silently
+fall back to DB for a record already stored in Calendar.
+
+## Existing authenticated browser operations
+
+All endpoints require the existing owner browser session; MCP/API-key tokens cannot
+invoke transfer or initialization. Use existing auth; do not copy tokens to chat.
+
+1. `GET /api/calendar-lesson-migration/records?cursor=...` returns10 source event IDs
+   at a time, including orphans. Iterate its cursor to `done`; no record init occurs.
+2. `POST /api/calendar-lesson-migration/preview` with `{event_id}` returns raw source,
+   original full event, privacy evidence and conservative plan. One record per call
+   bounds Google/D1 requests. Store response privately, review every mapping and
+   hold reason. 404/ambiguous resolution is a hold, never inferred calendar identity.
+3. `POST /api/calendar-lesson-migration/apply` with `{plan: preview.plan}` revalidates
+   the same record/event/privacy. It requires fresh verified-backup settings and
+   journal. No bulk unreviewed transfer. Each response follows GET verification.
+4. `POST /api/calendar-lesson-record/reconcile` with `{target:{calendar_id,id}}`
+   performs no Calendar mutation. Exact postimage+unchanged identity can finalize
+   a previously dispatched unknown write; otherwise keep locked. The old image
+   alone never releases an unknown write. Tutor/home provide an explicit button
+   on a reloaded pending card. A still-reserved operation requires operator review.
+5. `POST /api/next-lesson-plan/initialize` is called only by browser next-lesson
+   reads with explicit source/target proof, deduplicated per account/target. Standard
+   GET and MCP reads have no initializer side effects. Nonempty description stays.
+
+## Deliberate compatibility boundary
+
+MCP batch/history text mutations for post-cutoff Calendar targets are rejected
+before D1-only writes: cross-event Calendar mutations cannot preserve the former
+single-D1-transaction atomic semantics. They must not silently bypass Calendar or
+pretend rollback. Use the original browser editors for these targets. Read tools,
+notifications, pre-cutoff operations and unmigrated UI/DB records are preserved.
+This limitation must be stated in release reporting, not called full MCP write
+parity. Future batch/undo receipts are a separate coherent enhancement.
 
 ## Backup, dry run and execution order
 
@@ -74,7 +103,7 @@ not yet verified. A rewritten/malformed region is held rather than guessed.
    `worker/calendar-lesson-migration.sql` through the existing authorized helper.
    Verify table/index definitions and source aggregates unchanged. Back up again
    before activation if intervening changes occurred.
-5. Deploy compatible backend first, verify exact version, then frontend. Enable
+5. Deploy compatible backend first with source activation OFF, verify exact version, then frontend. Enable
    journal guard only when schema and ACL adapter are ready. During rollout all
    writers must honor reservations. Do not mix old backend versions with active
    reservations. A missing journal must fail closed, not silently save to D1.
@@ -105,3 +134,14 @@ Official: https://developers.google.com/workspace/calendar/api/v3/reference/acl/
 and https://developers.google.com/workspace/calendar/api/guides/version-resources .
 The latter documents conditional writes and 412; PATCH field preservation is
 documented in the Events reference. No new OAuth scopes have been requested.
+
+## Synthetic request-budget evidence
+
+Three selected calendars, exact linked-save path with cold attribution schema:
+Google19 + D1 RPC13 =32 transport calls (35 SQL statements within those RPCs).
+Warm path Google19 + D1 RPC12 =31 (24 SQL statements). This is synthetic counting,
+not production telemetry. Larger calendar counts and long Google pagination need
+separate budget validation before activation; do not infer an unbounded guarantee.
+A managed event moved across the cutoff retains its Calendar source. An untouched
+pre-cutoff event stays DB-only. Clearing an already managed description reads as
+empty, never resurrecting stale DB shadow fields; original snapshots remain.

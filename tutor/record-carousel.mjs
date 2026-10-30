@@ -14,7 +14,7 @@ export function attachRecordCarousel(root) {
   const [prev,next] = controls.querySelectorAll('button'), position=controls.querySelector('span');
   const mobile=matchMedia('(max-width: 640px)'), reduced=matchMedia('(prefers-reduced-motion: reduce)');
   let instance=null, selected=null, printing=false;
-  const rows=()=>[...root.children].filter(row=>row.querySelector('.record-student-link,.lesson-record-review,.record-empty-label'));
+  const rows=()=>[...root.children].filter(row=>row.querySelector('.record-student-link,.lesson-record-review,.calendar-record-reconcile,.record-empty-label'));
   const identity=row=>row?.dataset.eventId || row?.textContent.trim().slice(0,100);
   function update() {
     const items=rows(), active=items.findIndex(row=>row.classList.contains('active'));

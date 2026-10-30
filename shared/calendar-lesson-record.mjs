@@ -55,9 +55,9 @@ export function parseCalendarRecord(description='') {
   if(cursor!==lines.length)throw fail('管理欄の項目が重複しています');
   return {binding,values,start,end:end+CALENDAR_RECORD_END.length};
 }
-export function replaceCalendarRecord(description,record,binding) {
+export function replaceCalendarRecord(description,record,binding,{explicitRebind=false}={}) {
   const parsed=parseCalendarRecord(description),identity=bindingValue(binding),values=calendarRecordValues(record);
-  if(parsed&&!sameCalendarRecordBinding(parsed.binding,identity))throw fail('別の授業に属する管理欄です');
+  if(parsed&&!sameCalendarRecordBinding(parsed.binding,identity)&&!explicitRebind)throw fail('別の授業に属する管理欄です');
   if(!parsed&&headings.some(heading=>description.includes(heading)))throw fail('既存の授業記述と競合するため自動追記を停止しました');
   const content=[CALENDAR_RECORD_START,'<!--binding:'+escapeHTML(JSON.stringify(identity))+'-->',...Object.entries(CALENDAR_RECORD_FIELDS).map(([key,heading])=>heading+encodeValue(values[key])),CALENDAR_RECORD_END].join('\n');
   if(parsed)return description.slice(0,parsed.start)+content+description.slice(parsed.end);

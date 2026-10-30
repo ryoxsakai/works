@@ -1,11 +1,11 @@
 // Uses the caller's existing OAuth token. Never refreshes authorization, adds a
 // scope, follows an authentication redirect or retries a mutation automatically.
 const root='https://www.googleapis.com/calendar/v3';
-export function calendarLessonGoogle({accessToken,fetcher=fetch}){
+export function calendarLessonGoogle({accessToken,fetcher=fetch,ownerEmail,attestedCalendars=[]}){
  if(typeof accessToken!=='string'||!accessToken)throw Error('existing Google access token required');
  const path=(calendar,suffix)=>`${root}/calendars/${encodeURIComponent(calendar)}/${suffix}`;
  async function request(url,options={}){
-  const res=await fetcher(url,{...options,redirect:'error',headers:{Authorization:`Bearer ${accessToken}`,...options.headers}});
+  const res=await fetcher(url,{...options,redirect:'manual',headers:{Authorization:`Bearer ${accessToken}`,...options.headers}});
   if(!res.ok)throw Object.assign(new Error(`Google Calendar request failed (${res.status})`),{status:res.status,code:res.status===403?'CALENDAR_EXISTING_GRANT_INSUFFICIENT':'CALENDAR_REQUEST_FAILED'});
   return res.json();
  }
@@ -13,6 +13,7 @@ export function calendarLessonGoogle({accessToken,fetcher=fetch}){
   async read(calendar,id){try{return await request(path(calendar,`events/${encodeURIComponent(id)}`));}catch(error){if(error.status===404)return null;throw error;}},
   async privacy(calendar){
    const metadata=await request(`${root}/users/me/calendarList/${encodeURIComponent(calendar)}`);
+   if(attestedCalendars.includes(calendar))return {basis:'owner_attested',approved:true,calendar_id:calendar,accessRole:metadata.accessRole,ownerEmail};
    const rules=[],tokens=new Set();let token='';
    do{
     const q=new URLSearchParams({maxResults:'250',showDeleted:'false'});if(token)q.set('pageToken',token);

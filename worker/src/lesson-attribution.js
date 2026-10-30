@@ -99,7 +99,7 @@ export function guardStatements(env, eventId, revision, calendarOperationId = ''
     CASE WHEN COALESCE((SELECT revision FROM lesson_record_identity WHERE event_id = ?),0) = ?${calendarGuard} THEN 1 ELSE 0 END)`)
     .bind(...args), env.DB.prepare('DELETE FROM lesson_record_guard WHERE id = ?').bind(id)];
 }
-export async function prepareRecordWrite(env, ref, patch, expectedRevision) {
+export async function prepareRecordWrite(env, ref, patch, expectedRevision, options = {}) {
   const row = await rawRecord(env,ref.id);
   requireCurrent(row,ref);
   if (expectedRevision !== undefined && expectedRevision !== row.record_revision) throw fail('別の画面で記録が変更されました。入力を残して再読み込みしてください','LESSON_RECORD_CONFLICT');
@@ -114,7 +114,7 @@ export async function prepareRecordWrite(env, ref, patch, expectedRevision) {
   const archive = emptyRebind ? [env.DB.prepare(`INSERT INTO lesson_record_archive(id,event_id,calendar_id,title,decision,snapshot_json) VALUES (?,?,?,?,?,?)`)
     .bind(crypto.randomUUID(),ref.id,row.record_calendar_id,row.record_title,'empty_rebind',JSON.stringify(row))] : [];
   return {record_calendar_id:legacy?row.record_calendar_id:ref.calendar_id,record_title:legacy?null:ref.title,revision:row.record_revision+1,generation:row.record_generation+(emptyRebind?1:0),statements:[
-    ...guardStatements(env,ref.id,row.record_revision), ...archive, ...source,
+    ...guardStatements(env,ref.id,row.record_revision,options.calendarOperationId||''), ...archive, ...source,
     env.DB.prepare(`INSERT INTO lesson_record_identity(event_id,calendar_id,title,revision) VALUES (?,?,?,0)
       ON CONFLICT(event_id) DO UPDATE SET calendar_id=excluded.calendar_id,title=excluded.title`)
       .bind(ref.id,legacy?row.record_calendar_id:ref.calendar_id,legacy?null:ref.title),
@@ -142,12 +142,12 @@ export async function commitRecords(env, statements) {
     throw error;
   }
 }
-export async function resolveAttribution(env, ref, revision, decision) {
+export async function prepareAttributionResolution(env, ref, revision, decision, calendarOperationId='') {
   if (!['inherit','separate'].includes(decision)) throw Object.assign(new Error('確認方法を選択してください'),{status:400});
   const row=await rawRecord(env,ref.id);
   if (!row.record_exists && !row.record_hold_active) throw fail('確認対象の旧記録がありません');
   if (row.record_revision !== revision) throw fail('記録が変更されました。再読み込みしてください','LESSON_RECORD_CONFLICT');
-  const statements=[...guardStatements(env,ref.id,revision),
+  const statements=[...guardStatements(env,ref.id,revision,calendarOperationId),
     env.DB.prepare(`INSERT INTO lesson_record_archive(id,event_id,calendar_id,title,decision,snapshot_json) VALUES (?,?,?,?,?,?)`)
       .bind(crypto.randomUUID(),ref.id,row.record_calendar_id,row.record_title,decision,JSON.stringify(row))];
   if(decision==='separate') statements.push(env.DB.prepare(`UPDATE curriculum_entries SET completed=0,
@@ -156,6 +156,10 @@ export async function resolveAttribution(env, ref, revision, decision) {
     ON CONFLICT(event_id) DO UPDATE SET calendar_id=excluded.calendar_id,title=excluded.title,revision=revision+1`)
     .bind(ref.id,ref.calendar_id,ref.title));
   statements.push(env.DB.prepare("UPDATE lesson_record_hold SET resolved_at=datetime('now') WHERE event_id=? AND resolved_at IS NULL").bind(ref.id));
-  await commitRecords(env,statements);
-  return readCommittedRecord(env,ref,{revision:revision+(decision==='separate' && row.record_exists?2:1),generation:row.record_generation+1});
+  return {statements,revision:revision+(decision==='separate' && row.record_exists?2:1),generation:row.record_generation+1};
+}
+export async function resolveAttribution(env, ref, revision, decision) {
+  const prepared=await prepareAttributionResolution(env,ref,revision,decision);
+  await commitRecords(env,prepared.statements);
+  return readCommittedRecord(env,ref,prepared);
 }

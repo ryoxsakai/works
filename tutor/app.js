@@ -1,6 +1,7 @@
+import {readNextLessonWithTemplate} from "../shared/next-lesson-read.mjs?v=1";
 import { lessonRecordRows, renderPlanEditors, renderMemoEditors } from "../shared/lesson-record-view.mjs?v=1";
 import { setUserAvatar } from "../shared/avatar.mjs?v=1";
-import { attachRecordCarousel } from "./record-carousel.mjs?v=1";
+import { attachRecordCarousel } from "./record-carousel.mjs?v=2";
 import { attachRecordToasts } from "./record-toasts.mjs?v=2";
 import { startTutorPresentation } from "../shared/ui/tutor-presentation.mjs";
 startTutorPresentation();
@@ -14,7 +15,7 @@ import {
 import { getTheme, setTheme } from "../shared/theme.js?v=6";
 import { tokyoDateKey, shiftRecordDate, recordDateRange } from "./record-date.js?v=1";
 import { createStudentMemoStore } from "./student-memo.js?v=1";
-import { createLessonPlanController } from "./lesson-plan.js?v=3";
+import { createLessonPlanController } from "./lesson-plan.js?v=4";
 import { lessonEventRef, lessonEventKey } from "../shared/lesson-plan.js?v=1";
 
 const PASTEL_FALLBACK_COLORS = [
@@ -237,17 +238,25 @@ const studentMemos = createStudentMemoStore({
 });
 
 const lessonPlans = createLessonPlanController({
-  readNext: (source) => apiFetch(`/next-lesson-plan?calendar_id=${encodeURIComponent(source.calendar_id)}&event_id=${encodeURIComponent(source.id)}`, {}, null),
+  readNext: (source) => readNextLessonWithTemplate(source,(path,opts={})=>apiFetch(path,opts,null),(before,after,revision)=>applyCalendarTarget(before,after,revision),getSessionToken(),getSessionToken),
   write: async (body) => {
     const result = await apiFetch("/lesson-plan", { method: "PUT", body: JSON.stringify(body) }, null);
     document.querySelectorAll("tr[data-record-ref]").forEach(row => {
       const ref=JSON.parse(row.dataset.recordRef);
-      if (lessonEventKey(ref) === lessonEventKey(body.target)) row.dataset.recordRevision = result.record_revision;
+      if (lessonEventKey(ref) === lessonEventKey(body.target)) {row.dataset.recordRevision = result.record_revision;if(result.target)row.dataset.recordRef=JSON.stringify(result.target);}
     });
+    if(result.target)applyCalendarTarget(body.target,result.target,result.record_revision);
     return result;
   },
   onChange: () => renderLessonPlans(),
 });
+
+function applyCalendarTarget(before,after,revision){
+  lessonPlans.observeTarget(before,after);
+  if(Number.isSafeInteger(revision))lessonPlans.observeRecord(after,revision);
+  for(const event of rawEvents)if(lessonEventKey(lessonEventRef(event))===lessonEventKey(before))event.etag=after.etag;
+  document.querySelectorAll('tr[data-record-ref]').forEach(row=>{const ref=JSON.parse(row.dataset.recordRef);if(lessonEventKey(ref)===lessonEventKey(before)){row.dataset.recordRef=JSON.stringify(after);if(Number.isSafeInteger(revision))row.dataset.recordRevision=revision;}});
+}
 
 let calendarColors = new Map(); // calendarId -> { raw, bg, fg }
 let years = [];
@@ -691,6 +700,7 @@ els.recordTbody.addEventListener("change", async (e) => {
       }),
     });
     row.dataset.recordRevision = savedRecord.record_revision;
+    if(savedRecord.target)applyCalendarTarget(JSON.parse(row.dataset.recordRef),savedRecord.target,savedRecord.record_revision);
     lessonPlans.observeRecord(JSON.parse(row.dataset.recordRef),savedRecord.record_revision);
   } catch (err) {
     showActionError(err);
@@ -827,13 +837,14 @@ async function apiFetch(path, options = {}, context = (/^\/(?:goals|schools|stud
       const detail = await res.text();
       const error = new Error(`API error ${res.status}: ${detail}`);
       error.status = res.status;
-      try { const data = JSON.parse(detail); error.code = data.code; error.current = data.current; } catch {}
+      try { const data = JSON.parse(detail); error.code = data.code; error.current = data.current; error.unknown=data.code==='CALENDAR_WRITE_UNKNOWN'; } catch {}
       throw error;
     }
     const result = res.status === 204 ? null : await res.json();
     if (context) assertStudentContext(context);
     return result;
   } catch (err) {
+    if((options.method==='PUT'||path==='/next-lesson-plan/initialize')&&!err.status)err.unknown=true;
     if (context) assertStudentContext(context);
     throw err;
   }
@@ -2581,6 +2592,7 @@ els.curriculumTbody.addEventListener("change", async (e) => {
       }),
     });
     row.dataset.recordRevision = savedRecord.record_revision;
+    if(savedRecord.target)applyCalendarTarget(JSON.parse(row.dataset.recordRef),savedRecord.target,savedRecord.record_revision);
     lessonPlans.observeRecord(JSON.parse(row.dataset.recordRef),savedRecord.record_revision);
   } catch (err) {
     showActionError(err);
@@ -3549,10 +3561,15 @@ function escapeHtml(str) {
 
 
 function lessonReviewRow(ref,record,label,date) {
+  if(record.record_pending_operation)return `<tr><td colspan="7"><strong>${escapeHtml(label)}</strong> ${escapeHtml(date)}<p role="status">カレンダー保存の結果確認が必要です。再送は停止しています。</p><button type="button" class="calendar-record-reconcile" data-ref="${escapeHtml(JSON.stringify(ref))}">保存結果を照合する</button><small role="status"></small></td></tr>`;
   return `<tr><td colspan="7"><strong>${escapeHtml(label)}</strong> ${escapeHtml(date)}
     <p role="status">${record.attribution_status === "known_change" ? "既に予定名が変更されたことが分かっている枠です。" : record.attribution_status === "target_unavailable" ? "予定が削除・変更されたため再読み込みが必要です。" : record.attribution_status === "id_collision" ? "複数カレンダーに同じ予定IDがあり、安全に対応できません。" : record.record_title != null ? `確認済みの予定名「${escapeHtml(record.record_title)}」から変更されています。` : `比較開始時に観測した予定名「${escapeHtml(record.record_observed_title || "不明")}」から変更されています。この観測値は所属の証明ではありません。`} 対応を確認するまで授業記録の表示・保存を停止しています。</p>
     <button type="button" class="lesson-record-review" style="min-height:44px" data-ref="${escapeHtml(JSON.stringify(ref))}">旧記録を確認して対応を選ぶ</button></td></tr>`;
 }
+document.addEventListener('click',async event=>{
+ const button=event.target.closest('.calendar-record-reconcile');if(!button||button.disabled)return;
+ button.disabled=true;try{await apiFetch('/calendar-lesson-record/reconcile',{method:'POST',body:JSON.stringify({target:JSON.parse(button.dataset.ref)})},null);await loadRecordTable();}catch(error){button.nextElementSibling.textContent=error.message;button.disabled=false;}
+});
 document.addEventListener("click",async event => {
   const button=event.target.closest(".lesson-record-review");
   if(!button || button.disabled) return;
@@ -3595,12 +3612,16 @@ async function readRecordEntries(events,context=null) {
   const targets=[...new Map(events.map(event=>{const ref=lessonEventRef(event);return [lessonEventKey(ref),ref];})).values()];
   let entries=[];const collisions=new Set(),unavailable=new Set();
   if(!targets.length) return apiFetch("/curriculum?attribution=1",{},context);
-  for(let offset=0;offset<targets.length;offset+=250) {
-    entries=await apiFetch("/lesson-records",{method:"POST",body:JSON.stringify({targets:targets.slice(offset,offset+250)})},context);
+  const hydrated=new Map();
+  for(let offset=0,limit=1;offset<targets.length;) {
+    const batch=targets.slice(offset,offset+limit);
+    entries=await apiFetch("/lesson-records",{method:"POST",body:JSON.stringify({targets:batch})},context);
+    for(const row of entries)if(batch.some(ref=>ref.id===row.calendar_event_id))hydrated.set(row.calendar_event_id,row);
     entries.filter(row=>row.record_collision).forEach(row=>collisions.add(row.calendar_event_id));
     entries.filter(row=>row.record_target_unavailable).forEach(row=>unavailable.add(row.calendar_event_id));
+    offset+=batch.length;limit=entries.some(row=>row.calendar_source_enabled)?1:250;
   }
-  return entries.map(row=>({...row,...(collisions.has(row.calendar_event_id)?{record_collision:true}:{}),...(unavailable.has(row.calendar_event_id)?{record_target_unavailable:true}:{})}));
+  return [...new Map([...entries.map(row=>[row.calendar_event_id,row]),...hydrated]).values()].map(row=>({...row,...(collisions.has(row.calendar_event_id)?{record_collision:true}:{}),...(unavailable.has(row.calendar_event_id)?{record_target_unavailable:true}:{})}));
 }
 
 

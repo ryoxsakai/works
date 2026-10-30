@@ -2,7 +2,7 @@ import test from 'node:test';import assert from 'node:assert/strict';
 import {calendarLessonGoogle} from '../src/calendar-lesson-google.js';
 test('existing-token adapter paginates complete ACL and sends only description with instance ETag',async()=>{
  const calls=[];const api=calendarLessonGoogle({accessToken:'synthetic',fetcher:async(url,options)=>{
-  calls.push({url,options});assert.equal(options.redirect,'error');assert.equal(options.headers.Authorization,'Bearer synthetic');
+  calls.push({url,options});assert.equal(options.redirect,'manual');assert.equal(options.headers.Authorization,'Bearer synthetic');
   if(url.includes('calendarList'))return Response.json({accessRole:'owner'});
   if(url.includes('/acl'))return Response.json(new URL(url).searchParams.has('pageToken')?{items:[{role:'freeBusyReader',scope:{type:'default'}}]}:{items:[{role:'owner',scope:{type:'user',value:'owner@example.invalid'}}],nextPageToken:'next'});
   return Response.json({id:'instance',etag:'"new"'});
@@ -22,4 +22,8 @@ test('ACL malformed/repeated continuation is not a complete sharing proof',async
   const api=calendarLessonGoogle({accessToken:'synthetic',fetcher:async url=>Response.json(url.includes('calendarList')?{accessRole:'owner'}:page)});
   await assert.rejects(api.privacy('calendar'));
  }
+});
+test('exact private calendar attestation is not mislabeled as ACL evidence and does not request a new scope',async()=>{
+ const paths=[];const api=calendarLessonGoogle({accessToken:'synthetic',ownerEmail:'owner@example.invalid',attestedCalendars:['approved'],fetcher:async url=>{paths.push(url);return Response.json({accessRole:'owner'});}});
+ const proof=await api.privacy('approved');assert.equal(proof.basis,'owner_attested');assert.equal(proof.complete,undefined);assert.equal(proof.rules,undefined);assert.equal(paths.length,1);assert.ok(!paths.some(p=>p.includes('/acl')));
 });

@@ -16,7 +16,7 @@ async function setup(t) {
   const fetchMock = createFetchMock();
   const externalRequests = [];
   fetchMock.disableNetConnect(); // Every external request must match a synthetic fixture.
-  const mf = new Miniflare({ modules: true, modulesRoot: new URL("../../", import.meta.url).pathname, modulesRules: [{ type: "ESModule", include: ["**/*.js"] }], scriptPath: new URL("../src/index.js", import.meta.url).pathname, compatibilityDate: "2026-08-01", d1Databases: { DB: "runtime-test" }, bindings, outboundService: async request => {
+  const mf = new Miniflare({ modules: true, modulesRoot: new URL("../../", import.meta.url).pathname, modulesRules: [{ type: "ESModule", include: ["**/*.js", "**/*.mjs"] }], scriptPath: new URL("../src/index.js", import.meta.url).pathname, compatibilityDate: "2026-08-01", d1Databases: { DB: "runtime-test" }, bindings, outboundService: async request => {
     const body = await request.text();
     externalRequests.push(new URL(request.url).origin);
     return fixtureFetch(request.url, { method: request.method, headers: Object.fromEntries(request.headers), ...(body ? { body } : {}), dispatcher: fetchMock, redirect: "manual" });

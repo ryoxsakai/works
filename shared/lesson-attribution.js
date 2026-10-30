@@ -31,7 +31,7 @@ export function attributedLessonRecord(row, ref) {
   } else reason='title_changed';
   return {calendar_event_id:row.calendar_event_id,record_exists:Boolean(row.record_exists),record_calendar_id:row.record_calendar_id,
     record_title:row.record_title,record_observed_calendar_id:row.record_observed_calendar_id,record_observed_title:row.record_observed_title,
-    record_observed_at:row.record_observed_at,record_hold_active:row.record_hold_active,record_revision:row.record_revision || 0,
+    record_observed_at:row.record_observed_at,record_hold_active:row.record_hold_active,record_revision:row.record_revision || 0,record_pending_operation:row.record_pending_operation,
     attribution_status:reason,attribution_notice:'予定名の対応確認が必要なため、旧記録を現在の内容として表示していません。',completed:0,
     lesson_plan:null,confirmation_test:null,homework:null,lesson_memo:null};
 }

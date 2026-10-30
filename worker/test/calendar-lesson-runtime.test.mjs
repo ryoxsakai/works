@@ -1,0 +1,117 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {readFile} from 'node:fs/promises';import {Miniflare} from 'miniflare';
+import {ensureAttribution,rawRecord} from '../src/lesson-attribution.js';
+import {replaceCalendarRecord,parseCalendarRecord} from '../../shared/calendar-lesson-record.mjs';
+const origin='https://works.example.test',owner='owner@example.invalid';
+async function token(secret,claims={}){const payload=Buffer.from(JSON.stringify({email:owner,exp:Date.now()+86400000,...claims})).toString('base64url');const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(secret),{name:'HMAC',hash:'SHA-256'},false,['sign']);return payload+'.'+Buffer.from(await crypto.subtle.sign('HMAC',key,new TextEncoder().encode(payload))).toString('base64url');}
+async function setup(t,{backup=false}={}){
+ const event=(id,hour,date='2026-10-31')=>({id,summary:'合成生徒',organizer:{self:true},etag:'"'+id+'-1"',start:{dateTime:`${date}T${hour}:00:00+09:00`},end:{dateTime:`${date}T${hour+1}:00:00+09:00`}});
+ const events=[event('a',10),event('b',11),event('c',10,'2026-11-07')],control={patches:[],reads:[],lost:false,deny:false};
+ const bindings={SESSION_SECRET:'synthetic-secret',ALLOWED_EMAIL:owner,ALLOWED_ORIGIN:origin,GOOGLE_CLIENT_ID:'synthetic',GOOGLE_CLIENT_SECRET:'synthetic',WORKS_API_KEY:'synthetic-key',CALENDAR_LESSON_RECORDS:'true',CALENDAR_LESSON_MIGRATION_JOURNAL:'true',CALENDAR_LESSON_ATTESTED_CALENDARS:'["synthetic-calendar"]'};
+ if(backup){bindings.CALENDAR_LESSON_BACKUP_SHA256='f'.repeat(64);bindings.CALENDAR_LESSON_BACKUP_CAPTURED_AT=new Date().toISOString();}
+ const mf=new Miniflare({modules:true,modulesRoot:new URL('../../',import.meta.url).pathname,modulesRules:[{type:'ESModule',include:['**/*.js','**/*.mjs']}],scriptPath:new URL('../src/index.js',import.meta.url).pathname,compatibilityDate:'2026-08-01',d1Databases:{DB:'calendar-runtime'},bindings,outboundService:async request=>{
+  const url=new URL(request.url);control.reads.push(url.pathname);
+  if(url.origin==='https://oauth2.googleapis.com')return Response.json({access_token:'synthetic',expires_in:3600});
+  assert.equal(url.origin,'https://www.googleapis.com');
+  if(url.pathname.includes('/calendarList/'))return Response.json({accessRole:'owner'});
+  if(url.pathname.includes('/acl'))throw Error('no new ACL grant allowed');
+  if(url.pathname.endsWith('/events'))return Response.json({items:events.filter(e=>Date.parse(e.end.dateTime)>Date.parse(url.searchParams.get('timeMin'))&&Date.parse(e.start.dateTime)<Date.parse(url.searchParams.get('timeMax')))});
+  const ev=events.find(e=>e.id===decodeURIComponent(url.pathname.split('/').at(-1)));if(!ev)return new Response('',{status:404});
+  if(request.method==='PATCH'){
+   if(control.deny)return new Response('',{status:403});
+   if(request.headers.get('If-Match')!==ev.etag)return new Response('',{status:412});
+   const body=await request.json();assert.deepEqual(Object.keys(body),['description']);assert.equal(url.searchParams.get('sendUpdates'),'none');
+   control.patches.push({id:ev.id,body});ev.description=body.description;ev.etag='"'+ev.id+'-'+(control.patches.length+1)+'"';
+   if(control.lost)throw Error('response lost after commit');
+  }
+  return Response.json(ev);
+ }});t.after(()=>mf.dispose());const DB=await mf.getD1Database('DB');
+ await DB.batch([DB.prepare('CREATE TABLE settings(key TEXT PRIMARY KEY,value TEXT)'),DB.prepare("INSERT INTO settings VALUES('selected_calendars','[\"synthetic-calendar\"]')"),DB.prepare('CREATE TABLE google_auth(id INTEGER PRIMARY KEY,refresh_token TEXT,updated_at TEXT)'),DB.prepare("INSERT INTO google_auth VALUES(1,'synthetic','now')"),DB.prepare('CREATE TABLE curriculum_entries(calendar_event_id TEXT PRIMARY KEY,completed INTEGER DEFAULT 0,lesson_plan TEXT,confirmation_test TEXT,homework TEXT,lesson_memo TEXT,updated_at TEXT)')]);
+ await ensureAttribution({DB});const sql=await readFile(new URL('../calendar-lesson-migration.sql',import.meta.url),'utf8');await DB.batch(sql.replace(/^--.*$/gm,'').split(';').filter(s=>s.trim()).map(s=>DB.prepare(s)));
+ await DB.prepare("INSERT INTO curriculum_entries VALUES('b',0,'DB original','original test','original homework','original memo','now')").run();
+ await DB.prepare("UPDATE lesson_record_identity SET calendar_id='synthetic-calendar',title='合成生徒' WHERE event_id='b'").run();const row=await rawRecord({DB},'b');
+ events[1].description=replaceCalendarRecord('既存の案内',{...row,lesson_plan:'Calendar native value'},{calendar_id:'synthetic-calendar',event_id:'b',title:'合成生徒',generation:0});
+ const headers={Authorization:'Bearer '+await token(bindings.SESSION_SECRET),'Content-Type':'application/json'};
+ const call=(path,body,customHeaders=headers)=>mf.dispatchFetch(origin+path,{headers:customHeaders,...(body?{method:'POST',body:JSON.stringify(body)}:{})});
+ const put=(path,body)=>mf.dispatchFetch(origin+path,{headers,method:'PUT',body:JSON.stringify(body)});
+ return {DB,events,control,call,put,bindings};
+}
+test('actual Worker: current/next/MCP read Calendar without initialization, repeated saves and snapshots preserve original values',async t=>{
+ const {DB,events,control,call,put,bindings}=await setup(t);
+ const read=async id=>(await (await call('/api/lesson-plan?calendar_id=synthetic-calendar&event_id='+id)).json());
+ let current=await read('b');assert.equal(current.lesson_plan,'Calendar native value');assert.equal(control.patches.length,0);
+ const schedule=await (await call('/api/schedule?date=2026-10-31',null,{'X-API-Key':'synthetic-key'})).json();
+ assert.equal(schedule.events.find(e=>e.id==='b').lesson_plan,'Calendar native value');assert.equal(control.patches.length,0);
+ const next=await (await call('/api/next-lesson-plan?calendar_id=synthetic-calendar&event_id=b')).json();assert.equal(next.target.id,'c');assert.equal(next.template_initialization_available,true);assert.equal(control.patches.length,0);
+ const init=await call('/api/next-lesson-plan/initialize',{source:next.source,target:next.target});assert.equal(init.status,200,JSON.stringify(await init.clone().json()));assert.equal(parseCalendarRecord(events[2].description).values.lesson_plan,'');
+ const again=await (await call('/api/next-lesson-plan?calendar_id=synthetic-calendar&event_id=b')).json();assert.equal(again.template_initialization_available,false);assert.equal(control.patches.length,1);
+ const emptySchedule=await (await call('/api/schedule?date=2026-11-07',null,{'X-API-Key':'synthetic-key'})).json();assert.equal(emptySchedule.events.find(e=>e.id==='c').lesson_plan,null);assert.equal(emptySchedule.events.find(e=>e.id==='c').homework,null);assert.equal(control.patches.length,1);
+ for(const value of ['保存1\n二行目','保存2']){
+  const saved=await put('/api/lesson-plan',{target:current.target,record_revision:current.record_revision,expected_lesson_plan:current.lesson_plan,lesson_plan:value});assert.equal(saved.status,200,JSON.stringify(await saved.clone().json()));
+  const response=await saved.json();assert.equal(response.lesson_plan,value);assert.notEqual(response.target.etag,current.target.etag);current={...response};
+ }
+ assert.equal(parseCalendarRecord(events[1].description).values.homework,'original homework');
+ assert.equal((await rawRecord({DB},'b')).lesson_plan,'保存2');
+ const snapshots=(await DB.prepare("SELECT snapshot_json FROM calendar_lesson_migration WHERE event_id='b' ORDER BY rowid").all()).results;
+ assert.equal(JSON.parse(snapshots[0].snapshot_json).record_before.lesson_plan,'DB original');
+ const stale=await put('/api/lesson-plan',{target:{...current.target,etag:'"stale"'},record_revision:current.record_revision,expected_lesson_plan:'保存2',lesson_plan:'no'});assert.equal(stale.status,409);assert.equal(control.patches.length,3);
+ const bearer=await token(bindings.SESSION_SECRET,{aud:'works-mcp',scope:'schedule:read'});
+ const mcp=await call('/mcp',{jsonrpc:'2.0',id:1,method:'tools/call',params:{name:'get_schedule',arguments:{date:'2026-10-31'}}},{Authorization:'Bearer '+bearer,'Content-Type':'application/json'});const result=await mcp.json();assert.equal(result.result.structuredContent.events.find(e=>e.id==='b').lesson_plan,'保存2');assert.equal(control.patches.length,3);
+});
+test('actual Worker unknown dispatch keeps source snapshot and blocks another write without replay',async t=>{
+ const {DB,control,call,put}=await setup(t);const current=await (await call('/api/lesson-plan?calendar_id=synthetic-calendar&event_id=b')).json();control.lost=true;
+ const body={target:current.target,record_revision:current.record_revision,expected_lesson_plan:current.lesson_plan,lesson_plan:'committed but response lost'};
+ assert.equal((await put('/api/lesson-plan',body)).status,503);assert.equal(control.patches.length,1);
+ assert.equal((await DB.prepare("SELECT status FROM calendar_lesson_migration WHERE event_id='b'").first()).status,'unknown');
+ assert.equal((await rawRecord({DB},'b')).lesson_plan,'DB original');
+ const hidden=await (await call('/api/lesson-plan?calendar_id=synthetic-calendar&event_id=b')).json();assert.equal(hidden.attribution_status,'target_unavailable');assert.equal(hidden.lesson_plan,'');
+ assert.equal((await put('/api/lesson-plan',body)).status,409);assert.equal(control.patches.length,1);
+});
+test('actual Worker explicit separation archives old content and rebinds only the individual Calendar region',async t=>{
+ const {DB,events,control,call,put}=await setup(t);events[1].summary='別の合成生徒';events[1].etag='"renamed"';
+ const held=await (await call('/api/lesson-plan?calendar_id=synthetic-calendar&event_id=b')).json();assert.equal(held.attribution_status,'title_changed');assert.equal(held.lesson_plan,'');
+ const response=await put('/api/lesson-record',{target:held.target,record_revision:held.record_revision,decision:'separate'});assert.equal(response.status,200,JSON.stringify(await response.clone().json()));
+ const fresh=await (await call('/api/lesson-plan?calendar_id=synthetic-calendar&event_id=b')).json();assert.equal(fresh.lesson_plan,'');assert.equal(fresh.attribution_status,'new');
+ assert.equal(parseCalendarRecord(events[1].description).binding.title,'別の合成生徒');assert.equal(parseCalendarRecord(events[1].description).binding.generation,1);
+ const archive=await DB.prepare("SELECT snapshot_json FROM lesson_record_archive WHERE event_id='b'").first();assert.equal(JSON.parse(archive.snapshot_json).lesson_plan,'DB original');
+ const backup=await DB.prepare("SELECT snapshot_json FROM calendar_lesson_migration WHERE event_id='b'").first();assert.equal(parseCalendarRecord(JSON.parse(backup.snapshot_json).before.description).values.lesson_plan,'Calendar native value');assert.equal(control.patches.length,1);
+});
+test('actual Worker explicit reconciliation finalizes a lost response without sending another PATCH',async t=>{
+ const {DB,control,call,put}=await setup(t);const current=await (await call('/api/lesson-plan?calendar_id=synthetic-calendar&event_id=b')).json();control.lost=true;
+ await put('/api/lesson-plan',{target:current.target,record_revision:current.record_revision,expected_lesson_plan:current.lesson_plan,lesson_plan:'照合対象'});
+ const response=await call('/api/calendar-lesson-record/reconcile',{target:current.target});assert.equal(response.status,200,JSON.stringify(await response.clone().json()));assert.equal((await response.json()).reconciled,true);assert.equal(control.patches.length,1);
+ assert.equal((await rawRecord({DB},'b')).lesson_plan,'照合対象');assert.equal((await DB.prepare("SELECT status FROM calendar_lesson_migration WHERE event_id='b'").first()).status,'verified');
+});
+test('unverified legacy records keep existing DB edits without exporting or auto-confirming ownership',async t=>{
+ const {DB,events,control,call,put}=await setup(t);delete events[1].description;
+ await DB.prepare("UPDATE lesson_record_identity SET title=NULL WHERE event_id='b'").run();
+ await DB.prepare("INSERT INTO lesson_record_baseline(event_id,calendar_id,title,effective_date) VALUES('b','synthetic-calendar','合成生徒','2026-10-27')").run();
+ const current=await (await call('/api/lesson-plan?calendar_id=synthetic-calendar&event_id=b')).json();assert.equal(current.attribution_status,'legacy_unverified');
+ const response=await put('/api/lesson-plan',{target:current.target,record_revision:current.record_revision,expected_lesson_plan:current.lesson_plan,lesson_plan:'DBに保持'});assert.equal(response.status,200,JSON.stringify(await response.clone().json()));
+ assert.equal((await response.json()).record_storage,'db_pending_migration');assert.equal(control.patches.length,0);assert.equal((await rawRecord({DB},'b')).record_title,null);
+});
+test('protected migration preview is read-only; backup-gated instance apply is verified/idempotent and retains raw D1',async t=>{
+ const {DB,events,control,call}=await setup(t,{backup:true});events[1].description='既存の案内';
+ const listing=await (await call('/api/calendar-lesson-migration/records')).json();assert.deepEqual(listing.items,[{calendar_event_id:'b'}]);
+ const preview=await (await call('/api/calendar-lesson-migration/preview',{event_id:'b'})).json();assert.equal(preview.plan.status,'ready');assert.equal(preview.privacy.basis,'owner_attested');assert.equal(preview.privacy.rules,undefined);assert.equal(control.patches.length,0);
+ const bad=await call('/api/calendar-lesson-migration/apply',{plan:{...preview.plan,after_description:'overwrite'}});assert.equal(bad.status,409);assert.equal(control.patches.length,0);
+ const applied=await call('/api/calendar-lesson-migration/apply',{plan:preview.plan});assert.equal(applied.status,200,JSON.stringify(await applied.clone().json()));assert.equal((await applied.json()).status,'verified');assert.equal(control.patches.length,1);
+ assert.equal((await rawRecord({DB},'b')).lesson_plan,'DB original');assert.ok(events[1].description.startsWith('既存の案内\n'));assert.equal(parseCalendarRecord(events[1].description).values.lesson_plan,'DB original');
+ const repeated=await call('/api/calendar-lesson-migration/apply',{plan:preview.plan});assert.equal(repeated.status,200,JSON.stringify(await repeated.clone().json()));assert.equal(control.patches.length,1);
+});
+test('no verified-backup configuration means zero migration PATCH calls',async t=>{
+ const {events,control,call}=await setup(t);events[1].description='既存の案内';const preview=await (await call('/api/calendar-lesson-migration/preview',{event_id:'b'})).json();assert.equal(preview.plan.status,'ready');const response=await call('/api/calendar-lesson-migration/apply',{plan:preview.plan});assert.equal(response.status,503);assert.equal(control.patches.length,0);
+});
+test('time moves retain an already managed source, while untouched pre-cutoff records remain DB-only',async t=>{
+ const {events,control,call,put}=await setup(t);events[1].start.dateTime='2026-10-19T11:00:00+09:00';events[1].end.dateTime='2026-10-19T12:00:00+09:00';events[1].etag='"moved"';
+ const read=async id=>(await (await call('/api/lesson-plan?calendar_id=synthetic-calendar&event_id='+id)).json());
+ let current=await read('b');assert.equal(current.lesson_plan,'Calendar native value');
+ let response=await put('/api/lesson-plan',{target:current.target,record_revision:current.record_revision,expected_lesson_plan:current.lesson_plan,lesson_plan:'移動後も同じ記録'});assert.equal(response.status,200,JSON.stringify(await response.clone().json()));assert.equal(control.patches.length,1);
+ events[0].start.dateTime='2026-10-18T10:00:00+09:00';events[0].end.dateTime='2026-10-18T11:00:00+09:00';events[0].etag='"historical"';current=await read('a');
+ response=await put('/api/lesson-plan',{target:current.target,record_revision:current.record_revision,expected_lesson_plan:current.lesson_plan,lesson_plan:'従来のDB保存'});assert.equal(response.status,200,JSON.stringify(await response.clone().json()));assert.equal(control.patches.length,1);assert.equal(events[0].description,undefined);assert.equal((await read('a')).lesson_plan,'従来のDB保存');
+});
+test('clearing a migrated Calendar description never resurrects the old DB shadow or hidden fields',async t=>{
+ const {events,call,put}=await setup(t);const read=async()=>(await (await call('/api/lesson-plan?calendar_id=synthetic-calendar&event_id=b')).json());
+ let current=await read();await put('/api/lesson-plan',{target:current.target,record_revision:current.record_revision,expected_lesson_plan:current.lesson_plan,lesson_plan:'保存前の予定'});
+ events[1].description='';events[1].etag='"user-cleared"';current=await read();assert.equal(current.lesson_plan,'');assert.equal(current.record_storage,'calendar_missing_fields');
+ const response=await put('/api/lesson-plan',{target:current.target,record_revision:current.record_revision,expected_lesson_plan:'',lesson_plan:'消去後の予定'});assert.equal(response.status,200,JSON.stringify(await response.clone().json()));const values=parseCalendarRecord(events[1].description).values;assert.equal(values.lesson_plan,'消去後の予定');assert.equal(values.homework,'');assert.equal(values.confirmation_test,'');assert.equal(values.lesson_memo,'');
+});

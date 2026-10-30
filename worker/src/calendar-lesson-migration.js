@@ -10,6 +10,13 @@ export function recordBinding(row,ref){return {calendar_id:ref.calendar_id,event
 // ACL input must come from a trusted, complete server-side lookup. It is never
 // accepted as an assertion from a browser mutation body or stored layout data.
 export function calendarRecordPrivacy(event,privacy,ownerEmail){
+ // Explicit owner attestation is a separate evidence type, not fabricated ACL.
+ // It is provisioned privately by the release operator for exact calendar IDs.
+ if(typeof ownerEmail==='string'&&ownerEmail&&privacy?.basis==='owner_attested'&&privacy.approved===true&&privacy.calendar_id===event.calendar_id&&privacy.accessRole==='owner'&&privacy.ownerEmail?.toLowerCase()===ownerEmail.toLowerCase()){
+  if(event.attendeesOmitted||event.attendees?.some(a=>!a.self))return block('event_guests');
+  if(event.locked||event.privateCopy||event.organizer?.self!==true)return block('event_not_owned');
+  return {status:'safe',basis:'owner_attested'};
+ }
  if(!ownerEmail||privacy?.complete!==true||privacy.calendar_id!==event.calendar_id||!Array.isArray(privacy.rules))return block('sharing_unverified');
  if(privacy.accessRole!=='owner')return block('not_calendar_owner');
  if(event.attendeesOmitted||event.attendees?.some(a=>!a.self))return block('event_guests');
