@@ -42,3 +42,11 @@ test('ToDo isolated CSS uses official controls without adding a second dialog or
  assert.ok(!/fetch\(|localStorage|showModal\(|\.value\s*=|\.disabled\s*=/.test(presentation));
  assert.ok(!css.includes('@view-transition'));
 });
+test('KDP isolates official CSS and preserves its own data, upload and native dialog controllers',async()=>{
+ const css=await load('shared/ui/kdp-bootstrap.css');
+ postcss.parse(css).walkRules(rule=>{for(const selector of rule.selectors)assert.ok(selector.startsWith('.kdp-bootstrap'),selector);});
+ const source=await load('shared/ui/kdp-presentation.mjs');
+ assert.ok(!/fetch\(|localStorage|showModal\(|\.value\s*=|\.disabled\s*=/.test(source));
+ assert.ok(source.includes(':not([type="file"])'));
+ assert.ok(!css.includes('@view-transition'));
+});

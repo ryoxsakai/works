@@ -10,9 +10,11 @@
     <link rel="stylesheet" href="/shared/styles.css?v=56" />
     <link rel="stylesheet" href="/kdp/kdp.css?v=2" />
     <link rel="stylesheet" href="/shared/header.css?v=2" />
+  <link rel="stylesheet" href="/shared/ui/kdp-bootstrap.css?v=1" />
+  <link rel="stylesheet" href="/shared/ui/kdp-tokens.css?v=1" />
   <script type="module" src="/shared/header.js?v=4"></script>
 </head>
-  <body>
+  <body class="kdp-bootstrap">
     <header class="page-header works-header">
     <h1><a class="works-home" href="/" aria-label="Works ホーム"><span class="page-header-icon" aria-hidden="true">W</span><span>Works</span></a><span class="works-page-title">KDP管理</span></h1>
     <div class="works-header-actions">
@@ -44,7 +46,7 @@
               <button id="back-books">← 本一覧</button>
               <h2 id="book-name"></h2>
             </div>
-            <button id="book-settings">本の設定</button>
+            <button id="book-settings"><span data-works-icon="bx-cog"></span> 本の設定</button>
           </div>
           <div class="toolbar export-bar">
             <span>原稿をダウンロード</span
@@ -89,12 +91,12 @@
                 </p>
                 <div class="save-bar">
                   <span id="save-status" role="status"></span
-                  ><button id="save" type="submit" class="primary">保存</button>
+                  ><button id="save" type="submit" class="primary"><span data-works-icon="writing-save"></span> 保存</button>
                 </div>
               </form>
               <div class="toolbar">
                 <button id="section-archive">アーカイブ</button
-                ><button id="section-history">履歴・復元</button>
+                ><button id="section-history"><span data-works-icon="writing-history"></span> 履歴・復元</button>
               </div>
               <details open>
                 <summary>出典</summary>
@@ -126,6 +128,6 @@
       </div>
       <div id="modal-content"></div>
     </dialog>
-    <script type="module" src="/kdp/app.js?v=2"></script>
+    <script type="module" src="/kdp/app.js?v=3"></script>
   </body>
 </html>
