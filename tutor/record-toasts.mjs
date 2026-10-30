@@ -28,7 +28,9 @@ export function attachRecordToasts(root, { duration = 4000 } = {}) {
       element.className = 'record-save-toast alert'; element.setAttribute('role', 'status');
       element.setAttribute('aria-live', 'polite'); element.setAttribute('aria-atomic', 'true');
       region.append(element);
-      element.textContent = `${row.querySelector('.record-student-link').textContent.trim()}・${field}: ${text}`;
+      const slot = [...row.querySelectorAll(".record-card-meta > span")].map(el=>el.textContent).join(" ");
+      const day = document.querySelector("#record-date-label")?.textContent || "";
+      element.textContent = `${row.querySelector('.record-student-link').textContent.trim()}（${day} ${row.dataset.calendarName || ""} ${slot}）・${field}: ${text}`;
       const timer = setTimeout(() => { if (notices.get(key)?.element === element) { element.remove(); notices.delete(key); } }, duration);
       notices.set(key, {element, timer, row});
     });

@@ -571,7 +571,7 @@ function renderRecordTable(rows) {
         </tr>`;
       }
       if (lessonRecordNeedsReview(r.record)) return lessonReviewRow(r.ref,r.record,r.label,formatTimeOrPeriod(r.start,"Asia/Tokyo"));
-      return `<tr data-event-id="${escapeHtml(r.eventId)}" data-record-ref="${escapeHtml(JSON.stringify(r.ref))}" data-record-revision="${r.record.record_revision}" data-completed="${r.completed ? 1 : 0}">
+      return `<tr data-event-id="${escapeHtml(r.eventId)}" data-record-ref="${escapeHtml(JSON.stringify(r.ref))}" data-record-revision="${r.record.record_revision}" data-completed="${r.completed ? 1 : 0}" data-calendar-name="${escapeHtml(calendarColors.get(r.calendarId)?.name || "カレンダー")}">
         <td>
           <div class="record-card-heading"><button type="button" class="record-student-link" data-calendar-id="${escapeHtml(r.calendarId || "")}" data-name="${escapeHtml(r.label)}" data-term-id="${r.termId}"><span class="record-avatar"${r.iconColor ? ` style="background-color:${escapeHtml(lightenHexColor(r.iconColor, 0.75))};color:${escapeHtml(r.iconColor)}"` : ""}><i class="bx bx-book-open"></i></span> ${escapeHtml(r.label)}</button><div class="record-card-meta"><span>${r.n}/${r.m}回</span><span>${formatTimeOrPeriod(r.start, "Asia/Tokyo")}</span><button type="button" class="record-recheck btn btn-outline" aria-label="予定を再確認" title="予定を再確認" disabled><svg class="works-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-1l2 3M4 15l2 3a7 7 0 0 0 12-1"/></svg></button></div></div>
           ${lessonAttributionNotice(r.record)}
