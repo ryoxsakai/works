@@ -1,8 +1,12 @@
 // Only browser callers use this helper. Server/MCP GET readers remain pure.
+import {sameLessonEvent} from './lesson-plan.js';
 const pendingInitializations=new Map();
 export async function readNextLessonWithTemplate(source,request,onTarget=()=>{},scope=request,currentScope=()=>scope){
  const result=await request(`/next-lesson-plan?calendar_id=${encodeURIComponent(source.calendar_id)}&event_id=${encodeURIComponent(source.id)}`);
  if(currentScope()!==scope)throw new DOMException('stale session','AbortError');
+ // The controller still reports the changed source, but must do so BEFORE any
+ // automatic template mutation for a different student's replacement slot.
+ if(!sameLessonEvent(source,result.source))return result;
  if(!result.template_initialization_available||!result.target)return result;
  const key=JSON.stringify([result.target.calendar_id,result.target.id]);
  let scoped=pendingInitializations.get(scope);if(!scoped){scoped=new Map();pendingInitializations.set(scope,scoped);}

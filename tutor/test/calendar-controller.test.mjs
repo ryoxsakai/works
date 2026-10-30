@@ -19,3 +19,8 @@ test('browser-only template initialization is explicit and deduplicated; normal 
  const one=readNextLessonWithTemplate(source,request),two=readNextLessonWithTemplate(source,request);await new Promise(r=>setTimeout(r,0));assert.equal(posts,1);release();const results=await Promise.all([one,two]);assert.ok(results.every(r=>r.lesson_plan===''&&r.target.etag==='"2"'));
  let calls=0;await readNextLessonWithTemplate(source,async()=>{calls++;return {source,target,lesson_plan:'',template_initialization_available:false};});assert.equal(calls,1);
 });
+test('changed source and stale account cannot initialize another lesson before the controller conflict gate',async()=>{
+ let calls=0;const changed={...target,title:'別名'};
+ await readNextLessonWithTemplate(target,async()=>{calls++;return {source:changed,target,template_initialization_available:true};});assert.equal(calls,1);
+ await assert.rejects(readNextLessonWithTemplate(target,async()=>({source:target,target,template_initialization_available:true}),()=>{},'old',()=>'new'),e=>e.name==='AbortError');
+});
