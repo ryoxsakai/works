@@ -7,7 +7,9 @@ await expect(root).toHaveClass(/carousel-inner/);await expect(p.locator('.record
 assert.equal(await root.locator('[data-event-id=a]').count(),1);const field=root.locator('[data-event-id=a] .record-plan');await field.fill('入力を保持');await field.dispatchEvent('compositionstart');await field.press('ArrowRight');await expect(p.locator('.record-carousel-controls span')).toHaveText('1 / 4件');await field.dispatchEvent('compositionend');await field.press('Tab');await expect(root.locator('[data-event-id=a] .lesson-plan-status').first()).toHaveText('保存済み');
 await next.focus();await p.keyboard.press('Enter');await expect(p.locator('.record-carousel-controls span')).toHaveText('2 / 4件');await prev.click();await expect(p.locator('.record-carousel-controls span')).toHaveText('1 / 4件');await expect(field).toHaveValue('入力を保持');
 // Real touch on a card surface changes the native scroll-snap viewport.
+await expect.poll(()=>root.evaluate(el=>Math.round(el.scrollLeft))).toBe(0);
 const box=await root.boundingBox(),cdp=await ctx.newCDPSession(p);const y=box.y+25;
+assert.equal(await p.evaluate(({x,y})=>!!document.elementFromPoint(x,y)?.closest('button,input,textarea,a'),{x:box.x+box.width-95,y}),false,'swipe starts on settled card surface, not a form control');
 await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:box.x+box.width-95,y}]});
 for(let i=1;i<=12;i++){await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:box.x+box.width-95-(box.width-110)*i/12,y}]});await p.waitForTimeout(20);}
 await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await expect(p.locator('.record-carousel-controls span')).toHaveText('2 / 4件');
