@@ -13,19 +13,20 @@
   <script src="/shared/theme-init.js?v=1"></script>
   <link rel="apple-touch-icon" href="/shared/logo.png" />
   <link rel="stylesheet" href="/shared/styles.css?v=54" />
-  <link rel="stylesheet" href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" />
+  <link rel="stylesheet" href="/shared/ui/admission-bootstrap.css?v=1" />
+  <link rel="stylesheet" href="/shared/ui/admission-tokens.css?v=1" />
   <link rel="stylesheet" href="/admission/admission.css?v=16" />
   <link rel="stylesheet" href="/shared/header.css?v=2" />
   <script type="module" src="/shared/header.js?v=4"></script>
 </head>
-<body>
+<body class="admission-bootstrap">
   <header class="page-header works-header">
     <h1><a class="works-home" href="/" aria-label="Works ホーム"><span class="page-header-icon" aria-hidden="true">W</span><span>Works</span></a><span class="works-page-title">入試管理</span></h1>
     <div class="works-header-actions">
       <div class="user-bar" hidden>
       <button id="sign-out" type="button" class="user-icon-btn" aria-label="ログアウト">
         <img id="user-avatar" alt="" hidden />
-        <i class="bx bx-user-circle" id="user-avatar-fallback"></i>
+        <span data-works-icon="bx-user-circle" id="user-avatar-fallback"></span>
       </button>
     </div>
     </div>
@@ -38,35 +39,35 @@
       <div class="admission-heading">
         <div class="admission-heading-copy">
           <p class="eyebrow">ADMISSION CALENDAR</p>
-          <h2 id="admission-title"><i class="bx bx-calendar-event"></i> 入試日程</h2>
+          <h2 id="admission-title"><span data-works-icon="admission-event"></span> 入試日程</h2>
         </div>
-        <button id="admission-print" type="button" class="admission-print" aria-label="現在の表示を印刷" title="現在の表示を印刷"><i class="bx bx-printer"></i></button>
+        <button id="admission-print" type="button" class="admission-print" aria-label="現在の表示を印刷" title="現在の表示を印刷"><span data-works-icon="bx-printer"></span></button>
       </div>
 
       <div class="admission-filter-bar" aria-label="入試日程の絞り込み">
         <button id="admission-filter-open" type="button" class="btn-primary admission-filter-open">
-          <i class="bx bx-filter-alt"></i>
+          <span data-works-icon="admission-filter"></span>
           絞り込み
           <span id="admission-filter-count" class="admission-filter-count" hidden>0</span>
         </button>
         <p id="admission-filter-summary" class="admission-filter-summary">すべての入試日程</p>
         <button id="admission-filter-reset" type="button" class="admission-filter-reset" aria-label="絞り込みを解除" hidden>
-          <i class="bx bx-reset"></i>
+          <span data-works-icon="admission-reset"></span>
         </button>
       </div>
 
       <div class="admission-view-tabs" role="tablist" aria-label="入試日程の表示形式">
         <button class="admission-view-tab" type="button" role="tab" aria-controls="admission-view-list" data-admission-view-tab="list">
-          <i class="bx bx-list-ul"></i> 一覧
+          <span data-works-icon="admission-list"></span> 一覧
         </button>
         <button class="admission-view-tab" type="button" role="tab" aria-controls="admission-view-calendar" data-admission-view-tab="calendar">
-          <i class="bx bx-calendar"></i> カレンダー
+          <span data-works-icon="admission-calendar"></span> カレンダー
         </button>
         <button class="admission-view-tab" type="button" role="tab" aria-controls="admission-view-gantt" data-admission-view-tab="gantt">
-          <i class="bx bx-bar-chart-alt-2"></i> ガント
+          <span data-works-icon="admission-gantt"></span> ガント
         </button>
         <button class="admission-view-tab" type="button" role="tab" aria-controls="admission-view-table" data-admission-view-tab="table">
-          <i class="bx bx-table"></i> 表
+          <span data-works-icon="admission-table"></span> 表
         </button>
       </div>
 
@@ -77,13 +78,13 @@
       <section id="admission-view-calendar" class="admission-view" role="tabpanel" data-admission-view="calendar" hidden>
         <div class="admission-calendar-controls">
           <div class="admission-calendar-mode" role="group" aria-label="カレンダーの表示方法">
-            <button type="button" data-admission-calendar-mode="month" aria-pressed="true"><i class="bx bx-calendar"></i> 月表示</button>
-            <button type="button" data-admission-calendar-mode="continuous" aria-pressed="false"><i class="bx bx-calendar-week"></i> 連続表示</button>
+            <button type="button" data-admission-calendar-mode="month" aria-pressed="true"><span data-works-icon="admission-calendar"></span> 月表示</button>
+            <button type="button" data-admission-calendar-mode="continuous" aria-pressed="false"><span data-works-icon="admission-week"></span> 連続表示</button>
           </div>
           <div id="admission-calendar-nav" class="admission-calendar-nav">
-            <button id="admission-calendar-prev" type="button" aria-label="前の月"><i class="bx bx-chevron-left"></i></button>
+            <button id="admission-calendar-prev" type="button" aria-label="前の月"><span data-works-icon="bx-chevron-left"></span></button>
             <strong id="admission-calendar-label"></strong>
-            <button id="admission-calendar-next" type="button" aria-label="次の月"><i class="bx bx-chevron-right"></i></button>
+            <button id="admission-calendar-next" type="button" aria-label="次の月"><span data-works-icon="bx-chevron-right"></span></button>
           </div>
         </div>
         <div class="admission-calendar-shell">
@@ -115,26 +116,26 @@
 
   <dialog id="admission-filter-modal" class="app-modal admission-filter-modal">
     <div class="modal-header">
-      <h2><i class="bx bx-filter-alt"></i> 絞り込み設定</h2>
-      <button id="admission-filter-close" type="button" class="modal-close" aria-label="閉じる"><i class="bx bx-x"></i></button>
+      <h2><span data-works-icon="admission-filter"></span> 絞り込み設定</h2>
+      <button id="admission-filter-close" type="button" class="modal-close" aria-label="閉じる"><span data-works-icon="bx-x"></span></button>
     </div>
 
     <div class="modal-tabs admission-filter-tabs" role="tablist" aria-label="絞り込み項目">
       <button type="button" role="tab" data-admission-filter-tab="universities" aria-controls="admission-filter-panel-universities">
-        <i class="bx bx-building-house"></i> 大学
+        <span data-works-icon="admission-school"></span> 大学
       </button>
       <button type="button" role="tab" data-admission-filter-tab="types" aria-controls="admission-filter-panel-types">
-        <i class="bx bx-category"></i> 方式
+        <span data-works-icon="admission-category"></span> 方式
       </button>
       <button type="button" role="tab" data-admission-filter-tab="months" aria-controls="admission-filter-panel-months">
-        <i class="bx bx-calendar"></i> 一次実施月
+        <span data-works-icon="admission-calendar"></span> 一次実施月
       </button>
     </div>
 
     <form id="admission-filter-form" class="admission-filter-form">
       <section id="admission-filter-panel-universities" class="admission-filter-panel" role="tabpanel" data-admission-filter-panel="universities">
         <label class="admission-filter-modal-search">
-          <i class="bx bx-search"></i>
+          <span data-works-icon="admission-search"></span>
           <input id="admission-filter-university-search" type="search" placeholder="大学名を検索" autocomplete="off" />
         </label>
         <div class="admission-filter-panel-tools">
@@ -183,12 +184,12 @@
       </section>
 
       <div class="admission-filter-actions">
-        <button id="admission-filter-clear" type="button"><i class="bx bx-reset"></i> すべて解除</button>
-        <button type="submit" class="btn-primary"><i class="bx bx-check"></i> 適用</button>
+        <button id="admission-filter-clear" type="button"><span data-works-icon="admission-reset"></span> すべて解除</button>
+        <button type="submit" class="btn-primary"><span data-works-icon="bx-check"></span> 適用</button>
       </div>
     </form>
   </dialog>
 
-  <script type="module" src="/admission/app.js?v=16"></script>
+  <script type="module" src="/admission/app.js?v=17"></script>
 </body>
 </html>

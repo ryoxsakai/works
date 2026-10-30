@@ -1,3 +1,5 @@
+import { startAdmissionPresentation } from "../shared/ui/admission-presentation.mjs";
+startAdmissionPresentation();
 import { getSessionToken, signOutUser, watchAuth } from "../shared/auth.js?v=11";
 
 const VIEW_KEY = "works_admission_view";
@@ -409,7 +411,7 @@ function filteredEvents() {
 
 function renderList(viewEvents) {
   if (!viewEvents.length) {
-    els.list.innerHTML = `<div class="admission-empty-state"><div><i class="bx bx-list-ul"></i><p>入試日程はまだ登録されていません</p><small>右上の「日程を追加」から、大学・方式・段階・日付を登録できます。</small></div></div>`;
+    els.list.innerHTML = `<div class="admission-empty-state"><div><span data-works-icon="admission-list"></span><p>入試日程はまだ登録されていません</p><small>右上の「日程を追加」から、大学・方式・段階・日付を登録できます。</small></div></div>`;
     return;
   }
   els.list.innerHTML = viewEvents.map((event) => `
