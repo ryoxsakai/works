@@ -1,3 +1,5 @@
+import { startMaterialPresentation } from "../shared/ui/material-presentation.mjs";
+startMaterialPresentation();
 import {
   watchAuth,
   signOutUser,
