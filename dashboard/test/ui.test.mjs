@@ -104,3 +104,18 @@ test('Button state contract is scoped to migrated pages and shares the existing 
  for(const file of ['index.html',...['ss','todo','kdp','wiki','memo','admission','material','workflow','tutor'].map(p=>p+'/index.html'),'workflow/roles.html'])assert.ok((await load(file)).includes('/shared/ui/button-states.css?v=1'),file);
  assert.ok(!(await load('app/index.html')).includes('button-states.css'));
 });
+
+test('Carousel is the pinned official v6 module subset, with no autoplay or cloned records',async()=>{
+ const source=await load('tutor/record-carousel.mjs');
+ assert.match(source,/autoplay:false,ends:'stop'/);
+ assert.doesNotMatch(source,/cloneNode|innerHTML\s*=.*record-student/);
+ const copied=new Set();
+ async function verify(relative){
+  if(copied.has(relative))return;copied.add(relative);
+  const actual=await load('shared/ui/vendor/bootstrap-6.0.0-alpha.1/'+relative);
+  const official=await load('shared/ui/node_modules/bootstrap/js/dist/'+relative);
+  assert.equal(actual,official,relative+' must be byte-identical official ESM');
+  for(const match of actual.matchAll(/from\s+["'](\.[^"']+)["']/g))await verify(new URL(match[1],'file:///'+relative).pathname.slice(1));
+ }
+ await verify('carousel.js');assert.ok(copied.size<12);
+});

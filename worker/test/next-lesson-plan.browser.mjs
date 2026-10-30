@@ -41,6 +41,9 @@ try{
  await save(next('a'),'予定変更後の入力');await expect(status('a')).toContainText('保存を停止');
  await expect(next('a')).toHaveValue('予定変更後の入力');assert.equal(await dbPlan('b'),'遅延保存');assert.equal(await dbPlan('c'),'次週の既存予定');
  await row('a').getByRole('button',{name:'入力を破棄して予定を再確認',exact:true}).click();await expect(next('a')).toHaveValue('次週の既存予定');
+ // Finish the reload handler's parallel record/curriculum reads before simulating
+ // another editor; otherwise a valid late read can refresh the base before editing.
+ await page.waitForLoadState("networkidle");
  // A different editor's persisted update is a CAS conflict, preserving this draft.
  await fixture.DB.prepare("UPDATE curriculum_entries SET lesson_plan='別画面で保存' WHERE calendar_event_id='c'").run();
  await save(next('a'),'競合中の入力');await expect(status('a')).toContainText('保存を停止');await expect(next('a')).toHaveValue('競合中の入力');assert.equal(await dbPlan('c'),'別画面で保存');
