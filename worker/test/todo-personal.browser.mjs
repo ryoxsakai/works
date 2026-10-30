@@ -163,7 +163,7 @@ const server = createServer(async (req, res) => {
     if (!path.startsWith(root + "/")) throw Error("invalid path");
     res.setHeader(
       "Content-Type",
-      { ".html": "text/html", ".css": "text/css", ".js": "text/javascript" }[
+      { ".html": "text/html", ".css": "text/css", ".js": "text/javascript", ".mjs": "text/javascript" }[
         extname(path)
       ] || "application/octet-stream",
     );
@@ -199,6 +199,26 @@ try {
       await page.goto(origin + "/todo/");
       await expect(page.locator("#app")).toBeVisible();
       await expect(page.locator("#today-label")).toContainText(base);
+      await expect(page.locator('#capture button')).toHaveClass(/btn-solid/);
+      assert.equal(await page.locator('#capture button').evaluate(el=>getComputedStyle(el).whiteSpace),'nowrap');
+      assert.ok((await page.locator('#capture button').boundingBox()).height<=56,'capture action stays one line');
+      const beforePresentation=JSON.stringify(await db()), beforePosts=postCount;
+      await page.evaluate(async()=>{
+        const {startTodoPresentation}=await import('/shared/ui/todo-presentation.mjs');
+        const c=startTodoPresentation(); c.start();
+        window.dispatchEvent(new Event('pagehide'));
+        const b=document.createElement('button'); b.type='button'; b.id='ui-probe'; b.textContent='test';
+        document.querySelector('#app').append(b);
+      });
+      assert.equal(await page.locator('#ui-probe').getAttribute('class'),null);
+      await page.evaluate(()=>window.dispatchEvent(new Event('pageshow')));
+      await expect(page.locator('#ui-probe')).toHaveClass(/btn/);
+      await page.evaluate(()=>document.querySelector('#ui-probe').remove());
+      assert.equal(postCount,beforePosts);
+      assert.equal(JSON.stringify(await db()),beforePresentation);
+      await page.emulateMedia({reducedMotion:'reduce'});
+      assert.equal(await page.locator('#quick-title').evaluate(el=>getComputedStyle(el).transitionDuration),'0s');
+      await page.emulateMedia({reducedMotion:'no-preference'});
       const inputStyle = await page.locator("#quick-title").evaluate((e) => ({
         color: getComputedStyle(e).color,
         font: getComputedStyle(e).fontSize,
@@ -291,6 +311,10 @@ try {
         path: `${artifacts}/${width}-${theme}.png`,
         fullPage: true,
       });
+      await page.emulateMedia({media:'print'});
+      await expect(page.locator('.task-card')).toHaveCount(8);
+      await page.pdf({path:`${artifacts}/${width}-${theme}-print.pdf`,format:'A4'});
+      await page.emulateMedia({media:'screen'});
       assert.deepEqual(errors, []);
       console.log(
         `PASS ${width}px/${theme}: JST, layout, focus count, deadlines, same-data board, modal focus/Escape/back`,

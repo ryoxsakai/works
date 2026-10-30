@@ -35,3 +35,10 @@ test('SS bundle is isolated; no page transition or save capability introduced',a
  assert.ok(!css.includes('@view-transition'));
  assert.match(await load('ss/index.html'),/ss-sort-button btn btn-text/);
 });
+test('ToDo isolated CSS uses official controls without adding a second dialog or persistence controller',async()=>{
+ const css=await load('shared/ui/todo-bootstrap.css');
+ postcss.parse(css).walkRules(rule=>{for(const selector of rule.selectors)assert.ok(selector.startsWith('.todo-bootstrap'),selector);});
+ const presentation=await load('shared/ui/todo-presentation.mjs');
+ assert.ok(!/fetch\(|localStorage|showModal\(|\.value\s*=|\.disabled\s*=/.test(presentation));
+ assert.ok(!css.includes('@view-transition'));
+});

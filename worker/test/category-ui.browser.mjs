@@ -22,7 +22,7 @@ try {
    if(u.pathname==='/shared/auth.js')return route.fulfill({contentType:'text/javascript',body:`export const getSessionToken=()=> 'qa';export const signIn=()=>{};export const signOutUser=async()=>{};export const watchAuth=({onSignedIn})=>onSignedIn({});`});
    if(u.pathname===`/api/${service}`){if(route.request().method()!=='GET')state={...state,...route.request().postDataJSON(),revision:state.revision+1};return route.fulfill({json:state});}
    const f=path.join(root,u.pathname+(u.pathname.endsWith('/')?'index.html':''));if(!fs.existsSync(f))return route.fulfill({status:404,body:''});
-   return route.fulfill({contentType:({'.html':'text/html','.js':'text/javascript','.css':'text/css','.png':'image/png'})[path.extname(f)],body:fs.readFileSync(f)});
+   return route.fulfill({contentType:({'.html':'text/html','.js':'text/javascript','.mjs':'text/javascript','.css':'text/css','.png':'image/png'})[path.extname(f)],body:fs.readFileSync(f)});
   });
   await page.goto(`https://category.test/${service}/`);await expect(page.locator('#login-screen')).toBeHidden();
   await page.screenshot({path:`${artifacts}/${service}-${width}-${theme}-list.png`,fullPage:true});
