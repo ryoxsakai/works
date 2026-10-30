@@ -231,6 +231,10 @@ try {
     ["desktop-dark", { width: 1440, height: 1000 }],
     ["mobile-light", { width: 390, height: 844 }],
     ["mobile-dark", { width: 390, height: 844 }],
+    ["compact-light", { width: 320, height: 844 }],
+    ["compact-dark", { width: 320, height: 844 }],
+    ["tablet-light", { width: 768, height: 1000 }],
+    ["tablet-dark", { width: 768, height: 1000 }],
   ]) {
     const context = await browser.newContext({
         viewport,
@@ -246,6 +250,7 @@ try {
         sessionStorage.themeSeeded = "1";
       }
     }, selectedTheme);
+    let mutationCount=0;
     page.on("pageerror", (e) => errors.push(e.message));
     await context.route("**/*", async (route) => {
       const req = route.request(),
@@ -264,6 +269,7 @@ try {
             body: `export const getSessionToken=()=>${JSON.stringify(token)};export function watchAuth(o){queueMicrotask(()=>localStorage.fixtureSignedOut ? o.onSignedOut() : o.onSignedIn())}export function signIn(path){window.fixtureSignInPath=path}export async function signOutUser(){}`,
           });
         if (u.pathname.startsWith("/api/")) {
+          if(req.method()!=="GET")mutationCount++;
           const r = await worker.fetch(
             new Request(req.url(), {
               method: req.method(),
@@ -296,6 +302,29 @@ try {
     });
     await page.goto(origin + "/wiki/");
     await expect(page.locator("#new")).toBeEnabled();
+    await expect(page.locator('#new')).toHaveClass(/btn-solid/);
+    const beforePresentation=mutationCount;
+    await page.evaluate(async()=>{
+      const {startWikiPresentation}=await import('/shared/ui/wiki-presentation.mjs');
+      const c=startWikiPresentation();c.start();window.dispatchEvent(new Event('pagehide'));
+      const b=document.createElement('button');b.id='wiki-ui-probe';b.type='button';document.body.append(b);
+    });
+    assert.equal(await page.locator('#wiki-ui-probe').getAttribute('class'),null);
+    await page.evaluate(()=>window.dispatchEvent(new Event('pageshow')));
+    await expect(page.locator('#wiki-ui-probe')).toHaveClass(/btn/);
+    await page.evaluate(()=>{
+      document.querySelector('#wiki-ui-probe').remove();
+      const content=document.createElement('article');content.id='wiki-content-probe';content.className='wiki-markdown';
+      content.innerHTML='<input type="checkbox" checked disabled>';document.body.append(content);
+    });
+    await page.waitForTimeout(20);
+    assert.equal(await page.locator('#wiki-content-probe input').getAttribute('class'),null);
+    await expect(page.locator('#wiki-content-probe input')).toBeDisabled();
+    await page.evaluate(()=>document.querySelector('#wiki-content-probe').remove());
+    assert.equal(mutationCount,beforePresentation);
+    await page.emulateMedia({reducedMotion:'reduce'});
+    assert.equal(await page.locator('#search').evaluate(el=>getComputedStyle(el).transitionDuration),'0s');
+    await page.emulateMedia({reducedMotion:'no-preference'});
     await page.locator("#new").click();
     await page.locator("[name=title]").fill(name + " knowledge");
     await page
@@ -343,7 +372,7 @@ try {
         ),
       )
       .toBe(true);
-    assert.equal(editHeight, name.startsWith("mobile") ? 44 : 40);
+    assert.equal(editHeight, viewport.width <= 760 ? 44 : 40);
     await page.locator("#focus-reading").click();
     await expect(page.locator("#folder-browser")).not.toBeVisible();
     await page.locator("#focus-reading").click();
@@ -901,6 +930,9 @@ try {
       ["cycle-b", "cycle-a", "missing"],
     );
     await checkTheme(page, selectedTheme);
+    await page.emulateMedia({media:'print'});
+    await page.pdf({path:`test-artifacts/wiki-${name}-print.pdf`,format:'A4'});
+    await page.emulateMedia({media:'screen'});
     assert.deepEqual(errors, []);
     await context.close();
   }
