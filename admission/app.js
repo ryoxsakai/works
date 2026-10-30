@@ -1,3 +1,4 @@
+import { setUserAvatar } from "../shared/avatar.mjs?v=1";
 import { startAdmissionPresentation } from "../shared/ui/admission-presentation.mjs";
 startAdmissionPresentation();
 import { getSessionToken, signOutUser, watchAuth } from "../shared/auth.js?v=11";
@@ -820,14 +821,7 @@ watchAuth({
     els.signedIn.hidden = false;
     els.userBar.hidden = false;
     els.signOut.title = `${email} (クリックでログアウト)`;
-    if (picture) {
-      els.userAvatar.src = picture;
-      els.userAvatar.hidden = false;
-      els.userAvatarFallback.hidden = true;
-    } else {
-      els.userAvatar.hidden = true;
-      els.userAvatarFallback.hidden = false;
-    }
+    setUserAvatar(els.userAvatar, els.userAvatarFallback, picture);
     try {
       await loadEvents();
     } catch (error) {

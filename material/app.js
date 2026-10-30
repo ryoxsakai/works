@@ -1,3 +1,4 @@
+import { setUserAvatar } from "../shared/avatar.mjs?v=1";
 import { startMaterialPresentation } from "../shared/ui/material-presentation.mjs?v=2";
 startMaterialPresentation();
 import {
@@ -1032,14 +1033,7 @@ watchAuth({
     els.signedIn.hidden = false;
     els.userBar.hidden = false;
     els.signOut.title = `${email} (クリックでログアウト)`;
-    if (picture) {
-      els.userAvatar.src = picture;
-      els.userAvatar.hidden = false;
-      els.userAvatarFallback.hidden = true;
-    } else {
-      els.userAvatar.hidden = true;
-      els.userAvatarFallback.hidden = false;
-    }
+    setUserAvatar(els.userAvatar, els.userAvatarFallback, picture);
     await loadLibrary();
     if ([...els.tabPanels].some((panel) => panel.dataset.materialTabPanel !== "library" && !panel.hidden)) await loadTreeFiles();
   },
