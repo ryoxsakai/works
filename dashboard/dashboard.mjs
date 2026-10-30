@@ -529,31 +529,6 @@ export function createDashboard({
       );
     }
   });
-  const nav = $("home-navigation"),
-    wide = matchMedia("(min-width: 900px)");
-  let navHadFocus = false;
-  document.addEventListener("focusin", (e) => {
-    navHadFocus = nav.querySelector("nav").contains(e.target);
-  });
-  const navMode = () => {
-    const hiddenFocus =
-      !wide.matches &&
-      (nav.querySelector("nav").contains(document.activeElement) ||
-        (navHadFocus && document.activeElement === document.body));
-    nav.open = wide.matches;
-    if (hiddenFocus) nav.querySelector("summary").focus();
-  };
-  navMode();
-  wide.addEventListener("change", navMode);
-  nav.addEventListener("toggle", () => {
-    if (wide.matches && !nav.open) nav.open = true;
-  });
-  nav.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && !wide.matches) {
-      nav.open = false;
-      nav.querySelector("summary").focus();
-    }
-  });
   $("home-settings-modal").addEventListener("close", () =>
     $("open-home-settings").focus(),
   );
