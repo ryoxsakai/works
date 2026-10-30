@@ -226,7 +226,7 @@ try {
       assert.equal(inputStyle.font, "16px");
       assert.equal(
         inputStyle.color,
-        theme === "dark" ? "rgb(231, 237, 246)" : "rgb(36, 51, 71)",
+        await page.locator("html").evaluate(el=>getComputedStyle(el).getPropertyValue("--fg").trim()).then(value=>{const c=value.match(/\w\w/g).slice(0,3).map(x=>parseInt(x,16));return `rgb(${c.join(", ")})`;}),
       );
       await page.locator("#task-search").fill("no such teacher task");
       await expect(page.locator("#tasks")).toContainText("条件に合うタスクがありません");

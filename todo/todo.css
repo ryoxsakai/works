@@ -1,11 +1,9 @@
 .todo-page {
-  --bg: #f4f6f9;
-  --panel: #fff;
-  --ink: #243347;
-  --muted: #56657a;
-  --line: #d5dce5;
-  --accent: #3d587c;
-  background: var(--bg);
+  --panel: var(--bg-elevated);
+  --ink: var(--fg);
+  --muted: color-mix(in srgb, var(--fg) 75%, var(--bg-elevated));
+  --line: var(--border);
+  background: var(--bg-gradient);
   color: var(--ink);
   font-family:
     system-ui,
@@ -16,15 +14,7 @@
   line-height: 1.6;
   color-scheme: light;
 }
-html[data-theme="dark"] .todo-page {
-  --bg: #111925;
-  --panel: #1b2737;
-  --ink: #e7edf6;
-  --muted: #b3c0d2;
-  --line: #45556c;
-  --accent: #bbd3f4;
-  color-scheme: dark;
-}
+
 * {
   box-sizing: border-box;
 }
@@ -70,12 +60,12 @@ button:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
-  outline: 3px solid #699ee8;
+  outline: 3px solid var(--accent);
   outline-offset: 3px;
 }
 .primary {
-  background: #35557e;
-  border-color: #35557e;
+  background: var(--accent);
+  border-color: var(--accent);
   color: white;
 }
 .danger {
@@ -158,7 +148,7 @@ h4 {
   gap: 4px;
 }
 .view-switch [aria-pressed="true"] {
-  background: #35557e;
+  background: var(--accent);
   color: white;
 }
 .deadline-panel {
