@@ -1,0 +1,69 @@
+/* SS-only adapter. No global theme/auth controller or page-transition opt-in. */
+.ss-bootstrap {
+  color-scheme: inherit;
+  --fg-body: var(--fg);
+  --fg-1: var(--fg);
+  --fg-2: var(--muted);
+  --bg-body: var(--bg-elevated);
+  --bg-1: var(--bg-hover);
+  --bg-2: var(--bg-hover);
+  --border-color: var(--border);
+  --primary-base: var(--accent);
+  --primary-contrast: light-dark(#fff, #101828);
+  --focus-ring-color: var(--accent);
+  --focus-ring-width: 3px;
+  --control-checked-bg: var(--accent);
+  --control-checked-border-color: var(--accent);
+}
+.ss-bootstrap .btn {
+  --btn-min-height: 44px;
+  --btn-font-size: inherit;
+  --btn-color: var(--fg);
+  --btn-bg: var(--bg-elevated);
+  --btn-border-color: var(--border);
+  --btn-hover-color: var(--accent);
+  --btn-hover-bg: var(--bg-hover);
+  --btn-hover-border-color: var(--border);
+  --btn-border-radius: 9px;
+  font-family: inherit;
+}
+.ss-bootstrap .ss-sort-button {
+  --btn-padding-x: 0;
+  --btn-padding-y: 0;
+  --btn-border-width: 0;
+  --btn-bg: transparent;
+  --btn-hover-bg: transparent;
+  --btn-font-size: inherit;
+  --btn-border-radius: 0;
+}
+.ss-bootstrap .card {
+  --card-bg: var(--bg-elevated);
+  --card-border-color: var(--border);
+  --card-border-radius: .7rem;
+}
+.ss-bootstrap .alert {
+  --alert-bg: var(--bg-hover);
+  --alert-padding-x: 12px;
+  --alert-padding-y: 12px;
+}
+.ss-bootstrap .alert:empty { display: none; }
+.ss-bootstrap .check { padding: 0; min-height: 0; }
+.ss-bootstrap .form-control {
+  --control-bg: var(--bg-elevated);
+  --control-fg: var(--fg);
+  --control-border-color: var(--border);
+  min-height: 44px;
+  font-family: inherit;
+  font-size: 1rem;
+}
+.ss-bootstrap .works-icon { width: 1.25em; height: 1.25em; vertical-align: -.125em; flex-shrink: 0; }
+.ss-bootstrap .ss-empty > .works-icon { width: 2rem; height: 2rem; color: var(--accent); }
+.ss-bootstrap .ss-sort-icon { display: inline-flex; font-style: normal; }
+.ss-bootstrap [hidden] { display: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  .ss-bootstrap .btn, .ss-bootstrap .check, .ss-bootstrap .form-control, .ss-bootstrap .alert { transition: none; }
+}
+@media print {
+  .ss-bootstrap .btn, .ss-bootstrap .check, .ss-bootstrap .form-control, .ss-bootstrap .alert { transition: none; }
+}
+.ss-bootstrap .ss-heading h2 .works-icon { color: var(--accent); }

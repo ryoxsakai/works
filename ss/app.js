@@ -1,3 +1,8 @@
+import { icon, hydrateIcons } from "../shared/ui/ss-icons.mjs";
+hydrateIcons();
+for (const el of document.querySelectorAll("[data-sort-icon]")) {
+  el.innerHTML = icon(el.dataset.sortIcon);
+}
 import { getSessionToken, signOutUser, watchAuth } from "../shared/auth.js?v=11";
 
 const STATUS_CLASSES = {
@@ -138,7 +143,7 @@ function renderSortControls() {
   els.sortKey.value = sortState.key;
   const ascending = sortState.direction === "asc";
   els.sortDirection.querySelector("span").textContent = ascending ? "昇順" : "降順";
-  els.sortDirection.querySelector("i").className = `bx ${ascending ? "bx-sort-up" : "bx-sort-down"}`;
+  els.sortDirection.querySelector("i").innerHTML = icon(ascending ? "bx-sort-up" : "bx-sort-down");
   els.sortDirection.setAttribute("aria-label", `${ascending ? "降順" : "昇順"}に切り替える`);
 
   for (const button of els.sortButtons) {
@@ -146,7 +151,7 @@ function renderSortControls() {
     const header = button.closest("th");
     header.setAttribute("aria-sort", active ? (ascending ? "ascending" : "descending") : "none");
     button.classList.toggle("active", active);
-    button.querySelector("i").className = `bx ${active ? (ascending ? "bx-sort-up" : "bx-sort-down") : "bx-sort-alt-2"}`;
+    button.querySelector("i").innerHTML = icon(active ? (ascending ? "bx-sort-up" : "bx-sort-down") : "bx-sort-alt-2");
   }
 }
 

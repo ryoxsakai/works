@@ -1,6 +1,6 @@
 # Bootstrap 6 staged legacy UI rollout
 
-Scope: old root menu and then old pages, not the paused integrated app. PR157 and its SQL are untouched. No database, API, auth, permission or production test data changes. Current branch starts from published main 7713fdb017370482415092ca097b424b031774ba. This first stage stops at draft PR; publication awaits a separate instruction.
+Scope: old root menu and then old pages, not the paused integrated app. PR157 and its SQL are untouched. No database, API, auth, permission or production test data changes. Current branch starts from published main 7713fdb017370482415092ca097b424b031774ba. The initial draft-only boundary was superseded by explicit user authorization on 2026-10-30 for separate tested legacy-page PRs and phased releases. No PR approval review is included.
 
 ## Resumable stage ledger
 
@@ -9,8 +9,8 @@ These are work batches, not an external automation or a promise of unattended sc
 | Batch | Scope / completion condition | State |
 | --- | --- | --- |
 | 1 (first 2–3h) | Fixed source/dependencies, common tokens/SVG registry, menu component proof with actual rendered rules and no global CSS leakage | Implemented; synthetic checks pass |
-| 2 (next 2–3h) | Whole menu uses selected official components, existing layout/edit/storage/auth/URLs maintained; mobile/desktop, dark, print, cancel/drag/reentry tested; draft PR | Implemented; final CI tracked in PR |
-| 3 | SS representative page: original controls/status/table/print preserved | Not started; outside this first implementation batch |
+| 2 (next 2–3h) | Whole menu uses selected official components, existing layout/edit/storage/auth/URLs maintained; mobile/desktop, dark, print, cancel/drag/reentry tested; draft PR | PR159 created after new explicit authorization; current head64629527024b60fca0fc0eccd3b7a1e373d48c00 under exact-head CI |
+| 3 | SS representative page: original controls/status/table/print preserved | Local implementation/tested on feat/legacy-ss-bootstrap6; separate PR/release follows menu CI and merge |
 | 4 | ToDo, then KDP and Wiki, one reversible page at a time | Not started |
 | 5 | Memo (compiled utilities/dynamic classes), admissions (print/calendar), materials (native file drag/drop) | Not started |
 | 6 | Workflow/roles and tutor last: ownership, execution gates, blur autosave, attribution/conflicts and print | Not started |
@@ -64,3 +64,25 @@ These current guides were checked against the pinned npm alpha.1 source itself (
 - 12/12 node tests passed; 20/20 synthetic Chromium browser groups passed. The new contrast test measures rendered primary-button text at >=4.5:1 in both themes using canvas conversion for modern CSS colors.
 - Existing synthetic OAuth browser consent/logout regression passed. Existing header/theme multi-page regression is tracked separately in CI.
 - Actual pixels inspected: desktop all six widgets, mobile default and editor, desktop/mobile dark. All nine original links, 320–1920px overflow checks, focus hit tests, mouse/touch ordering and cancel pass. Print PDF generated; physical output is not verified.
+
+## Publication blocker and independent SS batch (2026-10-30)
+
+Menu draft PR creation to ryoxsakai/works was rejected by automatic approval review: explicit user authorization for external GitHub sharing was deemed insufficient. The operation did not execute, no PR exists, and it has not been retried. Existing push f89d0a528810644c4592da0b367938519e1be74c remains unchanged. Parent is seeking explicit authorization; no merge/deployment attempted. Main remains 7713fdb017370482415092ca097b424b031774ba.
+
+SS is a separate local branch based on that menu head. Original SS source has only GET /api/ss-projects; memo is read-only text, not an editing form. No business save API exists in this page and none was invented. Existing statuses, deadline date-only/JST semantics, remaining-day colors, completed toggle, sorting/persistence, original table-to-mobile-card structure and multiline memo text are retained. Official Button/Checkbox/Form-control/Alert/Card CSS is compiled into ss-bootstrap.css scoped solely to .ss-bootstrap. Source modules are selected separately; menu-bootstrap.css and icons.mjs remain byte-identical to the pushed menu commit. SS-only sorting/inbox SVGs live in ss-icons.mjs and reuse the common allowlist. Shared header/theme/native dialog behavior is not rewritten.
+
+No Bootstrap JS, AutoAnimate, Motion, View Transition opt-in or drag library is needed on the read-only sorted SS table. Sort changes are explicit data sorting, not manual ordering. CSS reduced-motion/print transition suppression is local. Neither root menu nor any other feature page imports SS assets. The SS test fixture needed the correct text/javascript MIME for new .mjs assets; that test-only omission was fixed after the first run correctly failed to load the page.
+
+Synthetic verification adds 320/390/768/1440px, touch-capable narrow contexts, dark settings, multiline memo, SVG auth fallback identity, reduced-motion, PDF generation, failing and delayed GET responses and unchanged input records. No real SS records, settings, files or external operations were used. The existing full menu browser suite is rerun for the shared build dependency. Physical print, actual iPhone, production authenticated browsing and real API latency remain unverified. Existing SS storage-quota handling and request-expiry behavior are unchanged rather than silently claimed as new safeguards.
+
+Rollback SS independently: remove SS-only imports/classes and revert the tiny icon rendering changes in ss/app.js, then remove its scoped assets/build extension. Keep the underlying menu commit and its version1 layout contract. No DB or data rollback is necessary. Future public PR should clearly separate this SS commit from the already pushed menu head, and must wait for the pending permission.
+
+SS batch final local results: 13 unit checks, the existing SS API test, all four SS viewport scenarios (320/390/768/1440, each dark/reduced-motion/print/error/delayed-read), and all 20 menu browser regression groups passed. Menu generated CSS/SVG diff against f89d0a5 is empty. No new remote operation or PR attempt occurred.
+
+## Publication authorization and CI correction (2026-10-30)
+
+After fresh explicit authorization, the known-unexecuted menu PR action was reconciled against GitHub (no existing PR) and retried once successfully as draft PR159. Its first unified-shell CI exposed an obsolete assertion requiring the root menu to load Boxicons. The paused integrated runtime was not changed: its test now verifies its own shell-app.mjs Boxicons import and the same class/license inventory, while root SVG use is covered by menu tests. All 115 integrated model/source tests passed locally. Menu assets remain the same; head64629527024b60fca0fc0eccd3b7a1e373d48c00 requires its own complete CI. SS local changes were rebased onto that test-only correction without conflict. The earlier denial is historical, not a continuing authority barrier after this new grant. View Transitions remain design-only, PR157 and integrated development remain paused.
+
+Menu PR159 passed dashboard40978396853, unified-regression40978396877 and OAuth/legacy40978396895 at head64629527024b60fca0fc0eccd3b7a1e373d48c00, then merged as8048cb85362f1d451d36984fac2ae2a9408f7d47. Merge and tested trees match63f2722949f175e9e8115d165a5f4ef3f809f28e. SS was rebased onto this published main without conflict; its scope is the isolated SS adapter/tests and ledger, with no menu runtime changes. Pages deployment40979098364 is being observed separately from browser/live QA.
+
+Menu deployment completed: Pages40979098364 at merge8048cb85362f1d451d36984fac2ae2a9408f7d47 succeeded; existing Cloudflare build bbba96ed-82a3-494b-820e-63f090ff95b5 succeeded with versionff8f88cf-f956-433f-8482-08a9e6aeacb1. Public URL https://works.lrnr.jp/ could not be directly read from this cloud environment (web tool inaccessible; browser previously tunnel failure). This is deployment evidence, not an authenticated live/iPhone verification. Rebased SS local 13-unit/4-width browser/20-menu-group checks passed again before its separate PR.

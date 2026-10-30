@@ -13,19 +13,20 @@
   <script src="/shared/theme-init.js?v=1"></script>
   <link rel="apple-touch-icon" href="/shared/logo.png" />
   <link rel="stylesheet" href="/shared/styles.css?v=56" />
-  <link rel="stylesheet" href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" />
   <link rel="stylesheet" href="/ss/ss.css?v=3" />
   <link rel="stylesheet" href="/shared/header.css?v=2" />
+  <link rel="stylesheet" href="/shared/ui/ss-bootstrap.css?v=1" />
+  <link rel="stylesheet" href="/shared/ui/ss-tokens.css?v=1" />
   <script type="module" src="/shared/header.js?v=4"></script>
 </head>
-<body>
+<body class="ss-bootstrap">
   <header class="page-header works-header">
     <h1><a class="works-home" href="/" aria-label="Works ホーム"><span class="page-header-icon" aria-hidden="true">W</span><span>Works</span></a><span class="works-page-title">SS管理</span></h1>
     <div class="works-header-actions">
       <div class="user-bar" hidden>
-      <button id="sign-out" type="button" class="user-icon-btn" aria-label="ログアウト">
+      <button id="sign-out" type="button" class="user-icon-btn btn btn-outline" aria-label="ログアウト">
         <img id="user-avatar" alt="" hidden />
-        <i class="bx bx-user-circle" id="user-avatar-fallback"></i>
+        <span data-works-icon="bx-user-circle" id="user-avatar-fallback"></span>
       </button>
     </div>
     </div>
@@ -33,31 +34,31 @@
 
   <main class="ss-main">
     <section id="signed-in" hidden>
-      <p id="ss-error" class="error" role="alert"></p>
-      <section class="ss-panel" aria-labelledby="ss-title">
+      <p id="ss-error" class="error alert" role="alert"></p>
+      <section class="ss-panel card" aria-labelledby="ss-title">
         <div class="ss-heading">
           <div>
             <p class="eyebrow">PROJECT TRACKER</p>
-            <h2 id="ss-title"><i class="bx bx-briefcase-alt-2"></i> SS案件</h2>
+            <h2 id="ss-title"><span data-works-icon="bx-briefcase-alt-2"></span> SS案件</h2>
           </div>
           <p id="ss-summary" class="ss-summary" aria-live="polite"></p>
         </div>
 
         <label class="ss-completed-toggle">
-          <input id="ss-show-completed" type="checkbox" />
+          <input class="check" id="ss-show-completed" type="checkbox" />
           <span>完了を表示</span>
         </label>
 
         <div class="ss-sort-toolbar" aria-label="案件の並べ替え">
           <label for="ss-sort-key">並べ替え</label>
-          <select id="ss-sort-key">
+          <select class="form-control" id="ss-sort-key">
             <option value="name">案件</option>
             <option value="status">進捗</option>
             <option value="deadline" selected>締切日</option>
             <option value="remaining">残り期間</option>
           </select>
-          <button id="ss-sort-direction" type="button" aria-label="降順に切り替える">
-            <i class="bx bx-sort-up" aria-hidden="true"></i>
+          <button class="btn btn-outline" id="ss-sort-direction" type="button" aria-label="降順に切り替える">
+            <i class="ss-sort-icon" aria-hidden="true" data-sort-icon="bx-sort-up"></i>
             <span>昇順</span>
           </button>
         </div>
@@ -66,17 +67,17 @@
           <table class="ss-table">
             <thead>
               <tr>
-                <th aria-sort="none"><button class="ss-sort-button" type="button" data-sort-key="name">案件<i class="bx bx-sort-alt-2" aria-hidden="true"></i></button></th>
-                <th aria-sort="none"><button class="ss-sort-button" type="button" data-sort-key="status">進捗<i class="bx bx-sort-alt-2" aria-hidden="true"></i></button></th>
-                <th aria-sort="ascending"><button class="ss-sort-button" type="button" data-sort-key="deadline">締切日<i class="bx bx-sort-up" aria-hidden="true"></i></button></th>
-                <th aria-sort="none"><button class="ss-sort-button" type="button" data-sort-key="remaining">残り期間<i class="bx bx-sort-alt-2" aria-hidden="true"></i></button></th>
+                <th aria-sort="none"><button class="ss-sort-button btn btn-text" type="button" data-sort-key="name">案件<i class="ss-sort-icon" aria-hidden="true" data-sort-icon="bx-sort-alt-2"></i></button></th>
+                <th aria-sort="none"><button class="ss-sort-button btn btn-text" type="button" data-sort-key="status">進捗<i class="ss-sort-icon" aria-hidden="true" data-sort-icon="bx-sort-alt-2"></i></button></th>
+                <th aria-sort="ascending"><button class="ss-sort-button btn btn-text" type="button" data-sort-key="deadline">締切日<i class="ss-sort-icon" aria-hidden="true" data-sort-icon="bx-sort-up"></i></button></th>
+                <th aria-sort="none"><button class="ss-sort-button btn btn-text" type="button" data-sort-key="remaining">残り期間<i class="ss-sort-icon" aria-hidden="true" data-sort-icon="bx-sort-alt-2"></i></button></th>
                 <th>メモ</th>
               </tr>
             </thead>
             <tbody id="ss-project-list"></tbody>
           </table>
           <div id="ss-empty" class="ss-empty" hidden>
-            <i class="bx bx-inbox"></i>
+            <span data-works-icon="bx-inbox"></span>
             <p>登録中のプロジェクトはありません。</p>
           </div>
         </div>
@@ -84,6 +85,6 @@
     </section>
   </main>
 
-  <script type="module" src="/ss/app.js?v=4"></script>
+  <script type="module" src="/ss/app.js?v=5"></script>
 </body>
 </html>
