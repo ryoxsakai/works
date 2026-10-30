@@ -1,3 +1,4 @@
+import { setUserAvatar } from "../shared/avatar.mjs?v=1";
 import { startTutorPresentation } from "../shared/ui/tutor-presentation.mjs";
 startTutorPresentation();
 import { attributedLessonRecord, lessonRecordNeedsReview } from "../shared/lesson-attribution.js?v=2";
@@ -839,14 +840,7 @@ watchAuth({
     els.signedIn.hidden = false;
     els.userBar.hidden = false;
     els.signOutBtn.title = `${user.email} (クリックでログアウト)`;
-    if (user.picture) {
-      els.userAvatar.src = user.picture;
-      els.userAvatar.hidden = false;
-      els.userAvatarFallback.hidden = true;
-    } else {
-      els.userAvatar.hidden = true;
-      els.userAvatarFallback.hidden = false;
-    }
+    setUserAvatar(els.userAvatar, els.userAvatarFallback, user.picture);
     els.actionError.textContent = "";
     try {
       await loadSettings();

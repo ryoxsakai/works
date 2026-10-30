@@ -1,3 +1,4 @@
+import { setUserAvatar } from "./shared/avatar.mjs?v=1";
 import "./shared/header.js?v=4";
 import { hydrateIcons } from "./shared/ui/icons.mjs";
 import {
@@ -90,9 +91,7 @@ function showSignedOut(message = "") {
   els.authError.textContent = message;
   els.authAction.setAttribute("aria-label", "Googleでログイン");
   els.authAction.title = "Googleでログイン";
-  els.userAvatar.hidden = true;
-  els.userAvatar.removeAttribute("src");
-  els.userAvatarFallback.hidden = false;
+  setUserAvatar(els.userAvatar, els.userAvatarFallback, "");
 }
 
 function showSignedIn(user) {
@@ -101,14 +100,7 @@ function showSignedIn(user) {
   els.authError.textContent = "";
   els.authAction.setAttribute("aria-label", "ログアウト");
   els.authAction.title = `${user.email} (クリックでログアウト)`;
-  if (user.picture) {
-    els.userAvatar.src = user.picture;
-    els.userAvatar.hidden = false;
-    els.userAvatarFallback.hidden = true;
-  } else {
-    els.userAvatar.hidden = true;
-    els.userAvatarFallback.hidden = false;
-  }
+  setUserAvatar(els.userAvatar, els.userAvatarFallback, user.picture);
 
   const pendingDestination = consumePendingDestination();
   if (pendingDestination) window.location.assign(pendingDestination);
