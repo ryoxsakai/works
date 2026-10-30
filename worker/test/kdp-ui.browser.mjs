@@ -62,13 +62,15 @@ try {
   for (const [name, viewport] of [
     ["desktop", { width: 1440, height: 1000 }],
     ["mobile", { width: 390, height: 844 }],
+    ["compact", { width: 320, height: 844 }],
+    ["tablet", { width: 768, height: 1000 }],
   ]) {
     const context = await browser.newContext({
       viewport,
       acceptDownloads: true,
     });
     const page = await context.newPage();
-    let delayPatch = false,
+    let failPatch = false, delayPatch = false,
       delayUpload = false,
       delayHistory = false,
       delaySection = false,
@@ -92,6 +94,8 @@ try {
             body: `export const getGoogleAccessToken=async()=> 'fixture-google';export const getSessionToken=()=>${JSON.stringify(token)};export function watchAuth(o){queueMicrotask(()=>localStorage.fixtureSignedOut?o.onSignedOut():o.onSignedIn({email:'fixture@example.test'}))}export function signIn(path){localStorage.fixtureSignInPath=path;localStorage.fixtureDestination=localStorage.works_pending_destination}export async function signOutUser(){}`,
           });
         if (u.pathname.startsWith("/api/")) {
+          if (failPatch && req.method()==='PATCH' && /^\/api\/kdp\/sections\/[^/]+$/.test(u.pathname))
+            return route.fulfill({status:503,json:{error:'fixture save failed'}});
           if (u.pathname === "/api/kdp/books" && req.method() === "POST")
             bookCreateRequests++;
           if (
@@ -166,6 +170,23 @@ try {
     await page.locator('#home-navigation').evaluate(el=>el.open=true);
     await page.locator('#home-navigation a[href="/kdp/"]').click();
     await page.locator("#new-book").waitFor();
+    await expect(page.locator('#new-book')).toBeVisible();
+    await expect(page.locator('#new-book')).toHaveClass(/btn-solid/);
+    const beforePresentation=JSON.stringify(await api('books')), beforeCreates=bookCreateRequests;
+    await page.evaluate(async()=>{
+      const {startKdpPresentation}=await import('/shared/ui/kdp-presentation.mjs');
+      const c=startKdpPresentation();c.start();
+      window.dispatchEvent(new Event('pagehide'));
+      const b=document.createElement('button');b.type='button';b.id='kdp-ui-probe';document.body.append(b);
+    });
+    assert.equal(await page.locator('#kdp-ui-probe').getAttribute('class'),null);
+    await page.evaluate(()=>window.dispatchEvent(new Event('pageshow')));
+    await expect(page.locator('#kdp-ui-probe')).toHaveClass(/btn/);
+    await page.evaluate(()=>document.querySelector('#kdp-ui-probe').remove());
+    assert.equal(bookCreateRequests,beforeCreates);
+    assert.equal(JSON.stringify(await api('books')),beforePresentation);
+
+
     await page.locator("#new-book").click();
     await page
       .getByLabel("本タイトル", { exact: true })
@@ -339,6 +360,15 @@ try {
       .getByRole("button", { name: "アーカイブ", exact: true })
       .waitFor();
     await expect(page.locator("#section-title")).toBeEnabled();
+    const beforeFailure=(await api('sections/'+section.id)).section;
+    failPatch=true;
+    await page.locator('#section-content').fill(original+' failed save');
+    await page.locator('#save').click();
+    await expect(page.locator('#message')).toContainText('fixture save failed');
+    await expect(page.locator('#section-content')).toBeEnabled();
+    await expect(page.locator('#section-content')).toHaveValue(original+' failed save');
+    assert.equal((await api('sections/'+section.id)).section.body,beforeFailure.body);
+    failPatch=false;
     delayPatch = true;
     await page.locator("#section-content").fill(original + " delayed");
     await page.locator("#save").click();
@@ -384,6 +414,30 @@ try {
       path: `test-artifacts/kdp-${name}.png`,
       fullPage: true,
     });
+    await expect(page.locator('#section-title')).toBeEnabled();
+    await page.evaluate(async()=>{const {setTheme}=await import('/shared/theme.js?v=6');setTheme('dark');});
+    await expect.poll(()=>page.locator('#section-title').evaluate(el=>getComputedStyle(el).backgroundColor)).toBe('rgb(30, 33, 38)');
+    for(const id of ['section-title','image-upload']){
+      const contrast=await page.locator('#'+id).evaluate(el=>{
+        const c=document.createElement('canvas');c.width=c.height=1;const ctx=c.getContext('2d');
+        const lum=color=>{ctx.fillStyle=color;ctx.fillRect(0,0,1,1);const a=Array.from(ctx.getImageData(0,0,1,1).data).slice(0,3).map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4;});return a[0]*.2126+a[1]*.7152+a[2]*.0722;};
+        const s=getComputedStyle(el),a=lum(s.color),b=lum(s.backgroundColor);return (Math.max(a,b)+.05)/(Math.min(a,b)+.05);
+      });
+      assert.ok(contrast>=4.5, `${id} dark text contrast ${contrast}`);
+    }
+    for(const id of ['section-title','image-upload']) {
+      await page.locator('#'+id).focus();
+      await page.locator('#'+id).scrollIntoViewIfNeeded();
+      assert.equal(await page.locator('#'+id).evaluate(el=>{const r=el.getBoundingClientRect();const hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return hit===el||el.contains(hit);}),true,`${id} focus is not covered by sticky controls`);
+      await page.screenshot({path:`test-artifacts/kdp-${name}-focused-${id}.png`});
+    }
+    await page.emulateMedia({reducedMotion:'reduce'});
+    assert.equal(await page.locator('#section-title').evaluate(el=>getComputedStyle(el).transitionDuration),'0s');
+    await page.evaluate(()=>scrollTo(0,0));
+    await page.screenshot({path:`test-artifacts/kdp-${name}-dark.png`,fullPage:true});
+    await page.emulateMedia({media:'print'});
+    await page.pdf({path:`test-artifacts/kdp-${name}-print.pdf`,format:'A4'});
+    await page.emulateMedia({media:'screen',reducedMotion:'no-preference'});
     await page.goto(origin + "/");
     await page.evaluate(() => {
       localStorage.fixtureSignedOut = "1";
@@ -427,7 +481,7 @@ try {
     await context.close();
   }
   console.log(
-    "PASS: isolated desktop/mobile KDP creation, long mixed-language save, sources, proposals, restore, archive, export, unsaved guard, categories/auth destinations and viewport",
+    "PASS: isolated 320/390/768/1440 KDP creation, long mixed-language save, sources, proposals, restore, archive, export, unsaved guard, categories/auth destinations and viewport",
   );
 } finally {
   if (browser) await browser.close();

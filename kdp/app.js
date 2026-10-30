@@ -1,3 +1,5 @@
+import { startKdpPresentation } from "../shared/ui/kdp-presentation.mjs";
+startKdpPresentation();
 import {
   watchAuth,
   getSessionToken,
