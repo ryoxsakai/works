@@ -98,3 +98,9 @@ test('Material SVG keeps decorative layout/state classes without retaining icon-
  const source=await load('shared/ui/material-presentation.mjs');assert.ok(source.includes("svg.classList.add(name)"));assert.ok(source.includes("classList.contains('bx-spin')"));
  const css=await load('shared/ui/material-tokens.css');assert.ok(css.includes('prefers-reduced-motion: no-preference'));assert.ok(css.includes('reduce), print'));assert.ok(css.includes('works-material-spin'));
 });
+
+test('Button state contract is scoped to migrated pages and shares the existing theme owner',async()=>{
+ const css=await load('shared/ui/button-states.css');assert.ok(!css.includes(':root'));assert.ok(!css.includes('@keyframes'));assert.ok(css.includes('color-scheme: inherit'));assert.ok(css.includes('--theme-contrast: var(--fg-body)'));
+ for(const file of ['index.html',...['ss','todo','kdp','wiki','memo','admission','material','workflow','tutor'].map(p=>p+'/index.html'),'workflow/roles.html'])assert.ok((await load(file)).includes('/shared/ui/button-states.css?v=1'),file);
+ assert.ok(!(await load('app/index.html')).includes('button-states.css'));
+});
