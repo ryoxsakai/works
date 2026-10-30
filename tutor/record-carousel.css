@@ -1,0 +1,15 @@
+.record-carousel-controls { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-bottom: .5rem; }
+.record-carousel-controls button { min-width: 44px; min-height: 44px; }
+.record-carousel-controls span { color: var(--fg); font-size: .8rem; }
+.record-carousel-controls[hidden] { display: none; }
+@media screen and (max-width:640px) {
+ .record-panel #record-table tbody.carousel-inner { display: flex; align-items: flex-start; gap: 0; }
+ .record-panel #record-table tbody.carousel-inner > tr.carousel-item { flex: 0 0 100%; min-width: 0; box-sizing: border-box; }
+ /* Input editing/selection retains vertical page scroll; swipe on card surfaces. */
+ .record-panel .carousel-inner :is(input,textarea,button,a) { touch-action: pan-y; }
+}
+@media print {
+ .record-carousel-controls { display: none !important; }
+ .record-panel #record-table tbody { display: table-row-group !important; overflow: visible !important; }
+ .record-panel #record-table tbody > tr { display: table-row !important; }
+}

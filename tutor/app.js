@@ -1,4 +1,5 @@
 import { setUserAvatar } from "../shared/avatar.mjs?v=1";
+import { attachRecordCarousel } from "./record-carousel.mjs?v=1";
 import { attachRecordToasts } from "./record-toasts.mjs?v=1";
 import { startTutorPresentation } from "../shared/ui/tutor-presentation.mjs";
 startTutorPresentation();
@@ -3718,3 +3719,5 @@ document.querySelector("#initialize-lesson-baselines").addEventListener("click",
 });
 
 attachRecordToasts(els.recordTbody);
+
+attachRecordCarousel(els.recordTbody);
