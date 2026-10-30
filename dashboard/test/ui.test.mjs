@@ -86,3 +86,10 @@ test('Workflow projection leaves run cards, native dialogs, authorization and st
  const css=await load('shared/ui/workflow-bootstrap.css');postcss.parse(css).walkRules(r=>{for(const s of r.selectors)assert.ok(s.startsWith('.workflow-bootstrap'),s);});
  const source=await load('shared/ui/workflow-presentation.mjs');assert.ok(!/fetch\(|localStorage|showModal\(|\.value\s*=|\.disabled\s*=/.test(source));assert.ok(source.includes("el.matches('.wf-run')"));
 });
+
+test('Tutor scoped UI keeps record autosizing and native attribution/save/print owners',async()=>{
+ const css=await load('shared/ui/tutor-bootstrap.css');postcss.parse(css).walkRules(r=>{for(const s of r.selectors)assert.ok(s.startsWith('.tutor-bootstrap'),s);});
+ const source=await load('shared/ui/tutor-presentation.mjs');assert.ok(!/fetch\(|localStorage|showModal\(|\.value\s*=|\.disabled\s*=/.test(source));assert.ok(source.includes('.record-student-link,.schedule-day-btn,.schedule-event'));
+ assert.match(await load('shared/ui/tutor-tokens.css'),/white-space: normal/);
+ assert.ok(!css.includes('@view-transition'));
+});
