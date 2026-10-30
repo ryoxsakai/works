@@ -170,6 +170,7 @@ try {
   await expect(page.locator('#step-2')).toBeVisible();await expect(page.locator('#setup-guide')).toBeHidden();
   await page.locator('#resume-setup').click();await expect(page.locator('#step-1')).toBeVisible();
   await page.locator('#new-role').click();await page.locator('#role-form [name=name]').fill('未保存の合成入力');
+  const beforeProjection=writes;await page.evaluate(async()=>{const c=(await import('/shared/ui/workflow-presentation.mjs')).startWorkflowPresentation();c.stop();c.start();c.start();});assert.equal(writes,beforeProjection);await expect(page.locator('#role-form [name=name]')).toHaveValue('未保存の合成入力');
   acceptDialogs=false;await page.keyboard.press('Escape');await expect(page.locator('#role-editor')).toBeVisible();
   await page.goBack();await expect(page.locator('#role-editor')).toBeVisible();
   await page.evaluate(()=>location.reload());await expect.poll(()=>beforeUnloadWarnings).toBe(1);
@@ -182,11 +183,15 @@ try {
     const opener=page.locator(`[data-open="${id}"]`);await opener.click();await expect(page.locator('#'+id)).toBeVisible();
     await page.keyboard.press('Escape');await expect(opener).toBeFocused();
   }
-  for(const width of [320,390,1440]){
+  for(const width of [320,390,768,1440])for(const theme of ['light','dark']){
+    await page.evaluate(t=>{localStorage.setItem('works_theme',t);document.documentElement.dataset.theme=t;},theme);
+    await page.emulateMedia({reducedMotion:'reduce'});
     await page.setViewportSize({width,height:1000});
-    for(const step of [1,2,3]){await page.locator(`[data-step="${step}"]`).focus();await page.keyboard.press('Enter');await expect(page.locator('#step-'+step)).toBeVisible();assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:new URL(`../test-artifacts/workflow/step-${step}-${width}.png`,import.meta.url).pathname});}
+    for(const step of [1,2,3]){await page.locator(`[data-step="${step}"]`).focus();await page.keyboard.press('Enter');await expect(page.locator('#step-'+step)).toBeVisible();assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:new URL(`../test-artifacts/workflow/step-${step}-${width}-${theme}.png`,import.meta.url).pathname});}
     await page.locator('[data-step="2"]').click();
+    if(width===390){await page.emulateMedia({media:'print'});await page.pdf({path:new URL(`../test-artifacts/workflow/print-${theme}.pdf`,import.meta.url).pathname});await page.emulateMedia({media:'screen'});}
   }
+  await page.evaluate(()=>{localStorage.setItem('works_theme','light');document.documentElement.dataset.theme='light';});
   await page.setViewportSize({width:1440,height:1000});
   await page.locator('[data-open="settings-dialog"]').click();await page.locator('#interval').selectOption('30');
   acceptDialogs=false;await page.keyboard.press('Escape');await expect(page.locator('#settings-dialog')).toBeVisible();

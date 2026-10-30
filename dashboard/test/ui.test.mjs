@@ -81,3 +81,8 @@ test('Material CSS and SVG projection preserve native file, preview, drag and pe
  const css=await load('shared/ui/material-bootstrap.css');postcss.parse(css).walkRules(r=>{for(const s of r.selectors)assert.ok(s.startsWith('.material-bootstrap'),s);});
  const source=await load('shared/ui/material-presentation.mjs');assert.ok(!/fetch\(|localStorage|showModal\(|\.value\s*=|\.disabled\s*=/.test(source));assert.ok(source.includes('#material-preview-body'));assert.ok(source.includes(':not([type="file"])'));
 });
+
+test('Workflow projection leaves run cards, native dialogs, authorization and state owners unchanged',async()=>{
+ const css=await load('shared/ui/workflow-bootstrap.css');postcss.parse(css).walkRules(r=>{for(const s of r.selectors)assert.ok(s.startsWith('.workflow-bootstrap'),s);});
+ const source=await load('shared/ui/workflow-presentation.mjs');assert.ok(!/fetch\(|localStorage|showModal\(|\.value\s*=|\.disabled\s*=/.test(source));assert.ok(source.includes("el.matches('.wf-run')"));
+});
