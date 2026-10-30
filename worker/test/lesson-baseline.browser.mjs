@@ -24,7 +24,8 @@ try {
  assert.equal(await fixture.DB.prepare("SELECT * FROM lesson_record_baseline WHERE event_id='held-instance'").first(),null);
  assert.equal(await page.locator('#record-tbody').innerText().then(text=>text.includes('private held source')),false);
  // Current title baseline is a comparison only: even an ordinary legacy save keeps NULL owner title.
- await row('b').locator('.record-homework').fill('edited legacy homework');await row('b').locator('.record-homework').press('Tab');
+ await expect(row('b').locator('.record-homework')).toBeHidden();
+ await row('b').locator('.record-homework').evaluate(el=>{el.value='edited legacy homework';el.dispatchEvent(new Event('change',{bubbles:true}));});
  await expect.poll(async()=> (await fixture.DB.prepare("SELECT homework FROM curriculum_entries WHERE calendar_event_id='b'").first()).homework).toBe('edited legacy homework');
  assert.equal((await fixture.DB.prepare("SELECT title FROM lesson_record_identity WHERE event_id='b'").first()).title,null);
  assert.equal(JSON.parse((await fixture.DB.prepare("SELECT snapshot_json FROM lesson_record_legacy_source WHERE event_id='b'").first()).snapshot_json).homework,'既存宿題');

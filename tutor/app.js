@@ -1,4 +1,5 @@
 import { setUserAvatar } from "../shared/avatar.mjs?v=1";
+import { attachRecordToasts } from "./record-toasts.mjs?v=1";
 import { startTutorPresentation } from "../shared/ui/tutor-presentation.mjs";
 startTutorPresentation();
 import { attributedLessonRecord, lessonRecordNeedsReview } from "../shared/lesson-attribution.js?v=2";
@@ -572,14 +573,12 @@ function renderRecordTable(rows) {
       if (lessonRecordNeedsReview(r.record)) return lessonReviewRow(r.ref,r.record,r.label,formatTimeOrPeriod(r.start,"Asia/Tokyo"));
       return `<tr data-event-id="${escapeHtml(r.eventId)}" data-record-ref="${escapeHtml(JSON.stringify(r.ref))}" data-record-revision="${r.record.record_revision}" data-completed="${r.completed ? 1 : 0}">
         <td>
-          <button type="button" class="record-student-link" data-calendar-id="${escapeHtml(r.calendarId || "")}" data-name="${escapeHtml(r.label)}" data-term-id="${r.termId}"><span class="record-avatar"${r.iconColor ? ` style="background-color:${escapeHtml(lightenHexColor(r.iconColor, 0.75))};color:${escapeHtml(r.iconColor)}"` : ""}><i class="bx bx-book-open"></i></span> ${escapeHtml(r.label)}</button>
+          <div class="record-card-heading"><button type="button" class="record-student-link" data-calendar-id="${escapeHtml(r.calendarId || "")}" data-name="${escapeHtml(r.label)}" data-term-id="${r.termId}"><span class="record-avatar"${r.iconColor ? ` style="background-color:${escapeHtml(lightenHexColor(r.iconColor, 0.75))};color:${escapeHtml(r.iconColor)}"` : ""}><i class="bx bx-book-open"></i></span> ${escapeHtml(r.label)}</button><div class="record-card-meta"><span>${r.n}/${r.m}回</span><span>${formatTimeOrPeriod(r.start, "Asia/Tokyo")}</span><button type="button" class="record-recheck btn btn-outline" aria-label="予定を再確認" title="予定を再確認" disabled><svg class="works-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-1l2 3M4 15l2 3a7 7 0 0 0 12-1"/></svg></button></div></div>
           ${lessonAttributionNotice(r.record)}
           ${
-            r.prevLessonPlan || r.prevHomework || r.prevLessonMemo
+            r.prevLessonPlan
               ? `<div class="record-prev-info">${lessonAttributionNotice(r.prevRecord)}
                   ${r.prevLessonPlan ? `<p><i class="bx bx-book-content"></i> ${escapeHtml(r.prevLessonPlan)}</p>` : ""}
-                  ${r.prevHomework ? `<p><i class="bx bx-pencil"></i> ${escapeHtml(r.prevHomework)}</p>` : ""}
-                  ${r.prevLessonMemo ? `<p><i class="bx bx-note"></i> ${escapeHtml(r.prevLessonMemo)}</p>` : ""}
                 </div>`
               : ""
           }
@@ -643,6 +642,7 @@ function renderLessonPlans() {
     status.dataset.error = String(!!conflict || state?.status === "error" || (sourceKey && linkStatus === "error"));
     if (sourceKey) {
       const target = conflict ? link?.current?.target || link?.target : link?.target;
+      editor.querySelector(".lesson-plan-target").dataset.conflict = String(!!conflict);
       editor.querySelector(".lesson-plan-target").textContent = target ? `${conflict ? "最新候補" : "連動先"}: ${lessonPlanDate(target)}` : "";
     }
     action.hidden = false; action.disabled = !!state?.pending || linkStatus === "loading" && !!sourceKey;
@@ -650,9 +650,17 @@ function renderLessonPlans() {
     else if (state?.status === "error") { action.dataset.action = "retry"; action.textContent = "再保存"; }
     else if (sourceKey) { action.dataset.action = "recheck"; action.textContent = "予定を再確認"; }
     else action.hidden = true;
+    const refresh = editor.closest("tr[data-event-id]")?.querySelector(".record-recheck");
+    if (sourceKey && refresh) refresh.disabled = action.disabled || action.dataset.action !== "recheck";
     resizeRecordInput(input);
   });
 }
+
+document.addEventListener("click", (event) => {
+  const refresh = event.target.closest(".record-recheck");
+  if (!refresh || refresh.disabled) return;
+  refresh.closest("tr[data-event-id]").querySelector(".record-next-plan .lesson-plan-action").click();
+});
 
 document.addEventListener("input", (event) => {
   if (!event.target.matches(".linked-lesson-plan") || event.target.disabled || event.target.readOnly) return;
@@ -3708,3 +3716,5 @@ document.querySelector("#initialize-lesson-baselines").addEventListener("click",
   } catch(error){status.textContent=error.message+"。再試行しても、作成済みの観測値や旧記録を上書きしません。";}
   finally{button.disabled=false;}
 });
+
+attachRecordToasts(els.recordTbody);
