@@ -1,15 +1,17 @@
-import { icon } from './material-icons.mjs';
+import { icon } from './material-icons.mjs?v=2';
 let controller;
 const controls='button,input,select,textarea,.material-panel,[role="alert"]';
 // DOM projection only: no values, disabled flags, handlers, order, API or dialog
 // state are changed. Dynamic forms retain their original delegated handlers.
 export function decorateMaterial(root) {
   for(const old of [...(root.matches?.('i.bx')?[root]:[]),...root.querySelectorAll('i.bx')]) {
-    const key=[...old.classList].find(c=>c.startsWith('bx-')&&c!=='bx-spin');
+    const key=[...old.classList].find(c=>(c.startsWith('bx-')||c.startsWith('bxs-'))&&c!=='bx-spin');
     if(!key)continue;
     const template=document.createElement('template');template.innerHTML=icon(key);
     const svg=template.content.firstElementChild;
     for(const attr of old.attributes)if(!['class','aria-hidden'].includes(attr.name))svg.setAttribute(attr.name,attr.value);
+    for(const name of old.classList)if(name!=='bx'&&!name.startsWith('bx-')&&!name.startsWith('bxs-'))svg.classList.add(name);
+    if(old.classList.contains('bx-spin'))svg.classList.add('works-spin');
     old.replaceWith(svg);
   }
   const nodes=[...(root.matches?.(controls)?[root]:[]),...root.querySelectorAll(controls)];

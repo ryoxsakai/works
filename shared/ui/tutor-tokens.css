@@ -29,3 +29,10 @@
 .tutor-bootstrap .record-heading h2 { white-space: nowrap; }
 
 @media(prefers-reduced-motion: reduce) { .tutor-bootstrap :is(.section-chevron,.material-chevron) { transition: none; } }
+/* Native modal add buttons retain their original filled fg/bg pair in every state. */
+.tutor-bootstrap .app-modal .btn-add.btn,
+.tutor-bootstrap .app-modal .btn-add.btn:is(:hover,:focus-visible,:active) {
+ --btn-color: var(--bg); --btn-bg: var(--fg); --btn-hover-color: var(--bg); --btn-hover-bg: var(--fg);
+ --btn-active-color: var(--bg); --btn-active-bg: var(--fg);
+ color: var(--bg); background: var(--fg); border-radius: 50%;
+}

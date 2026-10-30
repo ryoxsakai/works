@@ -146,7 +146,7 @@ await fs.writeFile(path.join(here,'material-bootstrap.css'),'/*! Bootstrap 6.0.0
 
 
 const materialPaths={};
-for(const [key,name] of Object.entries({"bx-check": "check-lg", "bx-cloud-upload": "cloud-upload", "bx-download": "download", "bx-file-find": "file-earmark-text", "bx-file-blank": "file-earmark", "bx-folder-open": "folder2-open", "bx-folder-plus": "folder-plus", "bx-git-branch": "diagram-3", "bx-pencil": "pencil-square", "bx-purchase-tag": "tag", "bx-search": "search", "bx-search-alt": "search", "bx-upload": "upload", "bx-user-circle": "person-circle", "bx-x": "x-lg", "bx-chevron-right": "chevron-right", "bx-home": "house", "bx-loader-alt": "hourglass-split", "bx-move": "arrows-move", "bx-trash": "trash"})){
+for(const [key,name] of Object.entries({"bxs-folder": "folder-fill", "bx-check": "check-lg", "bx-cloud-upload": "cloud-upload", "bx-download": "download", "bx-file-find": "file-earmark-text", "bx-file-blank": "file-earmark", "bx-folder-open": "folder2-open", "bx-folder-plus": "folder-plus", "bx-git-branch": "diagram-3", "bx-pencil": "pencil-square", "bx-purchase-tag": "tag", "bx-search": "search", "bx-search-alt": "search", "bx-upload": "upload", "bx-user-circle": "person-circle", "bx-x": "x-lg", "bx-chevron-right": "chevron-right", "bx-home": "house", "bx-loader-alt": "hourglass-split", "bx-move": "arrows-move", "bx-trash": "trash"})){
  const svg=await fs.readFile(path.join(here,'node_modules/bootstrap-icons/icons',name+'.svg'),'utf8');
  materialPaths[key]=svg.replace(/<svg[^>]*>/,'').replace('</svg>','').trim();
 }

@@ -25,3 +25,7 @@
  .material-bootstrap .material-inline-upload-action::after { font-size: .72rem; content: "選択"; }
  .material-bootstrap .material-file-actions { grid-template-columns: repeat(2,44px); gap: 4px; }
 }
+
+@keyframes works-material-spin { to { transform: rotate(360deg); } }
+@media(prefers-reduced-motion: no-preference) { .material-bootstrap .works-spin { animation: works-material-spin 1s linear infinite; } }
+@media(prefers-reduced-motion: reduce), print { .material-bootstrap .works-spin { animation: none; } }
