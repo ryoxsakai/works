@@ -1,8 +1,8 @@
-import {parseCalendarRecord,replaceCalendarRecord,calendarRecordValues,CALENDAR_RECORD_FROM,CALENDAR_RECORD_START,CALENDAR_RECORD_END} from '../../shared/calendar-lesson-record.mjs';
+import {parseCalendarRecord,parsePlainCalendarRecord,replaceCalendarRecord,calendarRecordValues,CALENDAR_RECORD_FROM,CALENDAR_RECORD_START,CALENDAR_RECORD_END} from '../../shared/calendar-lesson-record.mjs';
 import {lessonDate,lessonRecordNeedsReview,lessonTitleKey} from '../../shared/lesson-attribution.js';
 import {lessonEventRef,sameLessonEvent,isScheduledLesson} from '../../shared/lesson-plan.js';
 import {rawRecord,requireCurrent,prepareRecordWrite,commitRecords,readCommittedRecord} from './lesson-attribution.js';
-import {recordBinding,calendarRecordPrivacy} from './calendar-lesson-migration.js';
+import {recordBinding,calendarRecordPrivacy,calendarWriteRejected} from './calendar-lesson-migration.js';
 import {calendarLessonJournal} from './calendar-lesson-journal.js';
 import {calendarLessonGoogle} from './calendar-lesson-google.js';
 const fail=(message,code='CALENDAR_RECORD_CONFLICT',status=409)=>Object.assign(new Error(message),{code,status});
@@ -12,7 +12,8 @@ export function calendarStorageState(row,ref,operation){
  if(!operation)return row;
  if(operation.status!=='verified')return {...row,record_pending_operation:true,record_target_unavailable:true,attribution_status:'target_unavailable',...calendarRecordValues({})};
  try{const snapshot=JSON.parse(operation.snapshot_json),binding={...snapshot.binding,title:lessonTitleKey(snapshot.ref.title),generation:snapshot.after_generation??snapshot.binding.generation};
-  return JSON.stringify(binding)===JSON.stringify(recordBinding(row,ref))?{...row,record_calendar_managed:true}:row;
+  const previous=parseCalendarRecord(snapshot.after_description),suffix=previous?snapshot.after_description.slice(previous.end):'';
+  return JSON.stringify(binding)===JSON.stringify(recordBinding(row,ref))?{...row,record_calendar_managed:true,record_calendar_suffix:suffix}:row;
  }catch{return {...row,record_target_unavailable:true,attribution_status:'target_unavailable',...calendarRecordValues({})};}
 }
 export async function loadCalendarStorageState(env,row,ref){
@@ -21,11 +22,19 @@ export async function loadCalendarStorageState(env,row,ref){
  const operation=await env.DB.prepare("SELECT status,snapshot_json FROM calendar_lesson_migration WHERE event_id=? AND calendar_id=? AND status IN ('reserved','dispatching','unknown','verified') ORDER BY CASE WHEN status='verified' THEN 1 ELSE 0 END,rowid DESC LIMIT 1").bind(ref.id,ref.calendar_id).first();
  return calendarStorageState(row,ref,operation);
 }
+export async function previousCalendarLessonRecord(env,row,event){
+ if(!calendarRecordsEnabled(env)||!event)return row;
+ const ref={...lessonEventRef(event),calendar_id:row.record_calendar_id||row.record_observed_calendar_id||event.calendar_id,title:row.record_title||row.record_observed_title||event.summary||''};
+ const annotated=await loadCalendarStorageState(env,row,ref);
+ try{const binding=recordBinding(row,ref),parsed=parseCalendarRecord(event.description||'')||(annotated.record_calendar_managed?parsePlainCalendarRecord(event.description||'',binding,{suffix:annotated.record_calendar_suffix||''}):null);
+  return parsed&&JSON.stringify(parsed.binding)===JSON.stringify(binding)?{...row,...parsed.values}:row;
+ }catch{return row;}
+}
 export function overlayCalendarLessonRecord(env,row,event){
  if(!calendarRecordEligible(env,event)&&!row.record_calendar_managed)return row;
  if(lessonRecordNeedsReview(row))return row;
  try{
-  const parsed=parseCalendarRecord(event.description||'');
+  const parsed=parseCalendarRecord(event.description||'')||(row.record_calendar_managed?parsePlainCalendarRecord(event.description||'',recordBinding(row,lessonEventRef(event)),{suffix:row.record_calendar_suffix||''}):null);
   if(!parsed)return row.record_calendar_managed?{...row,...calendarRecordValues({}),record_storage:'calendar_missing_fields'}:{...row,record_storage:'db_pending_migration'};
   const ref=lessonEventRef(event),binding=recordBinding(row,ref);
   if(JSON.stringify(parsed.binding)!==JSON.stringify(binding))throw fail('カレンダー説明欄の授業対応が変更されています');
@@ -48,7 +57,8 @@ export async function writeCalendarLessonRecord(env,{target,patch,recordRevision
  for(const id of [...new Set(settings.selected_calendars)].filter(id=>id!==target.calendar_id))if(await google.read(id,target.id))throw fail('同じ予定IDが複数のカレンダーにあります');
  const row=await rawRecord(env,target.id);
  if(decision&&!['inherit','separate'].includes(decision))throw fail('確認方法が不正です');
- const current=await loadCalendarStorageState(env,decision?row:requireCurrent(row,ref),ref);useCalendar=useCalendar||!!current.record_calendar_managed;
+ const oldRef=decision?{...ref,calendar_id:row.record_calendar_id||row.record_observed_calendar_id||ref.calendar_id,title:row.record_title||row.record_observed_title||ref.title}:ref;
+ const current=await loadCalendarStorageState(env,decision?row:requireCurrent(row,ref),oldRef);useCalendar=useCalendar||!!current.record_calendar_managed;
  if(row.record_revision!==recordRevision)throw fail('授業記録の版が変更されています');
  const shown=overlayCalendarLessonRecord(env,current,event);if(!decision&&lessonRecordNeedsReview(shown))throw fail('説明欄の授業対応を確認してください');
  if(expectedLessonPlan!==undefined&&(shown.lesson_plan||'')!==expectedLessonPlan)throw fail('授業予定が別の画面で変更されています');
@@ -56,7 +66,7 @@ export async function writeCalendarLessonRecord(env,{target,patch,recordRevision
   if(initializeOnly)return {...shown,target:ref,initialized:false};
   const prepared=await prepareRecordWrite(env,ref,patch,row.record_revision);await commitRecords(env,prepared.statements);return {...await readCommittedRecord(env,ref,prepared),target:ref};
  }
- const parsed=parseCalendarRecord(event.description||'');
+ const parsed=parseCalendarRecord(event.description||'')||(current.record_calendar_managed?parsePlainCalendarRecord(event.description||'',recordBinding(row,oldRef),{suffix:current.record_calendar_suffix||''}):null);
  if(!decision&&!initializeOnly&&!parsed&&!['new','confirmed'].includes(current.attribution_status)){
   // Unverified legacy content is held from NEW Calendar disclosure, not from
   // its existing guarded DB workflow. Never silently mark it verified/export it.
@@ -72,11 +82,14 @@ export async function writeCalendarLessonRecord(env,{target,patch,recordRevision
  const values={...calendarRecordValues(decision?(decision==='inherit'?parsed.values:{}):shown),...Object.fromEntries(Object.keys(calendarRecordValues({})).filter(key=>patch[key]!==undefined).map(key=>[key,patch[key]??'']))};
  const recordAfter={...values,...(patch.completed===undefined?{}:{completed:patch.completed})};
  const prepared=decision?{generation:row.record_generation+1}:await prepareRecordWrite(env,ref,recordAfter,row.record_revision);
- const after=replaceCalendarRecord(event.description||'',values,{...recordBinding(row,ref),generation:prepared.generation},{explicitRebind:!!decision});
+ const nextBinding={...recordBinding(row,ref),generation:prepared.generation};
+ const prefix=parsed?.plain?(event.description||'').slice(0,parsed.start):'';
+ const after=parsed?.plain?prefix+(prefix&&!prefix.endsWith('\n')?'\n':'')+replaceCalendarRecord('',values,nextBinding)+(event.description||'').slice(parsed.end):replaceCalendarRecord(event.description||'',values,nextBinding,{explicitRebind:!!decision});
  const op=await journal.reserve({ref,binding:recordBinding(row,ref),after_generation:prepared.generation,decision,revision:row.record_revision,before:event,record_before:row,after_description:after,record_after:recordAfter});
  // Re-read the event AND privacy after the durable reservation, immediately
  // before dispatch. Never rely on a stale dry-run assertion supplied by a client.
- const latest=await google.read(ref.calendar_id,ref.id),privacy=await google.privacy(ref.calendar_id);
+ let latest,privacy;
+ try{latest=await google.read(ref.calendar_id,ref.id);privacy=await google.privacy(ref.calendar_id);}catch(error){await journal.mark(op.id,'dispatching');await journal.mark(op.id,'precondition_failed');throw error;}
  if(!latest||!sameLessonEvent(lessonEventRef(latest,ref.calendar_id),ref)||calendarRecordPrivacy({...latest,calendar_id:ref.calendar_id},privacy,env.ALLOWED_EMAIL).status!=='safe'){
   // No dispatch happened. Mark a distinct definitive failure via the journal's
   // dispatch fence; no timeout-based release is used.
@@ -84,7 +97,7 @@ export async function writeCalendarLessonRecord(env,{target,patch,recordRevision
  }
  await journal.mark(op.id,'dispatching');
  try{await google.patch(ref.calendar_id,ref.id,{description:after},{ifMatch:ref.etag,sendUpdates:'none'});}
- catch(error){await journal.mark(op.id,error.status===412?'precondition_failed':'unknown');throw fail(error.status===412?'予定が変更されました':'保存結果が不明です。再送せず照合してください',error.status===412?'CALENDAR_ETAG_CONFLICT':'CALENDAR_WRITE_UNKNOWN',error.status===412?409:503);}
+ catch(error){const rejected=calendarWriteRejected(error);await journal.mark(op.id,rejected?'precondition_failed':'unknown');throw fail(rejected?`カレンダーが保存を拒否しました (${error.status})。入力を保持しています`:'保存結果が不明です。再送せず照合してください',error.status===412?'CALENDAR_ETAG_CONFLICT':rejected?'CALENDAR_WRITE_REJECTED':'CALENDAR_WRITE_UNKNOWN',error.status===412?409:rejected?error.status:503);}
  const fresh=await google.read(ref.calendar_id,ref.id).catch(()=>null);
  if(!fresh||fresh.description!==after||!sameLessonEvent({...lessonEventRef(fresh,ref.calendar_id),etag:ref.etag},ref)){
   await journal.mark(op.id,'unknown');throw fail('保存後の照合が必要です。入力を保持してください','CALENDAR_WRITE_UNKNOWN',503);

@@ -145,3 +145,18 @@ separate budget validation before activation; do not infer an unbounded guarante
 A managed event moved across the cutoff retains its Calendar source. An untouched
 pre-cutoff event stays DB-only. Clearing an already managed description reads as
 empty, never resurrecting stale DB shadow fields; original snapshots remain.
+
+## Native Calendar editing and failure classification
+
+A verified journal binding also permits the native editor's plain four-line or
+`br`/`div`/`p` HTML form after comment removal. Only known managed records use this
+fallback. Duplicate/partial headings or a changed protected suffix are held. Read
+and rewrite preserve outside bytes and multiline text; Google real-device output
+still needs observation. The explicit old-record review shows Calendar's actual
+previous values alongside the preserved original DB snapshot.
+
+Confirmed Google validation/auth/quota/ETag rejections do not claim success and
+release the definitely unapplied reservation; no automatic retry occurs. Network,
+5xx, unreadable success bodies, postimage failures and uncertain DB finalization
+remain unknown. Source mutation transport failures are not reported as validation
+400 errors. Pending snapshots and source data remain available for reconciliation.

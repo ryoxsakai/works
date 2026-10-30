@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {CALENDAR_RECORD_START,CALENDAR_RECORD_END,parseCalendarRecord,replaceCalendarRecord,calendarRecordValues} from '../../shared/calendar-lesson-record.mjs';
+import {CALENDAR_RECORD_START,CALENDAR_RECORD_END,parseCalendarRecord,parsePlainCalendarRecord,replaceCalendarRecord,calendarRecordValues} from '../../shared/calendar-lesson-record.mjs';
 import {planCalendarRecordMigration,planCalendarTemplateInitialization,calendarRecordPrivacy,applyCalendarRecordMigration,reconcileCalendarRecordMigration} from '../src/calendar-lesson-migration.js';
 const binding={calendar_id:'synthetic',event_id:'instance_20261020T010000Z',title:'合成生徒',generation:0};
 const row={calendar_event_id:binding.event_id,record_exists:1,record_calendar_id:binding.calendar_id,record_title:binding.title,record_revision:4,record_generation:0,lesson_plan:'予定',confirmation_test:'テスト',homework:'宿題',lesson_memo:'メモ'};
@@ -19,9 +19,20 @@ test('ambiguous, duplicate, malformed, HTML-transformed and foreign blocks never
  const valid=replaceCalendarRecord('',row,binding);
  for(const description of [valid+'\n'+valid,valid.replace('宿題：','授業予定：'),valid.replace(CALENDAR_RECORD_END,''),valid.replace('授業予定：予定','授業予定：<b>予定</b>'),'<br>'+valid,valid.replace('<!--Works授業記録 v1-->','<!--Works授業記録 v2-->')])assert.throws(()=>replaceCalendarRecord(description,row,binding),/管理欄|既存/);
  assert.throws(()=>replaceCalendarRecord('授業予定：以前からの記述',row,binding));
+ assert.throws(()=>replaceCalendarRecord('授業予定:以前からの記述',row,binding));
  assert.throws(()=>replaceCalendarRecord(valid,row,{...binding,title:'別名'}));
  assert.throws(()=>replaceCalendarRecord(valid,row,{...binding,generation:1}));
  assert.equal(parseCalendarRecord('通常の説明だけ'),null);
+});
+test('verified native plaintext/HTML fallback preserves four-field content and rejects ambiguous headings',()=>{
+ const parsed=parsePlainCalendarRecord('<div>外側の案内</div><div><b> 授業予定&#65306;</b>native &amp; text</div><div>二行目</div><div>確認テスト：</div><div>宿題：work</div><div>授業メモ：</div>',binding);
+ assert.equal(parsed.values.lesson_plan,'native & text\n二行目');assert.equal(parsed.values.homework,'work');assert.equal(parsed.values.lesson_memo,'');assert.equal(parsed.start,'<div>外側の案内</div>'.length);
+ assert.throws(()=>parsePlainCalendarRecord('授業予定：one\n授業予定：two\n確認テスト：\n宿題：\n授業メモ：',binding));
+ assert.throws(()=>parsePlainCalendarRecord('授業予定：one\n宿題：two',binding));
+ assert.equal(parsePlainCalendarRecord('新しい説明だけ',binding),null);
+ assert.equal(parsePlainCalendarRecord('授業予定:英字コロン\n確認テスト:\n宿題:\n授業メモ:',binding).values.lesson_plan,'英字コロン');
+ assert.equal(parsePlainCalendarRecord('授業予定：<a href="https://example.invalid/book">教材</a>\n確認テスト：\n宿題：\n授業メモ：',binding).values.lesson_plan,'教材 (https://example.invalid/book)');
+ assert.throws(()=>parsePlainCalendarRecord('授業予定：<a href="javascript:alert(1)">危険</a>\n確認テスト：\n宿題：\n授業メモ：',binding));
 });
 test('cutoff includes JST Oct20 midnight, excludes earlier and rejects a series master',()=>{
  assert.equal(plan().status,'ready');
@@ -59,8 +70,8 @@ test('one conditional instance-only PATCH, durable full preimage before dispatch
 });
 for(const code of [412,403,500,undefined])test('PATCH failure does not auto retry: '+code,async()=>{
  const a=adapters({failPatch:Object.assign(Error('failed'),{status:code})});
- await assert.rejects(applyCalendarRecordMigration(plan(),a.deps),e=>e.code===(code===412?'CALENDAR_ETAG_CONFLICT':'CALENDAR_WRITE_UNKNOWN'));
- assert.equal(a.sent,1);assert.equal(a.journal.at(-1).state,code===412?'precondition_failed':'unknown');
+ await assert.rejects(applyCalendarRecordMigration(plan(),a.deps),e=>e.code===(code===412?'CALENDAR_ETAG_CONFLICT':code===403?'CALENDAR_WRITE_REJECTED':'CALENDAR_WRITE_UNKNOWN'));
+ assert.equal(a.sent,1);assert.equal(a.journal.at(-1).state,[412,403].includes(code)?'precondition_failed':'unknown');
 });
 test('missing verification, changed metadata or lost response remains unknown',async()=>{
  for(const opts of [{failReadAfter:true},{alterRead:(e,sent)=>sent?{...e,summary:'別の生徒'}:e}]){

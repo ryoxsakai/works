@@ -5,6 +5,7 @@ import {CALENDAR_RECORD_FROM,calendarRecordValues,parseCalendarRecord,replaceCal
 const problem=(code,message,status=409)=>Object.assign(new Error(message),{status,code});
 const block=(reason)=>({status:'held',reason});
 const equalValues=(a,b)=>JSON.stringify(calendarRecordValues(a))===JSON.stringify(calendarRecordValues(b));
+export const calendarWriteRejected=error=>[400,401,403,404,410,412,422,429].includes(error?.status);
 export function recordBinding(row,ref){return {calendar_id:ref.calendar_id,event_id:ref.id,title:lessonTitleKey(ref.title),generation:row.record_generation};}
 
 // ACL input must come from a trusted, complete server-side lookup. It is never
@@ -91,10 +92,9 @@ export async function applyCalendarRecordMigration(plan,{read,privacy,ownerEmail
  try{
   await patch(plan.ref.calendar_id,plan.ref.id,{description:plan.after_description},{ifMatch:plan.ref.etag,sendUpdates:'none'});
  }catch(error){
-  // 412 is definitively not applied. All other outcomes remain locked, including
-  // authorization errors: the adapter may have failed after sending the request.
-  await mark(operation.id,error.status===412?'precondition_failed':'unknown');
-  throw problem(error.status===412?'CALENDAR_ETAG_CONFLICT':'CALENDAR_WRITE_UNKNOWN',error.status===412?'予定が変更されました。転記は適用されていません':'転記結果が不明です。同じ要求を再送せず再取得して照合してください');
+  const rejected=calendarWriteRejected(error);
+  await mark(operation.id,rejected?'precondition_failed':'unknown');
+  throw problem(error.status===412?'CALENDAR_ETAG_CONFLICT':rejected?'CALENDAR_WRITE_REJECTED':'CALENDAR_WRITE_UNKNOWN',rejected?`カレンダーが保存を拒否しました (${error.status})。転記は適用されていません`:'転記結果が不明です。同じ要求を再送せず再取得して照合してください',rejected?error.status:503);
  }
  const fresh=await read(plan.ref.calendar_id,plan.ref.id).catch(()=>null);
  const unchanged=a=>{const ref=lessonEventRef(a,plan.ref.calendar_id);return sameLessonEvent({...ref,etag:plan.ref.etag},plan.ref);};

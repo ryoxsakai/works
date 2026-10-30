@@ -115,3 +115,15 @@ test('clearing a migrated Calendar description never resurrects the old DB shado
  events[1].description='';events[1].etag='"user-cleared"';current=await read();assert.equal(current.lesson_plan,'');assert.equal(current.record_storage,'calendar_missing_fields');
  const response=await put('/api/lesson-plan',{target:current.target,record_revision:current.record_revision,expected_lesson_plan:'',lesson_plan:'消去後の予定'});assert.equal(response.status,200,JSON.stringify(await response.clone().json()));const values=parseCalendarRecord(events[1].description).values;assert.equal(values.lesson_plan,'消去後の予定');assert.equal(values.homework,'');assert.equal(values.confirmation_test,'');assert.equal(values.lesson_memo,'');
 });
+test('native Calendar four-line HTML survives comment removal, preserves outside text, and can explicitly separate a renamed student',async t=>{
+ const {events,call,put}=await setup(t);const read=async()=>(await (await call('/api/lesson-plan?calendar_id=synthetic-calendar&event_id=b')).json());
+ let current=await read();await put('/api/lesson-plan',{target:current.target,record_revision:current.record_revision,expected_lesson_plan:current.lesson_plan,lesson_plan:'managed'});
+ events[1].description='<div>元の案内</div><div>授業予定：Calendarで直接変更</div><div>二行目</div><div>確認テスト：</div><div>宿題：native homework</div><div>授業メモ：</div>';events[1].etag='"native"';
+ current=await read();assert.equal(current.lesson_plan,'Calendarで直接変更\n二行目');
+ let response=await put('/api/lesson-plan',{target:current.target,record_revision:current.record_revision,expected_lesson_plan:current.lesson_plan,lesson_plan:'Worksへ往復'});assert.equal(response.status,200,JSON.stringify(await response.clone().json()));assert.ok(events[1].description.startsWith('<div>元の案内</div>'));assert.equal(parseCalendarRecord(events[1].description).values.homework,'native homework');
+ // A subsequent native edit may remove comments again before a title replacement.
+ events[1].description='授業予定：旧生徒の内容\n確認テスト：\n宿題：\n授業メモ：';events[1].summary='別生徒';events[1].etag='"renamed-native"';
+ current=await read();assert.equal(current.lesson_plan,'');assert.equal(current.attribution_status,'title_changed');
+ const review=await (await call('/api/lesson-record?calendar_id=synthetic-calendar&event_id=b')).json();assert.equal(review.previous_record.lesson_plan,'旧生徒の内容');assert.equal(review.record.lesson_plan,null);assert.equal(review.original_db_record.lesson_plan,'Worksへ往復');
+ response=await put('/api/lesson-record',{target:current.target,record_revision:current.record_revision,decision:'separate'});assert.equal(response.status,200,JSON.stringify(await response.clone().json()));assert.equal(parseCalendarRecord(events[1].description).values.lesson_plan,'');
+});

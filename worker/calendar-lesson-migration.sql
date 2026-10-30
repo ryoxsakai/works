@@ -15,3 +15,5 @@ CREATE TABLE IF NOT EXISTS calendar_lesson_migration (
 CREATE UNIQUE INDEX IF NOT EXISTS calendar_lesson_migration_active
  ON calendar_lesson_migration(event_id)
  WHERE status IN ('reserved','dispatching','unknown');
+CREATE INDEX IF NOT EXISTS calendar_lesson_migration_event
+ ON calendar_lesson_migration(event_id,calendar_id);

@@ -4,7 +4,7 @@ import { kdpTools, kdpWriteTools, availableKdpTools, callKdpTool, handleKdp } fr
 import { MCP_SCOPE, KDP_WRITE_SCOPE, mcpScopes, canonicalMcpScope, supportedMcpScope } from "./mcp-scopes.js";
 import { ensureRefreshSchema, issueRefreshGrant, readRefreshFamily, rotateRefreshGrant, revokeRefreshGrant } from "./oauth-refresh.js";
 
-import {calendarRecordsEnabled,calendarRecordEligible,overlayCalendarLessonRecord,writeCalendarLessonRecord,reconcileCalendarLessonRecord,calendarStorageState,loadCalendarStorageState} from "./calendar-lesson-records.js";
+import {calendarRecordsEnabled,calendarRecordEligible,overlayCalendarLessonRecord,writeCalendarLessonRecord,reconcileCalendarLessonRecord,calendarStorageState,loadCalendarStorageState,previousCalendarLessonRecord} from "./calendar-lesson-records.js";
 import {calendarLessonGoogle} from "./calendar-lesson-google.js";
 import {calendarLessonJournal} from "./calendar-lesson-journal.js";
 import {planCalendarRecordMigration,applyCalendarRecordMigration} from "./calendar-lesson-migration.js";
@@ -4442,8 +4442,13 @@ async function readObservedCurriculumEntries(env, targets, context = {}) {
   const rows=(await readCurriculumEntries(env)).map(row=>({...row,...(collisions.has(row.calendar_event_id)?{record_collision:true}:{}),...(unavailable.has(row.calendar_event_id)?{record_target_unavailable:true}:{})}));
   if(!calendarRecordsEnabled(env))return rows;
   if(env.CALENDAR_LESSON_MIGRATION_JOURNAL!=="true")throw httpError(503,"カレンダー記録の保護設定を確認してください");
-  const operations=(await env.DB.prepare("SELECT event_id,calendar_id,status,snapshot_json FROM calendar_lesson_migration WHERE status IN ('reserved','dispatching','unknown','verified') ORDER BY CASE WHEN status='verified' THEN 1 ELSE 0 END,rowid DESC").all()).results;
-  const storage=new Map();for(const operation of operations){const key=JSON.stringify([operation.calendar_id,operation.event_id]);if(!storage.has(key))storage.set(key,operation);}
+  const storage=new Map(),storageIds=[...new Set(refs.map(ref=>ref.id))];
+  for(let offset=0;offset<storageIds.length;offset+=80){const ids=storageIds.slice(offset,offset+80);
+    const operations=(await env.DB.prepare(`SELECT event_id,calendar_id,status,snapshot_json FROM (
+      SELECT event_id,calendar_id,status,snapshot_json,ROW_NUMBER() OVER (PARTITION BY event_id,calendar_id ORDER BY CASE WHEN status='verified' THEN 1 ELSE 0 END,rowid DESC) AS position
+      FROM calendar_lesson_migration WHERE event_id IN (${ids.map(()=>'?').join(',')}) AND status IN ('reserved','dispatching','unknown','verified')) WHERE position=1`).bind(...ids).all()).results;
+    for(const operation of operations)storage.set(JSON.stringify([operation.calendar_id,operation.event_id]),operation);
+  }
   const entries=new Map(rows.map(row=>[row.calendar_event_id,row]));
   const liveSettings=await deps.settings();
   const {sameLessonEvent}=await import("../../shared/lesson-plan.js");
@@ -6316,7 +6321,7 @@ export default {
         if(url.pathname==='/api/calendar-lesson-migration/preview')return json({event_id:eventId,calendar_id:resolved.calendar_id,record_before:row,event_before:event,privacy,plan},{...headers,'Cache-Control':'no-store'});
         if(url.pathname==='/api/calendar-lesson-migration/apply'){
           const captured=Date.parse(env.CALENDAR_LESSON_BACKUP_CAPTURED_AT||'');
-          if(!/^[a-f0-9]{64}$/.test(env.CALENDAR_LESSON_BACKUP_SHA256||'')||!Number.isFinite(captured)||Date.now()<captured||Date.now()-captured>86400000)throw httpError(503,'24時間以内の復元確認済み非公開バックアップを設定してから転記してください');
+          if(!/^[a-f0-9]{64}$/.test(env.CALENDAR_LESSON_BACKUP_SHA256||'')||!Number.isFinite(captured)||Date.now()<captured||Date.now()-captured>86400000)throw Object.assign(httpError(503,'24時間以内の復元確認済み非公開バックアップを設定してから転記してください'),{code:'CALENDAR_BACKUP_REQUIRED'});
           if(plan.status==='already_present'&&body.plan?.after_description===event.description){const result=await reconcileCalendarLessonRecord(env,{calendar_id:resolved.calendar_id,id:eventId},{settings:()=>readSettings(env),token:async()=>({access_token:context.access_token})});return json({...result,status:'already_present'},{...headers,'Cache-Control':'no-store'});}
           if(body.plan?.status!=='ready'||JSON.stringify(body.plan)!==JSON.stringify(plan))throw httpError(409,'dry run後に対象または記録が変更されています');
           const journal=calendarLessonJournal(env);
@@ -6398,7 +6403,8 @@ export default {
           if(calendarRecordsEnabled(env)){
             const token=await mintGoogleAccessToken(env),event=await fetchCalendarEventWithToken(token.access_token,target.calendar_id,target.id);
             const {parseCalendarRecord}=await import('../../shared/calendar-lesson-record.mjs');
-            if(parseCalendarRecord(event?.description||''))return json(await writeCalendarLessonRecord(env,{target,patch:{},recordRevision:body.record_revision,decision:body.decision},{settings:()=>readSettings(env),token:async()=>token}),headers);
+            const priorCalendar=await env.DB.prepare("SELECT id FROM calendar_lesson_migration WHERE event_id=? AND calendar_id=? AND status='verified' LIMIT 1").bind(target.id,target.calendar_id).first();
+            if(parseCalendarRecord(event?.description||'')||priorCalendar)return json(await writeCalendarLessonRecord(env,{target,patch:{},recordRevision:body.record_revision,decision:body.decision},{settings:()=>readSettings(env),token:async()=>token}),headers);
           }
           return json(await resolveAttribution(env,target,body.record_revision,body.decision),headers);
         }
@@ -6408,7 +6414,8 @@ export default {
         const liveEvent=calendarRecordsEnabled(env)?await fetchCalendarEventWithToken((await mintGoogleAccessToken(env)).access_token,target.calendar_id,target.id):null;
         const annotated=await loadCalendarStorageState(env,currentRecord(row,target),target);
         const current=liveEvent?overlayCalendarLessonRecord(env,annotated,{...liveEvent,calendar_id:target.calendar_id}):annotated;
-        return json({target,record:current,previous_record:row,history:history.results,legacy_source:legacySource},{...headers,'Cache-Control':'no-store'});
+        const previous=await previousCalendarLessonRecord(env,row,liveEvent?{...liveEvent,calendar_id:target.calendar_id}:null);
+        return json({target,record:current,previous_record:previous,original_db_record:row,history:history.results,legacy_source:legacySource},{...headers,'Cache-Control':'no-store'});
       }
 
       const curriculumMatch = url.pathname.match(/^\/api\/curriculum\/(.+)$/);
@@ -6625,12 +6632,15 @@ export default {
         "invalid session",
         "session expired",
       ];
-      const status = Number.isInteger(err.status) ? err.status : authErrors.includes(err.message) ? 401 : 400;
+      const calendarMutation=['POST','PUT'].includes(request.method)&&(
+        /^\/api\/calendar-lesson-migration\/apply$|^\/api\/calendar-lesson-record\/reconcile$/.test(url.pathname)||calendarRecordsEnabled(env)&&/^\/api\/(?:lesson-plan$|lesson-record$|next-lesson-plan\/initialize$|curriculum\/)/.test(url.pathname));
+      const status = Number.isInteger(err.status) ? err.status : authErrors.includes(err.message) ? 401 : calendarMutation ? 503 : 400;
+      const responseCode=err.code||((calendarMutation&&status>=500)?'CALENDAR_WRITE_UNKNOWN':undefined);
       if (authEndpoint(url.pathname)) {
         if (status === 413) return authJson(url.pathname, headers, { error: "authentication input too large" }, 413);
         return authJson(url.pathname, headers, { error: "authentication request failed" }, status === 502 ? 502 : 400);
       }
-      return json({error:err.message,...(err.code?{code:err.code}:{}),...(err.material_operation?{material_operation:err.material_operation}:{})},headers,status);
+      return json({error:err.message,...(responseCode?{code:responseCode}:{}),...(err.material_operation?{material_operation:err.material_operation}:{})},headers,status);
     }
   },
 };
