@@ -7,11 +7,11 @@
   --bg-1: var(--panel);
   --bg-2: var(--bg);
   --border-color: var(--line);
-  --primary-base: #35557e;
+  --primary-base: var(--accent);
   --primary-contrast: #fff;
-  --control-checked-bg: #35557e;
-  --control-checked-border-color: #35557e;
-  --focus-ring-color: #699ee8;
+  --control-checked-bg: var(--accent);
+  --control-checked-border-color: var(--accent);
+  --focus-ring-color: var(--accent);
   --focus-ring-width: 3px;
 }
 .todo-bootstrap .btn {
@@ -30,19 +30,19 @@
   white-space: normal;
 }
 .todo-bootstrap .btn.primary {
-  --theme-bg: #35557e;
+  --theme-bg: var(--accent);
   --theme-contrast: #fff;
   --btn-color: #fff;
-  --btn-bg: #35557e;
-  --btn-border-color: #35557e;
-  --btn-hover-bg: #29466c;
+  --btn-bg: var(--accent);
+  --btn-border-color: var(--accent);
+  --btn-hover-bg: color-mix(in srgb, var(--accent) 85%, #000);
   --btn-hover-color: #fff;
 }
 .todo-bootstrap .btn.danger { color: light-dark(#a7232b, #ff9298); }
 .todo-bootstrap .view-switch .btn[aria-pressed="true"] {
-  --btn-bg: #35557e;
+  --btn-bg: var(--accent);
   --btn-color: #fff;
-  --btn-border-color: #35557e;
+  --btn-border-color: var(--accent);
 }
 .todo-bootstrap .form-control {
   --control-fg: var(--ink);

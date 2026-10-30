@@ -1,14 +1,14 @@
 .dashboard-home {
-  background: #f3f6fb;
+  background: var(--bg-gradient);
   --muted: #596579;
 }
 :root[data-theme="dark"] .dashboard-home {
-  background: #141b27;
+  background: var(--bg-gradient);
   --muted: #aab7cb;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .dashboard-home {
-    background: #141b27;
+    background: var(--bg-gradient);
     --muted: #aab7cb;
   }
 }
@@ -321,3 +321,6 @@
   background: #2563eb;
   border-color: #2563eb;
 }
+/* Saturated teaching-blue actions keep a paired foreground in both themes. */
+.dashboard-home .btn.primary { color: #fff; background: #2563eb; border-color: #2563eb; }
+.dashboard-home .btn.primary:is(:hover, :focus-visible, :active) { color: #fff; background: #1d4ed8; border-color: #1d4ed8; }
