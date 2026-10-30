@@ -67,3 +67,8 @@
   .ss-bootstrap .btn, .ss-bootstrap .check, .ss-bootstrap .form-control, .ss-bootstrap .alert { transition: none; }
 }
 .ss-bootstrap .ss-heading h2 .works-icon { color: var(--accent); }
+/* v6's select asset uses data-bs-theme; bridge the existing resolved theme
+   instead of introducing a second theme controller. */
+:root[data-theme="dark"] .ss-bootstrap select.form-control {
+  background-image: var(--control-select-bg-dark);
+}
