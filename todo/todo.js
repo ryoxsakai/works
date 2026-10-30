@@ -1,3 +1,5 @@
+import { startTodoPresentation } from "../shared/ui/todo-presentation.mjs";
+startTodoPresentation();
 import {
   watchAuth,
   signIn,

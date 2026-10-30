@@ -1,0 +1,100 @@
+/* Preserve legacy ToDo palette/font/layout while adopting official controls. */
+.todo-bootstrap {
+  --fg-body: var(--ink);
+  --fg-1: var(--ink);
+  --fg-2: var(--muted);
+  --bg-body: var(--panel);
+  --bg-1: var(--panel);
+  --bg-2: var(--bg);
+  --border-color: var(--line);
+  --primary-base: #35557e;
+  --primary-contrast: #fff;
+  --control-checked-bg: #35557e;
+  --control-checked-border-color: #35557e;
+  --focus-ring-color: #699ee8;
+  --focus-ring-width: 3px;
+}
+.todo-bootstrap .btn {
+  --btn-min-height: 44px;
+  --btn-padding-x: 12px;
+  --btn-padding-y: 10px;
+  --btn-font-size: inherit;
+  --btn-color: var(--ink);
+  --btn-bg: var(--panel);
+  --btn-border-color: var(--line);
+  --btn-hover-bg: var(--bg);
+  --btn-hover-color: var(--ink);
+  --btn-hover-border-color: var(--accent);
+  --btn-border-radius: 10px;
+  font-family: inherit;
+  white-space: normal;
+}
+.todo-bootstrap .btn.primary {
+  --theme-bg: #35557e;
+  --theme-contrast: #fff;
+  --btn-color: #fff;
+  --btn-bg: #35557e;
+  --btn-border-color: #35557e;
+  --btn-hover-bg: #29466c;
+  --btn-hover-color: #fff;
+}
+.todo-bootstrap .btn.danger { color: light-dark(#a7232b, #ff9298); }
+.todo-bootstrap .view-switch .btn[aria-pressed="true"] {
+  --btn-bg: #35557e;
+  --btn-color: #fff;
+  --btn-border-color: #35557e;
+}
+.todo-bootstrap .form-control {
+  --control-fg: var(--ink);
+  --control-bg: var(--panel);
+  --control-border-color: var(--line);
+  --control-border-radius: 10px;
+  --control-padding-x: 12px;
+  --control-padding-y: 10px;
+  min-height: 44px;
+  font-family: inherit;
+  font-size: inherit;
+  max-width: 100%;
+}
+.todo-bootstrap :is(input,textarea).form-control { font-size: 16px; }
+.todo-bootstrap .capture .form-control { border: 0; background: transparent; min-width: 0; }
+:root[data-theme="dark"] .todo-bootstrap select.form-control { background-image: var(--control-select-bg-dark); }
+.todo-bootstrap .check {
+  --check-border-color: var(--muted);
+  padding: 0;
+  width: 20px;
+  height: 20px;
+}
+.todo-bootstrap .card {
+  --card-bg: var(--panel);
+  --card-color: var(--ink);
+  --card-border-color: var(--line);
+  --card-border-radius: 14px;
+  --card-height: auto;
+  color: var(--ink);
+}
+.todo-bootstrap .alert {
+  --alert-bg: var(--bg);
+  --alert-color: var(--ink);
+  --alert-border-color: var(--line);
+  --alert-padding-x: 12px;
+  --alert-padding-y: 10px;
+  --alert-border-radius: 10px;
+}
+.todo-bootstrap .alert:empty { display: none; }
+.todo-bootstrap .works-icon { width: 1.15em; height: 1.15em; flex-shrink: 0; vertical-align: -.125em; }
+/* Icons must never steal targets from legacy dataset-based event handlers. */
+.todo-bootstrap .works-icon, .todo-bootstrap .works-icon * { pointer-events: none; }
+.todo-bootstrap [hidden] { display: none !important; }
+@media(prefers-reduced-motion: reduce) {
+  .todo-bootstrap :is(.btn,.check,.form-control,.alert) { transition: none; }
+}
+@media print {
+  .todo-bootstrap :is(.btn,.check,.form-control,.alert) { transition: none; }
+}
+/* Keep original inline capture/filter labels when v6 controls stretch. */
+.todo-bootstrap .capture > .btn { white-space: nowrap; flex-shrink: 0; }
+.todo-bootstrap .capture-destination,
+.todo-bootstrap .toolbar > label { white-space: nowrap; }
+.todo-bootstrap .capture-destination select { flex: 1; min-width: 0; }
+.todo-bootstrap .toolbar > label select { width: auto; min-width: 0; }

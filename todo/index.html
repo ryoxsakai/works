@@ -8,9 +8,11 @@
     <link rel="stylesheet" href="/shared/styles.css?v=56" />
     <link rel="stylesheet" href="/shared/header.css?v=2" />
     <link rel="stylesheet" href="/todo/todo.css?v=6" />
+    <link rel="stylesheet" href="/shared/ui/todo-bootstrap.css?v=1" />
+    <link rel="stylesheet" href="/shared/ui/todo-tokens.css?v=1" />
     <script type="module" src="/shared/header.js?v=4"></script>
   </head>
-  <body class="todo-page">
+  <body class="todo-page todo-bootstrap">
     <header class="page-header works-header">
       <h1>
         <a class="works-home" href="/" aria-label="Works ホーム"
@@ -28,7 +30,7 @@
           <h2>今日から、ひとつずつ。</h2>
           <p id="today-label" class="muted"></p>
         </div>
-        <button id="roles-open">役割を管理</button>
+        <button id="roles-open"><span data-works-icon="bx-user-circle"></span> 役割を管理</button>
       </div>
       <form id="capture" class="panel capture">
         <label for="quick-title" class="sr-only">タスク名</label
@@ -56,10 +58,10 @@
             <option value="">すべて</option>
           </select></label
         >
-        <button id="categories-open" type="button">カテゴリを管理</button>
-        <div class="view-switch" role="group" aria-label="表示切替">
-          <button id="list-view" aria-pressed="true">日付リスト</button
-          ><button id="board-view" aria-pressed="false">カンバン</button>
+        <button id="categories-open" type="button"><span data-works-icon="bx-grid-alt"></span> カテゴリを管理</button>
+        <div class="view-switch btn-group" role="group" aria-label="表示切替">
+          <button id="list-view" aria-pressed="true"><span data-works-icon="bx-list-check"></span> 日付リスト</button
+          ><button id="board-view" aria-pressed="false"><span data-works-icon="bx-grid-alt"></span> カンバン</button>
         </div>
       </div>
       <div id="notice" role="status" aria-live="polite"></div>
@@ -243,6 +245,6 @@
         ><button class="primary">カテゴリを追加</button>
       </form>
     </dialog>
-    <script type="module" src="/todo/todo.js?v=2"></script>
+    <script type="module" src="/todo/todo.js?v=3"></script>
   </body>
 </html>
