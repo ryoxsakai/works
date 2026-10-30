@@ -165,6 +165,7 @@ async function selectedTheme(page) {
   }
   await page.goto(base + '/');
   assert.equal(await page.locator('.module-card[href="/material-print/"]').count(),0);
+  await page.locator('#home-navigation summary').click();
   assert.equal(await page.locator('#home-navigation a[href="/wiki/"]').innerText(),'Wiki');
   assert.equal(await page.locator('#home-navigation a:not([aria-current])').count(),9);
   await selectTheme(page,'dark');
