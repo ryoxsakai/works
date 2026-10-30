@@ -93,3 +93,8 @@ test('Tutor scoped UI keeps record autosizing and native attribution/save/print 
  assert.match(await load('shared/ui/tutor-tokens.css'),/white-space: normal/);
  assert.ok(!css.includes('@view-transition'));
 });
+
+test('Material SVG keeps decorative layout/state classes without retaining icon-font identities',async()=>{
+ const source=await load('shared/ui/material-presentation.mjs');assert.ok(source.includes("svg.classList.add(name)"));assert.ok(source.includes("classList.contains('bx-spin')"));
+ const css=await load('shared/ui/material-tokens.css');assert.ok(css.includes('prefers-reduced-motion: no-preference'));assert.ok(css.includes('reduce), print'));assert.ok(css.includes('works-material-spin'));
+});

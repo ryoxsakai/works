@@ -1,4 +1,4 @@
-import { startMaterialPresentation } from "../shared/ui/material-presentation.mjs";
+import { startMaterialPresentation } from "../shared/ui/material-presentation.mjs?v=2";
 startMaterialPresentation();
 import {
   watchAuth,
