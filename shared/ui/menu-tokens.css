@@ -1,0 +1,104 @@
+/* Shared semantic contract. Loaded by the legacy menu only until each page is migrated. */
+.dashboard-home {
+  /* shared/theme.js remains the sole theme controller. */
+  color-scheme: inherit;
+  --works-space-1: 4px;
+  --works-space-2: 8px;
+  --works-space-3: 16px;
+  --works-space-4: 24px;
+  --works-radius: 9px;
+  --works-touch-target: 44px;
+  --works-on-accent: light-dark(#fff, #101828);
+  /* Official v6 unprefixed Sass tokens: adapt to the existing theme owner. */
+  --fg-body: var(--fg);
+  --fg-1: var(--fg);
+  --fg-2: var(--muted);
+  --bg-body: var(--bg-elevated);
+  --bg-1: var(--bg-hover);
+  --bg-2: var(--bg-hover);
+  --border-color: var(--border);
+  --primary-bg: var(--accent);
+  --primary-base: var(--accent);
+  --primary-contrast: var(--works-on-accent);
+  --primary-fg: var(--accent);
+  --primary-fg-emphasis: var(--accent);
+  --primary-bg-subtle: var(--bg-hover);
+  --primary-border: var(--border);
+  --primary-focus-ring: var(--accent);
+  --control-checked-bg: var(--accent);
+  --control-checked-border-color: var(--accent);
+  --focus-ring-color: var(--accent);
+  --focus-ring-width: 3px;
+}
+.dashboard-home .btn {
+  --btn-min-height: var(--works-touch-target);
+  --btn-border-radius: var(--works-radius);
+  --btn-font-size: 1rem;
+  --btn-line-height: 1.5;
+  --btn-padding-x: 14px;
+  --btn-padding-y: 8px;
+  --btn-color: var(--fg);
+  --btn-border-color: var(--border);
+  --btn-bg: var(--bg-elevated);
+  --btn-hover-bg: var(--bg-hover);
+  --btn-hover-color: var(--fg);
+  --btn-hover-border-color: var(--border);
+  font-family: inherit;
+  white-space: normal;
+}
+.dashboard-home .btn.theme-primary {
+  --theme-bg: var(--accent);
+  --theme-contrast: var(--works-on-accent);
+  --btn-bg: var(--accent);
+  --btn-color: var(--works-on-accent);
+  --btn-hover-bg: light-dark(#1d4ed8, #a9c9ff);
+  --btn-hover-color: var(--works-on-accent);
+  --btn-border-color: var(--accent);
+}
+.dashboard-home .nav {
+  --nav-gap: 8px;
+  --nav-link-justify: start;
+  --nav-link-color: var(--fg);
+  --nav-link-hover-color: var(--fg);
+  --nav-link-active-color: var(--fg);
+  --nav-link-hover-bg: var(--bg-hover);
+  --nav-link-active-bg: var(--bg-hover);
+}
+.dashboard-home .card {
+  --card-bg: var(--bg-elevated);
+  --card-border-color: var(--border);
+  --card-border-radius: 18px;
+  --card-box-shadow: 0 4px 22px #14274906;
+}
+.dashboard-home .alert {
+  --alert-bg: var(--bg-hover);
+  --alert-color: var(--fg);
+  --alert-padding-x: 12px;
+  --alert-padding-y: 12px;
+  --alert-border-radius: var(--works-radius);
+  overflow-wrap: anywhere;
+}
+.dashboard-home .alert:empty { display: none; }
+.dashboard-home .works-icon {
+  flex-shrink: 0;
+  vertical-align: -.125em;
+  display: inline-block;
+  width: 1.25em;
+  height: 1.25em;
+}
+.dashboard-navigation .works-icon,
+.dashboard-widget h3 .works-icon { color: var(--accent); }
+.dashboard-home .check {
+  padding: 0;
+  min-height: 0;
+  accent-color: var(--accent);
+}
+.dashboard-home [hidden] { display: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-home .btn, .dashboard-home .nav-link, .dashboard-home .alert,
+  .dashboard-home .check { transition: none; }
+}
+@media print {
+  .dashboard-home .btn, .dashboard-home .nav-link, .dashboard-home .alert,
+  .dashboard-home .check { transition: none; }
+}

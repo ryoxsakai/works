@@ -1,3 +1,4 @@
+import { hydrateIcons } from "./shared/ui/icons.mjs";
 import {
   signIn,
   signOutUser,
@@ -7,7 +8,8 @@ import {
 } from "./shared/auth.js?v=12";
 import { getTheme, setTheme } from "./shared/theme.js?v=6";
 
-import { createDashboard } from "./dashboard/dashboard.mjs";
+import { createDashboard } from "./dashboard/dashboard.mjs?v=2";
+hydrateIcons();
 const dashboard = createDashboard({
   getSessionToken,
   getGoogleAccessToken,

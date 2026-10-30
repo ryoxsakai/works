@@ -855,6 +855,51 @@ try {
   await touch.page.locator("#dashboard-cancel").click();
   await touch.close();
   passed.push("emulated touch drag on dedicated handle changes draft order");
+  const ui = await fixture();
+  await ready(ui.page);
+  assert.equal(await ui.page.locator('#user-avatar-fallback').evaluate(el => el.tagName.toLowerCase()), 'svg');
+  assert.equal(await ui.page.locator('i.bx').count(), 0);
+  for (const mode of ['light', 'dark']) {
+    await ui.page.emulateMedia({colorScheme: mode === 'light' ? 'dark' : 'light'});
+    await ui.page.evaluate(async mode => { const {setTheme}=await import('/shared/theme.js?v=6'); setTheme(mode); }, mode);
+    assert.equal(await ui.page.locator('body').evaluate(el=>getComputedStyle(el).colorScheme),mode);
+    const contrast=await ui.page.locator('#dashboard-edit').evaluate(el=>{
+      const style=getComputedStyle(el);
+      const canvas=document.createElement('canvas'); canvas.width=canvas.height=1; const ctx=canvas.getContext('2d');
+      const luminance=color=>{ctx.fillStyle=color;ctx.fillRect(0,0,1,1);const c=Array.from(ctx.getImageData(0,0,1,1).data).slice(0,3).map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4;});return c[0]*.2126+c[1]*.7152+c[2]*.0722;};
+      const a=luminance(style.color),b=luminance(style.backgroundColor);return (Math.max(a,b)+.05)/(Math.min(a,b)+.05);
+    });
+    assert.ok(contrast>=4.5, `${mode} primary text contrast ${contrast}`);
+  }
+  await ui.page.locator('#dashboard-edit').click();
+  await expect.poll(()=>ui.page.evaluate(()=>!!window.Sortable?.get(document.querySelector('#dashboard-widgets')))).toBe(true);
+  await ui.page.emulateMedia({reducedMotion:'reduce'});
+  await expect.poll(()=>ui.page.evaluate(()=>window.Sortable.get(document.querySelector('#dashboard-widgets')).option('animation'))).toBe(0);
+  await ui.page.emulateMedia({reducedMotion:'no-preference'});
+  await expect.poll(()=>ui.page.evaluate(()=>window.Sortable.get(document.querySelector('#dashboard-widgets')).option('animation'))).toBe(150);
+  await ui.page.evaluate(()=>window.dispatchEvent(new Event('beforeprint')));
+  assert.equal(await ui.page.evaluate(()=>!!window.Sortable.get(document.querySelector('#dashboard-widgets'))),false);
+  await ui.page.emulateMedia({media:'print'});
+  await ui.page.pdf({path:path.join(artifacts,'menu-print.pdf'),format:'A4'});
+  await ui.page.emulateMedia({media:'screen'});
+  await ui.page.evaluate(()=>window.dispatchEvent(new Event('afterprint')));
+  await expect.poll(()=>ui.page.evaluate(()=>!!window.Sortable.get(document.querySelector('#dashboard-widgets')))).toBe(true);
+  await ui.page.locator('#dashboard-cancel').click();
+  assert.equal(await ui.page.evaluate(()=>!!window.Sortable.get(document.querySelector('#dashboard-widgets'))),false);
+  // The local CSS proof must style real official components, and stay inert on legacy pages.
+  const styles=await ui.page.evaluate(()=>{
+    const btn=document.querySelector('.dashboard-widget');
+    const before=getComputedStyle(btn).display;
+    document.querySelectorAll('link[href*="/shared/ui/"]').forEach(el=>el.disabled=true);
+    const without=getComputedStyle(btn).display;
+    document.querySelectorAll('link[href*="/shared/ui/"]').forEach(el=>el.disabled=false);
+    return {before,without};
+  });
+  assert.equal(styles.before,'flex');
+  assert.notEqual(styles.without,styles.before);
+  assert.deepEqual(ui.errors,[]);
+  await ui.close();
+  passed.push('official scoped Bootstrap components, SVG identity, explicit themes, dynamic reduced motion, print destroy/reinitialize and cancelled editor lifecycle');
   const font = await fixture();
   await ready(font.page);
   const fontSession = await font.ctx.newCDPSession(font.page);
