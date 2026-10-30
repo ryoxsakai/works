@@ -1,5 +1,7 @@
+import { startWorkflowPresentation } from "../shared/ui/workflow-presentation.mjs";
+startWorkflowPresentation();
 import { showDialog, closeDialog, markDialogSaved } from "./dialogs.mjs?v=2";
-import { renderRoles } from "./roles.js?v=2";
+import { renderRoles } from "./roles.js?v=3";
 import { createWorkflowSteps } from "./steps.mjs?v=1";
 import { runTime, orderRuns, roleOf } from "./planning.mjs";
 import {

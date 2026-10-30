@@ -1,3 +1,5 @@
+import { startWorkflowPresentation } from "../shared/ui/workflow-presentation.mjs";
+startWorkflowPresentation();
 import { showDialog, closeDialog, markDialogSaved } from "./dialogs.mjs?v=2";
 import {
   watchAuth,
