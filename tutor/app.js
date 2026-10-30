@@ -1,3 +1,5 @@
+import { startTutorPresentation } from "../shared/ui/tutor-presentation.mjs";
+startTutorPresentation();
 import { attributedLessonRecord, lessonRecordNeedsReview } from "../shared/lesson-attribution.js?v=2";
 import {
   watchAuth,

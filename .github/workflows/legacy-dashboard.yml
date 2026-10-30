@@ -19,7 +19,7 @@ jobs:
       - run: npm ci --prefix worker --ignore-scripts
       - run: npm ci --prefix shared/ui --ignore-scripts
       - run: npm run build --prefix shared/ui
-      - run: git diff --exit-code -- shared/ui/menu-bootstrap.css shared/ui/icons.mjs shared/ui/ss-bootstrap.css shared/ui/ss-icons.mjs shared/ui/todo-bootstrap.css shared/ui/kdp-bootstrap.css shared/ui/kdp-icons.mjs shared/ui/wiki-bootstrap.css shared/ui/wiki-icons.mjs shared/ui/memo-bootstrap.css shared/ui/memo-icons.mjs shared/ui/admission-bootstrap.css shared/ui/admission-icons.mjs shared/ui/material-bootstrap.css shared/ui/material-icons.mjs shared/ui/workflow-bootstrap.css shared/ui/workflow-icons.mjs
+      - run: git diff --exit-code -- shared/ui/menu-bootstrap.css shared/ui/icons.mjs shared/ui/ss-bootstrap.css shared/ui/ss-icons.mjs shared/ui/todo-bootstrap.css shared/ui/kdp-bootstrap.css shared/ui/kdp-icons.mjs shared/ui/wiki-bootstrap.css shared/ui/wiki-icons.mjs shared/ui/memo-bootstrap.css shared/ui/memo-icons.mjs shared/ui/admission-bootstrap.css shared/ui/admission-icons.mjs shared/ui/material-bootstrap.css shared/ui/material-icons.mjs shared/ui/workflow-bootstrap.css shared/ui/workflow-icons.mjs shared/ui/tutor-bootstrap.css shared/ui/tutor-icons.mjs
       - run: node --test dashboard/test/*.test.mjs
       - run: node worker/node_modules/playwright/cli.js install --with-deps chromium
       - run: node dashboard/test/browser.mjs

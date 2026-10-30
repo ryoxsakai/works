@@ -15,9 +15,11 @@ try {
   assert.equal(await pending.locator('textarea').count(),0);
   await pending.getByRole('button',{name:'旧記録を確認して対応を選ぶ'}).click();
   const dialog=page.getByRole('dialog',{name:'授業記録の対応を確認'});
+  await expect(dialog.locator('[data-decision]').first()).toHaveClass(/btn-solid/);
   await expect(dialog).toContainText('現在の予定: 新生徒サンプル');await expect(dialog).toContainText('既存の次回予定');
   for(const width of [320,390,1280]) {
     await page.setViewportSize({width,height:900});
+    await page.waitForTimeout(250); // Capture settled layout/color transitions after resize.
     assert.ok(await dialog.evaluate(el=>el.getBoundingClientRect().right<=innerWidth));
     assert.ok(await dialog.evaluate(el=>el.scrollWidth<=el.clientWidth));
     const buttons=await dialog.locator('button').evaluateAll(items=>items.map(el=>({height:el.getBoundingClientRect().height,label:el.textContent})));
