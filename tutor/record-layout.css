@@ -1,0 +1,16 @@
+/* Record-tab presentation only; hidden legacy fields retain their values/owners. */
+.record-panel #record-table tr[data-event-id] td:nth-child(2), .record-panel #record-table tr[data-event-id] td:nth-child(3),
+.record-panel #record-table tr[data-event-id] td:nth-child(5), .record-panel #record-table tr[data-event-id] td:nth-child(6),
+.record-panel #record-table th:nth-child(2), .record-panel #record-table th:nth-child(3),
+.record-panel #record-table th:nth-child(5), .record-panel #record-table th:nth-child(6),
+.record-panel .record-memo, .record-panel .record-next-plan .lesson-plan-target:not([data-conflict="true"]) { display: none !important; }
+.record-panel #record-table tr[data-event-id] td:nth-child(7)::before { display: none; }
+.record-panel .record-card-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: .5rem; flex-wrap: wrap; }
+.record-panel .record-card-meta { display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: .5rem; margin-left: auto; max-width: 100%; color: var(--muted); font-size: .75rem; overflow-wrap: anywhere; }
+.record-panel .record-card-heading .record-student-link { flex: 1 1 10rem; min-width: 0; }
+.record-panel .record-recheck { min-width: 44px; min-height: 44px; padding: .4rem; }
+.record-panel .record-next-plan .lesson-plan-action[data-action="recheck"] { display: none; }
+.record-panel .record-transient-status { display: none; }
+.record-save-toasts { position: fixed; z-index: 60; bottom: max(1rem, env(safe-area-inset-bottom)); right: 1rem; width: min(26rem, calc(100vw - 2rem)); display: grid; gap: .5rem; pointer-events: none; }
+.record-save-toast { padding: .7rem 1rem; color: var(--fg); background: var(--bg-elevated); border: 1px solid var(--border); border-radius: .5rem; box-shadow: var(--card-shadow); overflow-wrap: anywhere; }
+@media print { .record-save-toasts, .record-recheck { display: none !important; } }

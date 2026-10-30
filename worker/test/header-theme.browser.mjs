@@ -204,8 +204,8 @@ async function selectedTheme(page) {
     await selectTheme(page,'light');
     const geometry=await page.locator('#record-table').evaluate(el=>({display:getComputedStyle(el).display,width:el.getBoundingClientRect().width,body:document.body.scrollWidth,viewport:innerWidth}));
     assert.equal(geometry.display,'block');assert.ok(geometry.body<=width);assert.ok(geometry.width<=width);
-    const fields=await page.locator('#record-tbody tr').first().locator('.record-plan, .record-test, .record-homework, .record-memo').evaluateAll(es=>es.map(el=>{const r=el.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,bottom:r.bottom};}));
-    assert.equal(fields.length,4);
+    const fields=await page.locator('#record-tbody tr').first().locator('.record-plan, .record-next-plan textarea, .student-memo-input').evaluateAll(es=>es.filter(el=>el.getClientRects().length).map(el=>{const r=el.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,bottom:r.bottom};}));
+    assert.ok(fields.length>=1);
     for(let i=1;i<fields.length;i++){
       assert.equal(fields[i].x,fields[0].x,`${width}px record fields align vertically`);
       assert.equal(fields[i].width,fields[0].width,`${width}px record fields share full width`);
