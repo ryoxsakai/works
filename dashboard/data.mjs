@@ -101,7 +101,7 @@ export function createReader({ session, googleToken, fetcher = fetch }) {
               singleEvents: "true",
               orderBy: "startTime",
               maxResults: "250",
-              fields: "items(id,summary,start,end,status),nextPageToken",
+
             });
             if (page) params.set("pageToken", page);
             const data = await json(
@@ -121,9 +121,10 @@ export function createReader({ session, googleToken, fetcher = fetch }) {
                     ),
                 )
                 .map((e) => ({
-                  summary: e.summary,
-                  start: e.start,
-                  end: e.end,
+                  id: e.id, summary: e.summary, start: e.start, end: e.end,
+                  status: e.status, etag: e.etag, eventType: e.eventType, transparency: e.transparency,
+                  attendees: e.attendees?.map(a=>({self:a.self,responseStatus:a.responseStatus})),
+                  _calendarId: calendar,
                 })),
             );
             page = data.nextPageToken || "";
@@ -144,6 +145,6 @@ export function createReader({ session, googleToken, fetcher = fetch }) {
         String(b.start?.dateTime || b.start?.date || ""),
       ),
     );
-    return { unconfigured: false, events };
+    return { unconfigured: false, events, settings };
   };
 }

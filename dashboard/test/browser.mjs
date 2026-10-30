@@ -90,6 +90,7 @@ async function fixture(options = {}) {
     const u = new URL(r.request().url());
     requests.push({ url: u.pathname + u.search, method: r.request().method() });
     if (u.origin !== base) {
+      if(u.origin === "https://www.googleapis.com" && u.pathname.endsWith("calendarList")) return r.fulfill({json:{items:[{id:"fixture",summary:"合成教室",backgroundColor:"#2563eb"}]}});
       if (u.origin === "https://www.googleapis.com" && options.empty)
         return r.fulfill({ json: { items: [] } });
       if (u.origin === "https://www.googleapis.com")
@@ -129,6 +130,11 @@ async function fixture(options = {}) {
         )
         .catch(() => {});
     }
+    if (u.pathname === '/api/terms' || u.pathname === '/api/periods') return r.fulfill({json:[]});
+    if (u.pathname === '/api/lesson-records') { assert.deepEqual(Object.keys(r.request().postDataJSON()),['targets']);return r.fulfill({json:[]}); }
+    const eventRef=()=>({calendar_id:'fixture',id:u.searchParams.get('event_id'),title:u.searchParams.get('event_id')==='same'?'サンプル生徒 A':'サンプル生徒 B',start:u.searchParams.get('event_id')==='same'?'2026-10-29T10:00:00+09:00':'2026-10-29T14:30:00+09:00',end:u.searchParams.get('event_id')==='same'?'2026-10-29T11:00:00+09:00':'2026-10-29T15:30:00+09:00',etag:'',status:'confirmed',timed:true,event_type:'default',transparency:'opaque',declined:false});
+    if (u.pathname === '/api/next-lesson-plan') return r.fulfill({json:{source:eventRef(),target:null,reason:'none'}});
+    if (u.pathname === '/api/student-prefs/guarded') return r.fulfill({json:{target:eventRef(),name:u.searchParams.get('name'),record_revision:0,profile:{exists:false,memo:null,print_name:null,updated_at:null}}});
     if (u.pathname === "/api/settings")
       return r.fulfill({
         json: { selected_calendars: ["fixture"], excluded_titles: ["除外"] },
@@ -241,10 +247,10 @@ try {
   await expect(page.locator('[data-content="todo"]')).not.toContainText(
     "次週の予定",
   );
-  assert.ok(f.requests.every((r) => r.method === "GET"));
+  assert.ok(f.requests.every((r) => r.method === "GET" || (r.method === "POST" && r.url === "/api/lesson-records")));
   assert.ok(
     !f.requests.some((r) =>
-      /lesson-record|lesson-plan|curriculum|\/api\/schedule/.test(r.url),
+      /lesson-baseline|\/api\/schedule/.test(r.url),
     ),
   );
   assert.ok(
@@ -271,7 +277,7 @@ try {
   assert.ok(
     (
       await page
-        .locator('[data-content="lessons"] strong')
+        .locator('[data-content="lessons"] .record-student-link')
         .first()
         .boundingBox()
     ).y < 700,
@@ -283,7 +289,7 @@ try {
   });
   await page.setViewportSize({ width: 1440, height: 1000 });
   passed.push(
-    "default widgets, all nine original routes, JST planned/deadline distinction, GET-only safe endpoints and lazy optional widgets",
+    "default widgets, all nine original routes, JST planned/deadline distinction, protected read-only observations without saves and lazy optional widgets",
   );
   await page.locator("#dashboard-edit").click();
   await page.locator('[data-add="memo"]').click();
@@ -382,7 +388,7 @@ try {
     await page.locator("#home-navigation").evaluate((el) => (el.open = true));
     for (let i = 0; i < (await controls.count()); i++) {
       const c = controls.nth(i);
-      if (!(await c.isVisible())) continue;
+      if (!(await c.isVisible()) || await c.evaluate(el=>!!el.closest("[inert]"))) continue;
       await c.focus();
       const m = await c.evaluate((el) => {
         const r = el.getBoundingClientRect(),
@@ -752,7 +758,7 @@ try {
   await tokenWait.page.waitForFunction(
     () => typeof window.qaReleaseGoogle === "function",
   );
-  await tokenWait.page.clock.fastForward(20050);
+  await tokenWait.page.clock.fastForward(60050);
   await expect(tokenWait.page.locator('[data-retry="lessons"]')).toBeVisible();
   await tokenWait.page.locator("#home-auth-action").click();
   await tokenWait.page.evaluate(() => window.qaReleaseGoogle());

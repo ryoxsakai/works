@@ -1,3 +1,4 @@
+import {readLinkedProfile,writeLinkedProfile} from "../src/teaching-linked.js";
 import {allRecords,rawRecord,observeRecord,currentRecord,resolveAttribution,prepareRecordWrite,readCommittedRecord,commitRecords,ensureAttribution} from '../src/lesson-attribution.js';
 import {lessonRecordHasContent,lessonDate} from '../../shared/lesson-attribution.js';
 import {sameLessonEvent} from '../../shared/lesson-plan.js';
@@ -11,6 +12,7 @@ const root=path.resolve(fileURLToPath(new URL('../../',import.meta.url)));
 export async function createFixture(port=0){
 const mf=new Miniflare({modules:true,script:"export default {fetch(){return new Response('ok')}}",compatibilityDate:'2026-08-01',d1Databases:{DB:'next-lesson-fixture'}});
 const DB=await mf.getD1Database('DB');
+await DB.prepare('CREATE TABLE student_prefs(name TEXT PRIMARY KEY,print_name TEXT,memo TEXT,updated_at TEXT)').run();
 await DB.prepare('CREATE TABLE curriculum_entries(calendar_event_id TEXT PRIMARY KEY,completed INTEGER DEFAULT 0,lesson_plan TEXT,confirmation_test TEXT,homework TEXT,lesson_memo TEXT,updated_at TEXT)').run();
 const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 const shift=n=>new Date(Date.parse(today+'T00:00:00Z')+n*86400000).toISOString().slice(0,10);
@@ -24,8 +26,9 @@ for (const id of ['b','c','other-next']) {
 }
 const settings={selected_calendars:['qa','qa-tomas'],selected_term_ids:[2],excluded_titles:['空き']};
 const deps={settings:async()=>settings,token:async()=>({access_token:'synthetic'}),event:async(_t,cal,id)=>structuredClone(events.find(e=>e.calendar_id===cal&&e.id===id)||null),events:async(_t,cal,min,max)=>structuredClone(events.filter(e=>e.calendar_id===cal&&Date.parse(e.end.dateTime)>Date.parse(min)&&Date.parse(e.start.dateTime)<Date.parse(max)))};
-const control={failSave:false,holdSave:null,writes:[]};
+const control={failSave:false,holdSave:null,writes:[],profileWrites:[],profileFail:false,profileHold:null};
 const prefs=new Map([['サンプル生徒',{name:'サンプル生徒',memo:'既存の生徒メモ',print_name:'印刷サンプル'}],['サンプル別生徒',{name:'サンプル別生徒',memo:'別生徒のメモ'}]]);
+for(const profile of prefs.values())await DB.prepare('INSERT INTO student_prefs(name,print_name,memo) VALUES (?,?,?)').bind(profile.name,profile.print_name||null,profile.memo||null).run();
 const calendars=[{id:'qa',summary:'代官山メディカル',backgroundColor:'#8e24aa'},{id:'qa-tomas',summary:'TOMAS',backgroundColor:'#039be5'}];
 const listKeys=['students','goal-templates','periods','materials','material-categories','schools','goals'];
 const server=http.createServer(async(req,res)=>{
@@ -76,13 +79,22 @@ const server=http.createServer(async(req,res)=>{
       await commitRecords({DB},prepared.statements);
       return json(await readCommittedRecord({DB},value.target,prepared));
     }
+    if(key==='student-prefs/guarded'){
+      const linkedDeps={target:async ref=>(await readLessonPlan({DB},ref.calendar_id,ref.id,deps)).target,excluded:async()=>settings.excluded_titles};
+      if(req.method==='PUT'){
+        const body=await readBody();control.profileWrites.push(body);if(control.profileHold)await control.profileHold;
+        if(control.profileFail){control.profileFail=false;return send('application/json',JSON.stringify({error:'synthetic profile failure'}),500);}
+        const result=await writeLinkedProfile({DB},body,linkedDeps);prefs.set(result.name,{name:result.name,...result.profile});return json(result);
+      }
+      return json(await readLinkedProfile({DB},{calendar_id:url.searchParams.get('calendar_id'),id:url.searchParams.get('event_id'),profile_context:url.searchParams.get('profile_context'),name:url.searchParams.get('name')},linkedDeps));
+    }
     if(key==='student-prefs'){
       if(req.method==='PUT'){
         let text='';for await(const chunk of req)text+=chunk;const body=JSON.parse(text);
-        prefs.set(body.name,{...prefs.get(body.name),...body});return json(prefs.get(body.name));
+        prefs.set(body.name,{...prefs.get(body.name),...body});const p=prefs.get(body.name);await DB.prepare("INSERT INTO student_prefs(name,memo,print_name,updated_at) VALUES(?,?,?,datetime('now')) ON CONFLICT(name) DO UPDATE SET memo=excluded.memo,print_name=excluded.print_name,updated_at=excluded.updated_at").bind(body.name,p.memo||null,p.print_name||null).run();return json(prefs.get(body.name));
       }
       const name=url.searchParams.get('name');
-      return json(prefs.get(name)||{name,memo:null,print_name:null});
+      return json(await DB.prepare('SELECT * FROM student_prefs WHERE name=?').bind(name).first()||{name,memo:null,print_name:null});
     }
     if(req.method!=='GET')return send('text/plain','Only sample record saves are allowed',403);
     if(key==='settings')return json(settings);

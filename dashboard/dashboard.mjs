@@ -1,3 +1,4 @@
+import { homeLessonModel, lessonApi } from "./lesson-model.mjs?v=1";
 import {
   MODULES,
   WIDGETS,
@@ -10,7 +11,7 @@ import {
   metadataDateJst,
   esc,
 } from "./model.mjs";
-import { createReader } from "./data.mjs";
+import { createReader } from "./data.mjs?v=2";
 
 import { icon } from "../shared/ui/icons.mjs";
 
@@ -35,6 +36,7 @@ export function createDashboard({
   getGoogleAccessToken,
   onExpired = () => {},
 }) {
+  let lessonCards = null, cardImport = null, capturedSession = "", lessonNotice = "";
   let layoutReady = false,
     midnightTimer;
   let user = null,
@@ -52,7 +54,10 @@ export function createDashboard({
   function message(text) {
     $("dashboard-message").textContent = text;
   }
-  function invalidate() {
+  function lessonMessage(text){lessonNotice=text;message(text);}
+  function clearLessonMessage(){if(lessonNotice&&!lessonCards?.hasEdits()&&$("dashboard-message").textContent===lessonNotice){message("");lessonNotice="";}}
+  function invalidate({ keepCards = false } = {}) {
+    if (!keepCards) { lessonCards?.destroy(); lessonCards = null; }
     epoch++;
     for (const p of pending.values()) p.controller.abort();
     pending.clear();
@@ -62,6 +67,8 @@ export function createDashboard({
     return draft && JSON.stringify(draft) !== JSON.stringify(layout);
   }
   function dismiss() {
+    if (lessonCards && !lessonCards.canLeave()) return false;
+    if (lessonCards?.hasEdits()) { lessonCards.destroy(); lessonCards = null; cache.delete("lessons"); }
     if (changed() && !confirm("表示設定の変更を破棄して移動しますか？"))
       return false;
     if (draft) {
@@ -74,11 +81,7 @@ export function createDashboard({
     clearTimeout(midnightTimer);
     date = dayJst();
     midnightTimer = setTimeout(
-      () => {
-        invalidate();
-        updateDate();
-        if (!pagePaused) draw();
-      },
+      rollover,
       Date.parse(date + "T00:00:00+09:00") + 86400000 - Date.now() + 50,
     );
     $("dashboard-date").textContent =
@@ -89,6 +92,28 @@ export function createDashboard({
         day: "numeric",
         weekday: "long",
       }) + " · 日本時間";
+  }
+  function rollover() {
+    if (lessonCards?.hasEdits()) { message('日付が変わりました。授業記録の入力を保持しています。保存・確認後に更新してください。'); midnightTimer=setTimeout(rollover,60000); return; }
+    invalidate(); updateDate(); if(!pagePaused)draw();
+  }
+  function placeLessonCards(host){
+    const updated=document.createElement('p');updated.className='widget-updated';updated.textContent='取得 '+time(lessonCards.readAt);
+    host.replaceChildren(lessonCards.element,updated);lessonCards.setEditing(!!draft);lessonCards.refreshLayout();
+  }
+  async function mountLessons() {
+    const host=document.querySelector('[data-content="lessons"]'),model=cache.get('lessons')?.data,request=epoch;
+    if(!host||!user)return;
+    if(lessonCards){placeLessonCards(host);return;}
+    if(!model?.rows?.length)return;
+    cardImport ||= import('./lesson-cards.mjs?v=1');
+    try {
+      const {createHomeLessonCards}=await cardImport;
+      if(request!==epoch||pagePaused||!user||cache.get('lessons')?.data!==model||!current().widgets.includes('lessons'))return;
+      if(!lessonCards)lessonCards=createHomeLessonCards(model,{session:capturedSession,getSessionToken,onExpired:expire,reload:()=>load('lessons',true),onNotice:lessonMessage,onStateChange:clearLessonMessage,readAt:cache.get("lessons")?.at});
+      const target=document.querySelector('[data-content="lessons"]');
+      if(target)placeLessonCards(target);
+    } catch(e) { if(request===epoch){host.textContent='授業カードを表示できませんでした。再読み込みしてください。';} }
   }
   function shortcutBody() {
     return `<div class="dashboard-shortcut-links">${current()
@@ -101,15 +126,7 @@ export function createDashboard({
       )}</div>${current().shortcuts.length ? "" : '<p class="dashboard-muted">表示を編集してリンクを追加できます。</p>'}`;
   }
   function body(id, data) {
-    if (id === "lessons")
-      return data.unconfigured
-        ? '<p class="dashboard-muted">授業管理の設定でカレンダーを選択してください。</p>'
-        : list(
-            data.events,
-            (e) =>
-              `<strong>${esc(e.summary || "(無題)")}</strong><small>${e.start?.dateTime ? esc(time(e.start.dateTime) + (e.end?.dateTime ? " – " + time(e.end.dateTime) : "")) : "終日"}</small>`,
-            "今日の予定はありません。",
-          );
+    if (id === "lessons") return data.unconfigured ? '<p class="dashboard-muted">授業管理の設定でカレンダーを選択してください。</p>' : !data.rows.length ? '<p class="dashboard-muted">今日の予定はありません。</p>' : '<p role="status">授業カードを準備中…</p>';
     if (id === "todo") {
       const { planned, due } = todoSummary(data, date);
       return (
@@ -165,6 +182,8 @@ export function createDashboard({
     );
   }
   function draw(focus) {
+    const retainedCards=lessonCards,cardScroll=lessonCards?.scrollPosition()||0;
+    if(lessonCards&&!current().widgets.includes("lessons")){lessonCards.destroy();lessonCards=null;}
     sort?.destroy();
     sort = null;
     $("dashboard-editor").hidden = !draft;
@@ -193,6 +212,7 @@ export function createDashboard({
         })
         .join("") ||
       '<p class="dashboard-muted">ウィジェットは非表示になっています。「表示を編集」から追加できます。全機能はメニューから開けます。</p>';
+    mountLessons().then(()=>{if(lessonCards&&lessonCards===retainedCards)lessonCards.restoreScroll(cardScroll);});
     if (focus) document.querySelector(focus)?.focus();
     if (draft) enableDrag();
     loadVisible();
@@ -245,9 +265,14 @@ export function createDashboard({
     if (el) {
       el.innerHTML = content(id);
       el.setAttribute("aria-busy", "false");
+      if(id==="lessons")mountLessons();
     }
   }
   async function load(id, force = false) {
+    if(id==="lessons"&&lessonCards){
+      if(lessonCards.hasEdits()||lessonCards.element.contains(document.activeElement)){if(force)lessonMessage("授業記録の入力を保持しています。保存・確認後に更新してください。");return;}
+      if(force){lessonCards.destroy();lessonCards=null;cache.delete(id);}
+    }
     if (
       !user ||
       !layoutReady ||
@@ -264,7 +289,7 @@ export function createDashboard({
     const timeout = setTimeout(() => {
       timedOut = true;
       controller.abort();
-    }, 20000);
+    }, id === "lessons" ? 60000 : 20000);
     pending.set(id, { controller });
     const el = document.querySelector(`[data-content="${id}"]`);
     if (el) {
@@ -332,6 +357,7 @@ export function createDashboard({
     draw();
   }
   async function signedIn(info) {
+    if(user?.email===info.email&&capturedSession===getSessionToken())return;
     invalidate();
     const request = epoch;
     layoutReady = false;
@@ -340,10 +366,14 @@ export function createDashboard({
     key = "";
     layout = defaults();
     updateDate();
-    reader = createReader({
-      session: getSessionToken(),
-      googleToken: getGoogleAccessToken,
-    });
+    capturedSession=getSessionToken();
+    const session=capturedSession,readSummary=createReader({session,googleToken:getGoogleAccessToken});
+    reader=async(id,day,signal)=>{
+      const data=await readSummary(id,day,signal);
+      if(id!=="lessons")return data;
+      const api=lessonApi({session,isCurrent:()=>session===getSessionToken()&&user?.email===info.email,signal,onUnauthorized:()=>{if(session===getSessionToken()&&user?.email===info.email)expire();}});
+      return homeLessonModel(data,day,{api,googleToken:getGoogleAccessToken,signal});
+    };
     draw();
     try {
       const hash = Array.from(
@@ -382,6 +412,7 @@ export function createDashboard({
   }
   $("dashboard-edit").onclick = () => {
     if (!user || draft) return;
+    if(lessonCards?.hasEdits()){lessonMessage("先に授業記録を保存・確認してください。入力は保持しています。");return;}
     draft = structuredClone(layout);
     draw("#dashboard-save");
     message("編集中です。変更は配置を保存するまで確定しません。");
@@ -421,7 +452,9 @@ export function createDashboard({
   };
   $("dashboard-refresh").onclick = () => {
     if (!user) return;
+    if(lessonCards?.hasEdits()){lessonMessage("授業記録の入力を保持しています。保存・確認後に更新してください。");for(const id of current().widgets)if(id!=="lessons")load(id,true);return;}
     if (date !== dayJst()) {
+      if(lessonCards?.hasEdits()){message("日付が変わりました。授業記録の入力を保持しています。");return;}
       invalidate();
       updateDate();
       draw();
@@ -487,8 +520,12 @@ export function createDashboard({
     },
     true,
   );
+  $("dashboard-widgets").addEventListener('home-lesson-discard-reload',()=>{
+    lessonCards?.destroy();lessonCards=null;cache.delete('lessons');load('lessons',true);
+  });
+  $("dashboard-widgets").addEventListener("home-lesson-navigate",()=>{if(dismiss())location.assign("/tutor/");});
   window.addEventListener("beforeunload", (e) => {
-    if (changed()) {
+    if (changed() || lessonCards?.hasEdits()) {
       e.preventDefault();
       e.returnValue = "";
     }
@@ -496,7 +533,8 @@ export function createDashboard({
   window.addEventListener("pagehide", () => {
     pagePaused = true;
     clearTimeout(midnightTimer);
-    invalidate();
+    invalidate({keepCards:!!lessonCards?.hasEdits()});
+    lessonCards?.pause();
     sort?.destroy();
     sort = null;
     $("dashboard-widgets").replaceChildren();
@@ -504,13 +542,16 @@ export function createDashboard({
   window.addEventListener("pageshow", () => {
     if (pagePaused) {
       pagePaused = false;
-      updateDate();
+      if(lessonCards?.session!==getSessionToken()){lessonCards?.destroy();lessonCards=null;}
+      lessonCards?.resume();
+      if(!lessonCards?.hasEdits())updateDate();
       draw();
     }
   });
   document.addEventListener("visibilitychange", () => {
     if (document.hidden || !user) return;
     if (date !== dayJst()) {
+      if(lessonCards?.hasEdits()){message("日付が変わりました。授業記録の入力を保持しています。");return;}
       invalidate();
       updateDate();
       draw();
