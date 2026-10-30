@@ -86,12 +86,18 @@ export async function observeRecord(env,ref,{attempts=2}={}) {
     } catch(error) { if(error.code!=='LESSON_RECORD_CONFLICT' || attempt===attempts-1) throw error; }
   }
 }
-export function guardStatements(env, eventId, revision) {
+export function guardStatements(env, eventId, revision, calendarOperationId = '') {
   if (!Number.isSafeInteger(revision) || revision < 0) throw fail('再読み込みしてから保存してください','LESSON_RECORD_CONFLICT');
   const id=crypto.randomUUID();
+  // Disabled until the additive journal has been backed up and provisioned.
+  // Once enabled, all existing guarded writes/attribution changes honor a pending
+  // Calendar dispatch. A timeout never silently releases this cross-store lock.
+  const calendarGuard=env.CALENDAR_LESSON_MIGRATION_JOURNAL==='true'
+    ? ` AND NOT EXISTS(SELECT 1 FROM calendar_lesson_migration WHERE event_id=? AND id<>? AND status IN ('reserved','dispatching','unknown'))` : '';
+  const args=[id,eventId,revision,...(calendarGuard?[eventId,calendarOperationId]:[])];
   return [env.DB.prepare(`INSERT INTO lesson_record_guard(id,ok) VALUES (?,
-    CASE WHEN COALESCE((SELECT revision FROM lesson_record_identity WHERE event_id = ?),0) = ? THEN 1 ELSE 0 END)`)
-    .bind(id,eventId,revision), env.DB.prepare('DELETE FROM lesson_record_guard WHERE id = ?').bind(id)];
+    CASE WHEN COALESCE((SELECT revision FROM lesson_record_identity WHERE event_id = ?),0) = ?${calendarGuard} THEN 1 ELSE 0 END)`)
+    .bind(...args), env.DB.prepare('DELETE FROM lesson_record_guard WHERE id = ?').bind(id)];
 }
 export async function prepareRecordWrite(env, ref, patch, expectedRevision) {
   const row = await rawRecord(env,ref.id);
