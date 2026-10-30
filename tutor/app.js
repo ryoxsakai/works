@@ -1,7 +1,7 @@
 import { lessonRecordRows, renderPlanEditors, renderMemoEditors } from "../shared/lesson-record-view.mjs?v=1";
 import { setUserAvatar } from "../shared/avatar.mjs?v=1";
 import { attachRecordCarousel } from "./record-carousel.mjs?v=1";
-import { attachRecordToasts } from "./record-toasts.mjs?v=1";
+import { attachRecordToasts } from "./record-toasts.mjs?v=2";
 import { startTutorPresentation } from "../shared/ui/tutor-presentation.mjs";
 startTutorPresentation();
 import { attributedLessonRecord, lessonRecordNeedsReview } from "../shared/lesson-attribution.js?v=2";
