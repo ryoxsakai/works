@@ -146,3 +146,21 @@ test('moved managed record with native comments removed blocks D1-only MCP updat
  await DB.prepare("INSERT INTO mcp_schedule_changes(id,event_id,action,changed_fields,before_json,after_json) VALUES('synthetic-undo','b','update','[]','{}','{}')").run();
  const undo=await mcp('undo_schedule_update',{change_id:'synthetic-undo'});assert.equal(undo.result.isError,true);assert.ok(undo.result.content[0].text.includes('転記履歴'));assert.equal((await rawRecord({DB},'b')).homework,'original homework');assert.equal(control.patches.length,1);
 });
+for(const kind of ['legacy_unverified','legacy_historical','title_changed'])test('explicit owner inherit archives '+kind+' without modifying source or memo, then permits guarded instance migration',async t=>{
+ const {DB,events,control,call,put}=await setup(t,{backup:true});delete events[1].description;
+ await DB.prepare("UPDATE lesson_record_identity SET title=NULL WHERE event_id='b'").run();
+ if(kind==='legacy_historical'){events[1].start.dateTime='2026-10-20T11:00:00+09:00';events[1].end.dateTime='2026-10-20T12:00:00+09:00';}
+ if(kind==='title_changed'){await DB.prepare("INSERT INTO lesson_record_baseline(event_id,calendar_id,title,effective_date)VALUES('b','synthetic-calendar','Old student','2026-10-27')").run();}
+ await DB.prepare('CREATE TABLE IF NOT EXISTS student_prefs(name TEXT PRIMARY KEY,memo TEXT)').run();await DB.prepare("INSERT INTO student_prefs(name,memo) VALUES('Synthetic','Private memo stays')").run();
+ const source=await DB.prepare("SELECT * FROM curriculum_entries WHERE calendar_event_id='b'").first();
+ const review=await (await call('/api/lesson-record?calendar_id=synthetic-calendar&event_id=b')).json();assert.equal(review.record.attribution_status,kind);
+ const response=await put('/api/lesson-record',{target:review.target,record_revision:review.original_db_record.record_revision,decision:'inherit'});assert.equal(response.status,200,JSON.stringify(await response.clone().json()));assert.equal((await response.json()).attribution_status,'confirmed');
+ assert.deepEqual(await DB.prepare("SELECT * FROM curriculum_entries WHERE calendar_event_id='b'").first(),source);assert.equal(await DB.prepare("SELECT memo FROM student_prefs WHERE name='Synthetic'").first('memo'),'Private memo stays');assert.equal(control.patches.length,0);
+ const archives=(await DB.prepare("SELECT decision,snapshot_json FROM lesson_record_archive WHERE event_id='b'").all()).results;assert.equal(archives.length,1);assert.equal(archives[0].decision,'inherit');assert.equal(JSON.parse(archives[0].snapshot_json).lesson_plan,source.lesson_plan);
+ const preview=await (await call('/api/calendar-lesson-migration/preview',{event_id:'b'})).json();assert.equal(preview.plan.status,'ready');assert.equal(preview.plan.binding.generation,1);
+ const applied=await call('/api/calendar-lesson-migration/apply',{plan:preview.plan});assert.equal(applied.status,200,JSON.stringify(await applied.clone().json()));assert.equal(control.patches.length,1);assert.equal(control.patches[0].id,'b');assert.deepEqual(await DB.prepare("SELECT * FROM curriculum_entries WHERE calendar_event_id='b'").first(),source);
+});
+test('owner inherit rejects a changed ETag without creating attribution archive or modifying source',async t=>{
+ const {DB,events,call,put,control}=await setup(t);delete events[1].description;await DB.prepare("UPDATE lesson_record_identity SET title=NULL WHERE event_id='b'").run();const review=await (await call('/api/lesson-record?calendar_id=synthetic-calendar&event_id=b')).json();events[1].etag='"changed-after-review"';
+ const response=await put('/api/lesson-record',{target:review.target,record_revision:review.original_db_record.record_revision,decision:'inherit'});assert.equal(response.status,409);assert.equal((await rawRecord({DB},'b')).record_title,null);assert.equal(await DB.prepare("SELECT COUNT(*) AS n FROM lesson_record_archive WHERE event_id='b'").first('n'),0);assert.equal(control.patches.length,0);
+});
