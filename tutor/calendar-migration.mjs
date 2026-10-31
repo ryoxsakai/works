@@ -1,5 +1,6 @@
 import {watchAuth,getSessionToken} from '../shared/auth.js?v=12';
 import {sameLessonEvent,lessonEventRef} from '../shared/lesson-plan.js';
+import {parseCalendarRecord} from '../shared/calendar-lesson-record.mjs';
 const $=id=>document.getElementById(id),records=[];let authenticated=false,busy=false,downloaded=false,scanned=false,baselineReady=false;
 const status=text=>{$('status').textContent=text;};
 async function api(path,body,method=body?'POST':'GET'){
@@ -9,7 +10,8 @@ async function api(path,body,method=body?'POST':'GET'){
 }
 const call=(path,body)=>api('/calendar-lesson-migration/'+path,body);
 const confirmable=r=>r.state==='held'&&['attribution_legacy_unverified','attribution_legacy_historical','attribution_title_changed'].includes(r.reason)&&r.preview&&!(r.preview.event_before.description||'').trim()&&!r.confirmationSent;
-async function refresh(r){r.preview=await call('preview',{event_id:r.event_id});r.state=r.preview.plan.status;r.reason=r.preview.plan.reason;if(r.state==='ready'&&(r.preview.event_before.description||'').trim()){r.state='held';r.reason='existing_description';}}
+const replaceable=r=>{if(r.state!=='held'||!['attribution_legacy_unverified','attribution_legacy_historical','attribution_title_changed','existing_description'].includes(r.reason)||!r.preview||r.confirmationSent||!(r.preview.event_before.description||'').trim())return false;try{return !parseCalendarRecord(r.preview.event_before.description);}catch{return false;}};
+async function refresh(r){r.preview=await call('preview',{event_id:r.event_id,...(r.replaceRequested?{replace_unmanaged_description:true,expected_description:r.replacement_before_description}:{})});r.state=r.preview.plan.status;r.reason=r.preview.plan.reason;if(r.state==='ready'&&(r.preview.event_before.description||'').trim()&&r.preview.plan.mode!=='replace_unmanaged_description'){r.state='held';r.reason='existing_description';}}
 function render(){
  $('scan').disabled=!authenticated||busy||records.some(r=>r.dispatched||r.confirmationSent);$('download').disabled=!scanned||busy;
  $('backup').disabled=!downloaded||busy;
@@ -17,7 +19,8 @@ function render(){
  $('summary').textContent=Object.entries(counts).map(([k,n])=>k+': '+n+'件').join(' / ');
  $('items').replaceChildren(...records.map(r=>{const li=document.createElement('li'),text=document.createElement('span');text.textContent=(r.preview?.event_before?.summary||r.event_id)+' '+(r.preview?.event_before?.start?.dateTime||r.preview?.event_before?.start?.date||'')+' — '+r.state+(r.reason?' ('+r.reason+')':'');li.append(text);
   if(confirmable(r)){const button=document.createElement('button');button.textContent='この予定への帰属を確認する';button.disabled=busy||!baselineReady;button.addEventListener('click',()=>reviewAttribution(r));li.append(button);}
-  if(r.state==='ready'){const button=document.createElement('button');button.textContent='この1件を転記する';button.disabled=busy||!downloaded||!$('backup').checked||r.dispatched;button.addEventListener('click',()=>apply(r));li.append(button);}return li;}));
+  if(replaceable(r)){const button=document.createElement('button');button.textContent='この1件の既存説明の置換を確認する';button.disabled=busy||!baselineReady;button.addEventListener('click',()=>reviewAttribution(r,true));li.append(button);}
+  if(r.state==='ready'){const button=document.createElement('button');button.textContent=r.preview.plan.mode==='replace_unmanaged_description'?'この1件の既存説明を置換する':'この1件を転記する';button.disabled=busy||!downloaded||!$('backup').checked||r.dispatched;button.addEventListener('click',()=>apply(r));li.append(button);}return li;}));
 }
 $('scan').addEventListener('click',async()=>{
  if(busy)return;busy=true;scanned=false;downloaded=false;baselineReady=false;$('backup').checked=false;records.length=0;render();status('予定とDBの対応を確認しています。書き込みは行いません。');
@@ -31,25 +34,28 @@ $('download').addEventListener('click',()=>{
 });
 $('backup').addEventListener('change',()=>{if(downloaded)baselineReady=$('backup').checked;render();});
 
-async function reviewAttribution(r){
- if(busy||!baselineReady||!confirmable(r))return;
+async function reviewAttribution(r,replace=false){
+ if(busy||!baselineReady||!(replace?replaceable(r):confirmable(r)))return;
  busy=true;render();status('この予定と旧記録を再取得しています。');let dialog;
  try{
   const review=await api('/lesson-record?calendar_id='+encodeURIComponent(r.preview.calendar_id)+'&event_id='+encodeURIComponent(r.event_id));
   const expected=r.preview.event_before,target=review.target,old=review.original_db_record||review.previous_record;
   if(!target||target.id!==r.event_id||target.calendar_id!==r.preview.calendar_id||!old?.record_exists||!Number.isSafeInteger(old.record_revision)||review.record?.record_pending_operation||
     !sameLessonEvent(target,lessonEventRef(expected,r.preview.calendar_id)))throw Error('予定または記録が変わりました。帰属は変更していません。');
+  if(replace&&(review.record?.record_calendar_managed||review.record?.record_pending_operation||parseCalendarRecord(expected.description||'')))throw Error('管理済みの説明は授業画面で確認してください');
   dialog=document.createElement('dialog');dialog.setAttribute('aria-label','個別の授業記録の帰属確認');
-  const heading=document.createElement('h2');heading.textContent='この予定へ旧記録を引き継ぐ';dialog.append(heading);
+  const heading=document.createElement('h2');heading.textContent=replace?'この1件の既存説明の置換を確認する':'この予定へ旧記録を引き継ぐ';dialog.append(heading);
   const details=document.createElement('pre');details.textContent=target.title+'\n'+target.start+'\n旧記録の名前：'+(old.record_title||old.record_observed_title||'未確認')+'\n\n'+Object.entries({lesson_plan:'授業予定：',confirmation_test:'確認テスト：',homework:'宿題：',lesson_memo:'授業メモ：'}).map(([k,label])=>label+(old[k]||'')).join('\n');dialog.append(details);
-  const note=document.createElement('p');note.textContent='この1件の旧記録を履歴に保存して、予定への帰属を確定します。DB原文・生徒メモ・カレンダーの説明は変更しません。';dialog.append(note);
+  if(replace){const before=document.createElement('pre');before.textContent='置換前のカレンダー説明：\n'+expected.description;dialog.append(before);}
+  const note=document.createElement('p');note.textContent='この1件の旧記録を履歴に保存して、予定への帰属を確定します。DB原文・生徒メモ・カレンダーの説明は変更しません。';if(replace)note.textContent+=' 既存説明は転記履歴に保存してから4欄へ置き換えます。ここではまだ説明を変更せず、更新したバックアップの確認後に別操作で実行します。';dialog.append(note);
   const label=document.createElement('label'),ack=document.createElement('input');ack.type='checkbox';label.append(ack,document.createTextNode('上記はこの予定の授業記録と本人確認済みです。'));dialog.append(label);
+  let replaceAck;if(replace){const label=document.createElement('label');replaceAck=document.createElement('input');replaceAck.type='checkbox';label.append(replaceAck,document.createTextNode('表示された既存説明を、上記4欄へ置き換えることを確認しました。'));dialog.append(label);}
   const accept=document.createElement('button'),cancel=document.createElement('button');accept.textContent='この1件の帰属を確定する';accept.disabled=true;cancel.textContent='変更せず閉じる';dialog.append(accept,cancel);
-  let sending=false;ack.addEventListener('change',()=>accept.disabled=!ack.checked||sending);cancel.addEventListener('click',()=>dialog.close());dialog.addEventListener('cancel',e=>{if(sending)e.preventDefault();});
+  let sending=false;const updateAccept=()=>accept.disabled=!ack.checked||!!replaceAck&&!replaceAck.checked||sending;ack.addEventListener('change',updateAccept);replaceAck?.addEventListener('change',updateAccept);cancel.addEventListener('click',()=>dialog.close());dialog.addEventListener('cancel',e=>{if(sending)e.preventDefault();});
   dialog.addEventListener('close',()=>{dialog.remove();busy=false;render();});
   accept.addEventListener('click',async()=>{
-   if(sending||!ack.checked)return;sending=true;r.confirmationSent=true;r.confirmation_before=review;accept.disabled=true;cancel.disabled=true;ack.disabled=true;
-   try{r.confirmation_result=await api('/lesson-record',{target,record_revision:old.record_revision,decision:'inherit'},'PUT');await refresh(r);if(!['ready','already_present'].includes(r.state))throw Error('帰属確定後のプレビューを確認してください');status('この1件の帰属を確定しました。新しい確認データとDBバックアップを保存・確認してから転記してください。');}
+   if(sending||!ack.checked||replaceAck&&!replaceAck.checked)return;sending=true;r.confirmationSent=true;r.confirmation_before=review;accept.disabled=true;cancel.disabled=true;ack.disabled=true;if(replaceAck)replaceAck.disabled=true;
+   try{if(review.record?.attribution_status!=='confirmed')r.confirmation_result=await api('/lesson-record',{target,record_revision:old.record_revision,decision:'inherit',...(replace?{unmanaged_only:true}:{})},'PUT');else r.confirmation_result={attribution_status:'already_confirmed'};if(replace){r.replaceRequested=true;r.replacement_before_description=expected.description||'';}await refresh(r);if(!['ready','already_present'].includes(r.state))throw Error('帰属確定後のプレビューを確認してください');status('この1件の帰属を確定しました。新しい確認データとDBバックアップを保存・確認してから転記してください。');}
    catch(e){r.state='held';r.reason=e.code||e.message;status('帰属の処理結果を確認してください。同じ確定操作の再送は停止しました。');}
    finally{downloaded=false;$('backup').checked=false;sending=false;dialog.close();}
   });

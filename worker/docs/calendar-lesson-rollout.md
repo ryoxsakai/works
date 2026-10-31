@@ -178,3 +178,9 @@ migration preview is required after success, and the old transfer backup gate is
 invalidated: download the new evidence and update/verify the DB backup before
 Calendar transfer. Confirmation of one record never confirms other occurrences.
 Nonempty descriptions and other held reasons have no confirmation button.
+
+### Explicit replacement of one unmanaged description
+
+Ordinary lesson saves and migration preserve outside text. If the owner explicitly chooses to replace a nonempty unmanaged description, use the separate per-event replacement review. Read the exact old text and four new fields, acknowledge both ownership and replacement, then confirm attribution. This step uses `unmanaged_only` and archives the source without modifying Calendar. Managed, pending, malformed and changed descriptions remain blocked.
+
+Export the new preview and take/restore a fresh private D1+Calendar backup after attribution. Update the existing backup hash/time only. The separate replacement action requires the exact old description and fresh event reference, retains the full preimage in the durable journal, and sends one description-only conditional instance PATCH. Verify readback before completion. An unknown outcome is reconciled without re-sending. No bulk nonempty override is available; no unrelated event, date, series, source content or student memo is changed.

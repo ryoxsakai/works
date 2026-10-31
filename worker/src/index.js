@@ -6318,8 +6318,16 @@ export default {
         if(!Array.isArray(attested)||attested.some(id=>typeof id!=='string'))throw httpError(503,'共有確認設定が不正です');
         const google=calendarLessonGoogle({accessToken:context.access_token,ownerEmail:env.ALLOWED_EMAIL,attestedCalendars:attested});
         const {rawRecord}=await import('./lesson-attribution.js'),row=await rawRecord(env,eventId),event={...resolved.event,calendar_id:resolved.calendar_id};
+        const replaceExistingDescription=url.pathname==='/api/calendar-lesson-migration/apply'?body.plan?.mode==='replace_unmanaged_description':body.replace_unmanaged_description===true;
+        if(replaceExistingDescription){
+          const expected=url.pathname==='/api/calendar-lesson-migration/apply'?body.plan?.before_description:body.expected_description;
+          if(typeof expected!=='string'||expected.length>100000||expected!==(event.description||''))throw httpError(409,'既存説明が確認後に変更されています。置換は停止しました');
+          if(env.CALENDAR_LESSON_MIGRATION_JOURNAL!=='true')throw httpError(503,'転記履歴の保護設定が必要です');
+          const prior=await env.DB.prepare("SELECT id FROM calendar_lesson_migration WHERE event_id=? AND calendar_id=? AND status IN ('reserved','dispatching','unknown','verified') LIMIT 1").bind(eventId,resolved.calendar_id).first();
+          if(prior)throw httpError(409,'管理済み・処理中の説明は授業画面で確認してください');
+        }
         const privacy=await google.privacy(resolved.calendar_id).catch(error=>({calendar_id:resolved.calendar_id,complete:false,error_code:error.code||'SHARING_UNAVAILABLE'}));
-        const settings=await readSettings(env),plan=planCalendarRecordMigration({row,event,privacy,ownerEmail:env.ALLOWED_EMAIL,excluded:settings.excluded_titles||[]});
+        const settings=await readSettings(env),plan=planCalendarRecordMigration({row,event,privacy,ownerEmail:env.ALLOWED_EMAIL,excluded:settings.excluded_titles||[],replaceExistingDescription});
         if(url.pathname==='/api/calendar-lesson-migration/preview')return json({event_id:eventId,calendar_id:resolved.calendar_id,record_before:row,event_before:event,privacy,plan},{...headers,'Cache-Control':'no-store'});
         if(url.pathname==='/api/calendar-lesson-migration/apply'){
           const captured=Date.parse(env.CALENDAR_LESSON_BACKUP_CAPTURED_AT||'');
@@ -6406,7 +6414,9 @@ export default {
             const token=await mintGoogleAccessToken(env),event=await fetchCalendarEventWithToken(token.access_token,target.calendar_id,target.id);
             const {parseCalendarRecord}=await import('../../shared/calendar-lesson-record.mjs');
             const priorCalendar=await env.DB.prepare("SELECT id FROM calendar_lesson_migration WHERE event_id=? AND calendar_id=? AND status='verified' LIMIT 1").bind(target.id,target.calendar_id).first();
-            if(parseCalendarRecord(event?.description||'')||priorCalendar)return json(await writeCalendarLessonRecord(env,{target,patch:{},recordRevision:body.record_revision,decision:body.decision},{settings:()=>readSettings(env),token:async()=>token}),headers);
+            const managed=parseCalendarRecord(event?.description||'');
+            if(body.unmanaged_only===true&&(managed||priorCalendar))throw httpError(409,'管理済みの説明は既存の授業編集で確認してください');
+            if(managed||priorCalendar)return json(await writeCalendarLessonRecord(env,{target,patch:{},recordRevision:body.record_revision,decision:body.decision},{settings:()=>readSettings(env),token:async()=>token}),headers);
           }
           return json(await resolveAttribution(env,target,body.record_revision,body.decision),headers);
         }

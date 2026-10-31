@@ -30,7 +30,7 @@ export function calendarRecordPrivacy(event,privacy,ownerEmail){
 
 // Pure dry-run planner: does not initialize attribution, write DB or contact
 // Calendar. Unknown legacy ownership is preserved, never silently verified.
-export function planCalendarRecordMigration({row,event,privacy,ownerEmail,collision=false,excluded=[]}){
+export function planCalendarRecordMigration({row,event,privacy,ownerEmail,collision=false,excluded=[],replaceExistingDescription=false}){
  if(!event)return block('event_missing');
  const ref=lessonEventRef(event,event.calendar_id),date=lessonDate(ref);
  if(!date)return block('invalid_event_date');
@@ -47,6 +47,11 @@ export function planCalendarRecordMigration({row,event,privacy,ownerEmail,collis
  const binding=recordBinding(row,ref),description=event.description||'';
  try{
   const parsed=parseCalendarRecord(description);
+  if(replaceExistingDescription){
+   if(parsed)return block('managed_description_requires_editor');
+   if(!description.trim())return block('replacement_description_is_empty');
+   return {status:'ready',mode:'replace_unmanaged_description',ref,binding,record_revision:row.record_revision,before_description:description,after_description:replaceCalendarRecord('',row,binding),values:calendarRecordValues(row)};
+  }
   if(parsed&&!sameCalendarRecordBinding(binding,parsed.binding))return block('managed_binding_conflict');
   if(parsed&&!equalValues(parsed.values,row))return block('calendar_db_content_conflict');
   if(parsed)return {status:'already_present',ref,binding,record_revision:row.record_revision,description};
@@ -84,9 +89,9 @@ export async function applyCalendarRecordMigration(plan,{read,privacy,ownerEmail
  if(!before||!sameLessonEvent(lessonEventRef(before,plan.ref.calendar_id),plan.ref)||String(before.description||'')!==plan.before_description)throw problem('MIGRATION_SNAPSHOT_CHANGED','予定がdry run後に変更されました');
  const row=await readRecord(plan.ref.id);
  const planner=plan.mode==='initialize_template'?planCalendarTemplateInitialization:planCalendarRecordMigration;
- const checked=planner({row,event:{...before,calendar_id:plan.ref.calendar_id},privacy:await privacy(plan.ref.calendar_id),ownerEmail});
+ const checked=planner({row,event:{...before,calendar_id:plan.ref.calendar_id},privacy:await privacy(plan.ref.calendar_id),ownerEmail,replaceExistingDescription:plan.mode==='replace_unmanaged_description'});
  if(checked.status!=='ready'||checked.record_revision!==plan.record_revision||checked.after_description!==plan.after_description)throw problem('MIGRATION_PREFLIGHT_CHANGED','転記前の対応・共有範囲・記録が変更されました');
- const operation=await reserve({ref:plan.ref,binding:plan.binding,revision:plan.record_revision,before:structuredClone(before),after_description:plan.after_description});
+ const operation=await reserve({ref:plan.ref,binding:plan.binding,revision:plan.record_revision,before:structuredClone(before),after_description:plan.after_description,...(plan.mode?{mode:plan.mode}:{})});
  if(!operation?.id)throw problem('MIGRATION_JOURNAL_REQUIRED','復元可能な転記履歴の予約が必要です');
  await mark(operation.id,'dispatching');
  try{
