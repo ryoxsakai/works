@@ -160,3 +160,21 @@ release the definitely unapplied reservation; no automatic retry occurs. Network
 5xx, unreadable success bodies, postimage failures and uncertain DB finalization
 remain unknown. Source mutation transport failures are not reported as validation
 400 errors. Pending snapshots and source data remain available for reconciliation.
+
+## Explicit confirmation of legacy attribution
+
+The migration operator now offers an individual confirmation dialog for held
+legacy/historical records and changed titles when the description is blank. It
+re-reads `/api/lesson-record`, compares the exact event reference including ETag,
+and shows the current title/date, old title and all four source fields as literal
+text. A verified backup acknowledgement and a separate, initially unchecked
+owner-confirmation checkbox are required. There is no bulk confirmation.
+
+Confirming calls the existing browser-only `PUT /api/lesson-record` with `inherit`
+and the displayed record revision. The existing API archives the old record and
+updates attribution metadata; it does not rewrite curriculum text, student memos
+or Calendar. An uncertain confirmation is not retried from the operator. A fresh
+migration preview is required after success, and the old transfer backup gate is
+invalidated: download the new evidence and update/verify the DB backup before
+Calendar transfer. Confirmation of one record never confirms other occurrences.
+Nonempty descriptions and other held reasons have no confirmation button.
