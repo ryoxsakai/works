@@ -1,5 +1,7 @@
 import { rawRecord, currentRecord, requireCurrent, prepareRecordWrite, commitRecords, readCommittedRecord, observeRecord } from './lesson-attribution.js';
 import { NEXT_LESSON_DAYS, lessonEventRef, sameLessonEvent, findNextLesson } from "../../shared/lesson-plan.js";
+import {calendarRecordEligible,overlayCalendarLessonRecord,writeCalendarLessonRecord,calendarRecordsEnabled,loadCalendarStorageState} from './calendar-lesson-records.js';
+import {calendarRecordValues} from '../../shared/calendar-lesson-record.mjs';
 
 // A stale write may refer to a different ownership generation, even with an identical title.
 // Conflict responses identify the fresh target but never return another generation's plan.
@@ -29,14 +31,15 @@ async function uniqueRecordId(deps, context, ref) {
     throw failure(409, "複数カレンダーに同じ予定IDがあります。安全に連動できません", "LESSON_ID_COLLISION");
   }
 }
-async function planRecord(env, ref) {
-  return currentRecord(await observeRecord(env,ref),ref);
+async function planRecord(env, ref, event) {
+  const row=await loadCalendarStorageState(env,currentRecord(await observeRecord(env,ref),ref),ref);
+  return event?overlayCalendarLessonRecord(env,row,{...event,calendar_id:ref.calendar_id}):row;
 }
 export async function readLessonPlan(env, calendarId, eventId, deps) {
   const context = await lookup(deps, calendarId, eventId);
   await uniqueRecordId(deps, context, context.ref);
-  const record = await planRecord(env, context.ref);
-  return { target: context.ref, lesson_plan: record.lesson_plan || "", attribution_status: record.attribution_status, attribution_notice:record.attribution_notice || null, record_revision: record.record_revision };
+  const record = await planRecord(env, context.ref,context.event);
+  return { target: context.ref, lesson_plan: record.lesson_plan || "", attribution_status: record.attribution_status, attribution_notice:record.attribution_notice || null, record_revision: record.record_revision,record_pending_operation:record.record_pending_operation,record_storage:record.record_storage };
 }
 export async function readNextLessonPlan(env, calendarId, eventId, deps) {
   const context = await lookup(deps, calendarId, eventId);
@@ -50,8 +53,13 @@ export async function readNextLessonPlan(env, calendarId, eventId, deps) {
   const result = findNextLesson(source, events, context.settings.excluded_titles || []);
   if (!result.target) return { source, ...result, search_end: searchEnd, lesson_plan: "" };
   await uniqueRecordId(deps, context, result.target);
-  const record = await planRecord(env, result.target);
-  return { source, ...result, search_end: searchEnd, lesson_plan: record.lesson_plan || "", attribution_status: record.attribution_status, attribution_notice:record.attribution_notice || null, record_revision: record.record_revision };
+  const targetEvent=calendarRecordsEnabled(env)?await deps.event(context.token,calendarId,result.target.id):null;
+  if(calendarRecordsEnabled(env)&&!targetEvent)throw failure(409,'次回予定が削除されました','LESSON_TARGET_CHANGED');
+  if(targetEvent&&!sameLessonEvent(lessonEventRef(targetEvent,calendarId),result.target))throw failure(409,'次回予定が取得中に変更されました','LESSON_TARGET_CHANGED');
+  const record = await planRecord(env, result.target,targetEvent);
+  const templateAvailable=!!targetEvent&&calendarRecordEligible(env,{...targetEvent,calendar_id:calendarId})&&!(targetEvent.description||'').trim()
+    &&['new','confirmed'].includes(record.attribution_status)&&!record.record_pending_operation&&!Object.values(calendarRecordValues(record)).some(value=>value.trim());
+  return { source, ...result, search_end: searchEnd, lesson_plan: record.lesson_plan || "", attribution_status: record.attribution_status, attribution_notice:record.attribution_notice || null, record_revision: record.record_revision,record_pending_operation:record.record_pending_operation,record_storage:record.record_storage,template_initialization_available:templateAvailable };
 }
 export async function writeLessonPlan(env, body, deps) {
   if (!body || typeof body.lesson_plan !== "string" || body.lesson_plan.length > 5000
@@ -82,6 +90,7 @@ export async function writeLessonPlan(env, body, deps) {
       throw failure(409, "授業日時や予定名が変更されました。再読み込みしてください", "LESSON_TARGET_CHANGED", current);
     }
   }
+  if(calendarRecordsEnabled(env))return writeCalendarLessonRecord(env,{target:body.target,patch:{lesson_plan:body.lesson_plan},recordRevision:body.record_revision,expectedLessonPlan:body.expected_lesson_plan},deps);
   const row = await rawRecord(env, eventId);
   requireCurrent(row, body.target);
   if (!Number.isSafeInteger(body.record_revision) || body.record_revision !== row.record_revision || (row.lesson_plan || "") !== body.expected_lesson_plan) {

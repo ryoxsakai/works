@@ -4,6 +4,14 @@ import { lessonEventKey, sameLessonEvent } from "../shared/lesson-plan.js";
 // into the preceding event's record, and responses never use the later selection.
 export function createLessonPlanController({ readNext, write, onChange = () => {} }) {
   const plans = new Map(), links = new Map();
+  const ownTargets=new Map();
+  function latestOwn(ref){let current=ref;const seen=new Set();while(current&&ownTargets.has(JSON.stringify(current))&&!seen.has(JSON.stringify(current))){seen.add(JSON.stringify(current));current=ownTargets.get(JSON.stringify(current));}return current;}
+  function observeTarget(before,after){
+    if(!before||!after||!sameLessonEvent({...after,etag:before.etag},before))return;
+    ownTargets.set(JSON.stringify(before),after);
+    for(const state of plans.values())if(sameLessonEvent(state.target,before))state.target=after;
+    for(const link of links.values()){if(sameLessonEvent(link.source,before))link.source=after;if(sameLessonEvent(link.target,before))link.target=after;}
+  }
   let version = 0;
   const notify = () => onChange();
   function seed(target, value, readVersion = version, recordRevision = 0, attributionStatus = "new") {
@@ -18,23 +26,25 @@ export function createLessonPlanController({ readNext, write, onChange = () => {
     return state;
   }
   return {
-    get version() { return version; }, seed,
+    get version() { return version; }, seed, observeTarget,
     observeRecord(target, revision) {
       const state=plans.get(lessonEventKey(target));
       if(state && !state.pending) state.recordRevision=revision;
     },
     get: (key) => plans.get(key), getLink: (key) => links.get(key),
     async loadNext(source) {
+      source=latestOwn(source);
       const key = lessonEventKey(source);
       const link = links.get(key) || { key, source, generation: 0 };
       links.set(key, link);
       const generation = ++link.generation, readVersion = version;
       Object.assign(link, { source, status: "loading" }); notify();
       try {
-        const result = await readNext(source);
+        const rawResult = await readNext(source);
+        const result={...rawResult,source:latestOwn(rawResult.source),target:latestOwn(rawResult.target)};
         if (link.generation !== generation) return;
         const old = plans.get(link.targetKey);
-        const changed = !sameLessonEvent(source, result.source)
+        const changed = !sameLessonEvent(latestOwn(source), result.source)
           || (old?.dirty && !sameLessonEvent(link.target, result.target));
         link.current = result;
         if (changed) { link.status = "conflict"; notify(); return; }
@@ -69,7 +79,9 @@ export function createLessonPlanController({ readNext, write, onChange = () => {
       const save = state.queue.catch(() => {}).then(async () => {
         if (state.status === "conflict" || (linkKey && link?.status === "conflict")) return;
         try {
-          const result = await write({ target, ...(source ? { source } : {}), expected_lesson_plan: state.base, record_revision:state.recordRevision, lesson_plan: value });
+          const effectiveTarget=latestOwn(target),effectiveSource=latestOwn(source);
+          const result = await write({ target:effectiveTarget, ...(effectiveSource ? { source:effectiveSource } : {}), expected_lesson_plan: state.base, record_revision:state.recordRevision, lesson_plan: value });
+          if(result.target)observeTarget(effectiveTarget,result.target);
           state.base = result.lesson_plan || "";
           state.recordRevision = result.record_revision;
           state.attributionStatus = result.attribution_status || state.attributionStatus;
@@ -77,7 +89,7 @@ export function createLessonPlanController({ readNext, write, onChange = () => {
           if (state.revision === revision) { state.value = state.base; state.dirty = false; state.status = "saved"; }
           else state.status = "unsaved";
         } catch (error) {
-          state.status = error.status === 409 ? "conflict" : "error";
+          state.status = error.status === 409 || error.unknown || error.code==='CALENDAR_WRITE_UNKNOWN' ? "conflict" : "error";
           state.message = error.message;
           state.current = error.current;
           if (link && error.status === 409 && sameLessonEvent(link.target, target)) {

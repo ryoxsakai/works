@@ -1,4 +1,4 @@
-import { homeLessonModel, lessonApi } from "./lesson-model.mjs?v=1";
+import { homeLessonModel, lessonApi } from "./lesson-model.mjs?v=2";
 import {
   MODULES,
   WIDGETS,
@@ -106,7 +106,7 @@ export function createDashboard({
     if(!host||!user)return;
     if(lessonCards){placeLessonCards(host);return;}
     if(!model?.rows?.length)return;
-    cardImport ||= import('./lesson-cards.mjs?v=1');
+    cardImport ||= import('./lesson-cards.mjs?v=2');
     try {
       const {createHomeLessonCards}=await cardImport;
       if(request!==epoch||pagePaused||!user||cache.get('lessons')?.data!==model||!current().widgets.includes('lessons'))return;

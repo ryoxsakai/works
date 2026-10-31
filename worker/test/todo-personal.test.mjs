@@ -13,6 +13,10 @@ for (const file of [
   "kdp-services",
   "oauth-refresh",
   "mcp-scopes",
+  "calendar-lesson-records",
+  "calendar-lesson-google",
+  "calendar-lesson-journal",
+  "calendar-lesson-migration",
 ])
   source = source.replace(
     `./${file}.js`,
