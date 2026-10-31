@@ -127,3 +127,22 @@ test('native Calendar four-line HTML survives comment removal, preserves outside
  const review=await (await call('/api/lesson-record?calendar_id=synthetic-calendar&event_id=b')).json();assert.equal(review.previous_record.lesson_plan,'旧生徒の内容');assert.equal(review.record.lesson_plan,null);assert.equal(review.original_db_record.lesson_plan,'Worksへ往復');
  response=await put('/api/lesson-record',{target:current.target,record_revision:current.record_revision,decision:'separate'});assert.equal(response.status,200,JSON.stringify(await response.clone().json()));assert.equal(parseCalendarRecord(events[1].description).values.lesson_plan,'');
 });
+test('empty Calendar with existing next-lesson DB text stays readable and never advertises automatic initialization',async t=>{
+ const {DB,events,control,call}=await setup(t);delete events[1].description;
+ const read=async()=>(await (await call('/api/next-lesson-plan?calendar_id=synthetic-calendar&event_id=a')).json());
+ let next=await read();assert.equal(next.target.id,'b');assert.equal(next.lesson_plan,'DB original');assert.equal(next.template_initialization_available,false);
+ await DB.prepare("UPDATE lesson_record_identity SET title=NULL WHERE event_id='b'").run();
+ next=await read();assert.equal(next.lesson_plan,'DB original');assert.equal(next.template_initialization_available,false);assert.equal(control.patches.length,0);
+});
+test('moved managed record with native comments removed blocks D1-only MCP update and undo',async t=>{
+ const {DB,events,control,call,put,bindings}=await setup(t);
+ events[1].start.dateTime='2026-10-19T11:00:00+09:00';events[1].end.dateTime='2026-10-19T12:00:00+09:00';events[1].etag='"moved"';
+ let current=await (await call('/api/lesson-plan?calendar_id=synthetic-calendar&event_id=b')).json();
+ const saved=await put('/api/lesson-plan',{target:current.target,record_revision:current.record_revision,expected_lesson_plan:current.lesson_plan,lesson_plan:'managed'});assert.equal(saved.status,200);
+ events[1].description='授業予定：native\n確認テスト：\n宿題：\n授業メモ：';events[1].etag='"native"';
+ const bearer=await token(bindings.SESSION_SECRET,{aud:'works-mcp',scope:'schedule:read'});
+ const mcp=async(name,args)=>(await (await call('/mcp',{jsonrpc:'2.0',id:1,method:'tools/call',params:{name,arguments:args}},{Authorization:'Bearer '+bearer,'Content-Type':'application/json'})).json());
+ const update=await mcp('update_schedule',{calendar_id:'synthetic-calendar',event_id:'b',homework:'must not save'});assert.equal(update.result.isError,true);assert.ok(update.result.content[0].text.includes('D1だけ'));
+ await DB.prepare("INSERT INTO mcp_schedule_changes(id,event_id,action,changed_fields,before_json,after_json) VALUES('synthetic-undo','b','update','[]','{}','{}')").run();
+ const undo=await mcp('undo_schedule_update',{change_id:'synthetic-undo'});assert.equal(undo.result.isError,true);assert.ok(undo.result.content[0].text.includes('転記履歴'));assert.equal((await rawRecord({DB},'b')).homework,'original homework');assert.equal(control.patches.length,1);
+});

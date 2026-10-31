@@ -1,6 +1,7 @@
 import { rawRecord, currentRecord, requireCurrent, prepareRecordWrite, commitRecords, readCommittedRecord, observeRecord } from './lesson-attribution.js';
 import { NEXT_LESSON_DAYS, lessonEventRef, sameLessonEvent, findNextLesson } from "../../shared/lesson-plan.js";
 import {calendarRecordEligible,overlayCalendarLessonRecord,writeCalendarLessonRecord,calendarRecordsEnabled,loadCalendarStorageState} from './calendar-lesson-records.js';
+import {calendarRecordValues} from '../../shared/calendar-lesson-record.mjs';
 
 // A stale write may refer to a different ownership generation, even with an identical title.
 // Conflict responses identify the fresh target but never return another generation's plan.
@@ -56,7 +57,9 @@ export async function readNextLessonPlan(env, calendarId, eventId, deps) {
   if(calendarRecordsEnabled(env)&&!targetEvent)throw failure(409,'次回予定が削除されました','LESSON_TARGET_CHANGED');
   if(targetEvent&&!sameLessonEvent(lessonEventRef(targetEvent,calendarId),result.target))throw failure(409,'次回予定が取得中に変更されました','LESSON_TARGET_CHANGED');
   const record = await planRecord(env, result.target,targetEvent);
-  return { source, ...result, search_end: searchEnd, lesson_plan: record.lesson_plan || "", attribution_status: record.attribution_status, attribution_notice:record.attribution_notice || null, record_revision: record.record_revision,record_pending_operation:record.record_pending_operation,record_storage:record.record_storage,template_initialization_available:targetEvent&&calendarRecordEligible(env,{...targetEvent,calendar_id:calendarId})&&!(targetEvent.description||'').trim() };
+  const templateAvailable=!!targetEvent&&calendarRecordEligible(env,{...targetEvent,calendar_id:calendarId})&&!(targetEvent.description||'').trim()
+    &&['new','confirmed'].includes(record.attribution_status)&&!record.record_pending_operation&&!Object.values(calendarRecordValues(record)).some(value=>value.trim());
+  return { source, ...result, search_end: searchEnd, lesson_plan: record.lesson_plan || "", attribution_status: record.attribution_status, attribution_notice:record.attribution_notice || null, record_revision: record.record_revision,record_pending_operation:record.record_pending_operation,record_storage:record.record_storage,template_initialization_available:templateAvailable };
 }
 export async function writeLessonPlan(env, body, deps) {
   if (!body || typeof body.lesson_plan !== "string" || body.lesson_plan.length > 5000

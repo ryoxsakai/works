@@ -1901,8 +1901,9 @@ async function prepareAuditedScheduleUpdate(env, target, patch) {
   const { observeRecord, requireCurrent, prepareRecordWrite } = await import("./lesson-attribution.js");
   const { lessonEventRef } = await import("../../shared/lesson-plan.js");
   const ref=lessonEventRef(verified.event,verified.calendar_id);
-  if(calendarRecordEligible(env,{...verified.event,calendar_id:verified.calendar_id}))throw httpError(409,"カレンダー保存対象の一括・履歴更新は授業画面で行ってください。D1だけの更新は停止しました");
   const raw = await observeRecord(env,ref);
+  const storage=await loadCalendarStorageState(env,raw,ref);
+  if(calendarRecordEligible(env,{...verified.event,calendar_id:verified.calendar_id})||storage.record_calendar_managed||storage.record_pending_operation)throw httpError(409,"カレンダー保存対象の一括・履歴更新は授業画面で行ってください。D1だけの更新は停止しました");
   requireCurrent(raw,ref);
   const before = curriculumSnapshot(raw);
   const after = curriculumAfterPatch(before, patch);
@@ -3295,8 +3296,9 @@ async function undoScheduleUpdate(env, args = {}) {
   const {lessonEventRef}=await import("../../shared/lesson-plan.js");
   const {lessonTitleKey}=await import("../../shared/lesson-attribution.js");
   const liveRef=lessonEventRef(resolved.event,resolved.calendar_id);
-  if(calendarRecordEligible(env,{...resolved.event,calendar_id:resolved.calendar_id}))throw httpError(409,"カレンダー保存対象は説明欄と転記履歴の照合が必要です");
   const raw = await rawRecord(env,change.event_id);
+  const storage=await loadCalendarStorageState(env,raw,liveRef);
+  if(calendarRecordEligible(env,{...resolved.event,calendar_id:resolved.calendar_id})||storage.record_calendar_managed||storage.record_pending_operation)throw httpError(409,"カレンダー保存対象は説明欄と転記履歴の照合が必要です");
   requireCurrent(raw,liveRef);
   if (!after.target_calendar_id || after.target_calendar_id!==liveRef.calendar_id || lessonTitleKey(after.target_title)!==lessonTitleKey(liveRef.title) || after.record_calendar_id !== raw.record_calendar_id || after.record_title !== raw.record_title || after.record_generation !== raw.record_generation) {
     throw httpError(409,"授業記録の対応が変わったか、旧履歴のため安全に復元できません");
