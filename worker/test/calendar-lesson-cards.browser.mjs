@@ -2,7 +2,8 @@ import {chromium,expect} from '@playwright/test';
 import assert from 'node:assert/strict';
 import {mkdir} from 'node:fs/promises';
 import {createFixture} from './next-lesson-fixture.mjs';
-import {parseCalendarRecord} from '../../shared/calendar-lesson-record.mjs';
+import {parseCalendarRecord,parsePlainCalendarRecord} from '../../shared/calendar-lesson-record.mjs';
+const parseVisible=description=>parseCalendarRecord(description)||parsePlainCalendarRecord(description,{calendar_id:'synthetic-calendar',event_id:'b',title:'合成生徒',generation:0});
 const fixture=await createFixture(0,{calendarRecords:true});
 const browser=await chromium.launch({headless:true,...(process.env.BROWSER_EXECUTABLE?{executablePath:process.env.BROWSER_EXECUTABLE}:{})});
 const page=await browser.newPage({viewport:{width:390,height:900}}),errors=[];page.on('pageerror',error=>errors.push(error.message));
@@ -12,15 +13,15 @@ try{
  await page.goto(fixture.base+'/tutor/');await page.locator('[data-page-tab="record"]').click();
  await expect(field('b')).toHaveValue('既存の次回予定');
  await expect.poll(()=>fixture.control.initializations).toBe(1);
- await expect.poll(()=>parseCalendarRecord(fixture.events.find(e=>e.id==='template-target').description)?.values.lesson_plan).toBe('');
+ await expect.poll(()=>parseVisible(fixture.events.find(e=>e.id==='template-target').description)?.values.lesson_plan).toBe('');
  for(const value of ['カレンダーへ保存\n第二行','続けて保存']){
   await field('b').fill(value);await field('b').press('Tab');
   await expect(row('b').locator('.lesson-plan-status').first()).toHaveText('保存済み');
   await expect(row('a').locator('.record-next-plan textarea')).toHaveValue(value);
-  assert.equal(parseCalendarRecord(fixture.events.find(e=>e.id==='b').description).values.lesson_plan,value);
+  assert.equal(parseVisible(fixture.events.find(e=>e.id==='b').description).values.lesson_plan,value);
  }
  assert.equal(fixture.control.calendarWrites.filter(w=>w.id==='b').length,2);
- assert.equal(parseCalendarRecord(fixture.events.find(e=>e.id==='b').description).values.homework,'既存宿題');
+ assert.equal(parseVisible(fixture.events.find(e=>e.id==='b').description).values.homework,'既存宿題');
  const memobefore=await fixture.DB.prepare("SELECT memo FROM student_prefs WHERE name='サンプル生徒'").first();
  assert.equal(memobefore.memo,'既存の生徒メモ');
  await page.reload();await expect(field('b')).toHaveValue('続けて保存');assert.equal(fixture.control.initializations,1);
@@ -28,7 +29,7 @@ try{
  await page.goto(fixture.base+'/');await expect(page.locator('.home-lesson-cards .record-plan').filter({hasText:'never'})).toHaveCount(0);
  const home=page.locator('.home-lesson-cards tr[data-event-id="b"] .record-plan');await expect(home).toHaveValue('続けて保存');
  await home.fill('トップからの保存');await home.press('Tab');
- await expect.poll(()=>parseCalendarRecord(fixture.events.find(e=>e.id==='b').description).values.lesson_plan).toBe('トップからの保存');
+ await expect.poll(()=>parseVisible(fixture.events.find(e=>e.id==='b').description).values.lesson_plan).toBe('トップからの保存');
  assert.equal(fixture.control.calendarWrites.filter(w=>w.id==='b').length,3);
  await page.goto(fixture.base+'/tutor/');await expect(field('b')).toHaveValue('トップからの保存');assert.equal(fixture.control.initializations,1);
  await page.goto(fixture.base+'/');const rootField=page.locator('.home-lesson-cards tr[data-event-id="b"] .record-plan');await expect(rootField).toHaveValue('トップからの保存');
@@ -41,5 +42,6 @@ try{
  page.once('dialog',dialog=>dialog.accept());await page.reload();const reconcile=page.locator('.home-lesson-cards .calendar-record-reconcile');await expect(reconcile).toHaveCount(1);
  for(let i=0;i<6&&!await reconcile.isVisible();i++){await page.getByRole('button',{name:'次の授業カード',exact:true}).click();await page.waitForTimeout(250);}
  await expect(reconcile).toBeVisible();await reconcile.click();await expect(page.locator('.home-lesson-cards tr[data-event-id="b"] .record-plan')).toHaveValue('応答不明の保存');assert.equal(fixture.control.calendarWrites.length,patchCount);
- assert.deepEqual(errors,[]);console.log('PASS Calendar original Tutor + home: four fields retained, native editor/next link, repeated ETags, explicit empty-instance initialization once, root roundtrip, no memo migration');
+ assert.deepEqual(errors,[]);assert.ok(fixture.events.filter(e=>['b','template-target'].includes(e.id)).every(e=>!e.description.includes('<!--')));
+ console.log('PASS Calendar original Tutor + home: four fields retained, native editor/next link, repeated ETags, explicit empty-instance initialization once, root roundtrip, no memo migration');
 }finally{await browser.close();await fixture.close();}

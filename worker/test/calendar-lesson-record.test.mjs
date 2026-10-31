@@ -1,11 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {CALENDAR_RECORD_START,CALENDAR_RECORD_END,parseCalendarRecord,parsePlainCalendarRecord,replaceCalendarRecord,calendarRecordValues} from '../../shared/calendar-lesson-record.mjs';
-import {planCalendarRecordMigration,planCalendarTemplateInitialization,calendarRecordPrivacy,applyCalendarRecordMigration,reconcileCalendarRecordMigration} from '../src/calendar-lesson-migration.js';
+import {CALENDAR_RECORD_START,CALENDAR_RECORD_END,parseCalendarRecord,parsePlainCalendarRecord,plainCalendarRecordLayout,replaceCalendarRecord,calendarRecordValues} from '../../shared/calendar-lesson-record.mjs';
+import {planCalendarRecordTagRemoval,planCalendarRecordMigration,planCalendarTemplateInitialization,calendarRecordPrivacy,applyCalendarRecordMigration,reconcileCalendarRecordMigration} from '../src/calendar-lesson-migration.js';
 const binding={calendar_id:'synthetic',event_id:'instance_20261020T010000Z',title:'合成生徒',generation:0};
 const row={calendar_event_id:binding.event_id,record_exists:1,record_calendar_id:binding.calendar_id,record_title:binding.title,record_revision:4,record_generation:0,lesson_plan:'予定',confirmation_test:'テスト',homework:'宿題',lesson_memo:'メモ'};
 const event={id:binding.event_id,calendar_id:'synthetic',summary:binding.title,etag:'"before"',organizer:{self:true},start:{dateTime:'2026-10-20T10:00:00+09:00'},end:{dateTime:'2026-10-20T11:00:00+09:00'},recurringEventId:'series',originalStartTime:{dateTime:'2026-10-20T10:00:00+09:00'},description:'<b>既存案内</b>\nURL https://example.invalid'};
 const ownerEmail='owner@example.invalid',privacy={complete:true,calendar_id:'synthetic',accessRole:'owner',rules:[{role:'owner',scope:{type:'user',value:ownerEmail}}]};
+const parseVisible=description=>parseCalendarRecord(description)||parsePlainCalendarRecord(description,binding);
 const plan=(patch={})=>planCalendarRecordMigration({row,event,privacy,ownerEmail,...patch});
 test('four human-readable fields roundtrip, outside HTML bytes and trailing newlines are retained',()=>{
  const values={lesson_plan:'<script>alert(1)</script> & <b>語</b>\n宿題：\n\\slash\n'+CALENDAR_RECORD_START+'\n'+CALENDAR_RECORD_END+'\n',confirmation_test:'',homework:'a\n\nb\n',lesson_memo:'&lt;literal&gt;\n日本語'};
@@ -66,7 +67,7 @@ function adapters({failPatch,failReadAfter,alterRead,failReserve}={}){
 test('one conditional instance-only PATCH, durable full preimage before dispatch, re-fetch before verified',async()=>{
  const a=adapters(),result=await applyCalendarRecordMigration(plan(),a.deps);assert.equal(result.status,'verified');assert.equal(a.sent,1);assert.equal(a.reserved,1);
  assert.deepEqual(a.journal[0].snapshot.before,event);assert.deepEqual(a.journal.slice(1).map(e=>e.state),['dispatching','verified']);
- assert.deepEqual(parseCalendarRecord(a.journal.at(-1).proof.description).values,calendarRecordValues(row));
+ assert.deepEqual(parseVisible(a.journal.at(-1).proof.description).values,calendarRecordValues(row));
 });
 for(const code of [412,403,500,undefined])test('PATCH failure does not auto retry: '+code,async()=>{
  const a=adapters({failPatch:Object.assign(Error('failed'),{status:code})});
@@ -98,7 +99,7 @@ test('explicit next-instance initialization has four inline empty headings, neve
   const p=planCalendarTemplateInitialization({...input,event:{...event,description}});assert.equal(p.status,'ready');
   const visible=p.after_description.replace(/<!--[\s\S]*?-->\n?/g,'').trim();
   assert.equal(visible,'授業予定：\n確認テスト：\n宿題：\n授業メモ：');
-  assert.deepEqual(parseCalendarRecord(p.after_description).values,calendarRecordValues({}));
+  assert.deepEqual(parseVisible(p.after_description).values,calendarRecordValues({}));
   assert.equal(planCalendarTemplateInitialization({...input,event:{...event,description:p.after_description}}).status,'not_empty');
  }
  assert.equal(planCalendarTemplateInitialization({...input,row}).reason,'db_content_requires_migration');
@@ -108,9 +109,22 @@ test('explicit next-instance initialization has four inline empty headings, neve
 });
 
 test('explicit unmanaged replacement preserves preimage and refuses managed, unverified and stale content',async()=>{
- const replacement=plan({replaceExistingDescription:true});assert.equal(replacement.mode,'replace_unmanaged_description');assert.equal(replacement.before_description,event.description);assert.equal(parseCalendarRecord(replacement.after_description).start,0);assert.ok(plan().after_description.startsWith(event.description));
+ const replacement=plan({replaceExistingDescription:true});assert.equal(replacement.mode,'replace_unmanaged_description');assert.equal(replacement.before_description,event.description);assert.equal(parseVisible(replacement.after_description).start,0);assert.ok(plan().after_description.startsWith(event.description));
  for(const description of ['', '  ',replaceCalendarRecord('',row,binding),CALENDAR_RECORD_START])assert.equal(plan({replaceExistingDescription:true,event:{...event,description}}).status,'held');
  assert.equal(plan({replaceExistingDescription:true,row:{...row,record_title:null}}).status,'held');assert.equal(plan({replaceExistingDescription:true,privacy:null}).status,'held');
  const a=adapters();assert.equal((await applyCalendarRecordMigration(replacement,a.deps)).status,'verified');assert.equal(a.sent,1);assert.equal(a.journal[0].snapshot.before.description,event.description);assert.equal(a.journal[0].snapshot.mode,'replace_unmanaged_description');
  const stale=adapters({alterRead:e=>({...e,description:'concurrent edit'})});await assert.rejects(applyCalendarRecordMigration(replacement,stale.deps));assert.equal(stale.sent,0);assert.equal(stale.reserved,0);
+});
+
+test('tag cleanup preserves separate-instance identity, live values, surrounding notes and DB-only generation',async()=>{
+ const description=replaceCalendarRecord('<b>outside prefix</b>\n',{...row,lesson_plan:'Native change'},binding)+'\n<i>outside suffix</i>',stored={...row,record_calendar_managed:true,record_calendar_suffix:'\n<i>outside suffix</i>'},tagEvent={...event,description};
+ const cleanup=planCalendarRecordTagRemoval({row:stored,event:tagEvent,privacy,ownerEmail});assert.equal(cleanup.mode,'remove_management_tags');assert.equal(cleanup.values.lesson_plan,'Native change');assert.ok(cleanup.after_description.startsWith('<b>outside prefix</b>\n'));assert.ok(cleanup.after_description.endsWith('\n<i>outside suffix</i>'));assert.equal(cleanup.after_description.includes('<!--'),false);
+ const a=adapters({alterRead:(e,sent)=>sent?e:tagEvent});a.deps.readRecord=async()=>stored;assert.equal((await applyCalendarRecordMigration(cleanup,a.deps)).status,'verified');assert.equal(a.sent,1);assert.equal(a.journal[0].snapshot.binding.generation,0);assert.equal(a.journal[0].snapshot.format,'plain_v2');assert.equal(a.journal[0].snapshot.before.description,description);
+ for(const patch of [{row},{event:{...tagEvent,id:'series'}},{event:{...tagEvent,summary:'Another student'}},{privacy:null}])assert.equal(planCalendarRecordTagRemoval({row:stored,event:tagEvent,privacy,ownerEmail,...patch}).status,'held');
+});
+
+test('plain layout keeps byte-exact outside headings and suffix while body roundtrips without management comments',()=>{
+ const prefix='宿題：outside note\n',suffix='\n授業メモ：outside suffix',values={lesson_plan:'<b>literal</b> & two\n授業予定：escaped line',confirmation_test:'',homework:'',lesson_memo:''};
+ const legacy=replaceCalendarRecord('',values,binding),parsed=parseCalendarRecord(legacy),description=prefix+legacy+suffix,layout=plainCalendarRecordLayout(description,values,binding,{parsed:{...parsed,start:prefix.length,end:prefix.length+legacy.length}});
+ assert.equal(layout.managed_prefix,prefix);assert.equal(layout.managed_suffix,suffix);assert.equal(layout.after_description.includes('<!--'),false);assert.deepEqual(parsePlainCalendarRecord(layout.after_description,binding,{prefix,suffix}).values,values);assert.throws(()=>parsePlainCalendarRecord(layout.after_description+'changed',binding,{prefix,suffix}));
 });

@@ -1,6 +1,6 @@
 import {lessonDate,lessonTitleKey,attributedLessonRecord,lessonRecordHasContent} from '../../shared/lesson-attribution.js';
 import {lessonEventRef,isScheduledLesson,sameLessonEvent} from '../../shared/lesson-plan.js';
-import {CALENDAR_RECORD_FROM,calendarRecordValues,parseCalendarRecord,replaceCalendarRecord,sameCalendarRecordBinding} from '../../shared/calendar-lesson-record.mjs';
+import {CALENDAR_RECORD_FROM,calendarRecordValues,parseCalendarRecord,parsePlainCalendarRecord,plainCalendarRecordLayout,sameCalendarRecordBinding} from '../../shared/calendar-lesson-record.mjs';
 
 const problem=(code,message,status=409)=>Object.assign(new Error(message),{status,code});
 const block=(reason)=>({status:'held',reason});
@@ -46,17 +46,37 @@ export function planCalendarRecordMigration({row,event,privacy,ownerEmail,collis
  const privacyResult=calendarRecordPrivacy(event,privacy,ownerEmail);if(privacyResult.status!=='safe')return privacyResult;
  const binding=recordBinding(row,ref),description=event.description||'';
  try{
-  const parsed=parseCalendarRecord(description);
+  const parsed=parseCalendarRecord(description)||(row.record_calendar_managed?parsePlainCalendarRecord(description,binding,{prefix:row.record_calendar_prefix||'',suffix:row.record_calendar_suffix||'',allowPrefixEdit:true}):null);
   if(replaceExistingDescription){
    if(parsed)return block('managed_description_requires_editor');
    if(!description.trim())return block('replacement_description_is_empty');
-   return {status:'ready',mode:'replace_unmanaged_description',ref,binding,record_revision:row.record_revision,before_description:description,after_description:replaceCalendarRecord('',row,binding),values:calendarRecordValues(row)};
+   return {status:'ready',mode:'replace_unmanaged_description',ref,binding,record_revision:row.record_revision,before_description:description,...plainCalendarRecordLayout('',row,binding),values:calendarRecordValues(row)};
   }
   if(parsed&&!sameCalendarRecordBinding(binding,parsed.binding))return block('managed_binding_conflict');
   if(parsed&&!equalValues(parsed.values,row))return block('calendar_db_content_conflict');
   if(parsed)return {status:'already_present',ref,binding,record_revision:row.record_revision,description};
   if(!lessonRecordHasContent(row)||!Object.values(calendarRecordValues(row)).some(value=>value.trim()))return {status:'empty',reason:'no_text_to_export'};
-  return {status:'ready',ref,binding,record_revision:row.record_revision,before_description:description,after_description:replaceCalendarRecord(description,row,binding),values:calendarRecordValues(row)};
+  return {status:'ready',ref,binding,record_revision:row.record_revision,before_description:description,...plainCalendarRecordLayout(description,row,binding),values:calendarRecordValues(row)};
+ }catch(error){return block(error.code||'description_conflict');}
+}
+
+// Formatting-only migration of an already verified individual record. Calendar
+// values are authoritative; D1 lesson text and revision are never rewritten.
+export function planCalendarRecordTagRemoval({row,event,privacy,ownerEmail,excluded=[]}){
+ if(!event)return block('event_missing');
+ const ref=lessonEventRef(event,event.calendar_id),date=lessonDate(ref);
+ if(!date||date<CALENDAR_RECORD_FROM)return {status:'historical',reason:'before_cutoff'};
+ if(!isScheduledLesson(ref,excluded)||event.recurrence||event.id===event.recurringEventId)return block('not_individual_lesson');
+ if(!event.etag)return block('etag_missing');
+ if(!row.record_calendar_managed||row.record_pending_operation||attributedLessonRecord(row,ref).attribution_status!=='confirmed')return block('verified_storage_required');
+ const safety=calendarRecordPrivacy(event,privacy,ownerEmail);if(safety.status!=='safe')return safety;
+ const binding=recordBinding(row,ref),description=event.description||'';
+ try{
+  const parsed=parseCalendarRecord(description)||parsePlainCalendarRecord(description,binding,{prefix:row.record_calendar_prefix||'',suffix:row.record_calendar_suffix||'',allowPrefixEdit:true});
+  if(!parsed||!sameCalendarRecordBinding(parsed.binding,binding))return block('managed_binding_conflict');
+  const layout=plainCalendarRecordLayout(description,parsed.values,binding,{parsed});
+  if(layout.after_description===description)return {status:'already_present',ref,binding,record_revision:row.record_revision,description};
+  return {status:'ready',mode:'remove_management_tags',ref,binding,record_revision:row.record_revision,before_description:description,...layout,values:parsed.values};
  }catch(error){return block(error.code||'description_conflict');}
 }
 
@@ -77,7 +97,7 @@ export function planCalendarTemplateInitialization({row,event,privacy,ownerEmail
  if(!Number.isSafeInteger(row.record_revision)||!Number.isSafeInteger(row.record_generation))return block('record_version_missing');
  const safety=calendarRecordPrivacy(event,privacy,ownerEmail);if(safety.status!=='safe')return safety;
  const binding=recordBinding(row,ref),values=calendarRecordValues({}),description=event.description||'';
- return {status:'ready',mode:'initialize_template',ref,binding,record_revision:row.record_revision,before_description:description,after_description:replaceCalendarRecord(description,values,binding),values};
+ return {status:'ready',mode:'initialize_template',ref,binding,record_revision:row.record_revision,before_description:description,...plainCalendarRecordLayout(description,values,binding),values};
 }
 
 // The journal adapter must durably and atomically reserve expected record
@@ -88,10 +108,10 @@ export async function applyCalendarRecordMigration(plan,{read,privacy,ownerEmail
  const before=await read(plan.ref.calendar_id,plan.ref.id);
  if(!before||!sameLessonEvent(lessonEventRef(before,plan.ref.calendar_id),plan.ref)||String(before.description||'')!==plan.before_description)throw problem('MIGRATION_SNAPSHOT_CHANGED','予定がdry run後に変更されました');
  const row=await readRecord(plan.ref.id);
- const planner=plan.mode==='initialize_template'?planCalendarTemplateInitialization:planCalendarRecordMigration;
+ const planner=plan.mode==='initialize_template'?planCalendarTemplateInitialization:plan.mode==='remove_management_tags'?planCalendarRecordTagRemoval:planCalendarRecordMigration;
  const checked=planner({row,event:{...before,calendar_id:plan.ref.calendar_id},privacy:await privacy(plan.ref.calendar_id),ownerEmail,replaceExistingDescription:plan.mode==='replace_unmanaged_description'});
- if(checked.status!=='ready'||checked.record_revision!==plan.record_revision||checked.after_description!==plan.after_description)throw problem('MIGRATION_PREFLIGHT_CHANGED','転記前の対応・共有範囲・記録が変更されました');
- const operation=await reserve({ref:plan.ref,binding:plan.binding,revision:plan.record_revision,before:structuredClone(before),after_description:plan.after_description,...(plan.mode?{mode:plan.mode}:{})});
+ if(checked.status!=='ready'||checked.record_revision!==plan.record_revision||checked.after_description!==plan.after_description||checked.format!==plan.format||checked.managed_prefix!==plan.managed_prefix||checked.managed_suffix!==plan.managed_suffix)throw problem('MIGRATION_PREFLIGHT_CHANGED','転記前の対応・共有範囲・記録が変更されました');
+ const operation=await reserve({ref:plan.ref,binding:plan.binding,revision:plan.record_revision,before:structuredClone(before),after_description:plan.after_description,format:plan.format,managed_prefix:plan.managed_prefix,managed_suffix:plan.managed_suffix,...(plan.mode?{mode:plan.mode}:{})});
  if(!operation?.id)throw problem('MIGRATION_JOURNAL_REQUIRED','復元可能な転記履歴の予約が必要です');
  await mark(operation.id,'dispatching');
  try{

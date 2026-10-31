@@ -1,7 +1,7 @@
 import {watchAuth,getSessionToken} from '../shared/auth.js?v=12';
 import {sameLessonEvent,lessonEventRef} from '../shared/lesson-plan.js';
 import {parseCalendarRecord} from '../shared/calendar-lesson-record.mjs';
-const $=id=>document.getElementById(id),records=[];let authenticated=false,busy=false,downloaded=false,scanned=false,baselineReady=false;
+const $=id=>document.getElementById(id),records=[];let authenticated=false,busy=false,downloaded=false,scanned=false,baselineReady=false,scanMode='migration';
 const status=text=>{$('status').textContent=text;};
 async function api(path,body,method=body?'POST':'GET'){
  const token=getSessionToken();if(!authenticated||!token)throw Error('既存の本人ログインが必要です');
@@ -9,28 +9,29 @@ async function api(path,body,method=body?'POST':'GET'){
  const value=await response.json();if(!response.ok){const error=Error(value.error||'取得・保存できません ('+response.status+')');error.code=value.code;throw error;}return value;
 }
 const call=(path,body)=>api('/calendar-lesson-migration/'+path,body);
-const confirmable=r=>r.state==='held'&&['attribution_legacy_unverified','attribution_legacy_historical','attribution_title_changed'].includes(r.reason)&&r.preview&&!(r.preview.event_before.description||'').trim()&&!r.confirmationSent;
-const replaceable=r=>{if(r.state!=='held'||!['attribution_legacy_unverified','attribution_legacy_historical','attribution_title_changed','existing_description'].includes(r.reason)||!r.preview||r.confirmationSent||!(r.preview.event_before.description||'').trim())return false;try{return !parseCalendarRecord(r.preview.event_before.description);}catch{return false;}};
-async function refresh(r){r.preview=await call('preview',{event_id:r.event_id,...(r.replaceRequested?{replace_unmanaged_description:true,expected_description:r.replacement_before_description}:{})});r.state=r.preview.plan.status;r.reason=r.preview.plan.reason;if(r.state==='ready'&&(r.preview.event_before.description||'').trim()&&r.preview.plan.mode!=='replace_unmanaged_description'){r.state='held';r.reason='existing_description';}}
+const confirmable=r=>scanMode==='migration'&&r.state==='held'&&['attribution_legacy_unverified','attribution_legacy_historical','attribution_title_changed'].includes(r.reason)&&r.preview&&!(r.preview.event_before.description||'').trim()&&!r.confirmationSent;
+const replaceable=r=>{if(scanMode!=='migration'||r.state!=='held'||!['attribution_legacy_unverified','attribution_legacy_historical','attribution_title_changed','existing_description'].includes(r.reason)||!r.preview||r.confirmationSent||!(r.preview.event_before.description||'').trim())return false;try{return !parseCalendarRecord(r.preview.event_before.description);}catch{return false;}};
+async function refresh(r){r.preview=await call('preview',{event_id:r.event_id,...(scanMode==='remove_management_tags'?{remove_management_tags:true}:{}),...(r.replaceRequested?{replace_unmanaged_description:true,expected_description:r.replacement_before_description}:{})});r.state=r.preview.plan.status;r.reason=r.preview.plan.reason;if(r.state==='ready'&&(r.preview.event_before.description||'').trim()&&!['replace_unmanaged_description','remove_management_tags'].includes(r.preview.plan.mode)){r.state='held';r.reason='existing_description';}}
 function render(){
- $('scan').disabled=!authenticated||busy||records.some(r=>r.dispatched||r.confirmationSent);$('download').disabled=!scanned||busy;
+ $('mode').disabled=busy||records.some(r=>r.dispatched||r.confirmationSent);$('scan').disabled=!authenticated||busy||records.some(r=>r.dispatched||r.confirmationSent);$('download').disabled=!scanned||busy;
  $('backup').disabled=!downloaded||busy;
  const counts={};for(const r of records)counts[r.state]=(counts[r.state]||0)+1;
  $('summary').textContent=Object.entries(counts).map(([k,n])=>k+': '+n+'件').join(' / ');
  $('items').replaceChildren(...records.map(r=>{const li=document.createElement('li'),text=document.createElement('span');text.textContent=(r.preview?.event_before?.summary||r.event_id)+' '+(r.preview?.event_before?.start?.dateTime||r.preview?.event_before?.start?.date||'')+' — '+r.state+(r.reason?' ('+r.reason+')':'');li.append(text);
   if(confirmable(r)){const button=document.createElement('button');button.textContent='この予定への帰属を確認する';button.disabled=busy||!baselineReady;button.addEventListener('click',()=>reviewAttribution(r));li.append(button);}
   if(replaceable(r)){const button=document.createElement('button');button.textContent='この1件の既存説明の置換を確認する';button.disabled=busy||!baselineReady;button.addEventListener('click',()=>reviewAttribution(r,true));li.append(button);}
-  if(r.state==='ready'){const button=document.createElement('button');button.textContent=r.preview.plan.mode==='replace_unmanaged_description'?'この1件の既存説明を置換する':'この1件を転記する';button.disabled=busy||!downloaded||!$('backup').checked||r.dispatched;button.addEventListener('click',()=>apply(r));li.append(button);}return li;}));
+  if(r.state==='ready'){const button=document.createElement('button');button.textContent=r.preview.plan.mode==='remove_management_tags'?'この1件の管理タグを除去する':r.preview.plan.mode==='replace_unmanaged_description'?'この1件の既存説明を置換する':'この1件を転記する';button.disabled=busy||!downloaded||!$('backup').checked||r.dispatched;button.addEventListener('click',()=>apply(r));li.append(button);}return li;}));
 }
+$('mode').addEventListener('change',()=>{if(busy)return;records.length=0;scanned=false;downloaded=false;baselineReady=false;$('backup').checked=false;render();status('処理内容を選びました。対象を再取得してください。');});
 $('scan').addEventListener('click',async()=>{
- if(busy)return;busy=true;scanned=false;downloaded=false;baselineReady=false;$('backup').checked=false;records.length=0;render();status('予定とDBの対応を確認しています。書き込みは行いません。');
+ if(busy)return;scanMode=$('mode').value;busy=true;scanned=false;downloaded=false;baselineReady=false;$('backup').checked=false;records.length=0;render();status('予定とDBの対応を確認しています。書き込みは行いません。');
  try{let cursor='',done=false;const seen=new Set();while(!done){const page=await call('records?cursor='+encodeURIComponent(cursor));if(!Array.isArray(page.items))throw Error('対象一覧の形式を確認できません');for(const item of page.items){if(typeof item.calendar_event_id!=='string'||seen.has(item.calendar_event_id))throw Error('対象一覧の重複を確認してください');seen.add(item.calendar_event_id);records.push({event_id:item.calendar_event_id,state:'pending'});}done=page.done===true;if(!done&&(!page.next_cursor||page.next_cursor===cursor))throw Error('一覧の続きが確認できません');cursor=page.next_cursor;}
   for(const r of records){try{await refresh(r);}catch(e){r.state='held';r.reason=e.message;}render();}
   scanned=true;status('確認が完了しました。確認データを非公開で保存してから、転記可能な予定を1件ずつ処理してください。');
  }catch(e){status(e.message);}finally{busy=false;render();}
 });
 $('download').addEventListener('click',()=>{
- if(!scanned||busy)return;const blob=new Blob([JSON.stringify({format:1,cutoff:'2026-10-20T00:00:00+09:00',captured_at:new Date().toISOString(),records},null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='works-calendar-private-snapshot.json';a.click();URL.revokeObjectURL(url);downloaded=true;render();
+ if(!scanned||busy)return;const blob=new Blob([JSON.stringify({format:1,mode:scanMode,cutoff:'2026-10-20T00:00:00+09:00',captured_at:new Date().toISOString(),records},null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='works-calendar-private-snapshot.json';a.click();URL.revokeObjectURL(url);downloaded=true;render();
 });
 $('backup').addEventListener('change',()=>{if(downloaded)baselineReady=$('backup').checked;render();});
 

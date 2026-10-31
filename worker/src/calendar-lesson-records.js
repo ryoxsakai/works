@@ -1,4 +1,4 @@
-import {parseCalendarRecord,parsePlainCalendarRecord,replaceCalendarRecord,calendarRecordValues,CALENDAR_RECORD_FROM,CALENDAR_RECORD_START,CALENDAR_RECORD_END} from '../../shared/calendar-lesson-record.mjs';
+import {parseCalendarRecord,parsePlainCalendarRecord,plainCalendarRecordLayout,calendarRecordValues,CALENDAR_RECORD_FROM,CALENDAR_RECORD_START,CALENDAR_RECORD_END} from '../../shared/calendar-lesson-record.mjs';
 import {lessonDate,lessonRecordNeedsReview,lessonTitleKey} from '../../shared/lesson-attribution.js';
 import {lessonEventRef,sameLessonEvent,isScheduledLesson} from '../../shared/lesson-plan.js';
 import {rawRecord,requireCurrent,prepareRecordWrite,commitRecords,readCommittedRecord} from './lesson-attribution.js';
@@ -12,8 +12,10 @@ export function calendarStorageState(row,ref,operation){
  if(!operation)return row;
  if(operation.status!=='verified')return {...row,record_pending_operation:true,record_target_unavailable:true,attribution_status:'target_unavailable',...calendarRecordValues({})};
  try{const snapshot=JSON.parse(operation.snapshot_json),binding={...snapshot.binding,title:lessonTitleKey(snapshot.ref.title),generation:snapshot.after_generation??snapshot.binding.generation};
-  const previous=parseCalendarRecord(snapshot.after_description),suffix=previous?snapshot.after_description.slice(previous.end):'';
-  return JSON.stringify(binding)===JSON.stringify(recordBinding(row,ref))?{...row,record_calendar_managed:true,record_calendar_suffix:suffix}:row;
+  const previous=parseCalendarRecord(snapshot.after_description),plain=snapshot.format==='plain_v2';
+  if(plain&&(typeof snapshot.managed_prefix!=='string'||typeof snapshot.managed_suffix!=='string'||!parsePlainCalendarRecord(snapshot.after_description,binding,{prefix:snapshot.managed_prefix,suffix:snapshot.managed_suffix})))throw fail('保存範囲を確認できません');
+  const suffix=plain?snapshot.managed_suffix:previous?snapshot.after_description.slice(previous.end):'';
+  return JSON.stringify(binding)===JSON.stringify(recordBinding(row,ref))?{...row,record_calendar_managed:true,record_calendar_suffix:suffix,...(plain?{record_calendar_prefix:snapshot.managed_prefix}:{})}:row;
  }catch{return {...row,record_target_unavailable:true,attribution_status:'target_unavailable',...calendarRecordValues({})};}
 }
 export async function loadCalendarStorageState(env,row,ref){
@@ -26,7 +28,7 @@ export async function previousCalendarLessonRecord(env,row,event){
  if(!calendarRecordsEnabled(env)||!event)return row;
  const ref={...lessonEventRef(event),calendar_id:row.record_calendar_id||row.record_observed_calendar_id||event.calendar_id,title:row.record_title||row.record_observed_title||event.summary||''};
  const annotated=await loadCalendarStorageState(env,row,ref);
- try{const binding=recordBinding(row,ref),parsed=parseCalendarRecord(event.description||'')||(annotated.record_calendar_managed?parsePlainCalendarRecord(event.description||'',binding,{suffix:annotated.record_calendar_suffix||''}):null);
+ try{const binding=recordBinding(row,ref),parsed=parseCalendarRecord(event.description||'')||(annotated.record_calendar_managed?parsePlainCalendarRecord(event.description||'',binding,{prefix:annotated.record_calendar_prefix||'',suffix:annotated.record_calendar_suffix||'',allowPrefixEdit:true}):null);
   return parsed&&JSON.stringify(parsed.binding)===JSON.stringify(binding)?{...row,...parsed.values}:row;
  }catch{return row;}
 }
@@ -34,7 +36,7 @@ export function overlayCalendarLessonRecord(env,row,event){
  if(!calendarRecordEligible(env,event)&&!row.record_calendar_managed)return row;
  if(lessonRecordNeedsReview(row))return row;
  try{
-  const parsed=parseCalendarRecord(event.description||'')||(row.record_calendar_managed?parsePlainCalendarRecord(event.description||'',recordBinding(row,lessonEventRef(event)),{suffix:row.record_calendar_suffix||''}):null);
+  const parsed=parseCalendarRecord(event.description||'')||(row.record_calendar_managed?parsePlainCalendarRecord(event.description||'',recordBinding(row,lessonEventRef(event)),{prefix:row.record_calendar_prefix||'',suffix:row.record_calendar_suffix||'',allowPrefixEdit:true}):null);
   if(!parsed)return row.record_calendar_managed?{...row,...calendarRecordValues({}),record_storage:'calendar_missing_fields'}:{...row,record_storage:'db_pending_migration'};
   const ref=lessonEventRef(event),binding=recordBinding(row,ref);
   if(JSON.stringify(parsed.binding)!==JSON.stringify(binding))throw fail('カレンダー説明欄の授業対応が変更されています');
@@ -66,7 +68,7 @@ export async function writeCalendarLessonRecord(env,{target,patch,recordRevision
   if(initializeOnly)return {...shown,target:ref,initialized:false};
   const prepared=await prepareRecordWrite(env,ref,patch,row.record_revision);await commitRecords(env,prepared.statements);return {...await readCommittedRecord(env,ref,prepared),target:ref};
  }
- const parsed=parseCalendarRecord(event.description||'')||(current.record_calendar_managed?parsePlainCalendarRecord(event.description||'',recordBinding(row,oldRef),{suffix:current.record_calendar_suffix||''}):null);
+ const parsed=parseCalendarRecord(event.description||'')||(current.record_calendar_managed?parsePlainCalendarRecord(event.description||'',recordBinding(row,oldRef),{prefix:current.record_calendar_prefix||'',suffix:current.record_calendar_suffix||'',allowPrefixEdit:true}):null);
  if(!decision&&!initializeOnly&&!parsed&&!['new','confirmed'].includes(current.attribution_status)){
   // Unverified legacy content is held from NEW Calendar disclosure, not from
   // its existing guarded DB workflow. Never silently mark it verified/export it.
@@ -83,9 +85,8 @@ export async function writeCalendarLessonRecord(env,{target,patch,recordRevision
  const recordAfter={...values,...(patch.completed===undefined?{}:{completed:patch.completed})};
  const prepared=decision?{generation:row.record_generation+1}:await prepareRecordWrite(env,ref,recordAfter,row.record_revision);
  const nextBinding={...recordBinding(row,ref),generation:prepared.generation};
- const prefix=parsed?.plain?(event.description||'').slice(0,parsed.start):'';
- const after=parsed?.plain?prefix+(prefix&&!prefix.endsWith('\n')?'\n':'')+replaceCalendarRecord('',values,nextBinding)+(event.description||'').slice(parsed.end):replaceCalendarRecord(event.description||'',values,nextBinding,{explicitRebind:!!decision});
- const op=await journal.reserve({ref,binding:recordBinding(row,ref),after_generation:prepared.generation,decision,revision:row.record_revision,before:event,record_before:row,after_description:after,record_after:recordAfter});
+ const layout=plainCalendarRecordLayout(event.description||'',values,nextBinding,{parsed,explicitRebind:!!decision}),after=layout.after_description;
+ const op=await journal.reserve({ref,binding:recordBinding(row,ref),after_generation:prepared.generation,decision,revision:row.record_revision,before:event,record_before:row,...layout,record_after:recordAfter});
  // Re-read the event AND privacy after the durable reservation, immediately
  // before dispatch. Never rely on a stale dry-run assertion supplied by a client.
  let latest,privacy;

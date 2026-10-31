@@ -1,6 +1,10 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {readFile} from 'node:fs/promises';import {Miniflare} from 'miniflare';
 import {ensureAttribution,rawRecord} from '../src/lesson-attribution.js';
-import {replaceCalendarRecord,parseCalendarRecord} from '../../shared/calendar-lesson-record.mjs';
+import {replaceCalendarRecord,parseCalendarRecord,parsePlainCalendarRecord} from '../../shared/calendar-lesson-record.mjs';
+import {calendarLessonJournal} from '../src/calendar-lesson-journal.js';
+import {lessonEventRef} from '../../shared/lesson-plan.js';
+import {recordBinding} from '../src/calendar-lesson-migration.js';
+const parseVisible=description=>parseCalendarRecord(description)||parsePlainCalendarRecord(description,{calendar_id:'synthetic-calendar',event_id:'b',title:'合成生徒',generation:0});
 const origin='https://works.example.test',owner='owner@example.invalid';
 async function token(secret,claims={}){const payload=Buffer.from(JSON.stringify({email:owner,exp:Date.now()+86400000,...claims})).toString('base64url');const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(secret),{name:'HMAC',hash:'SHA-256'},false,['sign']);return payload+'.'+Buffer.from(await crypto.subtle.sign('HMAC',key,new TextEncoder().encode(payload))).toString('base64url');}
 async function setup(t,{backup=false}={}){
@@ -42,14 +46,14 @@ test('actual Worker: current/next/MCP read Calendar without initialization, repe
  const schedule=await (await call('/api/schedule?date=2026-10-31',null,{'X-API-Key':'synthetic-key'})).json();
  assert.equal(schedule.events.find(e=>e.id==='b').lesson_plan,'Calendar native value');assert.equal(control.patches.length,0);
  const next=await (await call('/api/next-lesson-plan?calendar_id=synthetic-calendar&event_id=b')).json();assert.equal(next.target.id,'c');assert.equal(next.template_initialization_available,true);assert.equal(control.patches.length,0);
- const init=await call('/api/next-lesson-plan/initialize',{source:next.source,target:next.target});assert.equal(init.status,200,JSON.stringify(await init.clone().json()));assert.equal(parseCalendarRecord(events[2].description).values.lesson_plan,'');
+ const init=await call('/api/next-lesson-plan/initialize',{source:next.source,target:next.target});assert.equal(init.status,200,JSON.stringify(await init.clone().json()));assert.equal(parseVisible(events[2].description).values.lesson_plan,'');assert.equal(events[2].description,'授業予定：\n確認テスト：\n宿題：\n授業メモ：');
  const again=await (await call('/api/next-lesson-plan?calendar_id=synthetic-calendar&event_id=b')).json();assert.equal(again.template_initialization_available,false);assert.equal(control.patches.length,1);
  const emptySchedule=await (await call('/api/schedule?date=2026-11-07',null,{'X-API-Key':'synthetic-key'})).json();assert.equal(emptySchedule.events.find(e=>e.id==='c').lesson_plan,null);assert.equal(emptySchedule.events.find(e=>e.id==='c').homework,null);assert.equal(control.patches.length,1);
  for(const value of ['保存1\n二行目','保存2']){
   const saved=await put('/api/lesson-plan',{target:current.target,record_revision:current.record_revision,expected_lesson_plan:current.lesson_plan,lesson_plan:value});assert.equal(saved.status,200,JSON.stringify(await saved.clone().json()));
   const response=await saved.json();assert.equal(response.lesson_plan,value);assert.notEqual(response.target.etag,current.target.etag);current={...response};
  }
- assert.equal(parseCalendarRecord(events[1].description).values.homework,'original homework');
+ assert.equal(parseVisible(events[1].description).values.homework,'original homework');
  assert.equal((await rawRecord({DB},'b')).lesson_plan,'保存2');
  const snapshots=(await DB.prepare("SELECT snapshot_json FROM calendar_lesson_migration WHERE event_id='b' ORDER BY rowid").all()).results;
  assert.equal(JSON.parse(snapshots[0].snapshot_json).record_before.lesson_plan,'DB original');
@@ -71,7 +75,7 @@ test('actual Worker explicit separation archives old content and rebinds only th
  const held=await (await call('/api/lesson-plan?calendar_id=synthetic-calendar&event_id=b')).json();assert.equal(held.attribution_status,'title_changed');assert.equal(held.lesson_plan,'');
  const response=await put('/api/lesson-record',{target:held.target,record_revision:held.record_revision,decision:'separate'});assert.equal(response.status,200,JSON.stringify(await response.clone().json()));
  const fresh=await (await call('/api/lesson-plan?calendar_id=synthetic-calendar&event_id=b')).json();assert.equal(fresh.lesson_plan,'');assert.equal(fresh.attribution_status,'new');
- assert.equal(parseCalendarRecord(events[1].description).binding.title,'別の合成生徒');assert.equal(parseCalendarRecord(events[1].description).binding.generation,1);
+ assert.equal((await rawRecord({DB},'b')).record_title,'別の合成生徒');assert.equal((await rawRecord({DB},'b')).record_generation,1);assert.equal(events[1].description.includes('<!--'),false);
  const archive=await DB.prepare("SELECT snapshot_json FROM lesson_record_archive WHERE event_id='b'").first();assert.equal(JSON.parse(archive.snapshot_json).lesson_plan,'DB original');
  const backup=await DB.prepare("SELECT snapshot_json FROM calendar_lesson_migration WHERE event_id='b'").first();assert.equal(parseCalendarRecord(JSON.parse(backup.snapshot_json).before.description).values.lesson_plan,'Calendar native value');assert.equal(control.patches.length,1);
 });
@@ -95,7 +99,7 @@ test('protected migration preview is read-only; backup-gated instance apply is v
  const preview=await (await call('/api/calendar-lesson-migration/preview',{event_id:'b'})).json();assert.equal(preview.plan.status,'ready');assert.equal(preview.privacy.basis,'owner_attested');assert.equal(preview.privacy.rules,undefined);assert.equal(control.patches.length,0);
  const bad=await call('/api/calendar-lesson-migration/apply',{plan:{...preview.plan,after_description:'overwrite'}});assert.equal(bad.status,409);assert.equal(control.patches.length,0);
  const applied=await call('/api/calendar-lesson-migration/apply',{plan:preview.plan});assert.equal(applied.status,200,JSON.stringify(await applied.clone().json()));assert.equal((await applied.json()).status,'verified');assert.equal(control.patches.length,1);
- assert.equal((await rawRecord({DB},'b')).lesson_plan,'DB original');assert.ok(events[1].description.startsWith('既存の案内\n'));assert.equal(parseCalendarRecord(events[1].description).values.lesson_plan,'DB original');
+ assert.equal((await rawRecord({DB},'b')).lesson_plan,'DB original');assert.ok(events[1].description.startsWith('既存の案内\n'));assert.equal(parseVisible(events[1].description).values.lesson_plan,'DB original');
  const repeated=await call('/api/calendar-lesson-migration/apply',{plan:preview.plan});assert.equal(repeated.status,200,JSON.stringify(await repeated.clone().json()));assert.equal(control.patches.length,1);
 });
 test('no verified-backup configuration means zero migration PATCH calls',async t=>{
@@ -113,19 +117,19 @@ test('clearing a migrated Calendar description never resurrects the old DB shado
  const {events,call,put}=await setup(t);const read=async()=>(await (await call('/api/lesson-plan?calendar_id=synthetic-calendar&event_id=b')).json());
  let current=await read();await put('/api/lesson-plan',{target:current.target,record_revision:current.record_revision,expected_lesson_plan:current.lesson_plan,lesson_plan:'保存前の予定'});
  events[1].description='';events[1].etag='"user-cleared"';current=await read();assert.equal(current.lesson_plan,'');assert.equal(current.record_storage,'calendar_missing_fields');
- const response=await put('/api/lesson-plan',{target:current.target,record_revision:current.record_revision,expected_lesson_plan:'',lesson_plan:'消去後の予定'});assert.equal(response.status,200,JSON.stringify(await response.clone().json()));const values=parseCalendarRecord(events[1].description).values;assert.equal(values.lesson_plan,'消去後の予定');assert.equal(values.homework,'');assert.equal(values.confirmation_test,'');assert.equal(values.lesson_memo,'');
+ const response=await put('/api/lesson-plan',{target:current.target,record_revision:current.record_revision,expected_lesson_plan:'',lesson_plan:'消去後の予定'});assert.equal(response.status,200,JSON.stringify(await response.clone().json()));const values=parseVisible(events[1].description).values;assert.equal(values.lesson_plan,'消去後の予定');assert.equal(values.homework,'');assert.equal(values.confirmation_test,'');assert.equal(values.lesson_memo,'');
 });
 test('native Calendar four-line HTML survives comment removal, preserves outside text, and can explicitly separate a renamed student',async t=>{
  const {events,call,put}=await setup(t);const read=async()=>(await (await call('/api/lesson-plan?calendar_id=synthetic-calendar&event_id=b')).json());
  let current=await read();await put('/api/lesson-plan',{target:current.target,record_revision:current.record_revision,expected_lesson_plan:current.lesson_plan,lesson_plan:'managed'});
  events[1].description='<div>元の案内</div><div>授業予定：Calendarで直接変更</div><div>二行目</div><div>確認テスト：</div><div>宿題：native homework</div><div>授業メモ：</div>';events[1].etag='"native"';
  current=await read();assert.equal(current.lesson_plan,'Calendarで直接変更\n二行目');
- let response=await put('/api/lesson-plan',{target:current.target,record_revision:current.record_revision,expected_lesson_plan:current.lesson_plan,lesson_plan:'Worksへ往復'});assert.equal(response.status,200,JSON.stringify(await response.clone().json()));assert.ok(events[1].description.startsWith('<div>元の案内</div>'));assert.equal(parseCalendarRecord(events[1].description).values.homework,'native homework');
+ let response=await put('/api/lesson-plan',{target:current.target,record_revision:current.record_revision,expected_lesson_plan:current.lesson_plan,lesson_plan:'Worksへ往復'});assert.equal(response.status,200,JSON.stringify(await response.clone().json()));assert.ok(events[1].description.startsWith('<div>元の案内</div>'));assert.equal(parseVisible(events[1].description).values.homework,'native homework');
  // A subsequent native edit may remove comments again before a title replacement.
  events[1].description='授業予定：旧生徒の内容\n確認テスト：\n宿題：\n授業メモ：';events[1].summary='別生徒';events[1].etag='"renamed-native"';
  current=await read();assert.equal(current.lesson_plan,'');assert.equal(current.attribution_status,'title_changed');
  const review=await (await call('/api/lesson-record?calendar_id=synthetic-calendar&event_id=b')).json();assert.equal(review.previous_record.lesson_plan,'旧生徒の内容');assert.equal(review.record.lesson_plan,null);assert.equal(review.original_db_record.lesson_plan,'Worksへ往復');
- response=await put('/api/lesson-record',{target:current.target,record_revision:current.record_revision,decision:'separate'});assert.equal(response.status,200,JSON.stringify(await response.clone().json()));assert.equal(parseCalendarRecord(events[1].description).values.lesson_plan,'');
+ response=await put('/api/lesson-record',{target:current.target,record_revision:current.record_revision,decision:'separate'});assert.equal(response.status,200,JSON.stringify(await response.clone().json()));assert.equal(parseVisible(events[1].description).values.lesson_plan,'');
 });
 test('empty Calendar with existing next-lesson DB text stays readable and never advertises automatic initialization',async t=>{
  const {DB,events,control,call}=await setup(t);delete events[1].description;
@@ -171,7 +175,7 @@ test('individual replacement requires exact preimage, archives it, keeps origina
  const inherited=await put('/api/lesson-record',{target:review.target,record_revision:review.original_db_record.record_revision,decision:'inherit',unmanaged_only:true});assert.equal(inherited.status,200,await inherited.clone().text());assert.equal(control.patches.length,0);
  const preview=async expected_description=>call('/api/calendar-lesson-migration/preview',{event_id:'b',replace_unmanaged_description:true,expected_description});assert.equal((await preview('wrong')).status,409);
  const ordinary=await (await call('/api/calendar-lesson-migration/preview',{event_id:'b'})).json();assert.ok(ordinary.plan.after_description.startsWith(events[1].description));
- const response=await preview(events[1].description);assert.equal(response.status,200,await response.clone().text());const {plan}=await response.json();assert.equal(plan.mode,'replace_unmanaged_description');assert.equal(parseCalendarRecord(plan.after_description).start,0);
+ const response=await preview(events[1].description);assert.equal(response.status,200,await response.clone().text());const {plan}=await response.json();assert.equal(plan.mode,'replace_unmanaged_description');assert.equal(parseVisible(plan.after_description).start,0);
  events[1].etag='"changed"';assert.equal((await call('/api/calendar-lesson-migration/apply',{plan})).status,409);assert.equal(control.patches.length,0);events[1].etag=plan.ref.etag;
  const result=await call('/api/calendar-lesson-migration/apply',{plan});assert.equal(result.status,200,await result.clone().text());assert.equal(control.patches.length,1);assert.deepEqual(await DB.prepare("SELECT * FROM curriculum_entries WHERE calendar_event_id='b'").first(),source);
  const snapshot=JSON.parse(await DB.prepare("SELECT snapshot_json FROM calendar_lesson_migration WHERE event_id='b'").first('snapshot_json'));assert.equal(snapshot.before.description,'Original unmanaged note');assert.equal(snapshot.mode,'replace_unmanaged_description');assert.equal((await preview(events[1].description)).status,409);
@@ -179,4 +183,30 @@ test('individual replacement requires exact preimage, archives it, keeps origina
 });
 test('replacement refuses missing backup and concurrent text before dispatch',async t=>{
  const {events,control,call}=await setup(t);events[1].description='Unmanaged';const {plan}=await (await call('/api/calendar-lesson-migration/preview',{event_id:'b',replace_unmanaged_description:true,expected_description:'Unmanaged'})).json();assert.equal(plan.status,'ready');assert.equal((await call('/api/calendar-lesson-migration/apply',{plan})).status,503);assert.equal(control.patches.length,0);events[1].description='Changed';assert.equal((await call('/api/calendar-lesson-migration/apply',{plan})).status,409);assert.equal(control.patches.length,0);
+});
+
+async function legacyStorage(fixture){
+ const {DB,events,bindings}=fixture,row=await rawRecord({DB},'b'),ref=lessonEventRef(events[1],'synthetic-calendar'),journal=calendarLessonJournal({DB,...bindings});
+ const op=await journal.reserve({ref,binding:recordBinding(row,ref),revision:row.record_revision,before:{...events[1],description:''},after_description:events[1].description,record_before:row});await journal.mark(op.id,'dispatching');await journal.mark(op.id,'verified',{etag:events[1].etag,description:events[1].description});return op.id;
+}
+test('tag-only conversion preserves live Calendar values, outside notes, D1 originals and provenance, future saves stay plain',async t=>{
+ const f=await setup(t,{backup:true}),{DB,events,control,call,put}=f;
+ events[1].description+='\n<i>Outside suffix</i>';await legacyStorage(f);const source=await DB.prepare("SELECT * FROM curriculum_entries WHERE calendar_event_id='b'").first();
+ const response=await call('/api/calendar-lesson-migration/preview',{event_id:'b',remove_management_tags:true});assert.equal(response.status,200,await response.clone().text());const {plan}=await response.json();assert.equal(plan.mode,'remove_management_tags');assert.equal(plan.values.lesson_plan,'Calendar native value');assert.equal(plan.after_description,'既存の案内\n授業予定：Calendar native value\n確認テスト：original test\n宿題：original homework\n授業メモ：original memo\n<i>Outside suffix</i>');assert.equal(control.patches.length,0);
+ const applied=await call('/api/calendar-lesson-migration/apply',{plan});assert.equal(applied.status,200,await applied.clone().text());const result=await applied.json();assert.ok(result.operation_id);assert.equal(control.patches.length,1);assert.equal(events[1].description.includes('<!--'),false);assert.deepEqual(await DB.prepare("SELECT * FROM curriculum_entries WHERE calendar_event_id='b'").first(),source);
+ const archived=JSON.parse(await DB.prepare('SELECT snapshot_json FROM calendar_lesson_migration WHERE id=?').bind(result.operation_id).first('snapshot_json'));assert.ok(archived.before.description.includes('<!--binding:'));assert.equal(archived.format,'plain_v2');assert.equal(archived.managed_suffix,'\n<i>Outside suffix</i>');assert.equal(archived.binding.generation,0);
+ const current=await (await call('/api/lesson-plan?calendar_id=synthetic-calendar&event_id=b')).json();assert.equal(current.lesson_plan,'Calendar native value');
+ const schedule=await (await call('/api/schedule?date=2026-10-31',null,{'X-API-Key':'synthetic-key'})).json();assert.equal(schedule.events.find(x=>x.id==='b').lesson_plan,'Calendar native value');
+ const bearer=await token(f.bindings.SESSION_SECRET,{aud:'works-mcp',scope:'schedule:read'});const mcp=await (await call('/mcp',{jsonrpc:'2.0',id:1,method:'tools/call',params:{name:'get_schedule',arguments:{date:'2026-10-31'}}},{Authorization:'Bearer '+bearer,'Content-Type':'application/json'})).json();assert.equal(mcp.result.structuredContent.events.find(x=>x.id==='b').lesson_plan,'Calendar native value');
+ const again=await call('/api/calendar-lesson-migration/apply',{plan});assert.equal(again.status,200);assert.equal(control.patches.length,1);
+ const saved=await put('/api/lesson-plan',{target:current.target,record_revision:current.record_revision,expected_lesson_plan:current.lesson_plan,lesson_plan:'Next native text'});assert.equal(saved.status,200,await saved.clone().text());assert.equal(events[1].description.includes('<!--'),false);assert.ok(events[1].description.startsWith('既存の案内\n'));assert.ok(events[1].description.endsWith('\n<i>Outside suffix</i>'));assert.equal((await (await call('/api/lesson-plan?calendar_id=synthetic-calendar&event_id=b')).json()).lesson_plan,'Next native text');
+});
+test('tag removal refuses unverified ownership, stale instance without dispatch',async t=>{
+ const f=await setup(t,{backup:true}),{events,call,control}=f;
+ let response=await call('/api/calendar-lesson-migration/preview',{event_id:'b',remove_management_tags:true});assert.equal((await response.json()).plan.reason,'verified_storage_required');await legacyStorage(f);
+ const {plan}=await (await call('/api/calendar-lesson-migration/preview',{event_id:'b',remove_management_tags:true})).json();events[1].etag='"concurrent"';response=await call('/api/calendar-lesson-migration/apply',{plan});assert.equal(response.status,409);assert.equal(control.patches.length,0);
+});
+test('tag conversion lost response stays locked and reconciles without another Calendar write',async t=>{
+ const f=await setup(t,{backup:true}),{DB,control,call,events}=f;await legacyStorage(f);const source=await DB.prepare("SELECT * FROM curriculum_entries WHERE calendar_event_id='b'").first();const {plan}=await (await call('/api/calendar-lesson-migration/preview',{event_id:'b',remove_management_tags:true})).json();control.lost=true;assert.equal((await call('/api/calendar-lesson-migration/apply',{plan})).status,503);assert.equal(control.patches.length,1);assert.equal(events[1].description.includes('<!--'),false);
+ assert.equal((await call('/api/calendar-lesson-migration/apply',{plan})).status,409);assert.equal(control.patches.length,1);control.lost=false;const reconciled=await call('/api/calendar-lesson-record/reconcile',{target:{calendar_id:'synthetic-calendar',id:'b'}});assert.equal(reconciled.status,200,await reconciled.clone().text());assert.equal(control.patches.length,1);assert.deepEqual(await DB.prepare("SELECT * FROM curriculum_entries WHERE calendar_event_id='b'").first(),source);
 });

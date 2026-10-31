@@ -7,7 +7,7 @@ import { ensureRefreshSchema, issueRefreshGrant, readRefreshFamily, rotateRefres
 import {calendarRecordsEnabled,calendarRecordEligible,overlayCalendarLessonRecord,writeCalendarLessonRecord,reconcileCalendarLessonRecord,calendarStorageState,loadCalendarStorageState,previousCalendarLessonRecord} from "./calendar-lesson-records.js";
 import {calendarLessonGoogle} from "./calendar-lesson-google.js";
 import {calendarLessonJournal} from "./calendar-lesson-journal.js";
-import {planCalendarRecordMigration,applyCalendarRecordMigration} from "./calendar-lesson-migration.js";
+import {planCalendarRecordMigration,planCalendarRecordTagRemoval,applyCalendarRecordMigration} from "./calendar-lesson-migration.js";
 
 // Best-effort per-isolate protection: Cloudflare client IP only, no credentials.
 const authBuckets = new Map();
@@ -6304,6 +6304,7 @@ export default {
       }
 
       if(url.pathname.startsWith('/api/calendar-lesson-migration/')){
+        const {lessonEventRef}=await import('../../shared/lesson-plan.js');
         if(browserSession.aud||browserSession.scope||browserSession.fid)throw httpError(401,'browser session required');
         if(url.pathname==='/api/calendar-lesson-migration/records'&&request.method==='GET'){
           const cursor=url.searchParams.get('cursor')||'';
@@ -6327,7 +6328,9 @@ export default {
           if(prior)throw httpError(409,'管理済み・処理中の説明は授業画面で確認してください');
         }
         const privacy=await google.privacy(resolved.calendar_id).catch(error=>({calendar_id:resolved.calendar_id,complete:false,error_code:error.code||'SHARING_UNAVAILABLE'}));
-        const settings=await readSettings(env),plan=planCalendarRecordMigration({row,event,privacy,ownerEmail:env.ALLOWED_EMAIL,excluded:settings.excluded_titles||[],replaceExistingDescription});
+        const removeTags=url.pathname==='/api/calendar-lesson-migration/apply'?body.plan?.mode==='remove_management_tags':body.remove_management_tags===true;
+        if(removeTags&&replaceExistingDescription)throw httpError(400,'処理方法を1つ指定してください');
+        const settings=await readSettings(env),stored=await loadCalendarStorageState(env,row,lessonEventRef(event,resolved.calendar_id)),planner=removeTags?planCalendarRecordTagRemoval:planCalendarRecordMigration,plan=planner({row:stored,event,privacy,ownerEmail:env.ALLOWED_EMAIL,excluded:settings.excluded_titles||[],replaceExistingDescription});
         if(url.pathname==='/api/calendar-lesson-migration/preview')return json({event_id:eventId,calendar_id:resolved.calendar_id,record_before:row,event_before:event,privacy,plan},{...headers,'Cache-Control':'no-store'});
         if(url.pathname==='/api/calendar-lesson-migration/apply'){
           const captured=Date.parse(env.CALENDAR_LESSON_BACKUP_CAPTURED_AT||'');
@@ -6335,7 +6338,7 @@ export default {
           if(plan.status==='already_present'&&body.plan?.after_description===event.description){const result=await reconcileCalendarLessonRecord(env,{calendar_id:resolved.calendar_id,id:eventId},{settings:()=>readSettings(env),token:async()=>({access_token:context.access_token})});return json({...result,status:'already_present'},{...headers,'Cache-Control':'no-store'});}
           if(body.plan?.status!=='ready'||JSON.stringify(body.plan)!==JSON.stringify(plan))throw httpError(409,'dry run後に対象または記録が変更されています');
           const journal=calendarLessonJournal(env);
-          const result=await applyCalendarRecordMigration(plan,{read:google.read,privacy:google.privacy,ownerEmail:env.ALLOWED_EMAIL,readRecord:id=>rawRecord(env,id),reserve:snapshot=>journal.reserve({...snapshot,record_before:row}),mark:journal.mark.bind(journal),patch:google.patch});
+          const result=await applyCalendarRecordMigration(plan,{read:google.read,privacy:google.privacy,ownerEmail:env.ALLOWED_EMAIL,readRecord:async id=>loadCalendarStorageState(env,await rawRecord(env,id),lessonEventRef(event,resolved.calendar_id)),reserve:snapshot=>journal.reserve({...snapshot,record_before:row}),mark:journal.mark.bind(journal),patch:google.patch});
           return json(result,{...headers,'Cache-Control':'no-store'});
         }
         throw httpError(404,'not found');

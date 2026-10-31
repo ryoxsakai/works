@@ -37,6 +37,7 @@ jobs:
       - run: node test/calendar-migration-operator.browser.mjs
       - run: node test/calendar-attribution-operator.browser.mjs
       - run: node test/calendar-description-replacement.browser.mjs
+      - run: node test/calendar-tag-removal-operator.browser.mjs
       - run: npm run test:lesson-attribution:browser
       - run: npm run test:lesson-baseline:browser
       - run: npm run test:header:browser
