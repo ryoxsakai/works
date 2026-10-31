@@ -106,3 +106,11 @@ test('explicit next-instance initialization has four inline empty headings, neve
  const p=planCalendarTemplateInitialization(input),a=adapters();a.deps.read=async()=>({...event,description:'本人が同時に入力'});a.deps.readRecord=async()=>emptyRow;
  await assert.rejects(applyCalendarRecordMigration(p,a.deps));assert.equal(a.sent,0);
 });
+
+test('explicit unmanaged replacement preserves preimage and refuses managed, unverified and stale content',async()=>{
+ const replacement=plan({replaceExistingDescription:true});assert.equal(replacement.mode,'replace_unmanaged_description');assert.equal(replacement.before_description,event.description);assert.equal(parseCalendarRecord(replacement.after_description).start,0);assert.ok(plan().after_description.startsWith(event.description));
+ for(const description of ['', '  ',replaceCalendarRecord('',row,binding),CALENDAR_RECORD_START])assert.equal(plan({replaceExistingDescription:true,event:{...event,description}}).status,'held');
+ assert.equal(plan({replaceExistingDescription:true,row:{...row,record_title:null}}).status,'held');assert.equal(plan({replaceExistingDescription:true,privacy:null}).status,'held');
+ const a=adapters();assert.equal((await applyCalendarRecordMigration(replacement,a.deps)).status,'verified');assert.equal(a.sent,1);assert.equal(a.journal[0].snapshot.before.description,event.description);assert.equal(a.journal[0].snapshot.mode,'replace_unmanaged_description');
+ const stale=adapters({alterRead:e=>({...e,description:'concurrent edit'})});await assert.rejects(applyCalendarRecordMigration(replacement,stale.deps));assert.equal(stale.sent,0);assert.equal(stale.reserved,0);
+});
