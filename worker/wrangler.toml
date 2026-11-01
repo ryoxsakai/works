@@ -2,6 +2,8 @@
 name = "works"
 main = "src/index.js"
 compatibility_date = "2026-08-01"
+# Preserve staged feature flags set in production by the rollout operator.
+keep_vars = true
 
 routes = [
   { pattern = "works.lrnr.jp/api/*", zone_name = "lrnr.jp" },

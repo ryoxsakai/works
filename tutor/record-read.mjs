@@ -19,3 +19,5 @@ export function precedingOwnerEvents(event,records,rangeEvents){
  const time=Date.parse(event.start?.dateTime||event.start?.date);
  return records.filter(r=>r.calendar_id&&r.event_id&&Date.parse(r.lesson_date)<time).sort((a,b)=>Date.parse(b.lesson_date)-Date.parse(a.lesson_date)).map(r=>rangeEvents.find(e=>e.id===r.event_id&&e._calendarId===r.calendar_id)).filter(Boolean).slice(0,1);
 }
+
+export const recordTermScope=(terms,selected)=>JSON.stringify([...selected].sort().map(id=>{const term=terms.find(t=>t.id===id);return [id,term?.start_date||null,term?.end_date||null];}));
