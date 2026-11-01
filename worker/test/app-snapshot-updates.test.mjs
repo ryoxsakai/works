@@ -5,7 +5,7 @@ import {Miniflare} from 'miniflare';
 
 async function loadFunctions(){
  let source=await readFile(new URL('../src/index.js',import.meta.url),'utf8');
- for(const file of ['workflow.js','wiki.js','kdp-services.js','mcp-scopes.js','oauth-refresh.js','calendar-lesson-records.js','calendar-lesson-google.js','calendar-lesson-journal.js','calendar-lesson-migration.js'])source=source.replace('./'+file,new URL('../src/'+file,import.meta.url).href);
+ for(const file of ['workflow.js','wiki.js','kdp-services.js','mcp-scopes.js','oauth-refresh.js','calendar-lesson-records.js','calendar-lesson-google.js','calendar-lesson-journal.js','calendar-lesson-migration.js','lesson-owner-history.js'])source=source.replace('./'+file,new URL('../src/'+file,import.meta.url).href);
  source+='\nexport {createSessionToken,guardedUpdateInput,ensureAdmissionSchema,ensureMaterialSchema,updateAdmissionEvent,updateMaterialFolder,updateMaterialFile};';
  return import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
 }

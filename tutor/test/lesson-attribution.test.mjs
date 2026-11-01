@@ -3,8 +3,42 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 import {lessonEventRef,lessonEventKey} from '../../shared/lesson-plan.js';
-import {attributedLessonRecord} from '../../shared/lesson-attribution.js';
+import {attributedLessonRecord,lessonRecordNeedsReview} from '../../shared/lesson-attribution.js';
+import {sameLessonOwner,previousOwnerRecord,lessonRecordRows} from '../../shared/lesson-record-view.mjs';
 const source=readFileSync(new URL('../app.js',import.meta.url),'utf8');
+test('D1 owner records never bypass a stale observed event label or date',()=>{
+ const observed=lessonEventRef({id:'same',calendar_id:'cal',summary:'A',etag:'old',start:{dateTime:'2026-11-01T10:00:00+09:00'},end:{dateTime:'2026-11-01T11:00:00+09:00'}}),current={...observed,title:'B',etag:'new'};
+ const row={calendar_event_id:'same',record_storage:'d1_owner',record_read_target:current,owner_id:'owner-b',attribution_status:'confirmed',record_exists:true,lesson_plan:'B private plan',homework:'B private homework'};
+ const held=attributedLessonRecord(row,observed);assert.equal(held.attribution_status,'target_unavailable');assert.ok(!held.lesson_plan);assert.ok(!held.homework);assert.ok(!held.owner_id);
+ assert.equal(attributedLessonRecord(row,current).lesson_plan,'B private plan');
+ assert.ok(!attributedLessonRecord(row,{...current,start:'2026-11-02T10:00:00+09:00'}).lesson_plan);
+ assert.ok(!attributedLessonRecord(row,{...current,calendar_id:'other'}).lesson_plan);
+ assert.equal(attributedLessonRecord({...row,record_read_target:undefined},observed).attribution_status,'target_unavailable');
+});
+test('previous lesson follows fixed owner through name swaps and rename, never a same-name other owner or deleted slot',()=>{
+ const event=(id,title,date)=>({id,calendar_id:'cal',summary:title,start:{dateTime:date},end:{dateTime:date},etag:id});
+ const oldB=event('b-old','B','2026-10-20T10:00:00+09:00'),oldA=event('a-old','A','2026-10-21T10:00:00+09:00'),today=event('a-now','B','2026-11-01T10:00:00+09:00');
+ const record=(e,owner)=>({calendar_event_id:e.id,record_storage:'d1_owner',record_read_target:lessonEventRef(e),owner_id:owner,attribution_status:'confirmed',lesson_plan:owner+' plan'});
+ const current=record(today,'owner-a'),map=new Map([[oldB.id,record(oldB,'owner-b')],[oldA.id,record(oldA,'owner-a')]]),read=e=>attributedLessonRecord(map.get(e.id),lessonEventRef(e));
+ assert.equal(sameLessonOwner(current,map.get(oldB.id)),false);assert.equal(previousOwnerRecord(current,today,[oldB,oldA],read).record.owner_id,'owner-a');
+ assert.equal(previousOwnerRecord(current,today,[oldB],read),null);
+ const renamed={...today,summary:'新しい名前'};assert.equal(previousOwnerRecord({...current,record_read_target:lessonEventRef(renamed)},renamed,[oldA],read).record.lesson_plan,'owner-a plan');
+});
+test('actual daily table row builder selects the same owner across renamed labels and hides a deleted predecessor',()=>{
+ const event=(id,title,date)=>({id,_calendarId:'cal',summary:title,start:{dateTime:date},end:{dateTime:date},etag:id}),a=event('a-old','A','2026-10-20T10:00:00+09:00'),b=event('b-old','B','2026-10-21T10:00:00+09:00'),now=event('a-now','B','2026-11-01T10:00:00+09:00');
+ const record=(event,owner)=>({calendar_event_id:event.id,record_storage:'d1_owner',record_read_target:lessonEventRef(event),owner_id:owner,attribution_status:'confirmed',lesson_plan:owner+' plan'});
+ const entryMap=new Map([[a.id,record(a,'a')],[b.id,record(b,'b')],[now.id,record(now,'a')]]),start=source.indexOf('const rows = dayEvents.map((ev)'),end=source.indexOf('renderRecordTable(rows);',start);
+ function build(rangeEvents){const state=vm.createContext({dayEvents:[now],rangeEvents,entryMap,lessonEventRef,attributedLessonRecord,previousOwnerRecord,calendarColors:new Map(),isExcludedScheduleEvent:()=>false,coveringTerm:null,planReadVersion:0});vm.runInContext(source.slice(start,end)+'\nglobalThis.result=rows;',state);return state.result[0];}
+ assert.equal(build([a,b,now]).prevRecord.owner_id,'a');assert.equal(build([b,now]).prevLessonPlan,'');
+});
+test('shared card renderer independently refuses stale D1 content and another owners previous plan',()=>{
+ const ref=lessonEventRef({id:'today',calendar_id:'cal',summary:'A',start:{dateTime:'2026-11-01T10:00:00+09:00'},end:{dateTime:'2026-11-01T11:00:00+09:00'}});
+ const current={record_storage:'d1_owner',record_read_target:ref,owner_id:'a',attribution_status:'confirmed',record_revision:1};
+ const deps={escapeHtml:String,formatTimeOrPeriod:String,lessonRecordNeedsReview,lessonReviewRow:()=>'<review-required>',lightenHexColor:String,calendarName:()=>'',lessonAttributionNotice:()=>'',lessonPlanEditor:()=>'',lessonPlanFeedback:()=>'',recordStudentPrefName:()=>'',lessonEventKey:()=>''};
+ const row={ref,record:current,label:'A',eventId:'today',start:ref.start,prevRecord:{...current,owner_id:'b'},prevLessonPlan:'B private previous plan'};
+ assert.ok(!lessonRecordRows([row],deps).includes('B private previous plan'));
+ assert.equal(lessonRecordRows([{...row,record:{...current,record_read_target:{...ref,title:'B'}},homework:'B private homework'}],deps),'<review-required>');
+});
 test('collision evidence survives a later unrelated 250-target chunk',async()=>{
  const targets=Array.from({length:251},(_,i)=>({id:`event-${i}`,calendar_id:'a',title:'Synthetic',start:'2026-10-27T01:00:00Z'}));
  const legacy={calendar_event_id:'event-0',record_exists:1,record_revision:0,record_title:null,lesson_plan:'ambiguous old plan'};

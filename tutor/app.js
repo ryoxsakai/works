@@ -1,5 +1,5 @@
 import {readNextLessonWithTemplate} from "../shared/next-lesson-read.mjs?v=1";
-import { lessonRecordRows, renderPlanEditors, renderMemoEditors } from "../shared/lesson-record-view.mjs?v=1";
+import { lessonRecordRows, renderPlanEditors, renderMemoEditors, previousOwnerRecord } from "../shared/lesson-record-view.mjs?v=1";
 import { setUserAvatar } from "../shared/avatar.mjs?v=1";
 import { attachRecordCarousel } from "./record-carousel.mjs?v=2";
 import { attachRecordToasts } from "./record-toasts.mjs?v=2";
@@ -535,8 +535,9 @@ async function loadRecordTable() {
       const n = sameLabelEvents.findIndex((e) => e.id === ev.id) + 1;
       const m = sameLabelEvents.length;
       const saved = attributedLessonRecord(entryMap.get(ev.id), lessonEventRef(ev));
-      const prevEvent = n > 1 ? sameLabelEvents[n - 2] : null;
-      const prevSaved = prevEvent ? attributedLessonRecord(entryMap.get(prevEvent.id),lessonEventRef(prevEvent)) : {};
+      const previous=saved.record_storage==='d1_owner'?previousOwnerRecord(saved,ev,rangeEvents,e=>attributedLessonRecord(entryMap.get(e.id),lessonEventRef(e))):null;
+      const prevEvent = saved.record_storage==='d1_owner'?previous?.event:n > 1 ? sameLabelEvents[n - 2] : null;
+      const prevSaved = previous?.record||(prevEvent ? attributedLessonRecord(entryMap.get(prevEvent.id),lessonEventRef(prevEvent)) : {});
       return {
         eventId: ev.id,
         ref: lessonEventRef(ev),
@@ -3561,6 +3562,8 @@ function escapeHtml(str) {
 
 
 function lessonReviewRow(ref,record,label,date) {
+  if(record.attribution_status==='excluded')return `<tr><td colspan="7">${escapeHtml(label)} ${escapeHtml(date)}：授業履歴への取り込み・編集の対象外です。</td></tr>`;
+  if(record.record_storage==='d1_owner'||record.attribution_status==='owner_unassigned')return `<tr><td colspan="7"><strong>${escapeHtml(label)}</strong> ${escapeHtml(date)}<p>生徒・クラスの紐づけを確認してください。保存済みの授業履歴は保持されています。</p><a href="/tutor/history.html?calendar_id=${encodeURIComponent(ref.calendar_id)}&event_id=${encodeURIComponent(ref.id)}">授業履歴で紐づけを確認</a></td></tr>`;
   if(record.record_pending_operation)return `<tr><td colspan="7"><strong>${escapeHtml(label)}</strong> ${escapeHtml(date)}<p role="status">カレンダー保存の結果確認が必要です。再送は停止しています。</p><button type="button" class="calendar-record-reconcile" data-ref="${escapeHtml(JSON.stringify(ref))}">保存結果を照合する</button><small role="status"></small></td></tr>`;
   return `<tr><td colspan="7"><strong>${escapeHtml(label)}</strong> ${escapeHtml(date)}
     <p role="status">${record.attribution_status === "known_change" ? "既に予定名が変更されたことが分かっている枠です。" : record.attribution_status === "target_unavailable" ? "予定が削除・変更されたため再読み込みが必要です。" : record.attribution_status === "id_collision" ? "複数カレンダーに同じ予定IDがあり、安全に対応できません。" : record.record_title != null ? `確認済みの予定名「${escapeHtml(record.record_title)}」から変更されています。` : `比較開始時に観測した予定名「${escapeHtml(record.record_observed_title || "不明")}」から変更されています。この観測値は所属の証明ではありません。`} 対応を確認するまで授業記録の表示・保存を停止しています。</p>

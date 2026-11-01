@@ -17,6 +17,7 @@ for (const file of [
   "calendar-lesson-google",
   "calendar-lesson-journal",
   "calendar-lesson-migration",
+  "lesson-owner-history",
 ])
   source = source.replace(
     `./${file}.js`,

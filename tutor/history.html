@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>生徒・クラスの授業履歴 | Works</title>
+<link rel="stylesheet" href="/shared/ui/kdp-bootstrap.css?v=1"><link rel="stylesheet" href="./history.css"></head>
+<body class="kdp-bootstrap"><main class="history-shell">
+<header><a href="/tutor/">Works 授業管理へ</a><h1>生徒・クラスの授業履歴</h1><p>名前順に選び、予定がなくなった授業も日付順に確認できます。</p></header>
+<p id="status" role="status" aria-live="polite">ログインを確認しています。</p>
+<details><summary>保存結果を操作IDで確認</summary><form id="operation-lookup"><label>操作ID<input id="operation-id" class="form-control" required></label><button class="btn-outline history-secondary">保存結果だけを照合</button></form><pre id="operation-result"></pre></details>
+<section aria-labelledby="owners-heading"><h2 id="owners-heading">生徒・クラス</h2>
+<label for="owner">名前順の一覧</label><select id="owner" class="form-select" disabled></select>
+<form id="create-owner"><label>名前<input name="name" class="form-control" required maxlength="200"></label><label>種類<select name="kind" class="form-select"><option value="student">生徒</option><option value="class">集団授業・クラス</option></select></label><button class="btn-solid history-primary">新しく登録</button></form>
+<form id="rename-owner"><label>選択中の表示名<input name="name" class="form-control" required maxlength="200"></label><button class="btn-outline history-secondary">同じ生徒・クラスの名前を変更</button></form><p>同姓同名でも別に登録できます。名前の変更だけで記録の所有者は変わりません。</p></section>
+<section aria-labelledby="records-heading"><h2 id="records-heading">授業履歴</h2><p id="history-empty"></p><div id="records"></div>
+<details><summary>予定のない授業記録を追加</summary><form id="new-record"><label>授業日時<input type="datetime-local" name="date" required class="form-control"></label><button class="btn-solid history-primary">選択中の生徒・クラスに空の記録を作る</button></form></details></section>
+<section aria-labelledby="binding-heading"><h2 id="binding-heading">予定との紐づけを確認</h2><p>予定名から自動で引き継ぎません。改名・入替・追加・再作成した個別の予定を確認します。</p>
+<form id="lookup"><label>カレンダー<select id="calendar" class="form-select" required></select></label><label>個別の予定ID<input id="event-id" class="form-control" required></label><button class="btn-outline history-secondary">現在の予定を確認</button></form>
+<div id="target-details"></div><div id="binding-actions" hidden>
+<label>この予定に対応する保存済み記録<select id="record-choice" class="form-select"></select></label>
+<p>別の生徒へ切り替えると、この予定には新しい空欄記録を作ります。以前の授業記録は元の生徒の履歴に残ります。</p>
+<button id="same-owner" class="btn-outline history-secondary">同じ生徒・クラスの改名として確認</button>
+<button id="different-owner" class="btn-outline history-secondary">別の生徒・クラスへ切り替える</button>
+<button id="new-binding" class="btn-outline history-secondary">選択中の生徒・クラスで新しい記録を作る</button>
+<button id="attach" class="btn-outline history-secondary">保存済み記録をこの予定に紐づける</button>
+<button id="detach" class="btn-outline history-secondary">予定との紐づけだけ外す</button>
+<button id="preview" class="btn-solid history-primary">最新カレンダーと旧DBの移行プレビュー</button>
+</div><div id="import-preview"></div></section>
+<section><h2>初期紐づけが必要な旧記録</h2><button id="legacy" class="btn-outline history-secondary">一覧を確認</button><p>原記録は保存されています。比較時の名前は所有者の証明として扱いません。</p><div id="legacy-list"></div></section>
+</main><script type="module" src="./history.mjs"></script></body></html>

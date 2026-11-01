@@ -8,6 +8,7 @@ import {calendarRecordsEnabled,calendarRecordEligible,overlayCalendarLessonRecor
 import {calendarLessonGoogle} from "./calendar-lesson-google.js";
 import {calendarLessonJournal} from "./calendar-lesson-journal.js";
 import {planCalendarRecordMigration,planCalendarRecordTagRemoval,applyCalendarRecordMigration} from "./calendar-lesson-migration.js";
+import {ownerHistoryActive,ownerHistoryFrozen,handleOwnerHistory,readEventOwnerRecord,writeEventOwnerRecord} from "./lesson-owner-history.js";
 
 // Best-effort per-isolate protection: Cloudflare client IP only, no credentials.
 const authBuckets = new Map();
@@ -1893,6 +1894,7 @@ function curriculumAfterPatch(before, patch) {
 }
 
 async function prepareAuditedScheduleUpdate(env, target, patch) {
+  if(ownerHistoryFrozen(env))throw httpError(409,'固定IDの授業履歴画面で編集してください。旧予定IDへの更新は停止しました');
   // Records are still keyed by event ID alone: explicit calendar selection cannot bypass collisions.
   const verified = await resolveCalendarEventById(env,target.event_id);
   if (verified.calendar_id !== target.calendar_id || String(verified.event.summary || "(無題)").trim() !== target.title) {
@@ -2930,9 +2932,10 @@ async function readScheduleEvents(
     }))
   );
   const attribution = await import("./lesson-attribution.js");
+  const {lessonEventRef}=await import("../../shared/lesson-plan.js");
   return filteredEvents.map((event) => {
       const { currentRecord } = attribution;
-      const detail = currentRecord(details.get(event.id), {id:event.id,calendar_id:event.calendar_id,title:event.summary || "",start:event.start?.dateTime || event.start?.date});
+      const detail = currentRecord(details.get(event.id), lessonEventRef(event,event.calendar_id));
       return {
         id: event.id,
         calendar_id: event.calendar_id,
@@ -3282,6 +3285,7 @@ function equalCurriculumSnapshots(left, right) {
 }
 
 async function undoScheduleUpdate(env, args = {}) {
+  if(ownerHistoryFrozen(env))throw httpError(409,'固定IDの授業履歴は旧予定IDの履歴から復元できません。授業履歴画面で確認してください');
   await ensureMcpFeatureSchema(env);
   const changeId = String(args.change_id || "").trim();
   if (!changeId) throw httpError(400, "change_id is required");
@@ -4417,6 +4421,18 @@ async function readCurriculumEntries(env) {
 }
 
 async function readObservedCurriculumEntries(env, targets, context = {}) {
+  if(ownerHistoryActive(env)){
+    const result=[];
+    const calendars=new Map();for(const target of targets){const ids=calendars.get(target.id)||new Set();ids.add(target.calendar_id||target._calendarId);calendars.set(target.id,ids);}if([...calendars.values()].some(ids=>ids.size>1))throw httpError(409,'同じ予定IDを持つ複数カレンダーは固定IDの授業履歴画面で確認してください');
+    const deps={settings:()=>readSettings(env),token:()=>mintGoogleAccessToken(env),event:fetchCalendarEventWithToken};
+    const {lessonEventRef,sameLessonEvent}=await import('../../shared/lesson-plan.js');
+    const settings=await deps.settings(),token=(await deps.token()).access_token;
+    for(const target of targets){const ref=lessonEventRef(target);if(!settings.selected_calendars?.includes(ref.calendar_id))throw httpError(403,'カレンダーを確認してください');const event=await deps.event(token,ref.calendar_id,ref.id);
+      // A response must belong to the exact observation whose label the caller will render.
+      if(!event||!sameLessonEvent(ref,lessonEventRef(event,ref.calendar_id))){result.push({calendar_event_id:ref.id,record_storage:'d1_owner',record_read_target:ref,attribution_status:'target_unavailable',record_target_unavailable:true,record_requires_reload:true});continue;}
+      result.push(await readEventOwnerRecord(env,ref,event));}
+    return result;
+  }
   const { lessonEventRef } = await import("../../shared/lesson-plan.js");
   const { lessonRecordHasContent, lessonDate } = await import("../../shared/lesson-attribution.js");
   const { readLessonPlan } = await import("./lesson-plan.js");
@@ -4524,8 +4540,10 @@ async function verifiedLessonTarget(env, target) {
 }
 
 async function upsertCurriculumEntry(env, eventId, body) {
+  if(env.LESSON_HISTORY_MODE==='reconcile')throw httpError(409,'D1移行の照合中です。授業内容の編集を一時停止しています');
   if (body.target?.id !== eventId) throw httpError(409, "予定を再読み込みしてください");
   const target = await verifiedLessonTarget(env, body.target);
+  if(ownerHistoryActive(env))return writeEventOwnerRecord(env,{target,patch:body,record_revision:body.record_revision,request_id:body.request_id},{settings:()=>readSettings(env),token:()=>mintGoogleAccessToken(env),event:fetchCalendarEventWithToken});
   const { prepareRecordWrite, commitRecords, readCommittedRecord } = await import("./lesson-attribution.js");
   const patch = Object.fromEntries(["completed", ...SCHEDULE_TEXT_FIELDS].filter(field => body[field] !== undefined).map(field => [field, body[field]]));
   if(calendarRecordsEnabled(env))return writeCalendarLessonRecord(env,{target,patch,recordRevision:body.record_revision},{settings:()=>readSettings(env),token:()=>mintGoogleAccessToken(env)});
@@ -6303,6 +6321,15 @@ export default {
         return json(result,{...headers,"Cache-Control":"no-store"});
       }
 
+      if(url.pathname.startsWith('/api/lesson-history/')){
+        if(browserSession.aud||browserSession.scope||browserSession.fid)throw httpError(401,'browser session required');
+        if(request.method!=='GET'&&(request.headers.get('Origin')!==env.ALLOWED_ORIGIN||!request.headers.get('Content-Type')?.startsWith('application/json')))throw httpError(403,'same-origin JSON required');
+        const dependencies={settings:()=>readSettings(env),token:()=>mintGoogleAccessToken(env),event:fetchCalendarEventWithToken};
+        return json(await handleOwnerHistory(env,request,url,dependencies),{...headers,'Cache-Control':'no-store'});
+      }
+
+      if(ownerHistoryFrozen(env)&&((url.pathname.startsWith('/api/calendar-lesson-migration/')&&request.method!=='GET')||url.pathname==='/api/calendar-lesson-record/reconcile'||url.pathname==='/api/next-lesson-plan/initialize'||url.pathname==='/api/lesson-record'&&request.method==='PUT'))throw httpError(409,'D1授業履歴の移行中・切替後はカレンダー説明を更新しません');
+
       if(url.pathname.startsWith('/api/calendar-lesson-migration/')){
         const {lessonEventRef}=await import('../../shared/lesson-plan.js');
         if(browserSession.aud||browserSession.scope||browserSession.fid)throw httpError(401,'browser session required');
@@ -6388,10 +6415,11 @@ export default {
         const body=await request.json();
         if (!Array.isArray(body.targets) || body.targets.length>250 || body.targets.some(ref=>typeof ref?.id!=="string" || !ref.id || typeof ref?.calendar_id!=="string" || !ref.calendar_id)) throw httpError(400,"予定の対象が不正です");
         if(calendarRecordsEnabled(env)&&body.targets.length>1)throw httpError(400,"カレンダー記録は1回に1授業ずつ取得してください");
-        return json((await readObservedCurriculumEntries(env,body.targets)).map(row=>({...row,attribution_status:"unverified",calendar_source_enabled:calendarRecordsEnabled(env)})),headers);
+        return json((await readObservedCurriculumEntries(env,body.targets)).map(row=>({...row,attribution_status:ownerHistoryActive(env)?row.attribution_status:"unverified",calendar_source_enabled:calendarRecordsEnabled(env)})),headers);
       }
 
       if (url.pathname === "/api/curriculum" && request.method === "GET") {
+        if(ownerHistoryActive(env))return json({error:'固定IDの授業履歴画面を使用してください'},headers,409);
         const rows = await readCurriculumEntries(env);
         // Older clients do not know how to compare titles. Never send their stale content.
         return json(rows.map(row => url.searchParams.get("attribution") === "1"
@@ -6400,6 +6428,7 @@ export default {
       }
 
       if (url.pathname === "/api/lesson-record" && ["GET", "PUT"].includes(request.method)) {
+        if(ownerHistoryActive(env))return json({error:'生徒・クラスの紐づけは授業履歴画面で確認してください',code:'LESSON_OWNER_BINDING_REQUIRED'},headers,409);
         if (browserSession.aud || browserSession.scope || browserSession.fid) throw httpError(401, "browser session required");
         const { rawRecord, currentRecord, resolveAttribution } = await import("./lesson-attribution.js");
         const body = request.method === "PUT" ? await request.json() : null;

@@ -6,7 +6,7 @@ import {recordBinding,calendarRecordPrivacy,calendarWriteRejected} from './calen
 import {calendarLessonJournal} from './calendar-lesson-journal.js';
 import {calendarLessonGoogle} from './calendar-lesson-google.js';
 const fail=(message,code='CALENDAR_RECORD_CONFLICT',status=409)=>Object.assign(new Error(message),{code,status});
-export const calendarRecordsEnabled=env=>env.CALENDAR_LESSON_RECORDS==='true';
+export const calendarRecordsEnabled=env=>env.LESSON_HISTORY_MODE!=='active'&&env.CALENDAR_LESSON_RECORDS==='true';
 export function calendarRecordEligible(env,event){return calendarRecordsEnabled(env)&&(lessonDate(lessonEventRef(event))>=CALENDAR_RECORD_FROM||[CALENDAR_RECORD_START,CALENDAR_RECORD_END].some(marker=>String(event.description||'').includes(marker)));}
 export function calendarStorageState(row,ref,operation){
  if(!operation)return row;
