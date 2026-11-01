@@ -1,11 +1,11 @@
 import {readNextLessonWithTemplate} from "../shared/next-lesson-read.mjs?v=1";
 import { curriculumSelectionName } from "../shared/student-profile-key.js";
-import {lessonRecordRows,renderPlanEditors,renderMemoEditors} from '../shared/lesson-record-view.mjs';
+import {lessonRecordRows,renderPlanEditors,renderMemoEditors} from '../shared/lesson-record-view.mjs?v=4';
 import {lessonEventKey,isScheduledLesson} from '../shared/lesson-plan.js';
 import {lessonRecordNeedsReview} from '../shared/lesson-attribution.js';
-import {createLessonPlanController} from '../tutor/lesson-plan.js?v=4';
+import {createLessonPlanController} from '../tutor/lesson-plan.js?v=7';
 import {createStudentMemoStore} from '../tutor/student-memo.js?v=1';
-import {attachRecordCarousel} from '../tutor/record-carousel.mjs?v=2';
+import {attachRecordCarousel} from '../tutor/record-carousel.mjs?v=3';
 import {attachRecordToasts} from '../tutor/record-toasts.mjs?v=2';
 import {decorateTutor} from '../shared/ui/tutor-presentation.mjs';
 import {esc} from './model.mjs';
@@ -29,9 +29,9 @@ export function createHomeLessonCards(model,{session,getSessionToken,onExpired,r
  const resize=input=>{if(!input.getClientRects().length)return;input.style.height='auto';const s=getComputedStyle(input);input.style.height=`${input.scrollHeight+parseFloat(s.borderTopWidth)+parseFloat(s.borderBottomWidth)}px`;};
  const date=ref=>{if(!ref)return '';const start=new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit',weekday:'short',hour:'2-digit',minute:'2-digit'}).format(new Date(ref.start));const end=new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',hour:'2-digit',minute:'2-digit'}).format(new Date(ref.end));return `${start}–${end}`;};
  const formatTime=iso=>{if(/^\d{4}-\d{2}-\d{2}$/.test(iso))return '終日';const time=new Date(iso).toLocaleTimeString('en-GB',{timeZone:'Asia/Tokyo',hour:'2-digit',minute:'2-digit'});const period=[...model.periods].sort((a,b)=>String(a.start_time).localeCompare(String(b.start_time))).filter(p=>p.start_time<=time).at(-1);return esc(period?.label||time);};
- const plans=createLessonPlanController({readNext:async source=>{const v=await readNextLessonWithTemplate(source,call,applyTarget,session,getSessionToken);if(!v?.source||v.source.id!==source.id||v.source.calendar_id!==source.calendar_id||v.target&&(!isScheduledLesson(v.target,model.settings?.excluded_titles||[])||v.target.calendar_id!==source.calendar_id||v.target.id===source.id||!Number.isSafeInteger(v.record_revision)||v.record_revision<0))throw new Error('次回予定の応答を確認できません');return v;},write:async body=>{
+ const plans=createLessonPlanController({readCurrent:target=>call('/lesson-plan?'+new URLSearchParams({calendar_id:target.calendar_id,event_id:target.id})),readOperation:id=>call('/lesson-history/audit?operation_id='+encodeURIComponent(id)),readNext:async source=>{const v=await readNextLessonWithTemplate(source,call,applyTarget,session,getSessionToken);if(!v?.source||v.source.id!==source.id||v.source.calendar_id!==source.calendar_id||v.target&&(!isScheduledLesson(v.target,model.settings?.excluded_titles||[])||v.target.calendar_id!==source.calendar_id||v.target.id===source.id||!Number.isSafeInteger(v.record_revision)||v.record_revision<0))throw new Error('次回予定の応答を確認できません');return v;},write:async body=>{
   const key=lessonEventKey(body.target);if(unknownPlans.has(key))throw new Error('保存結果が未確認です。再送は停止しています。');
-  try{const result=await call('/lesson-plan',{method:'PUT',body:JSON.stringify(body)});if(result.target)applyTarget(body.target,result.target,result.record_revision);return result;}catch(e){if(e.unknown)unknownPlans.add(key);throw e;}
+  try{const result=await call('/lesson-plan',{method:'PUT',body:JSON.stringify(body)});if(result.target)applyTarget(body.target,result.target,result.record_revision);return result;}catch(e){if(e.unknown&&!body.pending_context)unknownPlans.add(key);throw e;}
  },onChange:render});
  const memos=createStudentMemoStore({readProfile:async name=>{
   const row=memoReadSources.get(name)||model.rows.find(r=>nameFor(r.label)===name&&!lessonRecordNeedsReview(r.record));
@@ -75,12 +75,13 @@ export function createHomeLessonCards(model,{session,getSessionToken,onExpired,r
 
   onStateChange();
  }
- for(const row of model.rows)if(!lessonRecordNeedsReview(row.record))plans.seed(row.ref,row.lessonPlan,plans.version,row.record.record_revision,row.record.attribution_status);
+ const planEditor=(ref,title,className,ownerId='')=>`<div class="lesson-plan-editor" data-plan-key="${esc(lessonEventKey(ref))}" data-read-target="${esc(JSON.stringify(ref))}" data-read-owner="${esc(ownerId)}"><textarea class="${className} linked-lesson-plan" rows="1" maxlength="5000" aria-label="${esc(title)}の授業予定"></textarea>${feedback()}</div>`;
+ for(const row of model.rows)if(!lessonRecordNeedsReview(row.record)||row.record.pending_allowed)plans.seed(row.ref,row.lessonPlan,plans.version,row.record.record_revision,row.record.attribution_status,row.record.owner_id||null,row.record.pending_context||null);
  root.innerHTML=lessonRecordRows(model.rows,{
   escapeHtml:esc,formatTimeOrPeriod:formatTime,lessonRecordNeedsReview,
-  lessonReviewRow:(_ref,_record,label,time)=>_record.record_pending_operation?`<tr><td colspan="7"><strong>${esc(label)}</strong> ${time}<p role="status">保存結果を確認するまで再送を停止しています。</p><button type="button" class="calendar-record-reconcile" data-ref="${esc(JSON.stringify(_ref))}">保存結果を照合する</button></td></tr>`:`<tr><td colspan="7"><strong>${esc(label)}</strong> ${time}<p role="status">予定名・所属の対応確認が必要です。確認まで内容の表示と編集を停止しています。</p><a class="lesson-record-review" href="/tutor/">授業管理で確認する</a></td></tr>`,
+  lessonReviewRow:(_ref,_record,label,time)=>_record.pending_allowed?`<tr><td colspan="7"><strong>${esc(label)}</strong> ${time}<div class="pending-plan-label"><span>授業予定</span>${planEditor(_ref,label,'pending-record-plan','')}</div><p>未紐づけの予定単位下書きとしてD1へ保存します。生徒の履歴へは自動で移しません。</p><a class="pending-bind-link" href="/tutor/history.html?calendar_id=${encodeURIComponent(_ref.calendar_id)}&event_id=${encodeURIComponent(_ref.id)}">下書きと紐づけを確認</a></td></tr>`:_record.record_pending_operation?`<tr><td colspan="7"><strong>${esc(label)}</strong> ${time}<p role="status">保存結果を確認するまで再送を停止しています。</p><button type="button" class="calendar-record-reconcile" data-ref="${esc(JSON.stringify(_ref))}">保存結果を照合する</button></td></tr>`:`<tr><td colspan="7"><strong>${esc(label)}</strong> ${time}<p role="status">予定名・所属の対応確認が必要です。確認まで内容の表示と編集を停止しています。</p><a class="lesson-record-review" href="/tutor/">授業管理で確認する</a></td></tr>`,
   lightenHexColor:color=>/^#[0-9a-f]{6}$/i.test(color)?'#'+[1,3,5].map(i=>Math.round(parseInt(color.slice(i,i+2),16)*.25+255*.75).toString(16).padStart(2,'0')).join(''):'#e7e9ec',calendarName:id=>model.calendars.find(c=>c.id===id)?.summary||'カレンダー',lessonAttributionNotice:()=>'',
-  lessonPlanEditor:(ref,title,className)=>`<div class="lesson-plan-editor" data-plan-key="${esc(lessonEventKey(ref))}"><textarea class="${className} linked-lesson-plan" rows="1" maxlength="5000" aria-label="${esc(title)}の授業予定"></textarea>${feedback()}</div>`,lessonPlanFeedback:feedback,recordStudentPrefName:nameFor,lessonEventKey
+  lessonPlanEditor:planEditor,lessonPlanFeedback:feedback,recordStudentPrefName:nameFor,lessonEventKey
  });
  for(const editor of root.querySelectorAll('.student-memo-editor')){
   const label=document.createElement('label');label.className='home-memo-confirm';const source=JSON.parse(editor.closest('tr').dataset.recordRef);
@@ -105,6 +106,7 @@ export function createHomeLessonCards(model,{session,getSessionToken,onExpired,r
   button=e.target.closest('.lesson-plan-action');if(!button||button.disabled)return;
   const editor=button.closest('.lesson-plan-editor'),key=editor.dataset.planKey,source=editor.dataset.sourceKey;
   if(unknownPlans.has(key))return;
+  if(button.dataset.action==='verify-pending'){await plans.verifyPending(key);return;}
   if(button.dataset.action==='recheck'){const link=plans.getLink(source);if(link)await plans.loadNext(link.source);return;}
   if(button.dataset.action==='retry'){plans.save(key,source).catch(()=>{});return;}
   if(plans.get(key)?.dirty&&!confirm('この授業の未保存入力を破棄して予定を再確認しますか？'))return;

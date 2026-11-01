@@ -32,6 +32,7 @@ jobs:
       - run: npm run test:next-lesson:browser
       - run: node test/record-layout.browser.mjs
       - run: node test/record-carousel.browser.mjs
+      - run: node test/next-owner-cards.browser.mjs
       - run: node test/home-lesson-cards.browser.mjs
       - run: node test/calendar-lesson-cards.browser.mjs
       - run: node test/calendar-migration-operator.browser.mjs

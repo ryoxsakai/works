@@ -116,3 +116,29 @@ test('imports require the editing freeze and fresh restore evidence, never a sim
  const {env,deps,owner,ref}=await migratedFixture(t),preview=await previewOwnerImport(env,ref(),deps),body={request_id:request(),owner_id:owner.id,owner_revision:1,confirm_owner:true,preview};
  env.LESSON_HISTORY_MODE='prepare';await assert.rejects(importOwnerRecord(env,body,deps));env.LESSON_HISTORY_MODE='reconcile';await env.DB.prepare("UPDATE lesson_history_policy SET evidence_json='{}'").run();await assert.rejects(importOwnerRecord(env,body,deps));assert.equal((await listOwnerRecords(env,owner.id)).length,0);
 });
+
+test('next unassigned occurrence is a visible confirmation candidate, never a name-based owner/record transfer',async t=>{
+ const {env,events,deps,owner,ref}=await setup(t);await bind(env,owner,ref(),deps);env.LESSON_HISTORY_MODE='active';events[1].description='other unverified content';const before=(await env.DB.prepare('SELECT * FROM lesson_history_records').all()).results;
+ const next=await readNextLessonPlan(env,'a',events[0].id,deps);assert.equal(next.target.id,events[1].id);assert.equal(next.reason,'owner_confirmation_required');assert.equal(next.owner_confirmation_required,true);assert.equal(next.owner_id,null);assert.equal(next.source_owner_id,owner.id);assert.equal(next.lesson_plan,'');assert.equal(next.homework,undefined);assert.equal(next.template_initialization_available,false);assert.deepEqual((await env.DB.prepare('SELECT * FROM lesson_history_records').all()).results,before);assert.equal((await env.DB.prepare('SELECT count(*) n FROM lesson_event_links').first()).n,1);
+ events[1].status='cancelled';events[2].summary=events[0].summary;assert.equal((await readNextLessonPlan(env,'a',events[0].id,deps)).target.id,events[2].id);
+});
+test('earlier unassigned candidate is not hidden behind a later confirmed lesson; ties are ambiguous',async t=>{
+ const {env,events,deps,owner,ref}=await setup(t);await bind(env,owner,ref(),deps);await bind(env,owner,ref(2),deps);env.LESSON_HISTORY_MODE='active';assert.equal((await readNextLessonPlan(env,'a',events[0].id,deps)).target.id,events[1].id);
+ events.push({...events[1],id:'duplicate-unassigned'});const result=await readNextLessonPlan(env,'a',events[0].id,deps);assert.equal(result.reason,'ambiguous');assert.equal(result.target,null);assert.equal(result.lesson_plan,'');
+});
+test('owner mismatch is skipped, renamed/recreated same-owner target requires confirmation without private values',async t=>{
+ const {env,events,deps,owner,makeOwner,ref}=await setup(t),other=await makeOwner('甲');await bind(env,owner,ref(),deps);await bind(env,other,ref(1),deps);await bind(env,owner,ref(2),deps);env.LESSON_HISTORY_MODE='active';
+ events[2].summary='新しい名前';let result=await readNextLessonPlan(env,'a',events[0].id,deps);assert.equal(result.target.id,events[2].id);assert.equal(result.owner_confirmation_required,true);assert.equal(result.lesson_plan,'');
+ events[2].summary='乙';events[2].created='2026-11-02T00:00:00Z';result=await readNextLessonPlan(env,'a',events[0].id,deps);assert.equal(result.attribution_status,'event_recreated');assert.equal(result.owner_confirmation_required,true);
+});
+test('unassigned sources do not scan a year; bound sources batch bindings and avoid unrelated per-event D1 reads',async t=>{
+ const {env,events,deps,owner,ref}=await setup(t);let lists=0;const original=deps.events;deps.events=async(...args)=>{lists++;return original(...args);};env.LESSON_HISTORY_MODE='active';assert.equal((await readNextLessonPlan(env,'a',events[0].id,deps)).reason,'owner_unassigned');assert.equal(lists,0);
+ await bind(env,owner,ref(),deps);for(let i=0;i<400;i++)events.push({...events[1],id:'unrelated-'+i,summary:'different '+i});const real=env.DB;let reads=0;env.DB={prepare(sql){if(/^SELECT/.test(sql))reads++;return real.prepare(sql);}};const result=await readNextLessonPlan(env,'a',events[0].id,deps);assert.equal(result.reason,'owner_confirmation_required');assert.ok(reads<12,'bounded D1 reads, not 400 per-event lookups: '+reads);
+});
+
+test('explicitly excluded bound and unbound occurrences are skipped before earliest/tied next candidate selection',async t=>{
+ const {env,events,deps,owner,ref}=await setup(t);await bind(env,owner,ref(),deps);await bind(env,owner,ref(2),deps);env.LESSON_HISTORY_MODE='active';
+ await env.DB.prepare("INSERT INTO lesson_history_exclusions VALUES('a',?,'excluded')").bind(events[1].id).run();let result=await readNextLessonPlan(env,'a',events[0].id,deps);assert.equal(result.target.id,events[2].id);assert.equal(result.owner_confirmation_required,undefined);
+ events.push({...events[2],id:'excluded-tie'});await env.DB.prepare("INSERT INTO lesson_history_exclusions VALUES('a','excluded-tie','excluded')").run();result=await readNextLessonPlan(env,'a',events[0].id,deps);assert.equal(result.target.id,events[2].id);assert.notEqual(result.reason,'ambiguous');
+ await env.DB.prepare("INSERT INTO lesson_history_exclusions VALUES('a',?,'excluded')").bind(events[2].id).run();result=await readNextLessonPlan(env,'a',events[0].id,deps);assert.equal(result.target,null);assert.equal(result.reason,'none');
+});
