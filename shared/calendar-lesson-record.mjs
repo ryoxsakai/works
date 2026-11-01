@@ -67,10 +67,11 @@ export function replaceCalendarRecord(description,record,binding,{explicitRebind
 // Calendar's native editor may remove HTML comments and use <br>/<div> lines.
 // Only a server-verified storage binding may enable this fallback; never use it
 // to adopt an arbitrary old description as somebody's confirmed lesson record.
-export function parsePlainCalendarRecord(description,binding,{suffix=''}={}){
+export function parsePlainCalendarRecord(description,binding,{prefix='',suffix='',allowPrefixEdit=false}={}){
  const identity=bindingValue(binding);
+ if(prefix&&!description.startsWith(prefix)){if(allowPrefixEdit)prefix='';else throw fail('管理欄以外の前置本文の確認が必要です');}
  if(suffix&&!description.endsWith(suffix))throw fail('管理欄以外の後置本文の確認が必要です');
- const end=description.length-suffix.length,body=description.slice(0,end),lines=[];
+ const end=description.length-suffix.length,body=description.slice(prefix.length,end),lines=[];
  let start=0;const separators=/<br\b[^>]*>|<\/(?:div|p)>|\r?\n/gi;
  const line=(raw,from,to)=>{
   if(/<\/?(?:script|style|iframe|svg|img)\b/i.test(raw))return {text:null,start:from,end:to};
@@ -84,15 +85,37 @@ export function parsePlainCalendarRecord(description,binding,{suffix=''}={}){
   return {text:unescapeHTML(text),start:from,end:to};
  };
  for(const match of body.matchAll(separators)){lines.push(line(body.slice(start,match.index),start,match.index+match[0].length));start=match.index+match[0].length;}
- if(start<body.length)lines.push(line(body.slice(start),start,body.length));
- const indexes=headings.map(heading=>lines.flatMap((entry,index)=>[heading,heading.slice(0,-1)+':'].some(label=>entry.text?.trimStart().startsWith(label))?[index]:[]));
+ if(start<body.length||body.endsWith('\n'))lines.push(line(body.slice(start),start,body.length));
+ const indexes=headings.map(heading=>lines.flatMap((entry,index)=>plainHeadingLabel(entry.text,heading)?[index]:[]));
  if(indexes.every(items=>!items.length)){if(/(?:授業予定|確認テスト|宿題|授業メモ)\s*[:：]/.test(lines.map(entry=>entry.text||'').join('\n')))throw fail('見出しの形式を確認してください');return null;}
  if(indexes.some(items=>items.length!==1)||indexes.some((items,index)=>index&&items[0]<=indexes[index-1][0]))throw fail('4項目の見出しを一意に確認できません');
  const first=indexes[0][0];if(lines.slice(first).some(entry=>entry.text===null))throw fail('管理欄のHTMLを確認してください');
  const values={};Object.keys(CALENDAR_RECORD_FIELDS).forEach((key,index)=>{
   const from=indexes[index][0],to=index+1<indexes.length?indexes[index+1][0]:lines.length;
   const texts=lines.slice(from,to).map(entry=>entry.text);texts[0]=texts[0].trimStart().slice(headings[index].length);
-  values[key]=texts.map(text=>/^\\(?:\\|<!--|授業予定：|確認テスト：|宿題：|授業メモ：)/.test(text)?text.slice(1):text).join('\n');
+  values[key]=texts.map(decodePlainLine).join('\n');
  });
- return {binding:identity,values,start:lines[first].start,end,plain:true};
+ return {binding:identity,values,start:prefix.length+lines[first].start,end,plain:true};
+}
+
+// Use the same heading grammar as the native/plain reader, including ASCII
+// colons and trimStart whitespace. Keep legacy marker encoding unchanged.
+const plainHeadingLabel=(line,heading)=>typeof line==='string'&&[heading,heading.slice(0,-1)+':'].some(label=>line.trimStart().startsWith(label));
+const plainHeading=line=>headings.some(heading=>plainHeadingLabel(line,heading));
+const plainEscape=line=>line.startsWith('\\')||line.startsWith('&lt;!--')||line.startsWith('<!--')||plainHeading(line);
+function encodePlainValue(value){
+ return escapeHTML(value).split('\n').map(line=>(plainEscape(line)?'\\'+line:line).replaceAll('\r','&#13;')).join('\n');
+}
+function decodePlainLine(line){return line.startsWith('\\')&&plainEscape(line.slice(1))?line.slice(1):line;}
+
+// All new writes are human-readable only. Binding and managed boundaries live in
+// the existing verified D1 journal, never in the Calendar description.
+export function plainCalendarRecordLayout(description,record,binding,{parsed=parseCalendarRecord(description),explicitRebind=false}={}){
+ const identity=bindingValue(binding),values=calendarRecordValues(record);
+ if(parsed&&!sameCalendarRecordBinding(parsed.binding,identity)&&!explicitRebind)throw fail('別の授業に属する管理欄です');
+ if(!parsed&&/(?:授業予定|確認テスト|宿題|授業メモ)\s*[:：]/.test(description))throw fail('既存の授業記述と競合するため自動追記を停止しました');
+ const managed_prefix=parsed?description.slice(0,parsed.start):description+(description&&!description.endsWith('\n')?'\n':'');
+ const managed_suffix=parsed?description.slice(parsed.end):'';
+ const content=Object.entries(CALENDAR_RECORD_FIELDS).map(([key,heading])=>heading+encodePlainValue(values[key])).join('\n');
+ return {format:'plain_v2',managed_prefix,managed_suffix,after_description:managed_prefix+content+managed_suffix};
 }

@@ -1,4 +1,4 @@
-import {overlayCalendarLessonRecord,writeCalendarLessonRecord,reconcileCalendarLessonRecord} from "../src/calendar-lesson-records.js";
+import {loadCalendarStorageState,overlayCalendarLessonRecord,writeCalendarLessonRecord,reconcileCalendarLessonRecord} from "../src/calendar-lesson-records.js";
 import {replaceCalendarRecord} from "../../shared/calendar-lesson-record.mjs";
 import {readLinkedProfile,writeLinkedProfile} from "../src/teaching-linked.js";
 import {allRecords,rawRecord,observeRecord,currentRecord,resolveAttribution,prepareRecordWrite,readCommittedRecord,commitRecords,ensureAttribution} from '../src/lesson-attribution.js';
@@ -67,7 +67,7 @@ const server=http.createServer(async(req,res)=>{
       for(const target of body.targets){const row=records.get(target.id);if(row?.record_policy_enabled&&row.record_title==null&&row.record_observed_title==null&&!row.record_hold_active&&lessonRecordHasContent(row)){
         try{await readLessonPlan(env,target.calendar_id,target.id,deps);}catch(error){if(error.status===404||error.code==='LESSON_TARGET_CHANGED')unavailable.add(target.id);else throw error;}
       }}
-      const all=await allRecords(env);if(calendarRecords)for(const target of body.targets){const ev=events.find(e=>e.id===target.id&&e.calendar_id===target.calendar_id);if(!ev)continue;const before=all.find(r=>r.calendar_event_id===target.id)||await rawRecord(env,target.id),overlay=overlayCalendarLessonRecord(env,currentRecord(before,target),ev);if(await DB.prepare("SELECT id FROM calendar_lesson_migration WHERE event_id=? AND status IN ('reserved','dispatching','unknown') LIMIT 1").bind(target.id).first())Object.assign(overlay,{record_pending_operation:true,record_target_unavailable:true});const index=all.findIndex(r=>r.calendar_event_id===target.id);if(index<0)all.push(overlay);else all[index]=overlay;}
+      const all=await allRecords(env);if(calendarRecords)for(const target of body.targets){const ev=events.find(e=>e.id===target.id&&e.calendar_id===target.calendar_id);if(!ev)continue;const before=all.find(r=>r.calendar_event_id===target.id)||await rawRecord(env,target.id),overlay=overlayCalendarLessonRecord(env,await loadCalendarStorageState(env,currentRecord(before,target),target),ev);if(await DB.prepare("SELECT id FROM calendar_lesson_migration WHERE event_id=? AND status IN ('reserved','dispatching','unknown') LIMIT 1").bind(target.id).first())Object.assign(overlay,{record_pending_operation:true,record_target_unavailable:true});const index=all.findIndex(r=>r.calendar_event_id===target.id);if(index<0)all.push(overlay);else all[index]=overlay;}
       return json(all.map(row=>({...row,...(unavailable.has(row.calendar_event_id)?{record_target_unavailable:true}:{}),calendar_source_enabled:calendarRecords})));
     }
     if(key==='calendar-lesson-record/reconcile'){const body=await readBody();return json(await reconcileCalendarLessonRecord(env,body.target,deps));}
