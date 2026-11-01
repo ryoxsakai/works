@@ -5,7 +5,7 @@ export async function boundedRead(items, read, {concurrency=4,timeout=15000,isCu
  const results=new Array(items.length);let next=0,done=0,stopped=false;
  const stale=()=>Object.assign(new Error('表示対象が変わりました'),{code:'STALE_READ'});
  async function worker(){while(!stopped&&next<items.length){if(!isCurrent())throw stale();const index=next++,controller=new AbortController();let timer;
-  try{results[index]=await Promise.race([Promise.resolve().then(async()=>{const release=await acquire(controller.signal);try{if(stopped||!isCurrent())throw stale();return await read(items[index],controller.signal);}finally{release();}}),new Promise((_,reject)=>{timer=setTimeout(()=>{controller.abort();reject(Object.assign(new Error('読み取りが時間内に完了しませんでした。日付を切り替えて再読込してください'),{code:'READ_TIMEOUT'}));},timeout);})]);if(!isCurrent())throw stale();onProgress(++done,items.length);}
+  try{results[index]=await Promise.race([Promise.resolve().then(async()=>{const release=await acquire(controller.signal);try{if(stopped||!isCurrent())throw stale();return await read(items[index],controller.signal);}finally{release();}}),new Promise((_,reject)=>{timer=setTimeout(()=>{controller.abort();reject(Object.assign(new Error('読み取りが時間内に完了しませんでした。日付を切り替えて再読込してください'),{code:'READ_TIMEOUT'}));},timeout);})]);if(stopped||!isCurrent())throw stale();onProgress(++done,items.length);}
   catch(error){stopped=true;throw error;}finally{clearTimeout(timer);}
  }}
  await Promise.all(Array.from({length:Math.min(concurrency,items.length)},worker));return results;
