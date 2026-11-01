@@ -5,6 +5,7 @@
 <header><a href="/tutor/">Works 授業管理へ</a><h1>生徒・クラスの授業履歴</h1><p>名前順に選び、予定がなくなった授業も日付順に確認できます。</p></header>
 <p id="status" role="status" aria-live="polite">ログインを確認しています。</p>
 <details><summary>保存結果を操作IDで確認</summary><form id="operation-lookup"><label>操作ID<input id="operation-id" class="form-control" required></label><button class="btn-outline history-secondary">保存結果だけを照合</button></form><pre id="operation-result"></pre></details>
+<section aria-labelledby="snapshot-heading"><h2 id="snapshot-heading">移行前バックアップ</h2><p>書込み停止中のカレンダー原文を保存します。確認済みの対象一覧と、移行に含めない追加空欄2件の一覧を選んでください。授業内容や所有者は変更しません。</p><form id="snapshot-export"><label>確認済みの対象一覧<input type="file" name="scope" accept=".json,application/json" required class="form-control"></label><label>別枠の追加空欄一覧<input type="file" name="supplemental" accept=".json,application/json" required class="form-control"></label><button class="btn-outline history-secondary">移行前バックアップを保存</button></form><pre id="snapshot-result" role="status" aria-live="polite"></pre></section>
 <section aria-labelledby="owners-heading"><h2 id="owners-heading">生徒・クラス</h2>
 <label for="owner">名前順の一覧</label><select id="owner" class="form-select" disabled></select>
 <form id="create-owner"><label>名前<input name="name" class="form-control" required maxlength="200"></label><label>種類<select name="kind" class="form-select"><option value="student">生徒</option><option value="class">集団授業・クラス</option></select></label><button class="btn-solid history-primary">新しく登録</button></form>
@@ -24,4 +25,4 @@
 <button id="preview" class="btn-solid history-primary">最新カレンダーと旧DBの移行プレビュー</button>
 </div><div id="import-preview"></div></section>
 <section><h2>初期紐づけが必要な旧記録</h2><button id="legacy" class="btn-outline history-secondary">一覧を確認</button><p>原記録は保存されています。比較時の名前は所有者の証明として扱いません。</p><div id="legacy-list"></div></section>
-</main><script type="module" src="./history.mjs"></script></body></html>
+</main><script type="module" src="./history.mjs?v=2-readonly-snapshot"></script></body></html>

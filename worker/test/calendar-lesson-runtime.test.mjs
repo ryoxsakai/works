@@ -249,3 +249,16 @@ test('heading-like continuation lines survive actual save, verified D1 parsing, 
  }
  const bearer=await token(bindings.SESSION_SECRET,{aud:'works-mcp',scope:'schedule:read'});const mcp=await (await call('/mcp',{jsonrpc:'2.0',id:1,method:'tools/call',params:{name:'get_schedule',arguments:{date:'2026-10-31'}}},{Authorization:'Bearer '+bearer,'Content-Type':'application/json'})).json();assert.equal(mcp.result.structuredContent.events.find(e=>e.id==='b').lesson_plan,current.lesson_plan);assert.equal(await DB.prepare("SELECT COUNT(*) AS n FROM calendar_lesson_migration WHERE event_id='b' AND status='verified'").first('n'),2);
 });
+
+test('reconcile snapshot route is browser-session GET only, exports raw without lesson or Calendar mutations; old writers remain frozen',async t=>{
+ const {DB,events,control,call,put,bindings}=await setup(t,{historyMode:'reconcile'});
+ Object.assign(events[1],{status:'confirmed',created:'2026-01-01T00:00:00Z',updated:'2026-01-01T00:00:00Z',iCalUID:'synthetic'});
+ const before=await DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all();
+ const snapshot=async()=>{const result={};for(const {name} of before.results)result[name]=(await DB.prepare('SELECT * FROM "'+name+'"').all()).results;return result;};const initial=await snapshot();
+ const response=await call('/api/lesson-history/snapshot/event?calendar_id=synthetic-calendar&event_id=b');assert.equal(response.status,200,await response.clone().text());const backup=await response.json();assert.equal(backup.raw_event.etag,events[1].etag);assert.equal(backup.raw_event.description,events[1].description);assert.match(response.headers.get('Cache-Control'),/no-store/);assert.deepEqual(await snapshot(),initial);assert.equal(control.patches.length,0);
+ assert.equal((await call('/api/lesson-history/snapshot/event?calendar_id=foreign&event_id=b')).status,403);
+ assert.equal((await call('/api/lesson-history/snapshot/event?calendar_id=synthetic-calendar&event_id=b',{})).status,405);
+ assert.equal((await call('/api/lesson-history/snapshot/event?calendar_id=synthetic-calendar&event_id=b',null,{})).status,401);
+ const scoped=await token(bindings.SESSION_SECRET,{aud:'works-mcp',scope:'schedule:read'});assert.equal((await call('/api/lesson-history/snapshot/event?calendar_id=synthetic-calendar&event_id=b',null,{Authorization:'Bearer '+scoped})).status,401);
+ assert.equal((await call('/api/next-lesson-plan/initialize',{target:{calendar_id:'synthetic-calendar',id:'b'}})).status,409);assert.equal((await call('/api/calendar-lesson-migration/preview',{event_id:'b'})).status,409);assert.equal((await put('/api/lesson-record',{})).status,409);assert.equal(control.patches.length,0);assert.deepEqual(await snapshot(),initial);
+});
