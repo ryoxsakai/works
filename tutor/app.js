@@ -776,6 +776,30 @@ els.signOutBtn.addEventListener("click", async () => {
   window.location.assign("/");
 });
 
+// Only calendar selection is required before the daily read. Auxiliary services
+// must not hold the first date/status row behind a failed or slow request.
+async function loadSignedInTutor(){
+  renderRecordDateLabel();
+  els.recordTbody.innerHTML='<tr><td colspan="7" role="status">カレンダー設定を確認しています…</td></tr>';
+  try{await loadSettings();}catch(error){showActionError(error);els.recordTbody.innerHTML='<tr><td colspan="7" role="status">カレンダー設定を取得できませんでした。再読込してください。</td></tr>';return;}
+  const optional=[
+    ()=>loadCalendarList(),()=>loadYears(),
+    async()=>{const before=[...selectedTermIds].sort().join(',');await loadTerms();if(before!==[...selectedTermIds].sort().join(','))await loadRecordTable();},
+    ()=>loadGoalTemplates(),()=>loadPeriods(),()=>loadMaterials(),
+    async()=>{studentDirectory=await apiFetch('/students');},
+  ];
+  void Promise.allSettled(optional.map(work=>Promise.resolve().then(work))).then(results=>{
+    results.forEach(result=>{if(result.status==='rejected')showActionError(result.reason);});
+    renderYearGroups();renderExcludedTitleList();renderCurriculumYearOptions();restoreCurriculumState();renderCurriculumSearchSummary();renderCurrentView();
+  }).catch(showActionError);
+  // Load the schedule independently of the restored student curriculum.
+  const schedule=loadCalendarEvents().catch(error=>{showEventPlaceholder('授業予定を取得できませんでした。再読み込みしてください。');showActionError(error);});
+  try{await loadRecordTable();}catch(error){showActionError(error);}
+  void schedule;
+}
+renderRecordDateLabel();
+els.recordTbody.innerHTML='<tr><td colspan="7" role="status">ログイン状態を確認しています…</td></tr>';
+
 watchAuth({
   onSignedIn: async (user) => {
     const pendingDestination = consumePendingDestination();
@@ -789,41 +813,7 @@ watchAuth({
     els.signOutBtn.title = `${user.email} (クリックでログアウト)`;
     setUserAvatar(els.userAvatar, els.userAvatarFallback, user.picture);
     els.actionError.textContent = "";
-    try {
-      await loadSettings();
-    } catch (err) {
-      showActionError(err);
-    }
-    // カレンダー一覧の取得はGoogle側の一時的な問題(API割り当て超過など)で
-    // 失敗することがあるため、失敗しても他の初期化処理は続行する。
-    try {
-      await loadCalendarList();
-    } catch (err) {
-      showActionError(err);
-    }
-    try {
-      try {
-        studentDirectory = await apiFetch("/students");
-      } catch (err) {
-        showActionError(err);
-      }
-      await loadYears();
-      await loadTerms();
-      await loadGoalTemplates();
-      await loadPeriods();
-      await loadMaterials();
-      renderYearGroups();
-      renderExcludedTitleList();
-      renderCurriculumYearOptions();
-      restoreCurriculumState();
-      renderCurriculumSearchSummary();
-      // Load the schedule independently of the restored student curriculum.
-      const schedule = loadCalendarEvents().catch(err=>{showEventPlaceholder("授業予定を取得できませんでした。再読み込みしてください。");showActionError(err);});
-      await loadRecordTable();
-      await schedule;
-    } catch (err) {
-      showActionError(err);
-    }
+    await loadSignedInTutor();
   },
   onSignedOut: () => {
     window.location.replace("/");
@@ -951,15 +941,12 @@ async function extractGoogleErrorDetail(res) {
 }
 
 async function loadCalendarList() {
-  const token = await getGoogleAccessToken();
-  const res = await fetch("https://www.googleapis.com/calendar/v3/users/me/calendarList", {
-    headers: { Authorization: `Bearer ${token}` },
+  const [data]=await boundedRead([null],async(_item,signal)=>{
+    const token=await getGoogleAccessToken({signal});
+    const res=await fetch('https://www.googleapis.com/calendar/v3/users/me/calendarList',{headers:{Authorization:`Bearer ${token}`},signal});
+    if(!res.ok){const detail=await extractGoogleErrorDetail(res);throw new Error(`カレンダー一覧の取得に失敗しました (${res.status})${detail ? `: ${detail}` : ''}`);}
+    return res.json();
   });
-  if (!res.ok) {
-    const detail = await extractGoogleErrorDetail(res);
-    throw new Error(`カレンダー一覧の取得に失敗しました (${res.status})${detail ? `: ${detail}` : ""}`);
-  }
-  const data = await res.json();
   const calendars = data.items || [];
   calendarColors = new Map(
     calendars.map((c, i) => {

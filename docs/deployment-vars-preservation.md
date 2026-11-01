@@ -1,0 +1,9 @@
+# 本番の段階設定を配備で保持する
+
+WorksのWorkers Buildsはmainをルートworkerから`npx wrangler deploy`で配備する。実行時のWranglerは3.114.17。`worker/package.json`のnpm scriptはこの経路では使われないため、そのscriptだけの変更では解決しない。
+
+Wranglerは既定で設定ファイルにない通常変数を次回配備で削除する。段階移行の`LESSON_HISTORY_MODE`は運用時に設定し、コードのvarsには固定値を書いていないため、マージ連動配備で消えてoffへ戻る。D1の新しい保存内容が非表示になるため、prepare/reconcile/activeのどの段階も保持する必要がある。
+
+最小修正はworker/wrangler.tomlのトップレベルに`keep_vars = true`を追加すること。modeの値、認証、権限、binding先は変更しない。設定ファイル内に明記されたvarsの値は引き続き適用する。
+
+同じWrangler 3.114.17の実パーサーとアップロード形式生成処理で、変更前のkeep_bindings未指定、変更後のplain_text/json/secret_text/secret_key保持をネットワークなしで確認する。通常のdeployコマンドをdry-runし、アップロードしない。実適用の承認後はマージ連動配備を一度だけ追跡し、完了前に手動配備を重ねず、最終版のmodeと全既存bindingを照合する。
