@@ -210,3 +210,13 @@ test('tag conversion lost response stays locked and reconciles without another C
  const f=await setup(t,{backup:true}),{DB,control,call,events}=f;await legacyStorage(f);const source=await DB.prepare("SELECT * FROM curriculum_entries WHERE calendar_event_id='b'").first();const {plan}=await (await call('/api/calendar-lesson-migration/preview',{event_id:'b',remove_management_tags:true})).json();control.lost=true;assert.equal((await call('/api/calendar-lesson-migration/apply',{plan})).status,503);assert.equal(control.patches.length,1);assert.equal(events[1].description.includes('<!--'),false);
  assert.equal((await call('/api/calendar-lesson-migration/apply',{plan})).status,409);assert.equal(control.patches.length,1);control.lost=false;const reconciled=await call('/api/calendar-lesson-record/reconcile',{target:{calendar_id:'synthetic-calendar',id:'b'}});assert.equal(reconciled.status,200,await reconciled.clone().text());assert.equal(control.patches.length,1);assert.deepEqual(await DB.prepare("SELECT * FROM curriculum_entries WHERE calendar_event_id='b'").first(),source);
 });
+
+test('heading-like continuation lines survive actual save, verified D1 parsing, MCP read and another edit',async t=>{
+ const {DB,events,call,put,bindings}=await setup(t);const value='first\n宿題: p.10\n 宿題：p.11\r\n\t確認テスト: continuation\n\u3000授業予定：continuation\n\\ 宿題: literal slash';
+ let current=await (await call('/api/lesson-plan?calendar_id=synthetic-calendar&event_id=b')).json();
+ for(const lesson_plan of [value,value+'\nnext edit']){
+  const saved=await put('/api/lesson-plan',{target:current.target,record_revision:current.record_revision,expected_lesson_plan:current.lesson_plan,lesson_plan});assert.equal(saved.status,200,await saved.clone().text());
+  current=await (await call('/api/lesson-plan?calendar_id=synthetic-calendar&event_id=b')).json();assert.equal(current.lesson_plan,lesson_plan);assert.equal(current.attribution_status,'confirmed');assert.equal(current.record_target_unavailable,undefined);assert.equal(events[1].description.includes('<!--'),false);
+ }
+ const bearer=await token(bindings.SESSION_SECRET,{aud:'works-mcp',scope:'schedule:read'});const mcp=await (await call('/mcp',{jsonrpc:'2.0',id:1,method:'tools/call',params:{name:'get_schedule',arguments:{date:'2026-10-31'}}},{Authorization:'Bearer '+bearer,'Content-Type':'application/json'})).json();assert.equal(mcp.result.structuredContent.events.find(e=>e.id==='b').lesson_plan,current.lesson_plan);assert.equal(await DB.prepare("SELECT COUNT(*) AS n FROM calendar_lesson_migration WHERE event_id='b' AND status='verified'").first('n'),2);
+});

@@ -128,3 +128,11 @@ test('plain layout keeps byte-exact outside headings and suffix while body round
  const legacy=replaceCalendarRecord('',values,binding),parsed=parseCalendarRecord(legacy),description=prefix+legacy+suffix,layout=plainCalendarRecordLayout(description,values,binding,{parsed:{...parsed,start:prefix.length,end:prefix.length+legacy.length}});
  assert.equal(layout.managed_prefix,prefix);assert.equal(layout.managed_suffix,suffix);assert.equal(layout.after_description.includes('<!--'),false);assert.deepEqual(parsePlainCalendarRecord(layout.after_description,binding,{prefix,suffix}).values,values);assert.throws(()=>parsePlainCalendarRecord(layout.after_description+'changed',binding,{prefix,suffix}));
 });
+
+test('plain fields roundtrip every recognized continuation heading, indentation, colon and newline without ambiguity',()=>{
+ for(const key of Object.keys(calendarRecordValues({})))for(const label of ['授業予定','確認テスト','宿題','授業メモ'])for(const colon of [':','：'])for(const indent of ['', ' ', '  ', '\t', '\u3000', '\u00a0', '\\', '\\ '])for(const newline of ['\n','\r\n']){
+  const value='first'+newline+indent+label+colon+' p.10'+newline+'tail',values={...calendarRecordValues({}),[key]:value};
+  const layout=plainCalendarRecordLayout('',values,binding);assert.deepEqual(parsePlainCalendarRecord(layout.after_description,binding).values,values,JSON.stringify({key,label,colon,indent,newline}));assert.equal(layout.after_description.includes('<!--'),false);
+  const legacy=replaceCalendarRecord('',values,binding),converted=plainCalendarRecordLayout(legacy,parseCalendarRecord(legacy).values,binding);assert.deepEqual(parsePlainCalendarRecord(converted.after_description,binding).values,values);
+ }
+});
