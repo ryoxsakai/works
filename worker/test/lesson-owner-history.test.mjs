@@ -135,3 +135,10 @@ test('unassigned sources do not scan a year; bound sources batch bindings and av
  const {env,events,deps,owner,ref}=await setup(t);let lists=0;const original=deps.events;deps.events=async(...args)=>{lists++;return original(...args);};env.LESSON_HISTORY_MODE='active';assert.equal((await readNextLessonPlan(env,'a',events[0].id,deps)).reason,'owner_unassigned');assert.equal(lists,0);
  await bind(env,owner,ref(),deps);for(let i=0;i<400;i++)events.push({...events[1],id:'unrelated-'+i,summary:'different '+i});const real=env.DB;let reads=0;env.DB={prepare(sql){if(/^SELECT/.test(sql))reads++;return real.prepare(sql);}};const result=await readNextLessonPlan(env,'a',events[0].id,deps);assert.equal(result.reason,'owner_confirmation_required');assert.ok(reads<12,'bounded D1 reads, not 400 per-event lookups: '+reads);
 });
+
+test('explicitly excluded bound and unbound occurrences are skipped before earliest/tied next candidate selection',async t=>{
+ const {env,events,deps,owner,ref}=await setup(t);await bind(env,owner,ref(),deps);await bind(env,owner,ref(2),deps);env.LESSON_HISTORY_MODE='active';
+ await env.DB.prepare("INSERT INTO lesson_history_exclusions VALUES('a',?,'excluded')").bind(events[1].id).run();let result=await readNextLessonPlan(env,'a',events[0].id,deps);assert.equal(result.target.id,events[2].id);assert.equal(result.owner_confirmation_required,undefined);
+ events.push({...events[2],id:'excluded-tie'});await env.DB.prepare("INSERT INTO lesson_history_exclusions VALUES('a','excluded-tie','excluded')").run();result=await readNextLessonPlan(env,'a',events[0].id,deps);assert.equal(result.target.id,events[2].id);assert.notEqual(result.reason,'ambiguous');
+ await env.DB.prepare("INSERT INTO lesson_history_exclusions VALUES('a',?,'excluded')").bind(events[2].id).run();result=await readNextLessonPlan(env,'a',events[0].id,deps);assert.equal(result.target,null);assert.equal(result.reason,'none');
+});

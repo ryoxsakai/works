@@ -58,10 +58,11 @@ export async function readNextLessonPlan(env, calendarId, eventId, deps) {
     if(record.attribution_status!=='confirmed')return {...base,target:null,reason:'owner_unassigned',lesson_plan:''};
     const events=await deps.events(context.token,calendarId,source.start,searchEnd);
     // One binding read avoids per-event D1 reads for a whole year of unrelated lessons.
-    const {results:bindings}=await env.DB.prepare('SELECT l.event_id,r.owner_id FROM lesson_event_links l LEFT JOIN lesson_history_records r ON r.id=l.record_id WHERE l.calendar_id=?').bind(calendarId).all();
-    const owners=new Map(bindings.map(link=>[link.event_id,link.owner_id]));
+    const {results:bindings}=await env.DB.prepare('SELECT l.event_id,r.owner_id,0 AS excluded FROM lesson_event_links l LEFT JOIN lesson_history_records r ON r.id=l.record_id WHERE l.calendar_id=? UNION ALL SELECT event_id,NULL AS owner_id,1 AS excluded FROM lesson_history_exclusions WHERE calendar_id=?').bind(calendarId,calendarId).all();
+    const owners=new Map(bindings.filter(link=>!link.excluded).map(link=>[link.event_id,link.owner_id]));
+    const exclusions=new Set(bindings.filter(link=>link.excluded).map(link=>link.event_id));
     const candidates=events.map(event=>({event,ref:lessonEventRef(event,calendarId)}))
-      .filter(({ref})=>ref.id!==source.id&&isScheduledLesson(ref,context.settings.excluded_titles||[])&&Date.parse(ref.start)>=Date.parse(source.end))
+      .filter(({ref})=>ref.id!==source.id&&!exclusions.has(ref.id)&&isScheduledLesson(ref,context.settings.excluded_titles||[])&&Date.parse(ref.start)>=Date.parse(source.end))
       .filter(({ref})=>owners.get(ref.id)?owners.get(ref.id)===record.owner_id:lessonTitleKey(ref.title)===lessonTitleKey(source.title))
       .sort((a,b)=>Date.parse(a.ref.start)-Date.parse(b.ref.start));
     if(!candidates.length||candidates[1]&&Date.parse(candidates[1].ref.start)===Date.parse(candidates[0].ref.start))return {...base,target:null,reason:candidates.length?'ambiguous':'none',lesson_plan:''};
