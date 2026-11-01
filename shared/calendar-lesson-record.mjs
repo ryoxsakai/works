@@ -85,7 +85,7 @@ export function parsePlainCalendarRecord(description,binding,{prefix='',suffix='
   return {text:unescapeHTML(text),start:from,end:to};
  };
  for(const match of body.matchAll(separators)){lines.push(line(body.slice(start,match.index),start,match.index+match[0].length));start=match.index+match[0].length;}
- if(start<body.length)lines.push(line(body.slice(start),start,body.length));
+ if(start<body.length||body.endsWith('\n'))lines.push(line(body.slice(start),start,body.length));
  const indexes=headings.map(heading=>lines.flatMap((entry,index)=>plainHeadingLabel(entry.text,heading)?[index]:[]));
  if(indexes.every(items=>!items.length)){if(/(?:授業予定|確認テスト|宿題|授業メモ)\s*[:：]/.test(lines.map(entry=>entry.text||'').join('\n')))throw fail('見出しの形式を確認してください');return null;}
  if(indexes.some(items=>items.length!==1)||indexes.some((items,index)=>index&&items[0]<=indexes[index-1][0]))throw fail('4項目の見出しを一意に確認できません');
