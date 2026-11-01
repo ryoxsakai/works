@@ -4,13 +4,31 @@ import {replaceCalendarRecord,parseCalendarRecord,parsePlainCalendarRecord} from
 import {calendarLessonJournal} from '../src/calendar-lesson-journal.js';
 import {lessonEventRef} from '../../shared/lesson-plan.js';
 import {recordBinding} from '../src/calendar-lesson-migration.js';
+import {createLessonOwner,changeLessonBinding,listOwnerRecords} from '../src/lesson-owner-history.js';
 const parseVisible=description=>parseCalendarRecord(description)||parsePlainCalendarRecord(description,{calendar_id:'synthetic-calendar',event_id:'b',title:'合成生徒',generation:0});
 const origin='https://works.example.test',owner='owner@example.invalid';
+test('actual Worker D1 owner mode: legacy UI and MCP read D1, edits never PATCH Calendar; old attribution/template/undo writers are blocked',async t=>{
+ const {DB,events,control,call,put,bindings}=await setup(t,{historyMode:'active'}),env={DB,LESSON_HISTORY_MODE:'active'};
+ const person=(await createLessonOwner(env,{request_id:crypto.randomUUID(),name:'固定IDの生徒',kind:'student'})).owner;
+ const deps={settings:async()=>({selected_calendars:['synthetic-calendar']}),token:async()=>({access_token:'synthetic'}),event:async(token,cal,id)=>events.find(e=>e.id===id)};
+ await changeLessonBinding(env,{request_id:crypto.randomUUID(),target:lessonEventRef(events[0],'synthetic-calendar'),link_revision:0,decision:'new',owner_id:person.id,owner_revision:1},deps);
+ const current=await (await call('/api/lesson-plan?calendar_id=synthetic-calendar&event_id=a')).json();assert.equal(current.record_storage,'d1_owner');
+ const saved=await put('/api/lesson-plan',{target:current.target,record_revision:current.record_revision,expected_lesson_plan:'',lesson_plan:'D1に保存'});assert.equal(saved.status,200,await saved.clone().text());
+ assert.equal((await listOwnerRecords(env,person.id))[0].lesson_plan,'D1に保存');assert.equal(control.patches.length,0);assert.equal(events[0].description,undefined);
+ const bearer=await token(bindings.SESSION_SECRET,{aud:'works-mcp',scope:'schedule:read'});
+ const mcp=await (await call('/mcp',{jsonrpc:'2.0',id:1,method:'tools/call',params:{name:'get_schedule',arguments:{date:'2026-10-31'}}},{Authorization:'Bearer '+bearer,'Content-Type':'application/json'})).json();assert.ok(mcp.result?.structuredContent,JSON.stringify(mcp));assert.equal(mcp.result.structuredContent.events.find(e=>e.id==='a').lesson_plan,'D1に保存');
+ assert.equal((await call('/api/next-lesson-plan/initialize',{target:current.target})).status,409);
+ assert.equal((await put('/api/lesson-record',{target:current.target})).status,409);
+ assert.equal((await call('/api/calendar-lesson-migration/apply',{})).status,409);
+ const denied=await call('/api/lesson-history/owners',{request_id:crypto.randomUUID(),name:'blocked',kind:'student'});assert.equal(denied.status,403);
+ const allowed=await call('/api/lesson-history/owners',{request_id:crypto.randomUUID(),name:'集団授業',kind:'class'},{Authorization:'Bearer '+await token(bindings.SESSION_SECRET),'Content-Type':'application/json',Origin:origin});assert.equal(allowed.status,200,await allowed.clone().text());assert.equal(control.patches.length,0);
+});
 async function token(secret,claims={}){const payload=Buffer.from(JSON.stringify({email:owner,exp:Date.now()+86400000,...claims})).toString('base64url');const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(secret),{name:'HMAC',hash:'SHA-256'},false,['sign']);return payload+'.'+Buffer.from(await crypto.subtle.sign('HMAC',key,new TextEncoder().encode(payload))).toString('base64url');}
-async function setup(t,{backup=false}={}){
+async function setup(t,{backup=false,historyMode}={}){
  const event=(id,hour,date='2026-10-31')=>({id,summary:'合成生徒',organizer:{self:true},etag:'"'+id+'-1"',start:{dateTime:`${date}T${hour}:00:00+09:00`},end:{dateTime:`${date}T${hour+1}:00:00+09:00`}});
  const events=[event('a',10),event('b',11),event('c',10,'2026-11-07')],control={patches:[],reads:[],lost:false,deny:false};
  const bindings={SESSION_SECRET:'synthetic-secret',ALLOWED_EMAIL:owner,ALLOWED_ORIGIN:origin,GOOGLE_CLIENT_ID:'synthetic',GOOGLE_CLIENT_SECRET:'synthetic',WORKS_API_KEY:'synthetic-key',CALENDAR_LESSON_RECORDS:'true',CALENDAR_LESSON_MIGRATION_JOURNAL:'true',CALENDAR_LESSON_ATTESTED_CALENDARS:'["synthetic-calendar"]'};
+ if(historyMode)bindings.LESSON_HISTORY_MODE=historyMode;
  if(backup){bindings.CALENDAR_LESSON_BACKUP_SHA256='f'.repeat(64);bindings.CALENDAR_LESSON_BACKUP_CAPTURED_AT=new Date().toISOString();}
  const mf=new Miniflare({modules:true,modulesRoot:new URL('../../',import.meta.url).pathname,modulesRules:[{type:'ESModule',include:['**/*.js','**/*.mjs']}],scriptPath:new URL('../src/index.js',import.meta.url).pathname,compatibilityDate:'2026-08-01',d1Databases:{DB:'calendar-runtime'},bindings,outboundService:async request=>{
   const url=new URL(request.url);control.reads.push(url.pathname);
@@ -31,6 +49,7 @@ async function setup(t,{backup=false}={}){
  }});t.after(()=>mf.dispose());const DB=await mf.getD1Database('DB');
  await DB.batch([DB.prepare('CREATE TABLE settings(key TEXT PRIMARY KEY,value TEXT)'),DB.prepare("INSERT INTO settings VALUES('selected_calendars','[\"synthetic-calendar\"]')"),DB.prepare('CREATE TABLE google_auth(id INTEGER PRIMARY KEY,refresh_token TEXT,updated_at TEXT)'),DB.prepare("INSERT INTO google_auth VALUES(1,'synthetic','now')"),DB.prepare('CREATE TABLE curriculum_entries(calendar_event_id TEXT PRIMARY KEY,completed INTEGER DEFAULT 0,lesson_plan TEXT,confirmation_test TEXT,homework TEXT,lesson_memo TEXT,updated_at TEXT)')]);
  await ensureAttribution({DB});const sql=await readFile(new URL('../calendar-lesson-migration.sql',import.meta.url),'utf8');await DB.batch(sql.replace(/^--.*$/gm,'').split(';').filter(s=>s.trim()).map(s=>DB.prepare(s)));
+ if(historyMode){const historySql=await readFile(new URL('../migrations/lesson-owner-history.sql',import.meta.url),'utf8');await DB.batch(historySql.replace(/^--.*$/gm,'').split(';').filter(s=>s.trim()).map(s=>DB.prepare(s)));await DB.prepare("INSERT INTO lesson_history_policy VALUES(1,1,1,'synthetic')").run();}
  await DB.prepare("INSERT INTO curriculum_entries VALUES('b',0,'DB original','original test','original homework','original memo','now')").run();
  await DB.prepare("UPDATE lesson_record_identity SET calendar_id='synthetic-calendar',title='合成生徒' WHERE event_id='b'").run();const row=await rawRecord({DB},'b');
  events[1].description=replaceCalendarRecord('既存の案内',{...row,lesson_plan:'Calendar native value'},{calendar_id:'synthetic-calendar',event_id:'b',title:'合成生徒',generation:0});

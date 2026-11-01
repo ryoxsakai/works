@@ -12,6 +12,7 @@ export function lessonDate(ref) {
   return Number.isFinite(time) ? new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit'}).format(time) : null;
 }
 export function attributedLessonRecord(row, ref) {
+  if(row?.record_storage==='d1_owner'||row?.attribution_status==='owner_unassigned')return row;
   if (!row?.record_hold_active && !row?.record_collision && !row?.record_target_unavailable && (!row?.record_exists || !lessonRecordHasContent(row))) return {...row,record_revision:row?.record_revision || 0,attribution_status:'new'};
   const sameId = row.calendar_event_id === ref.id;
   const matches = (calendar,title) => sameId && calendar === ref.calendar_id && title != null && lessonTitleKey(title) === lessonTitleKey(ref.title);
@@ -35,4 +36,4 @@ export function attributedLessonRecord(row, ref) {
     attribution_status:reason,attribution_notice:'予定名の対応確認が必要なため、旧記録を現在の内容として表示していません。',completed:0,
     lesson_plan:null,confirmation_test:null,homework:null,lesson_memo:null};
 }
-export const lessonRecordNeedsReview = row => ['legacy_unknown','known_change','title_changed','id_collision','target_unavailable'].includes(row?.attribution_status);
+export const lessonRecordNeedsReview = row => ['excluded','event_recreated','owner_unassigned','legacy_unknown','known_change','title_changed','id_collision','target_unavailable'].includes(row?.attribution_status);
