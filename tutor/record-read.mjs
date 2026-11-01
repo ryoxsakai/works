@@ -1,11 +1,11 @@
 let active=0;const waiting=[];
-function acquire(signal){return new Promise((resolve,reject)=>{const run=()=>{signal.removeEventListener('abort',abort);active++;resolve(()=>{active--;waiting.shift()?.();});};const abort=()=>{const index=waiting.indexOf(run);if(index>=0)waiting.splice(index,1);reject(Object.assign(new Error('読み取りを中止しました'),{code:'READ_TIMEOUT'}));};if(signal.aborted)return abort();if(active<4)run();else{waiting.push(run);signal.addEventListener('abort',abort,{once:true});}});}
+function acquire(signal){return new Promise((resolve,reject)=>{const run=()=>{signal.removeEventListener('abort',abort);active++;let released=false;resolve(()=>{if(released)return;released=true;active--;waiting.shift()?.();});};const abort=()=>{const index=waiting.indexOf(run);if(index>=0)waiting.splice(index,1);reject(Object.assign(new Error('読み取りを中止しました'),{code:'READ_TIMEOUT'}));};if(signal.aborted)return abort();if(active<4)run();else{waiting.push(run);signal.addEventListener('abort',abort,{once:true});}});}
 // Read-only work has bounded concurrency and deadlines; writes never use this helper.
 export async function boundedRead(items, read, {concurrency=4,timeout=15000,isCurrent=()=>true,onProgress=()=>{}}={}) {
  const results=new Array(items.length);let next=0,done=0,stopped=false;
  const stale=()=>Object.assign(new Error('表示対象が変わりました'),{code:'STALE_READ'});
- async function worker(){while(!stopped&&next<items.length){if(!isCurrent())throw stale();const index=next++,controller=new AbortController();let timer;
-  try{results[index]=await Promise.race([Promise.resolve().then(async()=>{const release=await acquire(controller.signal);try{if(stopped||!isCurrent())throw stale();return await read(items[index],controller.signal);}finally{release();}}),new Promise((_,reject)=>{timer=setTimeout(()=>{controller.abort();reject(Object.assign(new Error('読み取りが時間内に完了しませんでした。日付を切り替えて再読込してください'),{code:'READ_TIMEOUT'}));},timeout);})]);if(stopped||!isCurrent())throw stale();onProgress(++done,items.length);}
+ async function worker(){while(!stopped&&next<items.length){if(!isCurrent())throw stale();const index=next++,controller=new AbortController();let timer,release=()=>{};
+  try{results[index]=await Promise.race([Promise.resolve().then(async()=>{release=await acquire(controller.signal);try{if(controller.signal.aborted||stopped||!isCurrent())throw stale();return await read(items[index],controller.signal);}finally{release();}}),new Promise((_,reject)=>{timer=setTimeout(()=>{controller.abort();release();reject(Object.assign(new Error('読み取りが時間内に完了しませんでした。日付を切り替えて再読込してください'),{code:'READ_TIMEOUT'}));},timeout);})]);if(stopped||!isCurrent())throw stale();onProgress(++done,items.length);}
   catch(error){stopped=true;throw error;}finally{clearTimeout(timer);}
  }}
  await Promise.all(Array.from({length:Math.min(concurrency,items.length)},worker));return results;

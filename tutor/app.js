@@ -1,6 +1,6 @@
 import {boundedRead,precedingLegacyEvents,precedingOwnerEvents} from './record-read.mjs?v=1';
 import {readNextLessonWithTemplate} from "../shared/next-lesson-read.mjs?v=1";
-import { lessonRecordRows, renderPlanEditors, renderMemoEditors, previousOwnerRecord } from "../shared/lesson-record-view.mjs?v=1";
+import { lessonRecordRows, renderPlanEditors, renderMemoEditors, previousOwnerRecord } from "../shared/lesson-record-view.mjs?v=2";
 import { setUserAvatar } from "../shared/avatar.mjs?v=1";
 import { attachRecordCarousel } from "./record-carousel.mjs?v=2";
 import { attachRecordToasts } from "./record-toasts.mjs?v=2";
@@ -12,11 +12,11 @@ import {
   signOutUser,
   getGoogleAccessToken,
   getSessionToken,
-} from "../shared/auth.js?v=12";
+} from "../shared/auth.js?v=13";
 import { getTheme, setTheme } from "../shared/theme.js?v=6";
 import { tokyoDateKey, shiftRecordDate, recordDateRange } from "./record-date.js?v=1";
 import { createStudentMemoStore } from "./student-memo.js?v=1";
-import { createLessonPlanController } from "./lesson-plan.js?v=4";
+import { createLessonPlanController } from "./lesson-plan.js?v=5";
 import { lessonEventRef, lessonEventKey } from "../shared/lesson-plan.js?v=1";
 
 const PASTEL_FALLBACK_COLORS = [
@@ -873,7 +873,7 @@ async function apiFetch(path, options = {}, context = (/^\/(?:goals|schools|stud
 // 選択中の全カレンダーから指定期間の予定を横断取得する共通ヘルパー。
 // withCalendarId=trueのときは各予定に_calendarId(色分け用)を付与する。
 async function fetchCalendarEvents(timeMin, timeMax, { withCalendarId = false, includeExcluded = false } = {}) {
-  const [token] = await boundedRead([null],()=>getGoogleAccessToken());
+  const [token] = await boundedRead([null],(_item,signal)=>getGoogleAccessToken({signal}));
   const results = await Promise.all(
     [...selectedCalendarIds].map(async (calendarId) => {
       // Page tokens belong to one calendar; never share them between requests.

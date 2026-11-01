@@ -52,7 +52,7 @@ export function createLessonPlanController({ readNext, write, onChange = () => {
           link.status='attribution'; link.targetKey=''; notify(); return;
         }
         link.target = result.target;
-        link.targetKey = result.target ? seed(result.target, result.lesson_plan || "", readVersion, result.record_revision,result.attribution_status).key : "";
+        link.targetKey = result.target ? seed(result.target, result.lesson_plan || "", readVersion, result.record_revision,result.attribution_status,result.owner_id||null).key : "";
         link.status = result.target ? "ready" : result.reason;
         notify();
       } catch (error) {
