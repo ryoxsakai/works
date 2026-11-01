@@ -12,6 +12,7 @@
 <form id="rename-owner"><label>選択中の表示名<input name="name" class="form-control" required maxlength="200"></label><button class="btn-outline history-secondary">同じ生徒・クラスの名前を変更</button></form><p>同姓同名でも別に登録できます。名前の変更だけで記録の所有者は変わりません。</p></section>
 <section aria-labelledby="records-heading"><h2 id="records-heading">授業履歴</h2><p id="history-empty"></p><div id="records"></div>
 <details><summary>予定のない授業記録を追加</summary><form id="new-record"><label>授業日時<input type="datetime-local" name="date" required class="form-control"></label><button class="btn-solid history-primary">選択中の生徒・クラスに空の記録を作る</button></form></details></section>
+<section aria-labelledby="pending-heading"><h2 id="pending-heading">未紐づけの予定下書き</h2><p>予定単位のD1下書きです。生徒の履歴には自動で移しません。予定を削除・変更しても元の下書きを保持します。</p><button id="pending-plans" class="btn-outline history-secondary">下書き一覧を確認</button><div id="pending-plan-list"></div></section>
 <section aria-labelledby="binding-heading"><h2 id="binding-heading">予定との紐づけを確認</h2><p>予定名から自動で引き継ぎません。改名・入替・追加・再作成した個別の予定を確認します。</p>
 <form id="lookup"><label>カレンダー<select id="calendar" class="form-select" required></select></label><label>個別の予定ID<input id="event-id" class="form-control" required></label><button class="btn-outline history-secondary">現在の予定を確認</button></form>
 <div id="target-details"></div><div id="binding-actions" hidden>
@@ -25,4 +26,4 @@
 <button id="preview" class="btn-solid history-primary">最新カレンダーと旧DBの移行プレビュー</button>
 </div><div id="import-preview"></div></section>
 <section><h2>初期紐づけが必要な旧記録</h2><button id="legacy" class="btn-outline history-secondary">一覧を確認</button><p>原記録は保存されています。比較時の名前は所有者の証明として扱いません。</p><div id="legacy-list"></div></section>
-</main><script type="module" src="./history.mjs?v=2-readonly-snapshot"></script></body></html>
+</main><script type="module" src="./history.mjs?v=3-pending-plans"></script></body></html>

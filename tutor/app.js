@@ -1,8 +1,8 @@
 import {boundedRead,precedingLegacyEvents,precedingOwnerEvents,recordTermScope} from './record-read.mjs?v=2';
 import {readNextLessonWithTemplate} from "../shared/next-lesson-read.mjs?v=1";
-import { lessonRecordRows, renderPlanEditors, renderMemoEditors, previousOwnerRecord } from "../shared/lesson-record-view.mjs?v=2";
+import { lessonRecordRows, renderPlanEditors, renderMemoEditors, previousOwnerRecord } from "../shared/lesson-record-view.mjs?v=4";
 import { setUserAvatar } from "../shared/avatar.mjs?v=1";
-import { attachRecordCarousel } from "./record-carousel.mjs?v=2";
+import { attachRecordCarousel } from "./record-carousel.mjs?v=3";
 import { attachRecordToasts } from "./record-toasts.mjs?v=2";
 import { startTutorPresentation } from "../shared/ui/tutor-presentation.mjs";
 startTutorPresentation();
@@ -16,7 +16,7 @@ import {
 import { getTheme, setTheme } from "../shared/theme.js?v=6";
 import { tokyoDateKey, shiftRecordDate, recordDateRange } from "./record-date.js?v=1";
 import { createStudentMemoStore } from "./student-memo.js?v=1";
-import { createLessonPlanController } from "./lesson-plan.js?v=5";
+import { createLessonPlanController } from "./lesson-plan.js?v=7";
 import { lessonEventRef, lessonEventKey } from "../shared/lesson-plan.js?v=1";
 
 const PASTEL_FALLBACK_COLORS = [
@@ -239,6 +239,8 @@ const studentMemos = createStudentMemoStore({
 });
 
 const lessonPlans = createLessonPlanController({
+  readCurrent:target=>apiFetch('/lesson-plan?'+new URLSearchParams({calendar_id:target.calendar_id,event_id:target.id}),{},null),
+  readOperation:id=>apiFetch('/lesson-history/audit?operation_id='+encodeURIComponent(id),{},null),
   readNext: (source) => readNextLessonWithTemplate(source,(path,opts={})=>apiFetch(path,opts,null),(before,after,revision)=>applyCalendarTarget(before,after,revision),getSessionToken(),getSessionToken),
   write: async (body) => {
     const result = await apiFetch("/lesson-plan", { method: "PUT", body: JSON.stringify(body) }, null);
@@ -585,7 +587,7 @@ async function loadRecordTable() {
 }
 
 function renderRecordTable(rows) {
-  rows.filter((row) => !row.emptySlot && !lessonRecordNeedsReview(row.record)).forEach((row) => lessonPlans.seed(row.ref, row.lessonPlan, row.planReadVersion, row.record.record_revision,row.record.attribution_status,row.record.owner_id||null));
+  rows.filter((row) => !row.emptySlot && (!lessonRecordNeedsReview(row.record)||row.record.pending_allowed)).forEach((row) => lessonPlans.seed(row.ref, row.lessonPlan, row.planReadVersion, row.record.record_revision,row.record.attribution_status,row.record.owner_id||null,row.record.pending_context||null));
   els.recordTbody.innerHTML = lessonRecordRows(rows, { escapeHtml, formatTimeOrPeriod, lessonRecordNeedsReview, lessonReviewRow, lightenHexColor, calendarName: id => calendarColors.get(id)?.name, lessonAttributionNotice, lessonPlanEditor, lessonPlanFeedback, recordStudentPrefName, lessonEventKey });
   renderStudentMemos();
   renderLessonPlans();
@@ -594,7 +596,7 @@ function renderRecordTable(rows) {
     else{row.querySelectorAll('input,textarea,button').forEach(el=>el.disabled=true);const notice=document.createElement('p');notice.textContent='未保存入力と現在の予定・版が異なります。保持中の入力を確認してください。';row.cells[0].append(notice);}
   }
   showRetainedRecordDrafts();
-  rows.filter((row) => !row.emptySlot).forEach((row) => lessonPlans.loadNext(row.ref));
+  rows.filter((row) => !row.emptySlot&&!lessonRecordNeedsReview(row.record)).forEach((row) => lessonPlans.loadNext(row.ref));
   const names = new Set([...els.recordTbody.querySelectorAll(".student-memo-editor")].map((editor) => editor.dataset.studentName));
   names.forEach((name) => studentMemos.load(name).catch(() => {}));
   requestAnimationFrame(resizeRecordInputs);
@@ -634,6 +636,7 @@ document.addEventListener("click", async (event) => {
   if (!button || button.disabled) return;
   const editor = button.closest(".lesson-plan-editor");
   const key = editor.dataset.planKey, sourceKey = editor.dataset.sourceKey;
+  if(button.dataset.action==='verify-pending'){await lessonPlans.verifyPending(key);return;}
   if (button.dataset.action === "retry") { lessonPlans.save(key, sourceKey).catch(() => {}); return; }
   if (button.dataset.action === "recheck") { await lessonPlans.loadNext(lessonPlans.getLink(sourceKey).source); return; }
   lessonPlans.discard(key);
@@ -3577,6 +3580,7 @@ function escapeHtml(str) {
 
 function lessonReviewRow(ref,record,label,date) {
   if(record.attribution_status==='excluded')return `<tr><td colspan="7">${escapeHtml(label)} ${escapeHtml(date)}：授業履歴への取り込み・編集の対象外です。</td></tr>`;
+  if(record.attribution_status==='owner_unassigned'&&record.pending_allowed)return `<tr><td colspan="7"><strong>${escapeHtml(label)}</strong> ${escapeHtml(date)}<div class="pending-plan-label"><span>授業予定</span>${lessonPlanEditor(ref,label,'pending-record-plan','')}</div><p>未紐づけのため予定単位のD1下書きとして保存します。生徒の履歴へは自動で移しません。</p><a class="pending-bind-link" href="/tutor/history.html?calendar_id=${encodeURIComponent(ref.calendar_id)}&event_id=${encodeURIComponent(ref.id)}">下書きと紐づけを確認</a></td></tr>`;
   if(record.record_storage==='d1_owner'||record.attribution_status==='owner_unassigned')return `<tr><td colspan="7"><strong>${escapeHtml(label)}</strong> ${escapeHtml(date)}<p>生徒・クラスの紐づけを確認してください。保存済みの授業履歴は保持されています。</p><a href="/tutor/history.html?calendar_id=${encodeURIComponent(ref.calendar_id)}&event_id=${encodeURIComponent(ref.id)}">授業履歴で紐づけを確認</a></td></tr>`;
   if(record.record_pending_operation)return `<tr><td colspan="7"><strong>${escapeHtml(label)}</strong> ${escapeHtml(date)}<p role="status">カレンダー保存の結果確認が必要です。再送は停止しています。</p><button type="button" class="calendar-record-reconcile" data-ref="${escapeHtml(JSON.stringify(ref))}">保存結果を照合する</button><small role="status"></small></td></tr>`;
   return `<tr><td colspan="7"><strong>${escapeHtml(label)}</strong> ${escapeHtml(date)}

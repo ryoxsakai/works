@@ -3,7 +3,7 @@
 .record-panel #record-table tr[data-event-id] td:nth-child(5), .record-panel #record-table tr[data-event-id] td:nth-child(6),
 .record-panel #record-table th:nth-child(2), .record-panel #record-table th:nth-child(3),
 .record-panel #record-table th:nth-child(5), .record-panel #record-table th:nth-child(6),
-.record-panel .record-memo, .record-panel .record-next-plan .lesson-plan-target:not([data-conflict="true"]) { display: none !important; }
+.record-panel .record-memo, .record-panel .record-next-plan .lesson-plan-target:not([data-conflict="true"]):not([data-review="true"]) { display: none !important; }
 .record-panel #record-table tr[data-event-id] td:nth-child(7)::before { display: none; }
 .record-panel .record-card-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: .5rem; flex-wrap: wrap; }
 .record-panel .record-card-meta { display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: .5rem; margin-left: auto; max-width: 100%; color: var(--muted); font-size: .75rem; overflow-wrap: anywhere; }
