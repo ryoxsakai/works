@@ -1,3 +1,4 @@
+import {boundedRead,precedingLegacyEvents,precedingOwnerEvents} from './record-read.mjs?v=1';
 import {readNextLessonWithTemplate} from "../shared/next-lesson-read.mjs?v=1";
 import { lessonRecordRows, renderPlanEditors, renderMemoEditors, previousOwnerRecord } from "../shared/lesson-record-view.mjs?v=1";
 import { setUserAvatar } from "../shared/avatar.mjs?v=1";
@@ -255,6 +256,7 @@ function applyCalendarTarget(before,after,revision){
   lessonPlans.observeTarget(before,after);
   if(Number.isSafeInteger(revision))lessonPlans.observeRecord(after,revision);
   for(const event of rawEvents)if(lessonEventKey(lessonEventRef(event))===lessonEventKey(before))event.etag=after.etag;
+  document.querySelectorAll('.lesson-plan-editor[data-read-target]').forEach(editor=>{const ref=JSON.parse(editor.dataset.readTarget);if(JSON.stringify(ref)===JSON.stringify(before))editor.dataset.readTarget=JSON.stringify(after);});
   document.querySelectorAll('tr[data-record-ref]').forEach(row=>{const ref=JSON.parse(row.dataset.recordRef);if(lessonEventKey(ref)===lessonEventKey(before)){row.dataset.recordRef=JSON.stringify(after);if(Number.isSafeInteger(revision))row.dataset.recordRevision=revision;}});
 }
 
@@ -287,6 +289,13 @@ let listWeekCursor = startOfWeek(new Date());
 let selectedScheduleDate = formatDateOnly(new Date());
 let selectedRecordDate = tokyoDateKey();
 let recordTableRequest = 0;
+const recordDrafts=new Map();
+function rememberRecordDraft(row){if(!row)return;const ref=JSON.parse(row.dataset.recordRef);recordDrafts.set(lessonEventKey(ref),{ref,ownerId:row.dataset.recordOwner||null,revision:Number(row.dataset.recordRevision),values:Object.fromEntries(['test','homework','memo'].map(field=>[field,row.querySelector('.record-'+field).value]))});}
+function showRetainedRecordDrafts(){
+ let panel=document.querySelector('#retained-record-drafts');if(!panel){panel=document.createElement('aside');panel.id='retained-record-drafts';els.recordTbody.closest('table').before(panel);}
+ panel.replaceChildren();for(const draft of recordDrafts.values()){const details=document.createElement('details'),title=document.createElement('summary'),text=document.createElement('pre');title.textContent='保持中の未保存入力：'+draft.ref.title+' / '+draft.ref.start;text.textContent=['確認テスト：'+draft.values.test,'宿題：'+draft.values.homework,'授業メモ：'+draft.values.memo].join('\n');details.append(title,text);panel.append(details);}
+}
+window.addEventListener('beforeunload',event=>{if(recordDrafts.size){event.preventDefault();event.returnValue='';}});
 let goals = [];
 let candidateSchools = [];
 let editingGoalId = null;
@@ -507,7 +516,10 @@ async function loadRecordTable() {
     if (!isCurrent()) return;
 
     const planReadVersion = lessonPlans.version;
-    const entries = await readRecordEntries([...dayEvents,...rangeEvents]);
+    const dayEntries = await readRecordEntries(dayEvents,null,{isCurrent,onProgress:(done,total)=>{if(isCurrent())els.recordTbody.innerHTML=`<tr><td colspan="7" role="status">授業記録を読み込んでいます… ${done}/${total}</td></tr>`;}});
+    if (!isCurrent()) return;
+    const previousEntries = await readPreviousEntries(dayEvents,rangeEvents,dayEntries,isCurrent);
+    const entries = [...dayEntries,...previousEntries];
     if (!isCurrent()) return;
     const entryMap = new Map(entries.map((entry) => [entry.calendar_event_id, entry]));
 
@@ -571,10 +583,15 @@ async function loadRecordTable() {
 }
 
 function renderRecordTable(rows) {
-  rows.filter((row) => !row.emptySlot && !lessonRecordNeedsReview(row.record)).forEach((row) => lessonPlans.seed(row.ref, row.lessonPlan, row.planReadVersion, row.record.record_revision,row.record.attribution_status));
+  rows.filter((row) => !row.emptySlot && !lessonRecordNeedsReview(row.record)).forEach((row) => lessonPlans.seed(row.ref, row.lessonPlan, row.planReadVersion, row.record.record_revision,row.record.attribution_status,row.record.owner_id||null));
   els.recordTbody.innerHTML = lessonRecordRows(rows, { escapeHtml, formatTimeOrPeriod, lessonRecordNeedsReview, lessonReviewRow, lightenHexColor, calendarName: id => calendarColors.get(id)?.name, lessonAttributionNotice, lessonPlanEditor, lessonPlanFeedback, recordStudentPrefName, lessonEventKey });
   renderStudentMemos();
   renderLessonPlans();
+  for(const row of els.recordTbody.querySelectorAll('tr[data-record-ref]')){const ref=JSON.parse(row.dataset.recordRef),draft=recordDrafts.get(lessonEventKey(ref));if(!draft)continue;
+    if(JSON.stringify(ref)===JSON.stringify(draft.ref)&&Number(row.dataset.recordRevision)===draft.revision&&(row.dataset.recordOwner||null)===draft.ownerId){for(const [field,value]of Object.entries(draft.values))row.querySelector('.record-'+field).value=value;}
+    else{row.querySelectorAll('input,textarea,button').forEach(el=>el.disabled=true);const notice=document.createElement('p');notice.textContent='未保存入力と現在の予定・版が異なります。保持中の入力を確認してください。';row.cells[0].append(notice);}
+  }
+  showRetainedRecordDrafts();
   rows.filter((row) => !row.emptySlot).forEach((row) => lessonPlans.loadNext(row.ref));
   const names = new Set([...els.recordTbody.querySelectorAll(".student-memo-editor")].map((editor) => editor.dataset.studentName));
   names.forEach((name) => studentMemos.load(name).catch(() => {}));
@@ -584,8 +601,8 @@ function renderRecordTable(rows) {
 function lessonPlanFeedback() {
   return '<div class="lesson-plan-feedback"><small class="lesson-plan-status" role="status" aria-live="polite"></small><button type="button" class="lesson-plan-action" hidden></button></div>';
 }
-function lessonPlanEditor(ref, title, className) {
-  return `<div class="lesson-plan-editor" data-plan-key="${escapeHtml(lessonEventKey(ref))}"><textarea class="${className} linked-lesson-plan" rows="1" maxlength="5000" aria-label="${escapeHtml(title)}の授業予定"></textarea>${lessonPlanFeedback()}</div>`;
+function lessonPlanEditor(ref, title, className, ownerId="") {
+  return `<div class="lesson-plan-editor" data-plan-key="${escapeHtml(lessonEventKey(ref))}" data-read-target="${escapeHtml(JSON.stringify(ref))}" data-read-owner="${escapeHtml(ownerId)}"><textarea class="${className} linked-lesson-plan" rows="1" maxlength="5000" aria-label="${escapeHtml(title)}の授業予定"></textarea>${lessonPlanFeedback()}</div>`;
 }
 function lessonPlanDate(ref) {
   if (!ref) return "";
@@ -661,6 +678,7 @@ function resizeRecordInputs() {
 }
 els.recordTbody.addEventListener("input", (event) => {
   if (event.target.matches("textarea")) resizeRecordInput(event.target);
+  if(event.target.matches('.record-test,.record-homework,.record-memo')){rememberRecordDraft(event.target.closest('tr[data-record-ref]'));showRetainedRecordDrafts();}
 });
 let recordInputWidth = 0;
 new ResizeObserver(([entry]) => {
@@ -684,6 +702,8 @@ els.recordTbody.addEventListener("change", async (e) => {
   const row = e.target.closest("tr[data-event-id]");
   if (!row) return;
   const eventId = row.dataset.eventId;
+  rememberRecordDraft(row);
+  const sentDraft=recordDrafts.get(lessonEventKey(JSON.parse(row.dataset.recordRef)));
   const completed = row.dataset.completed === "1";
   const confirmationTest = row.querySelector(".record-test").value;
   const homework = row.querySelector(".record-homework").value;
@@ -700,6 +720,8 @@ els.recordTbody.addEventListener("change", async (e) => {
         lesson_memo: lessonMemo,
       }),
     });
+    if(recordDrafts.get(lessonEventKey(sentDraft.ref))===sentDraft)recordDrafts.delete(lessonEventKey(sentDraft.ref));
+    showRetainedRecordDrafts();
     row.dataset.recordRevision = savedRecord.record_revision;
     if(savedRecord.target)applyCalendarTarget(JSON.parse(row.dataset.recordRef),savedRecord.target,savedRecord.record_revision);
     lessonPlans.observeRecord(JSON.parse(row.dataset.recordRef),savedRecord.record_revision);
@@ -796,13 +818,9 @@ watchAuth({
       restoreCurriculumState();
       renderCurriculumSearchSummary();
       // Load the schedule independently of the restored student curriculum.
-      try {
-        await loadCalendarEvents();
-      } catch (err) {
-        showEventPlaceholder("授業予定を取得できませんでした。再読み込みしてください。");
-        showActionError(err);
-      }
+      const schedule = loadCalendarEvents().catch(err=>{showEventPlaceholder("授業予定を取得できませんでした。再読み込みしてください。");showActionError(err);});
       await loadRecordTable();
+      await schedule;
     } catch (err) {
       showActionError(err);
     }
@@ -821,6 +839,7 @@ async function apiFetch(path, options = {}, context = (/^\/(?:goals|schools|stud
     if (!token) throw new Error("not signed in");
     const res = await fetch(API_BASE + path, {
       ...options,
+      ...(!options.signal&&(!options.method||options.method==='GET')?{signal:AbortSignal.timeout(15000)}:{}),
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
@@ -854,7 +873,7 @@ async function apiFetch(path, options = {}, context = (/^\/(?:goals|schools|stud
 // 選択中の全カレンダーから指定期間の予定を横断取得する共通ヘルパー。
 // withCalendarId=trueのときは各予定に_calendarId(色分け用)を付与する。
 async function fetchCalendarEvents(timeMin, timeMax, { withCalendarId = false, includeExcluded = false } = {}) {
-  const token = await getGoogleAccessToken();
+  const [token] = await boundedRead([null],()=>getGoogleAccessToken());
   const results = await Promise.all(
     [...selectedCalendarIds].map(async (calendarId) => {
       // Page tokens belong to one calendar; never share them between requests.
@@ -869,15 +888,11 @@ async function fetchCalendarEvents(timeMin, timeMax, { withCalendarId = false, i
       let pageToken = "";
       do {
         if (pageToken) params.set("pageToken", pageToken);
-        const res = await fetch(
-          `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?${params}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        if (!res.ok) {
-          const detail = await extractGoogleErrorDetail(res);
-          throw new Error(`カレンダーの予定を取得できませんでした (${res.status})${detail ? `: ${detail}` : ""}`);
-        }
-        const data = await res.json();
+        const [data] = await boundedRead([params.toString()],async(_params,signal)=>{
+          const res=await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?${_params}`,{headers:{Authorization:`Bearer ${token}`},signal});
+          if(!res.ok){const detail=await extractGoogleErrorDetail(res);throw new Error(`カレンダーの予定を取得できませんでした (${res.status})${detail ? `: ${detail}` : ""}`);}
+          return res.json();
+        });
         items.push(...(data.items || []));
         pageToken = data.nextPageToken || "";
       } while (pageToken);
@@ -2555,12 +2570,12 @@ async function renderCurriculumTable(events, context = captureStudentContext()) 
       if (lessonRecordNeedsReview(saved)) return lessonReviewRow(lessonEventRef(ev),saved,ev.summary || "授業",formatCurriculumDate(start));
       const checked = saved.completed ? "checked" : "";
       const ref = lessonEventRef(ev);
-      lessonPlans.seed(ref, saved.lesson_plan || "", planReadVersion, saved.record_revision,saved.attribution_status);
+      lessonPlans.seed(ref, saved.lesson_plan || "", planReadVersion, saved.record_revision,saved.attribution_status,saved.owner_id||null);
       return `<tr data-event-id="${escapeHtml(ev.id)}" data-record-ref="${escapeHtml(JSON.stringify(ref))}" data-record-revision="${saved.record_revision}" data-completed="${saved.completed ? 1 : 0}">
         <td><input type="checkbox" class="curriculum-completed" ${checked} /></td>
         <td>第${i + 1}回${lessonAttributionNotice(saved)}</td>
         <td>${formatCurriculumDate(start)}</td>
-        <td>${lessonPlanEditor(ref, ev.summary || "授業", "curriculum-plan")}</td>
+        <td>${lessonPlanEditor(ref, ev.summary || "授業", "curriculum-plan",saved.owner_id||"")}</td>
         <td><textarea class="curriculum-test" rows="2">${escapeHtml(saved.confirmation_test || "")}</textarea></td>
         <td><textarea class="curriculum-homework" rows="2">${escapeHtml(saved.homework || "")}</textarea></td>
         <td><textarea class="curriculum-memo" rows="2">${escapeHtml(saved.lesson_memo || "")}</textarea></td>
@@ -3256,11 +3271,8 @@ async function loadCalendarEvents() {
     const bStart = b.start?.dateTime || b.start?.date || "";
     return aStart.localeCompare(bStart);
   });
-  // カードに授業予定・宿題・授業メモを表示するため、既存の進行記録を対応付ける。
-  const curriculumEntries = await readRecordEntries(sortedEvents);
-  if (request !== calendarEventsRequest) return;
   rawEvents = sortedEvents;
-  eventDetails = new Map(curriculumEntries.map((entry) => [entry.calendar_event_id, entry]));
+  eventDetails = new Map();
 
   renderCurriculumNameSuggestions();
   alignCurriculumTermWithSettings();
@@ -3303,7 +3315,16 @@ function renderCurrentView() {
     renderCalendarView(events);
   } else {
     renderListView(events);
+    void loadVisibleScheduleDetails(events);
   }
+}
+let scheduleDetailRequest=0;
+async function loadVisibleScheduleDetails(events){
+ const request=++scheduleDetailRequest,date=selectedScheduleDate,version=calendarEventsRequest;
+ const isCurrent=()=>request===scheduleDetailRequest&&date===selectedScheduleDate&&version===calendarEventsRequest&&eventViewMode!=="calendar";
+ const visible=events.filter(e=>(e.start?.dateTime||e.start?.date||'').slice(0,10)===date);
+ try{const entries=await readRecordEntries(visible,null,{isCurrent});if(!isCurrent())return;eventDetails=new Map(entries.map(r=>[r.calendar_event_id,r]));renderListView(events);}
+ catch(error){if(!isCurrent())return;eventDetails=new Map(visible.map(e=>[e.id,{read_error:true}]));renderListView(events);showActionError(error);}
 }
 
 function eventColorStyle(ev) {
@@ -3410,9 +3431,11 @@ function renderListView(events) {
     }
     const detail = attributedLessonRecord(eventDetails.get(ev.id),lessonEventRef(ev));
     const summary = (ev.summary || "(無題)").trim();
-    const plan = detail.lesson_plan || "未入力";
-    const homework = detail.homework || "未入力";
-    const memo = detail.lesson_memo || "未入力";
+    const pending=!eventDetails.has(ev.id),failed=eventDetails.get(ev.id)?.read_error;
+    const fallback=pending?'読み込み中…':failed?'取得できませんでした':lessonRecordNeedsReview(detail)?'紐づけの確認が必要です':'未入力';
+    const plan = detail.lesson_plan || fallback;
+    const homework = detail.homework || fallback;
+    const memo = detail.lesson_memo || fallback;
     return `<li class="event-item"${eventColorStyle(ev)}>
       <div class="event-time"><span>${formatEventTime(ev)}</span><small>${period}</small></div>
       <div class="event-main">
@@ -3611,20 +3634,28 @@ document.addEventListener("click",async event => {
 function lessonAttributionNotice(record) {
   return lessonRecordNeedsReview(record) ? '<small role="status">予定名の対応確認が必要です</small>' : '';
 }
-async function readRecordEntries(events,context=null) {
-  const targets=[...new Map(events.map(event=>{const ref=lessonEventRef(event);return [lessonEventKey(ref),ref];})).values()];
-  let entries=[];const collisions=new Set(),unavailable=new Set();
-  if(!targets.length) return apiFetch("/curriculum?attribution=1",{},context);
-  const hydrated=new Map();
-  for(let offset=0,limit=1;offset<targets.length;) {
-    const batch=targets.slice(offset,offset+limit);
-    entries=await apiFetch("/lesson-records",{method:"POST",body:JSON.stringify({targets:batch})},context);
-    for(const row of entries)if(batch.some(ref=>ref.id===row.calendar_event_id))hydrated.set(row.calendar_event_id,row);
-    entries.filter(row=>row.record_collision).forEach(row=>collisions.add(row.calendar_event_id));
-    entries.filter(row=>row.record_target_unavailable).forEach(row=>unavailable.add(row.calendar_event_id));
-    offset+=batch.length;limit=entries.some(row=>row.calendar_source_enabled)?1:250;
-  }
-  return [...new Map([...entries.map(row=>[row.calendar_event_id,row]),...hydrated]).values()].map(row=>({...row,...(collisions.has(row.calendar_event_id)?{record_collision:true}:{}),...(unavailable.has(row.calendar_event_id)?{record_target_unavailable:true}:{})}));
+async function readRecordEntries(events,context=null,{isCurrent=()=>true,onProgress=()=>{}}={}) {
+  const targets=[...new Map(events.filter(event=>!isExcludedScheduleEvent(event)).map(event=>{const ref=lessonEventRef(event);return [lessonEventKey(ref),ref];})).values()];
+  const calendars=new Map();for(const target of targets){const values=calendars.get(target.id)||new Set();values.add(target.calendar_id);calendars.set(target.id,values);}
+  const collisions=new Set([...calendars].filter(([,values])=>values.size>1).map(([id])=>id));
+  const batches=await boundedRead(targets,async(target,signal)=>{
+    if(collisions.has(target.id))return [{calendar_event_id:target.id,record_collision:true}];
+    const entries=await apiFetch("/lesson-records",{method:"POST",body:JSON.stringify({targets:[target]}),signal},context);
+    // The API can return unrelated legacy rows. Only this verified target belongs to this read.
+    return entries.filter(row=>row.calendar_event_id===target.id);
+  },{isCurrent,onProgress});
+  return batches.flat();
+}
+async function readPreviousEntries(dayEvents,rangeEvents,dayEntries,isCurrent) {
+  const map=new Map(dayEntries.map(r=>[r.calendar_event_id,r]));
+  const read=event=>attributedLessonRecord(map.get(event.id),lessonEventRef(event));
+  const previous=precedingLegacyEvents(dayEvents,rangeEvents,read);
+  const owners=[...new Set(dayEvents.map(read).filter(r=>r.record_storage==='d1_owner'&&r.attribution_status==='confirmed'&&r.owner_id).map(r=>r.owner_id))];
+  const histories=await boundedRead(owners,(id,signal)=>apiFetch('/lesson-history/records?owner_id='+encodeURIComponent(id),{signal},null),{isCurrent});
+  const byOwner=new Map(owners.map((id,i)=>[id,histories[i]]));
+  for(const event of dayEvents){const current=read(event);if(current.record_storage==='d1_owner'&&current.attribution_status==='confirmed')previous.push(...precedingOwnerEvents(event,byOwner.get(current.owner_id)||[],rangeEvents));}
+  // Re-read the selected predecessor against its live ref/owner; history names never establish identity.
+  return readRecordEntries(previous,null,{isCurrent});
 }
 
 

@@ -26,7 +26,7 @@ test('two date buttons accumulate days from the displayed date',async()=>{
 function setup(overrides={}){
   const state=vm.createContext({lessonPlans:{version:0},lessonEventRef,attributedLessonRecord,recordTableRequest:0,selectedRecordDate:'2026-10-17',selectedCalendarIds:new Set(['qa']),selectedTermIds:new Set(),terms:[],calendarColors:new Map(),
     els:{recordTbody:{innerHTML:''}},getSessionToken:()=>true,renderRecordDateLabel(){},recordDateRange,shiftRecordDate,isExcludedScheduleEvent:()=>false,
-    readRecordEntries:async()=>state.apiFetch(),fetchCalendarEvents:async()=>[],apiFetch:async()=>[],renderRecordTable:rows=>{state.rendered=rows;},...overrides});
+    readPreviousEntries:async()=>[],readRecordEntries:async()=>state.apiFetch(),fetchCalendarEvents:async()=>[],apiFetch:async()=>[],renderRecordTable:rows=>{state.rendered=rows;},...overrides});
   vm.runInContext(fn('loadRecordTable'),state);return state;
 }
 const ev=(day)=>({id:day,summary:'サンプル',start:{dateTime:day+'T10:00:00+09:00'},_calendarId:'qa'});
