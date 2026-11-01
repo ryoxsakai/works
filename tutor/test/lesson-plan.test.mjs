@@ -63,3 +63,8 @@ test('no next lesson never creates a plan or submits a write',async()=>{
   await store.loadNext(source);assert.equal(store.getLink(sourceKey).status,'none');assert.equal(store.getLink(sourceKey).targetKey,'');
   await store.save('',sourceKey);assert.equal(writes.length,0);
 });
+
+test('a D1 next read retains the owner shared with the direct second lesson editor',async()=>{
+ const source=ref('one'),target=ref('two');const store=createLessonPlanController({readNext:async()=>({source,target,owner_id:'owner-A',lesson_plan:'second plan',record_revision:3,attribution_status:'confirmed'}),write:async()=>{throw Error('no automatic write')}});
+ store.seed(source,'first plan',0,1,'confirmed','owner-A');store.seed(target,'second plan',0,3,'confirmed','owner-A');await store.loadNext(source);const state=store.get(lessonEventKey(target));assert.equal(state.ownerId,'owner-A');assert.equal(store.getLink(lessonEventKey(source)).targetKey,state.key);store.edit(state.key,'shared unsaved');assert.equal(store.get(store.getLink(lessonEventKey(source)).targetKey).value,'shared unsaved');
+});

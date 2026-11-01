@@ -14,14 +14,14 @@ export function createLessonPlanController({ readNext, write, onChange = () => {
   }
   let version = 0;
   const notify = () => onChange();
-  function seed(target, value, readVersion = version, recordRevision = 0, attributionStatus = "new") {
+  function seed(target, value, readVersion = version, recordRevision = 0, attributionStatus = "new", ownerId = null) {
     const key = lessonEventKey(target);
     let state = plans.get(key);
     if (!state) {
-      state = { key, target, value, recordRevision, attributionStatus, base: value, dirty: false, status: "ready", revision: 0, changedAt: version, pending: 0, queue: Promise.resolve() };
+      state = { key, target, value, recordRevision, attributionStatus, ownerId, base: value, dirty: false, status: "ready", revision: 0, changedAt: version, pending: 0, queue: Promise.resolve() };
       plans.set(key, state);
     } else if (!state.dirty && !state.pending && state.changedAt <= readVersion) {
-      Object.assign(state, { target, value, recordRevision, attributionStatus, base: value, status: "ready" });
+      Object.assign(state, { target, value, recordRevision, attributionStatus, ownerId, base: value, status: "ready" });
     }
     return state;
   }
@@ -52,7 +52,7 @@ export function createLessonPlanController({ readNext, write, onChange = () => {
           link.status='attribution'; link.targetKey=''; notify(); return;
         }
         link.target = result.target;
-        link.targetKey = result.target ? seed(result.target, result.lesson_plan || "", readVersion, result.record_revision,result.attribution_status).key : "";
+        link.targetKey = result.target ? seed(result.target, result.lesson_plan || "", readVersion, result.record_revision,result.attribution_status,result.owner_id||null).key : "";
         link.status = result.target ? "ready" : result.reason;
         notify();
       } catch (error) {

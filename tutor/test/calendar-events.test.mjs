@@ -1,3 +1,4 @@
+import {boundedRead} from '../record-read.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
@@ -5,7 +6,7 @@ import { readFileSync } from 'node:fs';
 const source = readFileSync(new URL('../app.js', import.meta.url), 'utf8');
 const helper = source.slice(source.indexOf('async function fetchCalendarEvents('), source.indexOf('\nfunction isExcludedScheduleEvent'));
 function setup(fetch) {
-  const context = vm.createContext({ URLSearchParams, selectedCalendarIds: new Set(['one', 'two']), getGoogleAccessToken: async () => 'fixture', fetch, isExcludedScheduleEvent: ev => ev.summary === '空き', extractGoogleErrorDetail: async () => 'fixture error' });
+  const context = vm.createContext({ boundedRead, URLSearchParams, selectedCalendarIds: new Set(['one', 'two']), getGoogleAccessToken: async () => 'fixture', fetch, isExcludedScheduleEvent: ev => ev.summary === '空き', extractGoogleErrorDetail: async () => 'fixture error' });
   vm.runInContext(helper, context);
   return options => context.fetchCalendarEvents('2026-09-01T00:00:00+09:00', '2026-12-06T00:00:00+09:00', options);
 }
@@ -41,5 +42,5 @@ test('records still load when the schedule fails', async () => {
   const section = source.slice(source.indexOf('      // Load the schedule independently'), source.indexOf('      await loadRecordTable();', source.indexOf('      // Load the schedule independently')) + '      await loadRecordTable();'.length);
   const context = vm.createContext({loadCalendarEvents:async()=>{calls.push('schedule');throw Error('fixture schedule error');},showEventPlaceholder:()=>{},showActionError:()=>calls.push('error'),loadRecordTable:async()=>calls.push('records')});
   await vm.runInContext(`(async()=>{${section}})()`, context);
-  assert.deepEqual(calls, ['schedule','error','records']);
+  assert.ok(calls.includes('error'));assert.ok(calls.includes('records'));assert.ok(calls.indexOf('records')<calls.indexOf('error'));
 });

@@ -1,3 +1,4 @@
+import {boundedRead} from '../record-read.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
@@ -39,14 +40,14 @@ test('shared card renderer independently refuses stale D1 content and another ow
  assert.ok(!lessonRecordRows([row],deps).includes('B private previous plan'));
  assert.equal(lessonRecordRows([{...row,record:{...current,record_read_target:{...ref,title:'B'}},homework:'B private homework'}],deps),'<review-required>');
 });
-test('collision evidence survives a later unrelated 250-target chunk',async()=>{
+test('collision evidence survives unrelated target responses',async()=>{
  const targets=Array.from({length:251},(_,i)=>({id:`event-${i}`,calendar_id:'a',title:'Synthetic',start:'2026-10-27T01:00:00Z'}));
  const legacy={calendar_event_id:'event-0',record_exists:1,record_revision:0,record_title:null,lesson_plan:'ambiguous old plan'};
  let calls=0;
- const state=vm.createContext({lessonEventRef,lessonEventKey,apiFetch:async()=>{calls++;return calls===1?[{...legacy,record_collision:true}]:[legacy];}});
+ const state=vm.createContext({boundedRead,isExcludedScheduleEvent:()=>false,lessonEventRef,lessonEventKey,apiFetch:async()=>{calls++;return calls===1?[{...legacy,record_collision:true}]:[legacy];}});
  const start=source.indexOf('async function readRecordEntries(');
  vm.runInContext(source.slice(start,source.indexOf('\n}',start)+2),state);
- const rows=await state.readRecordEntries(targets);assert.equal(calls,2);assert.equal(rows[0].record_collision,true);
+ const rows=await state.readRecordEntries(targets);assert.equal(calls,251);assert.equal(rows[0].record_collision,true);
  assert.equal(attributedLessonRecord(rows[0],targets[0]).attribution_status,'id_collision');assert.equal(attributedLessonRecord(rows[0],targets[0]).lesson_plan,null);
 });
 test('list cards apply the same safe comparison as lesson tables',()=>{

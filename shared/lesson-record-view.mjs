@@ -1,6 +1,6 @@
 // Shared record-card markup; identity, attribution and persistence stay with owners.
 import {attributedLessonRecord} from './lesson-attribution.js';
-import {lessonEventRef} from './lesson-plan.js';
+import {lessonEventRef,sameLessonEvent} from './lesson-plan.js';
 export function sameLessonOwner(current,previous){
   if(current?.record_storage!=='d1_owner')return previous?.record_storage!=='d1_owner';
   return current.attribution_status==='confirmed'&&previous?.record_storage==='d1_owner'&&previous.attribution_status==='confirmed'&&!!current.owner_id&&current.owner_id===previous.owner_id;
@@ -26,7 +26,7 @@ export function lessonRecordRows(rows, { escapeHtml, formatTimeOrPeriod, lessonR
       }
       const record=r.record?.record_storage==='d1_owner'?attributedLessonRecord(r.record,r.ref):r.record;
       if (lessonRecordNeedsReview(record)) return lessonReviewRow(r.ref,record,r.label,formatTimeOrPeriod(r.start,"Asia/Tokyo"));
-      return `<tr data-event-id="${escapeHtml(r.eventId)}" data-record-ref="${escapeHtml(JSON.stringify(r.ref))}" data-record-revision="${r.record.record_revision}" data-completed="${r.completed ? 1 : 0}" data-calendar-name="${escapeHtml(calendarName(r.calendarId) || "カレンダー")}">
+      return `<tr data-event-id="${escapeHtml(r.eventId)}" data-record-ref="${escapeHtml(JSON.stringify(r.ref))}" data-record-revision="${r.record.record_revision}" data-record-owner="${escapeHtml(r.record.owner_id||'')}" data-completed="${r.completed ? 1 : 0}" data-calendar-name="${escapeHtml(calendarName(r.calendarId) || "カレンダー")}">
         <td>
           <div class="record-card-heading"><button type="button" class="record-student-link" data-calendar-id="${escapeHtml(r.calendarId || "")}" data-name="${escapeHtml(r.label)}" data-term-id="${r.termId}"><span class="record-avatar"${r.iconColor ? ` style="background-color:${escapeHtml(lightenHexColor(r.iconColor, 0.75))};color:${escapeHtml(r.iconColor)}"` : ""}><i class="bx bx-book-open"></i></span> ${escapeHtml(r.label)}</button><div class="record-card-meta"><span>${r.n}/${r.m}回</span><span>${formatTimeOrPeriod(r.start, "Asia/Tokyo")}</span><button type="button" class="record-recheck btn btn-outline" aria-label="予定を再確認" title="予定を再確認" disabled><svg class="works-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-1l2 3M4 15l2 3a7 7 0 0 0 12-1"/></svg></button></div></div>
           ${lessonAttributionNotice(r.record)}
@@ -40,7 +40,7 @@ export function lessonRecordRows(rows, { escapeHtml, formatTimeOrPeriod, lessonR
         </td>
         <td data-label="回数">${r.n}/${r.m}回</td>
         <td data-label="時刻">${formatTimeOrPeriod(r.start, "Asia/Tokyo")}</td>
-        <td data-label="授業予定">${lessonPlanEditor(r.ref, r.label, "record-plan")}</td>
+        <td data-label="授業予定">${lessonPlanEditor(r.ref, r.label, "record-plan",r.record.owner_id||"")}</td>
         <td data-label="確認テスト"><textarea class="record-test" rows="1" aria-label="${escapeHtml(r.label)}の確認テスト">${escapeHtml(r.confirmationTest)}</textarea></td>
         <td data-label="宿題"><textarea class="record-homework" rows="1" aria-label="${escapeHtml(r.label)}の宿題">${escapeHtml(r.homework)}</textarea></td>
         <td data-label="授業メモ"><textarea class="record-memo" rows="1" aria-label="${escapeHtml(r.label)}の授業メモ">${escapeHtml(r.lessonMemo)}</textarea>
@@ -68,6 +68,14 @@ export function renderPlanEditors(root, lessonPlans, { lessonPlanDate, resizeRec
     if (sourceKey) editor.dataset.planKey = link?.targetKey || "";
     const key = editor.dataset.planKey, state = lessonPlans.get(key);
     const input = editor.querySelector("textarea"), status = editor.querySelector(".lesson-plan-status"), action = editor.querySelector(".lesson-plan-action");
+    const readTarget=editor.dataset.readTarget?JSON.parse(editor.dataset.readTarget):null;
+    const changedObservation=!!(readTarget&&state&&(!sameLessonEvent(state.target,readTarget)||(editor.dataset.readOwner||null)!==(state.ownerId||null)));
+    editor.querySelector('.retained-plan-draft')?.remove();
+    if(changedObservation){
+      input.value='';input.disabled=true;status.textContent='予定の変更を検出しました。以前の入力を保持して編集を停止しています。';action.hidden=true;action.disabled=true;
+      if(state.dirty){const retained=editor.ownerDocument.createElement('details'),label=editor.ownerDocument.createElement('summary'),body=editor.ownerDocument.createElement('pre');retained.className='retained-plan-draft';label.textContent='以前の予定の未保存入力：'+state.target.title+' / '+state.target.start;body.textContent=state.value;retained.append(label,body);editor.append(retained);}
+      return;
+    }
     const linkStatus = link?.status || "loading";
     const conflict = state?.status === "conflict" || (sourceKey && linkStatus === "conflict");
     input.disabled = !state;

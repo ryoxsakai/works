@@ -47,6 +47,7 @@ jobs:
       - run: node test/admission-ui.browser.mjs
       - run: node test/material-ui.browser.mjs
       - run: node test/tutor-ui.browser.mjs
+      - run: node test/tutor-bounded-reads.browser.mjs
       - run: node test/button-contrast.browser.mjs
       - run: CONTRAST_BASELINE=1 node test/tutor-button-states.browser.mjs
       - run: node test/tutor-button-states.browser.mjs
