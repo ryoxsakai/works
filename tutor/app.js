@@ -1,4 +1,4 @@
-import {boundedRead,precedingLegacyEvents,precedingOwnerEvents} from './record-read.mjs?v=1';
+import {boundedRead,precedingLegacyEvents,precedingOwnerEvents,recordTermScope} from './record-read.mjs?v=2';
 import {readNextLessonWithTemplate} from "../shared/next-lesson-read.mjs?v=1";
 import { lessonRecordRows, renderPlanEditors, renderMemoEditors, previousOwnerRecord } from "../shared/lesson-record-view.mjs?v=2";
 import { setUserAvatar } from "../shared/avatar.mjs?v=1";
@@ -289,6 +289,7 @@ let listWeekCursor = startOfWeek(new Date());
 let selectedScheduleDate = formatDateOnly(new Date());
 let selectedRecordDate = tokyoDateKey();
 let recordTableRequest = 0;
+let recordRequestedTermScope=null;
 const recordDrafts=new Map();
 function rememberRecordDraft(row){if(!row)return;const ref=JSON.parse(row.dataset.recordRef);recordDrafts.set(lessonEventKey(ref),{ref,ownerId:row.dataset.recordOwner||null,revision:Number(row.dataset.recordRevision),values:Object.fromEntries(['test','homework','memo'].map(field=>[field,row.querySelector('.record-'+field).value]))});}
 function showRetainedRecordDrafts(){
@@ -461,9 +462,10 @@ async function loadRecordTable() {
   const request = ++recordTableRequest;
   const dayStr = selectedRecordDate;
   const calendars = [...selectedCalendarIds].sort().join("\n");
-  const selectedTerms = [...selectedTermIds].sort().join(",");
+  const selectedTerms = recordTermScope(terms,selectedTermIds);
+  recordRequestedTermScope=selectedTerms;
   const isCurrent = () => request === recordTableRequest && dayStr === selectedRecordDate
-    && calendars === [...selectedCalendarIds].sort().join("\n") && selectedTerms === [...selectedTermIds].sort().join(",");
+    && calendars === [...selectedCalendarIds].sort().join("\n") && selectedTerms === recordTermScope(terms,selectedTermIds);
   renderRecordDateLabel();
   els.recordTbody.innerHTML = `<tr><td colspan="7" role="status">授業記録を読み込んでいます…</td></tr>`;
   try {
@@ -782,20 +784,27 @@ async function loadSignedInTutor(){
   renderRecordDateLabel();
   els.recordTbody.innerHTML='<tr><td colspan="7" role="status">カレンダー設定を確認しています…</td></tr>';
   try{await loadSettings();}catch(error){showActionError(error);els.recordTbody.innerHTML='<tr><td colspan="7" role="status">カレンダー設定を取得できませんでした。再読込してください。</td></tr>';return;}
-  const optional=[
-    ()=>loadCalendarList(),()=>loadYears(),
-    async()=>{const before=[...selectedTermIds].sort().join(',');await loadTerms();if(before!==[...selectedTermIds].sort().join(','))await loadRecordTable();},
-    ()=>loadGoalTemplates(),()=>loadPeriods(),()=>loadMaterials(),
-    async()=>{studentDirectory=await apiFetch('/students');},
-  ];
-  void Promise.allSettled(optional.map(work=>Promise.resolve().then(work))).then(results=>{
-    results.forEach(result=>{if(result.status==='rejected')showActionError(result.reason);});
-    renderYearGroups();renderExcludedTitleList();renderCurriculumYearOptions();restoreCurriculumState();renderCurriculumSearchSummary();renderCurrentView();
+  const saved=readCurriculumState(),generation=studentGeneration,initialName=els.curriculumName.value;
+  const initialScope=recordTermScope(terms,selectedTermIds),initialSchedule=calendarEventsRequest;
+  const daily=loadRecordTable().catch(showActionError);
+  const yearsReady=Promise.resolve().then(loadYears),termsReady=Promise.resolve().then(loadTerms),calendarsReady=Promise.resolve().then(loadCalendarList);
+  // A changed term definition matters even if its selected ID did not change.
+  void termsReady.then(async()=>{
+    await daily;
+    if(initialScope!==recordTermScope(terms,selectedTermIds)&&recordRequestedTermScope!==recordTermScope(terms,selectedTermIds))await loadRecordTable();
   }).catch(showActionError);
-  // Load the schedule independently of the restored student curriculum.
-  const schedule=loadCalendarEvents().catch(error=>{showEventPlaceholder('授業予定を取得できませんでした。再読み込みしてください。');showActionError(error);});
-  try{await loadRecordTable();}catch(error){showActionError(error);}
-  void schedule;
+  // Schedule range and restored curriculum need term definitions and calendar
+  // grouping, but neither is allowed to hold the independent daily display.
+  void Promise.all([yearsReady,termsReady,calendarsReady]).then(async()=>{
+    const selected=generation===studentGeneration&&initialName===els.curriculumName.value?saved:{name:els.curriculumName.value,group:studentGroup,yearId:els.curriculumYearSelect.value,termId:els.curriculumTermSelect.value};
+    renderYearGroups();renderCurriculumYearOptions();restoreCurriculumState(selected);renderCurriculumSearchSummary();
+    const request=calendarEventsRequest+1;
+    try{await loadCalendarEvents();}catch(error){if(request===calendarEventsRequest){showEventPlaceholder('授業予定を取得できませんでした。再読み込みしてください。');showActionError(error);}}
+  }).catch(error=>{if(initialSchedule===calendarEventsRequest)showEventPlaceholder('授業予定の初期情報を取得できませんでした。再読み込みしてください。');showActionError(error);});
+  renderExcludedTitleList();
+  const optional=[()=>loadGoalTemplates(),()=>loadPeriods(),()=>loadMaterials(),async()=>{studentDirectory=await apiFetch('/students');}];
+  void Promise.allSettled(optional.map(work=>Promise.resolve().then(work))).then(results=>{results.forEach(result=>{if(result.status==='rejected')showActionError(result.reason);});}).catch(showActionError);
+  await daily;
 }
 renderRecordDateLabel();
 els.recordTbody.innerHTML='<tr><td colspan="7" role="status">ログイン状態を確認しています…</td></tr>';
@@ -2173,13 +2182,8 @@ function saveCurriculumState() {
   );
 }
 
-function restoreCurriculumState() {
-  let saved;
-  try {
-    saved = JSON.parse(localStorage.getItem(CURRICULUM_STATE_KEY) || "null");
-  } catch {
-    return;
-  }
+function readCurriculumState(){try{return JSON.parse(localStorage.getItem(CURRICULUM_STATE_KEY)||'null');}catch{return null;}}
+function restoreCurriculumState(saved=readCurriculumState()) {
   if (!saved) return;
   els.curriculumName.value = saved.name || "";
   studentGroup = saved.group || "";

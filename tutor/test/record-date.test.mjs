@@ -1,3 +1,4 @@
+import {recordTermScope} from '../record-read.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
@@ -24,7 +25,7 @@ test('two date buttons accumulate days from the displayed date',async()=>{
   assert.deepEqual(loaded,['2026-12-31','2026-12-30','2026-12-31']);
 });
 function setup(overrides={}){
-  const state=vm.createContext({lessonPlans:{version:0},lessonEventRef,attributedLessonRecord,recordTableRequest:0,selectedRecordDate:'2026-10-17',selectedCalendarIds:new Set(['qa']),selectedTermIds:new Set(),terms:[],calendarColors:new Map(),
+  const state=vm.createContext({recordTermScope,lessonPlans:{version:0},lessonEventRef,attributedLessonRecord,recordTableRequest:0,selectedRecordDate:'2026-10-17',selectedCalendarIds:new Set(['qa']),selectedTermIds:new Set(),terms:[],calendarColors:new Map(),
     els:{recordTbody:{innerHTML:''}},getSessionToken:()=>true,renderRecordDateLabel(){},recordDateRange,shiftRecordDate,isExcludedScheduleEvent:()=>false,
     readPreviousEntries:async()=>[],readRecordEntries:async()=>state.apiFetch(),fetchCalendarEvents:async()=>[],apiFetch:async()=>[],renderRecordTable:rows=>{state.rendered=rows;},...overrides});
   vm.runInContext(fn('loadRecordTable'),state);return state;
@@ -64,3 +65,5 @@ test('fetch uses Tokyo day boundaries and preserves record payloads',async()=>{
   assert.deepEqual(ranges[0],recordDateRange('2026-10-17'));
   assert.equal(state.rendered[0].lessonPlan,'既存の日本語\n二行目');assert.equal(state.rendered[0].homework,'宿題');
 });
+
+test('a new definition for the same selected term invalidates an older range response',async()=>{let release,calls=0;const state=setup({selectedTermIds:new Set([2]),fetchCalendarEvents:async()=>{if(++calls===2)return new Promise(r=>release=r);return [ev('2026-10-17')];}});const old=state.loadRecordTable();while(!release)await Promise.resolve();state.terms=[{id:2,start_date:'2026-09-03',end_date:'2026-12-05'}];release([ev('2026-10-17')]);await old;assert.equal(state.rendered,undefined);await state.loadRecordTable();assert.equal(state.rendered[0].eventId,'2026-10-17');});
