@@ -1,3 +1,4 @@
+import {installSnapshotExport} from './history-snapshot.mjs?v=1';
 import {watchAuth,getSessionToken} from '../shared/auth.js?v=12';
 const $=id=>document.getElementById(id),fields={lesson_plan:'授業予定',confirmation_test:'確認テスト',homework:'宿題',lesson_memo:'授業メモ'};
 const pendingKey='works_lesson_history_pending_operation';
@@ -8,8 +9,8 @@ const status=message=>{$('status').textContent=message;};
 const owner=()=>owners.find(item=>item.id===$('owner').value);
 const formatDate=value=>new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',dateStyle:'medium',timeStyle:'short'}).format(new Date(value));
 const element=(tag,text)=>{const el=document.createElement(tag);if(text!==undefined)el.textContent=text;return el;};
-async function api(path,body,method=body?'POST':'GET'){
- const response=await fetch('/api'+path,{method,cache:'no-store',headers:{Authorization:'Bearer '+getSessionToken(),...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{})});
+async function api(path,body,method=body?'POST':'GET',signal){
+ const response=await fetch('/api'+path,{method,signal,cache:'no-store',headers:{Authorization:'Bearer '+getSessionToken(),...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{})});
  const value=await response.json();if(!response.ok)throw Object.assign(Error(value.error||'読み込み・保存できませんでした'),{status:response.status,code:value.code});return value;
 }
 function controls(){document.querySelectorAll('button,input,select,textarea').forEach(el=>el.disabled=!ready||busy||uncertain&&!el.closest('#operation-lookup')||el.dataset.conflictSave==='true');$('binding-actions').hidden=!target;}
@@ -70,3 +71,5 @@ $('preview').onclick=()=>action(async()=>{
 });
 $('legacy').onclick=()=>action(async()=>{const legacy=await api('/lesson-history/legacy');$('legacy-list').replaceChildren(...legacy.map(row=>{const p=element('p',(row.title||'所属不明')+' · '+row.calendar_event_id+(row.hold_reason?' / 保留':'')),button=element('button','現在の予定を探して確認');button.className='btn-outline history-secondary';button.onclick=()=>action(async()=>{const found=await api('/lesson-history/locate',{event_id:row.calendar_event_id});if(!found.length){p.append(element('span','現在の予定が見つかりません。原記録は保持しています。所属・授業日を別途確認してください。'));return;}for(const ref of found){const choose=element('button',ref.title+' / '+ref.start+' / '+ref.calendar_id);choose.className='btn-outline history-secondary';choose.onclick=()=>action(async()=>{$('calendar').value=ref.calendar_id;$('event-id').value=ref.id;await lookup();$('lookup').scrollIntoView({block:'start'});});p.append(choose);}});p.append(button);return p;}));});
 watchAuth({onSignedOut(){ready=false;controls();status('本人の既存ログインが必要です。授業管理からログインしてください。');},async onSignedIn(){ready=true;controls();await action(async()=>{const state=await api('/lesson-history/status');if(state.mode==='off'){ready=false;throw Error('新しい授業履歴はまだ本番切替前です。');}const settings=await api('/settings');$('calendar').replaceChildren(...(settings.selected_calendars||[]).map(id=>{const option=element('option',id);option.value=id;return option;}));await loadOwners();const params=new URLSearchParams(location.search);if(params.has('event_id')){$('calendar').value=params.get('calendar_id');$('event-id').value=params.get('event_id');await lookup();}});}});
+
+installSnapshotExport({api,action,status});

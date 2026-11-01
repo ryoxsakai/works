@@ -6321,6 +6321,17 @@ export default {
         return json(result,{...headers,"Cache-Control":"no-store"});
       }
 
+      if(url.pathname==='/api/lesson-history/snapshot/event'){
+        if(browserSession.aud||browserSession.scope||browserSession.fid)throw httpError(401,'browser session required');
+        if(request.method!=='GET')throw httpError(405,'GET required');
+        const {readSnapshotEvent}=await import('./lesson-history-snapshot.js');
+        const dependencies={settings:()=>readSettings(env),token:()=>mintGoogleAccessToken(env),event:async(token,calendar,id,{signal})=>{
+          const response=await fetch('https://www.googleapis.com/calendar/v3/calendars/'+encodeURIComponent(calendar)+'/events/'+encodeURIComponent(id),{headers:{Authorization:'Bearer '+token},signal});
+          if(!response.ok)throw httpError(response.status===404?404:502,'Google Calendarの原文を取得できませんでした');return response.json();
+        }};
+        return json(await readSnapshotEvent(env,{calendar_id:url.searchParams.get('calendar_id'),event_id:url.searchParams.get('event_id')},dependencies),{...headers,'Cache-Control':'no-store'});
+      }
+
       if(url.pathname.startsWith('/api/lesson-history/')){
         if(browserSession.aud||browserSession.scope||browserSession.fid)throw httpError(401,'browser session required');
         if(request.method!=='GET'&&(request.headers.get('Origin')!==env.ALLOWED_ORIGIN||!request.headers.get('Content-Type')?.startsWith('application/json')))throw httpError(403,'same-origin JSON required');

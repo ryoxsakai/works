@@ -1,0 +1,15 @@
+# Read-only cutover backup
+
+While `LESSON_HISTORY_MODE=reconcile`, the authenticated history page can save an exact Calendar snapshot. This does not import records, register owners, enable active mode, or relax old writer guards.
+
+Choose the existing private scope manifest (119 approved records, two exclusions) and a separate private JSON array for the two additional empty records. The latter contains only `{calendar_ref,event_id}`. No names, IDs, manifests, backup content or credentials from production belong in the repository. Calendar references resolve through the scope manifest's `calendars` list. Duplicate keys, missing entries, wrong counts and unknown calendar references stop before reads.
+
+The browser reads four individual events at a time through `GET /api/lesson-history/snapshot/event?calendar_id=…&event_id=…`. The route requires the existing owner browser session, reconcile mode, a selected calendar, and a retained legacy record. It uses Google events GET and D1 SELECT only; it does not call attribution/template planners, initialize schemas, reserve journal rows, or mint new authorization grants. Existing OAuth token refresh may contact Google's token endpoint, but does not write D1 or expose the token.
+
+The route exports an allowlist of raw event fields, including exact description (or its original absence), ETag, creation/update timestamps, iCalUID, recurring-event/original-start metadata and self-declined boolean. It strips contacts and credentials. Missing mandatory identity fields, series parents, unknown journal operations and upstream failures stop the backup. Source operation and generation come from SELECT of existing verified journal data; parsed values are deliberately null pending Mac-side parsing with restored D1 provenance. Cancelled/excluded records may be backed up without becoming eligible for import.
+
+The per-event server deadline is15s with Google fetch abort; the browser deadline is20s. Late results are discarded. A failed attempt downloads no partial file; an explicit retry starts a fresh capture. Successful output contains `events` (119+2 exclusions), `additional_empty_events` (two separate entries), capture window, manifest hashes and per-description hashes. The screen shows the exact downloaded file SHA256. Confirm the actual saved file and transfer it through the existing private Library flow.
+
+A complete capture is not an atomic Calendar transaction: external Google edits remain possible. Before import, validate the paired D1 restore, exact scope, exclusion/extra preservation and current values; obtain a fresh UI import preview and retain existing fingerprint/owner/source-revision guards. Changes require review. Production import and active mode remain separately gated.
+
+Validation uses synthetic data only: unit tests cover exact whitespace/HTML, metadata, hashes, scope validation, failures/timeouts/late responses/retry; actual Worker tests cover browser-only authentication, GET-only access, selected calendars, all D1 tables unchanged, no Calendar PATCH and old writer freeze; browser tests cover downloaded JSON/hash, failed attempts, retry and mobile/desktop layout.
