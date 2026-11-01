@@ -1,5 +1,5 @@
 import {readNextLessonWithTemplate} from "../shared/next-lesson-read.mjs?v=1";
-import { lessonRecordRows, renderPlanEditors, renderMemoEditors } from "../shared/lesson-record-view.mjs?v=1";
+import { lessonRecordRows, renderPlanEditors, renderMemoEditors, previousOwnerRecord } from "../shared/lesson-record-view.mjs?v=1";
 import { setUserAvatar } from "../shared/avatar.mjs?v=1";
 import { attachRecordCarousel } from "./record-carousel.mjs?v=2";
 import { attachRecordToasts } from "./record-toasts.mjs?v=2";
@@ -535,8 +535,9 @@ async function loadRecordTable() {
       const n = sameLabelEvents.findIndex((e) => e.id === ev.id) + 1;
       const m = sameLabelEvents.length;
       const saved = attributedLessonRecord(entryMap.get(ev.id), lessonEventRef(ev));
-      const prevEvent = n > 1 ? sameLabelEvents[n - 2] : null;
-      const prevSaved = prevEvent ? attributedLessonRecord(entryMap.get(prevEvent.id),lessonEventRef(prevEvent)) : {};
+      const previous=saved.record_storage==='d1_owner'?previousOwnerRecord(saved,ev,rangeEvents,e=>attributedLessonRecord(entryMap.get(e.id),lessonEventRef(e))):null;
+      const prevEvent = saved.record_storage==='d1_owner'?previous?.event:n > 1 ? sameLabelEvents[n - 2] : null;
+      const prevSaved = previous?.record||(prevEvent ? attributedLessonRecord(entryMap.get(prevEvent.id),lessonEventRef(prevEvent)) : {});
       return {
         eventId: ev.id,
         ref: lessonEventRef(ev),

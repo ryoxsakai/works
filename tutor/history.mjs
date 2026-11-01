@@ -12,7 +12,7 @@ async function api(path,body,method=body?'POST':'GET'){
  const response=await fetch('/api'+path,{method,cache:'no-store',headers:{Authorization:'Bearer '+getSessionToken(),...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{})});
  const value=await response.json();if(!response.ok)throw Object.assign(Error(value.error||'読み込み・保存できませんでした'),{status:response.status,code:value.code});return value;
 }
-function controls(){document.querySelectorAll('button,input,select,textarea').forEach(el=>el.disabled=!ready||busy||uncertain&&!el.closest('#operation-lookup'));$('binding-actions').hidden=!target;}
+function controls(){document.querySelectorAll('button,input,select,textarea').forEach(el=>el.disabled=!ready||busy||uncertain&&!el.closest('#operation-lookup')||el.dataset.conflictSave==='true');$('binding-actions').hidden=!target;}
 async function action(work,{write=false}={}){
  if(busy||!ready||uncertain&&write)return;busy=true;controls();let dispatched=false;
  try{await work(()=>{dispatched=true;});status(uncertain?'未確認の保存があります。再送せず操作IDで照合してください。':write?'保存を確認しました。操作ID: '+lastOperation:'読み込みました。');}
@@ -32,7 +32,23 @@ async function loadRecords(){const generation=++view,current=owner();preview=nul
  const completed=element('label','完了 '),checkbox=element('input');checkbox.type='checkbox';checkbox.name='completed';checkbox.checked=!!(draft?.values.completed??record.completed);completed.append(checkbox);form.append(completed);const save=element('button','授業記録を保存');save.className='btn-solid history-primary';form.append(save);
  const values=()=>({...Object.fromEntries(Object.keys(fields).map(k=>[k,form.elements[k].value])),completed:checkbox.checked});
  form.oninput=()=>{drafts.set(record.id,{revision:draft?.revision??record.revision,values:values()});notice.textContent='未保存の入力を保持しています。';};
- form.onsubmit=event=>{event.preventDefault();action(async dispatch=>{await mutate('/records/'+record.id,{revision:drafts.get(record.id)?.revision??record.revision,...values()},'PUT',dispatch);drafts.delete(record.id);await loadRecords();},{write:true});};article.append(form);
+ form.onsubmit=event=>{event.preventDefault();action(async dispatch=>{try{await mutate('/records/'+record.id,{revision:drafts.get(record.id)?.revision??record.revision,...values()},'PUT',dispatch);}catch(error){if(error.status===409){try{await loadRecords();}catch{error.message+='。最新内容を取得できないため、入力を保持して読み直してください';}}throw error;}drafts.delete(record.id);await loadRecords();},{write:true});};article.append(form);
+ if(draft&&draft.revision!==record.revision){
+  const recovery=element('section'),title=element('h4','別の画面で更新されました。最新内容と未保存入力を比較');recovery.dataset.conflictRecord=record.id;
+  recovery.append(title,element('p','入力は保持しています。下の最新内容と比較し、必要なら入力欄を編集してください。保存する内容を確認してから編集を再開できます。ここで保存や再送は行いません。'));
+  for(const [key,label]of Object.entries(fields)){
+   const latest=element('pre',record[key]);latest.dataset.latestField=key;
+   const use=element('button','最新の'+label+'を入力へ採用');use.type='button';use.className='btn-outline history-secondary';
+   use.onclick=()=>{form.elements[key].value=record[key];drafts.set(record.id,{revision:draft.revision,values:values()});notice.textContent='未保存の入力を保持しています。比較後に編集の再開を確認してください。';};
+   recovery.append(element('h5','最新の'+label),latest,use);
+  }
+  recovery.append(element('p','最新の完了状態：'+(record.completed?'完了':'未完了')));
+  const useCompleted=element('button','最新の完了状態を入力へ採用');useCompleted.type='button';useCompleted.className='btn-outline history-secondary';useCompleted.onclick=()=>{checkbox.checked=!!record.completed;drafts.set(record.id,{revision:draft.revision,values:values()});};recovery.append(useCompleted);
+  const confirmation=element('label','最新内容と入力を比較し、保存する内容を確認しました。'),ack=element('input');ack.type='checkbox';confirmation.prepend(ack);recovery.append(confirmation);
+  const resume=element('button','比較した入力で編集を再開する');resume.type='button';resume.className='btn-solid history-primary';resume.onclick=()=>action(async()=>{if(!ack.checked)throw Error('最新内容との比較を確認してください');drafts.set(record.id,{revision:record.revision,values:values()});await loadRecords();});
+  const discard=element('button','未保存入力を破棄して最新内容を使う');discard.type='button';discard.className='btn-outline history-secondary';discard.onclick=()=>action(async()=>{drafts.delete(record.id);await loadRecords();});
+  recovery.append(resume,discard);article.append(recovery);save.disabled=true;save.dataset.conflictSave='true';
+ }
  if(record.event_id){const detach=element('button','この記録の予定との紐づけを外す');detach.className='btn-outline history-secondary';detach.onclick=()=>action(async dispatch=>{await mutate('/binding',{target:JSON.parse(record.target_json),link_revision:record.link_revision,decision:'detach'},'POST',dispatch);await loadRecords();},{write:true});article.append(detach);}
  return article;}));controls();
 }

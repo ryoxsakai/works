@@ -1,4 +1,18 @@
 // Shared record-card markup; identity, attribution and persistence stay with owners.
+import {attributedLessonRecord} from './lesson-attribution.js';
+import {lessonEventRef} from './lesson-plan.js';
+export function sameLessonOwner(current,previous){
+  if(current?.record_storage!=='d1_owner')return previous?.record_storage!=='d1_owner';
+  return current.attribution_status==='confirmed'&&previous?.record_storage==='d1_owner'&&previous.attribution_status==='confirmed'&&!!current.owner_id&&current.owner_id===previous.owner_id;
+}
+export function previousOwnerRecord(current,event,events,readRecord){
+  current=attributedLessonRecord(current,lessonEventRef(event));
+  if(current?.record_storage!=='d1_owner'||current.attribution_status!=='confirmed'||!current.owner_id)return null;
+  const start=Date.parse(event.start?.dateTime||event.start?.date||event.start);
+  return events.map(candidate=>({event:candidate,record:readRecord(candidate),time:Date.parse(candidate.start?.dateTime||candidate.start?.date||candidate.start)}))
+    .filter(candidate=>Number.isFinite(candidate.time)&&candidate.time<start&&sameLessonOwner(current,candidate.record))
+    .sort((a,b)=>b.time-a.time)[0]||null;
+}
 export function lessonRecordRows(rows, { escapeHtml, formatTimeOrPeriod, lessonRecordNeedsReview, lessonReviewRow, lightenHexColor, calendarName, lessonAttributionNotice, lessonPlanEditor, lessonPlanFeedback, recordStudentPrefName, lessonEventKey }) {
   return rows
     .map((r) => {
@@ -10,13 +24,14 @@ export function lessonRecordRows(rows, { escapeHtml, formatTimeOrPeriod, lessonR
           <td colspan="4"></td>
         </tr>`;
       }
-      if (lessonRecordNeedsReview(r.record)) return lessonReviewRow(r.ref,r.record,r.label,formatTimeOrPeriod(r.start,"Asia/Tokyo"));
+      const record=r.record?.record_storage==='d1_owner'?attributedLessonRecord(r.record,r.ref):r.record;
+      if (lessonRecordNeedsReview(record)) return lessonReviewRow(r.ref,record,r.label,formatTimeOrPeriod(r.start,"Asia/Tokyo"));
       return `<tr data-event-id="${escapeHtml(r.eventId)}" data-record-ref="${escapeHtml(JSON.stringify(r.ref))}" data-record-revision="${r.record.record_revision}" data-completed="${r.completed ? 1 : 0}" data-calendar-name="${escapeHtml(calendarName(r.calendarId) || "カレンダー")}">
         <td>
           <div class="record-card-heading"><button type="button" class="record-student-link" data-calendar-id="${escapeHtml(r.calendarId || "")}" data-name="${escapeHtml(r.label)}" data-term-id="${r.termId}"><span class="record-avatar"${r.iconColor ? ` style="background-color:${escapeHtml(lightenHexColor(r.iconColor, 0.75))};color:${escapeHtml(r.iconColor)}"` : ""}><i class="bx bx-book-open"></i></span> ${escapeHtml(r.label)}</button><div class="record-card-meta"><span>${r.n}/${r.m}回</span><span>${formatTimeOrPeriod(r.start, "Asia/Tokyo")}</span><button type="button" class="record-recheck btn btn-outline" aria-label="予定を再確認" title="予定を再確認" disabled><svg class="works-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-1l2 3M4 15l2 3a7 7 0 0 0 12-1"/></svg></button></div></div>
           ${lessonAttributionNotice(r.record)}
           ${
-            r.prevLessonPlan
+            r.prevLessonPlan&&sameLessonOwner(r.record,r.prevRecord)&&!lessonRecordNeedsReview(r.prevRecord)
               ? `<div class="record-prev-info">${lessonAttributionNotice(r.prevRecord)}
                   ${r.prevLessonPlan ? `<p><i class="bx bx-book-content"></i> ${escapeHtml(r.prevLessonPlan)}</p>` : ""}
                 </div>`

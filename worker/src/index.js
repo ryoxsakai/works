@@ -2932,9 +2932,10 @@ async function readScheduleEvents(
     }))
   );
   const attribution = await import("./lesson-attribution.js");
+  const {lessonEventRef}=await import("../../shared/lesson-plan.js");
   return filteredEvents.map((event) => {
       const { currentRecord } = attribution;
-      const detail = currentRecord(details.get(event.id), {id:event.id,calendar_id:event.calendar_id,title:event.summary || "",start:event.start?.dateTime || event.start?.date});
+      const detail = currentRecord(details.get(event.id), lessonEventRef(event,event.calendar_id));
       return {
         id: event.id,
         calendar_id: event.calendar_id,
@@ -4424,9 +4425,12 @@ async function readObservedCurriculumEntries(env, targets, context = {}) {
     const result=[];
     const calendars=new Map();for(const target of targets){const ids=calendars.get(target.id)||new Set();ids.add(target.calendar_id||target._calendarId);calendars.set(target.id,ids);}if([...calendars.values()].some(ids=>ids.size>1))throw httpError(409,'同じ予定IDを持つ複数カレンダーは固定IDの授業履歴画面で確認してください');
     const deps={settings:()=>readSettings(env),token:()=>mintGoogleAccessToken(env),event:fetchCalendarEventWithToken};
-    const {lessonEventRef}=await import('../../shared/lesson-plan.js');
+    const {lessonEventRef,sameLessonEvent}=await import('../../shared/lesson-plan.js');
     const settings=await deps.settings(),token=(await deps.token()).access_token;
-    for(const target of targets){const ref=lessonEventRef(target);if(!settings.selected_calendars?.includes(ref.calendar_id))throw httpError(403,'カレンダーを確認してください');const event=await deps.event(token,ref.calendar_id,ref.id);result.push(event?await readEventOwnerRecord(env,lessonEventRef(event,ref.calendar_id),event):{calendar_event_id:ref.id,record_storage:'d1_owner',attribution_status:'target_unavailable',record_target_unavailable:true});}
+    for(const target of targets){const ref=lessonEventRef(target);if(!settings.selected_calendars?.includes(ref.calendar_id))throw httpError(403,'カレンダーを確認してください');const event=await deps.event(token,ref.calendar_id,ref.id);
+      // A response must belong to the exact observation whose label the caller will render.
+      if(!event||!sameLessonEvent(ref,lessonEventRef(event,ref.calendar_id))){result.push({calendar_event_id:ref.id,record_storage:'d1_owner',record_read_target:ref,attribution_status:'target_unavailable',record_target_unavailable:true,record_requires_reload:true});continue;}
+      result.push(await readEventOwnerRecord(env,ref,event));}
     return result;
   }
   const { lessonEventRef } = await import("../../shared/lesson-plan.js");
@@ -6411,7 +6415,7 @@ export default {
         const body=await request.json();
         if (!Array.isArray(body.targets) || body.targets.length>250 || body.targets.some(ref=>typeof ref?.id!=="string" || !ref.id || typeof ref?.calendar_id!=="string" || !ref.calendar_id)) throw httpError(400,"予定の対象が不正です");
         if(calendarRecordsEnabled(env)&&body.targets.length>1)throw httpError(400,"カレンダー記録は1回に1授業ずつ取得してください");
-        return json((await readObservedCurriculumEntries(env,body.targets)).map(row=>({...row,attribution_status:"unverified",calendar_source_enabled:calendarRecordsEnabled(env)})),headers);
+        return json((await readObservedCurriculumEntries(env,body.targets)).map(row=>({...row,attribution_status:ownerHistoryActive(env)?row.attribution_status:"unverified",calendar_source_enabled:calendarRecordsEnabled(env)})),headers);
       }
 
       if (url.pathname === "/api/curriculum" && request.method === "GET") {

@@ -4,9 +4,19 @@ import {replaceCalendarRecord,parseCalendarRecord,parsePlainCalendarRecord} from
 import {calendarLessonJournal} from '../src/calendar-lesson-journal.js';
 import {lessonEventRef} from '../../shared/lesson-plan.js';
 import {recordBinding} from '../src/calendar-lesson-migration.js';
-import {createLessonOwner,changeLessonBinding,listOwnerRecords} from '../src/lesson-owner-history.js';
+import {createLessonOwner,changeLessonBinding,listOwnerRecords,editOwnerRecord} from '../src/lesson-owner-history.js';
 const parseVisible=description=>parseCalendarRecord(description)||parsePlainCalendarRecord(description,{calendar_id:'synthetic-calendar',event_id:'b',title:'合成生徒',generation:0});
 const origin='https://works.example.test',owner='owner@example.invalid';
+test('D1 record list holds an old observed A row after another tab rebinds the same event to B',async t=>{
+ const {DB,events,call}=await setup(t,{historyMode:'active'}),env={DB,LESSON_HISTORY_MODE:'active'},deps={settings:async()=>({selected_calendars:['synthetic-calendar']}),token:async()=>({access_token:'synthetic'}),event:async(token,cal,id)=>events.find(e=>e.id===id)};
+ events[0].summary='A';const old=lessonEventRef(events[0],'synthetic-calendar');
+ const a=(await createLessonOwner(env,{request_id:crypto.randomUUID(),name:'A',kind:'student'})).owner,b=(await createLessonOwner(env,{request_id:crypto.randomUUID(),name:'B',kind:'student'})).owner;
+ await changeLessonBinding(env,{request_id:crypto.randomUUID(),target:old,link_revision:0,decision:'new',owner_id:a.id,owner_revision:1},deps);
+ events[0].summary='B';events[0].etag='renamed-b';const current=lessonEventRef(events[0],'synthetic-calendar');const rebound=await changeLessonBinding(env,{request_id:crypto.randomUUID(),target:current,link_revision:1,decision:'different_owner',owner_id:b.id,owner_revision:1},deps);
+ await editOwnerRecord(env,rebound.record.id,{request_id:crypto.randomUUID(),revision:1,lesson_plan:'B private plan'});
+ const stale=await (await call('/api/lesson-records',{targets:[old]})).json();assert.equal(stale[0].attribution_status,'target_unavailable');assert.ok(!stale[0].lesson_plan);assert.ok(!stale[0].owner_id);
+ const fresh=await (await call('/api/lesson-records',{targets:[current]})).json();assert.equal(fresh[0].lesson_plan,'B private plan');
+});
 test('actual Worker D1 owner mode: legacy UI and MCP read D1, edits never PATCH Calendar; old attribution/template/undo writers are blocked',async t=>{
  const {DB,events,control,call,put,bindings}=await setup(t,{historyMode:'active'}),env={DB,LESSON_HISTORY_MODE:'active'};
  const person=(await createLessonOwner(env,{request_id:crypto.randomUUID(),name:'固定IDの生徒',kind:'student'})).owner;

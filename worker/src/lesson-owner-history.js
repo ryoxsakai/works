@@ -86,13 +86,14 @@ export async function editOwnerRecord(env,recordId,body){await policy(env,ownerH
  return {before:{record},after:{record:after},statements:[...guards,statement(env,`UPDATE lesson_history_records SET ${Object.keys(patch).map(k=>k+'=?').join(',')},revision=revision+1,updated_at=? WHERE id=?`,...Object.values(patch),after.updated_at,recordId)]};});}
 export async function readEventOwnerRecord(env,target,event){
  await policy(env,true);
- if(await first(env,'SELECT reason FROM lesson_history_exclusions WHERE calendar_id=? AND event_id=?',target.calendar_id,target.id)||event&&!isScheduledLesson(lessonEventRef(event,target.calendar_id)))return {calendar_event_id:target.id,record_storage:'d1_owner',attribution_status:'excluded',record_exists:false,record_revision:0,...calendarRecordValues({})};
+ const observation={calendar_event_id:target.id,record_storage:'d1_owner',record_read_target:target};
+ if(await first(env,'SELECT reason FROM lesson_history_exclusions WHERE calendar_id=? AND event_id=?',target.calendar_id,target.id)||event&&!isScheduledLesson(lessonEventRef(event,target.calendar_id)))return {...observation,attribution_status:'excluded',record_exists:false,record_revision:0,...calendarRecordValues({})};
  const link=await first(env,'SELECT * FROM lesson_event_links WHERE calendar_id=? AND event_id=?',target.calendar_id,target.id);
- if(!link?.record_id)return {calendar_event_id:target.id,record_exists:false,record_revision:0,attribution_status:'owner_unassigned',attribution_notice:'生徒・クラスの紐づけが必要です',...calendarRecordValues({})};
+ if(!link?.record_id)return {...observation,record_exists:false,record_revision:0,attribution_status:'owner_unassigned',attribution_notice:'生徒・クラスの紐づけが必要です',...calendarRecordValues({})};
  const record=await first(env,'SELECT * FROM lesson_history_records WHERE id=?',link.record_id),old=JSON.parse(link.target_json);
  const changed=lessonTitleKey(old.title)!==lessonTitleKey(target.title);
  const recreated=event&&encode(eventIdentity(event))!==link.event_identity_json;
- return {calendar_event_id:target.id,record_exists:true,record_revision:record.revision,record_id:record.id,owner_id:record.owner_id,record_storage:'d1_owner',record_calendar_id:target.calendar_id,record_title:old.title,attribution_status:recreated?'event_recreated':changed?'title_changed':'confirmed',...(changed||recreated?{...calendarRecordValues({}),attribution_notice:'予定名または予定の生成情報が変わりました。同じ生徒か、別の生徒かを確認してください'}:{...calendarRecordValues(record),completed:record.completed}),link_revision:link.revision};
+ return {...observation,record_exists:true,record_revision:record.revision,record_id:record.id,owner_id:record.owner_id,record_calendar_id:target.calendar_id,record_title:old.title,attribution_status:recreated?'event_recreated':changed?'title_changed':'confirmed',...(changed||recreated?{...calendarRecordValues({}),attribution_notice:'予定名または予定の生成情報が変わりました。同じ生徒か、別の生徒かを確認してください'}:{...calendarRecordValues(record),completed:record.completed}),link_revision:link.revision};
 }
 export async function writeEventOwnerRecord(env,body,deps){
  await policy(env,true);const {ref,event}=await liveHistoryTarget(env,body.target,deps),shown=await readEventOwnerRecord(env,ref,event);
