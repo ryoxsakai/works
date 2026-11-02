@@ -1,4 +1,5 @@
 import {ownerSemesterCounts} from '../shared/semester-counts.mjs?v=1';
+import {recordRowSnapshot,independentRecordRows,synchronizeRecordRows} from './record-row-sync.mjs?v=1';
 import {readPendingRecovery,persistPendingRecovery,clearPendingRecovery,pendingRecoveryCopies} from './pending-plan-draft.mjs?v=2';
 import {createOwnerMemoEditors} from '../shared/owner-memo.mjs?v=1';
 import {boundedRead,precedingLegacyEvents,precedingOwnerEvents,recordTermScope} from './record-read.mjs?v=2';
@@ -248,22 +249,18 @@ const lessonPlans = createLessonPlanController({
   readNext: (source) => readNextLessonWithTemplate(source,(path,opts={})=>apiFetch(path,opts,null),(before,after,revision)=>applyCalendarTarget(before,after,revision),getSessionToken(),getSessionToken),
   write: async (body) => {
     const result = await apiFetch("/lesson-plan", { method: "PUT", body: JSON.stringify(body) }, null);
-    document.querySelectorAll("tr[data-record-ref]").forEach(row => {
-      const ref=JSON.parse(row.dataset.recordRef);
-      if (lessonEventKey(ref) === lessonEventKey(body.target)) {row.dataset.recordRevision = result.record_revision;if(result.target)row.dataset.recordRef=JSON.stringify(result.target);}
-    });
-    if(result.target)applyCalendarTarget(body.target,result.target,result.record_revision);
+    applyCalendarTarget(body.target,result.target||body.target,result.record_revision,body.expected_owner_id||null,body.record_revision);
     return result;
   },
   onChange: () => renderLessonPlans(),
 });
 
-function applyCalendarTarget(before,after,revision){
+function applyCalendarTarget(before,after,revision,ownerId=lessonPlans.get(lessonEventKey(before))?.ownerId||null,beforeRevision=lessonPlans.get(lessonEventKey(before))?.recordRevision){
   lessonPlans.observeTarget(before,after);
   if(Number.isSafeInteger(revision))lessonPlans.observeRecord(after,revision);
-  for(const event of rawEvents)if(lessonEventKey(lessonEventRef(event))===lessonEventKey(before))event.etag=after.etag;
-  document.querySelectorAll('.lesson-plan-editor[data-read-target]').forEach(editor=>{const ref=JSON.parse(editor.dataset.readTarget);if(JSON.stringify(ref)===JSON.stringify(before))editor.dataset.readTarget=JSON.stringify(after);});
-  document.querySelectorAll('tr[data-record-ref]').forEach(row=>{const ref=JSON.parse(row.dataset.recordRef);if(lessonEventKey(ref)===lessonEventKey(before)){row.dataset.recordRef=JSON.stringify(after);if(Number.isSafeInteger(revision))row.dataset.recordRevision=revision;}});
+  for(const event of rawEvents)if(JSON.stringify(lessonEventRef(event))===JSON.stringify(before))event.etag=after.etag;
+  document.querySelectorAll('.lesson-plan-editor[data-read-target]').forEach(editor=>{const ref=JSON.parse(editor.dataset.readTarget);if(JSON.stringify(ref)===JSON.stringify(before)&&(editor.dataset.readOwner||null)===ownerId)editor.dataset.readTarget=JSON.stringify(after);});
+  document.querySelectorAll('tr[data-record-ref]').forEach(row=>{const ref=JSON.parse(row.dataset.recordRef);if(JSON.stringify(ref)===JSON.stringify(before)&&(row.dataset.recordOwner||null)===ownerId){row.dataset.recordRef=JSON.stringify(after);if(Number.isSafeInteger(revision)&&Number(row.dataset.recordRevision)===beforeRevision)row.dataset.recordRevision=revision;}});
 }
 
 let calendarColors = new Map(); // calendarId -> { raw, bg, fg }
@@ -299,36 +296,56 @@ let recordTableRequest = 0;
 let recordRequestedTermScope=null;
 const recordDrafts=new Map();
 function recordRecoveryContext(draft){return draft.ownerId?'owner-record:'+draft.ownerId+':'+lessonEventKey(draft.ref):null;}
-function persistRecordDraft(draft){const recovery={recoveryContext:recordRecoveryContext(draft),target:draft.ref,value:JSON.stringify({values:draft.values,ownerId:draft.ownerId,completed:draft.completed,sentValues:draft.sentValues,conflict:!!draft.conflict}),base:'',recordRevision:draft.revision,operationId:draft.operationId,pendingUnknown:!!draft.unknown};persistPendingRecovery(recovery);return !recovery.recoveryUnavailable;}
+function persistRecordDraft(draft){const recovery={recoveryContext:recordRecoveryContext(draft),target:draft.ref,value:JSON.stringify({values:draft.values,ownerId:draft.ownerId,completed:draft.completed,sentValues:draft.sentValues,conflict:!!draft.conflict,view:draft.view,alternatives:draft.alternatives}),base:'',recordRevision:draft.revision,operationId:draft.operationId,pendingUnknown:!!draft.unknown};persistPendingRecovery(recovery);return !recovery.recoveryUnavailable;}
 function clearRecordDraft(draft){clearPendingRecovery({recoveryContext:recordRecoveryContext(draft)});}
-function restoredRecordDraft(cached){try{const value=JSON.parse(cached.value);return {ref:cached.target,ownerId:value.ownerId,revision:cached.recordRevision,values:value.values,completed:value.completed,sentValues:value.sentValues,operationId:cached.operationId,unknown:!!cached.unknown,conflict:!!value.conflict};}catch{return null;}}
-function rememberRecordDraft(row){if(!row)return;const ref=JSON.parse(row.dataset.recordRef),old=recordDrafts.get(lessonEventKey(ref));if(old?.unknown||old?.busy||old?.conflict)return;const draft={ref,ownerId:row.dataset.recordOwner||null,revision:Number(row.dataset.recordRevision),values:Object.fromEntries(['test','homework','memo'].map(field=>[field,row.querySelector('.'+recordFieldPrefix(row)+'-'+field).value]))};recordDrafts.set(lessonEventKey(ref),draft);persistRecordDraft(draft);}
+function restoredRecordDraft(cached){try{const value=JSON.parse(cached.value);return {ref:cached.target,ownerId:value.ownerId,revision:cached.recordRevision,values:value.values,completed:value.completed,sentValues:value.sentValues,operationId:cached.operationId,unknown:!!cached.unknown,conflict:!!value.conflict,view:value.view,alternatives:value.alternatives};}catch{return null;}}
+function rememberRecordDraft(row){if(!row)return;const ref=JSON.parse(row.dataset.recordRef),old=recordDrafts.get(lessonEventKey(ref));if(old?.unknown||old?.busy||old?.conflict)return;const draft={ref,ownerId:row.dataset.recordOwner||null,...recordRowSnapshot(row)};recordDrafts.set(lessonEventKey(ref),draft);persistRecordDraft(draft);}
 async function verifyRecordDraft(draft,message){
  try{const audit=(await apiFetch('/lesson-history/audit?operation_id='+encodeURIComponent(draft.operationId),{},null)).find(a=>a.id===draft.operationId&&['write_series_record','edit_record'].includes(a.action));if(!audit)throw Error('保存をまだ確認できません。同じ操作IDで照合し、再送しないでください');const after=JSON.parse(audit.after_json),saved=after.record||after;if(saved.owner_id!==draft.ownerId||!!saved.completed!==!!draft.completed||!['test','homework','memo'].every(k=>(saved[{test:'confirmation_test',homework:'homework',memo:'lesson_memo'}[k]]||'')===draft.sentValues[k]))throw Error('操作と保持中の内容の対応を確認できません');
  const [fresh]=await apiFetch('/lesson-records',{method:'POST',body:JSON.stringify({targets:[draft.ref]})},null);if(fresh.owner_id!==draft.ownerId||!!fresh.completed!==!!draft.completed||fresh.attribution_status!=='confirmed'||JSON.stringify(fresh.record_read_target)!==JSON.stringify(draft.ref)||!['test','homework','memo'].every(k=>(fresh[{test:'confirmation_test',homework:'homework',memo:'lesson_memo'}[k]]||'')===draft.sentValues[k]))throw Error('保存後に予定または内容が変わっています。入力を保持し履歴で比較してください');
- clearRecordDraft(draft);recordDrafts.delete(lessonEventKey(draft.ref));for(const row of document.querySelectorAll('tr[data-record-ref]'))if(JSON.stringify(JSON.parse(row.dataset.recordRef))===JSON.stringify(draft.ref)&&(row.dataset.recordOwner||null)===draft.ownerId){row.dataset.recordRevision=fresh.record_revision;row.dataset.completed=fresh.completed?'1':'0';if(row.querySelector('.curriculum-completed'))row.querySelector('.curriculum-completed').checked=!!fresh.completed;recordControls(row).forEach(el=>el.disabled=false);row.querySelector('.record-draft-feedback')?.remove();}if(lessonPlans.get(lessonEventKey(draft.ref))?.ownerId===draft.ownerId)lessonPlans.observeRecord(draft.ref,fresh.record_revision);showRetainedRecordDrafts();await loadRecordTable();
+ acceptRecordSnapshot(draft,{revision:fresh.record_revision,values:{test:fresh.confirmation_test||'',homework:fresh.homework||'',memo:fresh.lesson_memo||''},completed:!!fresh.completed});if(lessonPlans.get(lessonEventKey(draft.ref))?.ownerId===draft.ownerId)lessonPlans.observeRecord(draft.ref,fresh.record_revision);showRetainedRecordDrafts();await loadRecordTable();
  }catch(error){message.textContent=error.message;}
 }
 function recordFieldPrefix(row){return row.querySelector('.record-test')?'record':'curriculum';}
 function recordControls(row){return row.querySelectorAll('.record-test,.record-homework,.record-memo,.curriculum-test,.curriculum-homework,.curriculum-memo,.curriculum-completed');}
+function matchingRecordRows(draft){return [...document.querySelectorAll('tr[data-record-ref]')].filter(row=>JSON.stringify(JSON.parse(row.dataset.recordRef))===JSON.stringify(draft.ref)&&(row.dataset.recordOwner||null)===draft.ownerId);}
+function acceptRecordSnapshot(draft,saved,sourceRow){
+ const rows=matchingRecordRows(draft),held=synchronizeRecordRows(rows,saved,sourceRow);
+ // A view can be unmounted while a request is pending. Its recovery copy still matters.
+ const copies=new Map((Array.isArray(draft.alternatives)?draft.alternatives:[]).map(copy=>[copy.view,copy]));
+ held.forEach(copy=>copies.set(copy.view,copy));
+ if(recordDrafts.get(lessonEventKey(draft.ref))===draft)recordDrafts.delete(lessonEventKey(draft.ref));draft.unknown=false;
+ let recovery=null;
+ if(copies.size){const [first,...alternatives]=copies.values();recovery={ref:draft.ref,ownerId:draft.ownerId,...first,alternatives,conflict:true,operationId:draft.operationId};recordDrafts.set(lessonEventKey(draft.ref),recovery);recovery.recoveryUnavailable=!persistRecordDraft(recovery);}else clearRecordDraft(draft);
+ for(const row of rows){recordControls(row).forEach(el=>el.disabled=!!recovery);row.querySelector('.record-draft-feedback')?.remove();if(recovery)showRowRecordRecovery(row,recovery);}
+ if(recovery)showActionError(Error('別の表示に未保存入力があります。入力と元の版を保持し、保存を停止しました。保持した入力と授業履歴の最新内容を比較してください。'+(recovery.recoveryUnavailable?'復旧コピーを更新できないため、保持した入力をファイルにも保存してください。':'')));
+}
 function showRowRecordRecovery(row,draft){row.querySelector('.record-draft-feedback')?.remove();if(!draft.unknown&&!draft.conflict)return;const details=document.createElement('details'),summary=document.createElement('summary'),message=document.createElement('p');details.className='record-draft-feedback';summary.textContent='保持した入力と保存結果を確認';message.textContent=(draft.busy?'保存中':draft.unknown?'結果不明・再送を停止しています。':'入力を保持して保存を停止しています。')+' 操作ID: '+(draft.operationId||'');message.style.overflowWrap='anywhere';details.append(summary,message);if(draft.unknown){const button=document.createElement('button');button.type='button';button.textContent='この記録の保存結果だけを照合';button.onclick=()=>verifyRecordDraft(draft,message);details.append(button);}row.cells[0].append(details);}
-function restoreRecordDraftRows(root){for(const row of root.querySelectorAll('tr[data-record-ref]')){const ref=JSON.parse(row.dataset.recordRef),key=lessonEventKey(ref);let draft=recordDrafts.get(key);if(!draft&&row.dataset.recordOwner){const cached=readPendingRecovery('owner-record:'+row.dataset.recordOwner+':'+key);if(cached){draft=restoredRecordDraft(cached);if(draft)recordDrafts.set(key,draft);}}if(!draft)continue;const prefix=recordFieldPrefix(row);if(JSON.stringify(ref)===JSON.stringify(draft.ref)&&Number(row.dataset.recordRevision)===draft.revision&&(row.dataset.recordOwner||null)===draft.ownerId){for(const [field,value]of Object.entries(draft.values))row.querySelector('.'+prefix+'-'+field).value=value;if(prefix==='curriculum'&&draft.completed!==undefined)row.querySelector('.curriculum-completed').checked=draft.completed;}if(draft.unknown||draft.conflict||JSON.stringify(ref)!==JSON.stringify(draft.ref)||Number(row.dataset.recordRevision)!==draft.revision||(row.dataset.recordOwner||null)!==draft.ownerId){recordControls(row).forEach(el=>el.disabled=true);showRowRecordRecovery(row,draft);}}}
+function restoreRecordDraftRows(root){for(const row of root.querySelectorAll('tr[data-record-ref]')){
+ const ref=JSON.parse(row.dataset.recordRef),key=lessonEventKey(ref);let draft=recordDrafts.get(key);
+ if(!draft&&row.dataset.recordOwner){const cached=readPendingRecovery('owner-record:'+row.dataset.recordOwner+':'+key);if(cached){draft=restoredRecordDraft(cached);if(draft)recordDrafts.set(key,draft);}}
+ if(!draft)continue;const prefix=recordFieldPrefix(row),sameTarget=JSON.stringify(ref)===JSON.stringify(draft.ref)&&(row.dataset.recordOwner||null)===draft.ownerId;
+ const copy=!draft.view||draft.view===prefix?draft:(draft.alternatives||[]).find(copy=>copy.view===prefix);
+ if(sameTarget&&copy){for(const [field,value]of Object.entries(copy.values))row.querySelector('.'+prefix+'-'+field).value=value;if(prefix==='curriculum'&&copy.completed!==undefined)row.querySelector('.curriculum-completed').checked=copy.completed;}
+ const changed=!sameTarget||Number(row.dataset.recordRevision)!==draft.revision;
+ if(changed&&!draft.unknown&&!draft.busy){draft.conflict=true;persistRecordDraft(draft);}
+ if(draft.unknown||draft.busy||draft.conflict||changed){recordControls(row).forEach(el=>el.disabled=true);showRowRecordRecovery(row,draft);}
+}}
 async function saveRecordFields(row){
  const ref=JSON.parse(row.dataset.recordRef),key=lessonEventKey(ref),existing=recordDrafts.get(key);if(existing?.unknown||existing?.busy||existing?.conflict)return;rememberRecordDraft(row);const sentDraft=recordDrafts.get(key),prefix=recordFieldPrefix(row),completed=prefix==='curriculum'?row.querySelector('.curriculum-completed').checked:row.dataset.completed==='1';
- sentDraft.operationId=crypto.randomUUID();sentDraft.unknown=true;sentDraft.busy=true;sentDraft.completed=completed;sentDraft.sentValues={...sentDraft.values};if(!persistRecordDraft(sentDraft)){sentDraft.busy=false;sentDraft.unknown=false;showActionError(Error('復旧コピーを保持できないため保存を停止しました'));return;}showRetainedRecordDrafts();recordControls(row).forEach(el=>el.disabled=true);
+ sentDraft.alternatives=independentRecordRows(matchingRecordRows(sentDraft),{values:sentDraft.values,completed},row);sentDraft.operationId=crypto.randomUUID();sentDraft.unknown=true;sentDraft.busy=true;sentDraft.completed=completed;sentDraft.sentValues={...sentDraft.values};if(!persistRecordDraft(sentDraft)){sentDraft.busy=false;sentDraft.unknown=false;showActionError(Error('復旧コピーを保持できないため保存を停止しました'));return;}showRetainedRecordDrafts();matchingRecordRows(sentDraft).forEach(current=>recordControls(current).forEach(el=>el.disabled=true));
  try{const saved=await apiFetch('/curriculum/'+encodeURIComponent(ref.id),{method:'PUT',body:JSON.stringify({target:ref,record_revision:sentDraft.revision,expected_owner_id:sentDraft.ownerId,request_id:sentDraft.operationId,completed,confirmation_test:sentDraft.values.test,homework:sentDraft.values.homework,lesson_memo:sentDraft.values.memo})},null);
   if(sentDraft.ownerId&&saved.owner_id!==sentDraft.ownerId)throw Object.assign(Error('保存応答の共有先を確認できません'),{unknown:true});
-  clearRecordDraft(sentDraft);if(recordDrafts.get(key)===sentDraft)recordDrafts.delete(key);sentDraft.unknown=false;
-  for(const current of document.querySelectorAll('tr[data-record-ref]'))if(JSON.stringify(JSON.parse(current.dataset.recordRef))===JSON.stringify(ref)&&(current.dataset.recordOwner||null)===sentDraft.ownerId){current.dataset.recordRevision=saved.record_revision;current.dataset.completed=completed?'1':'0';recordControls(current).forEach(el=>el.disabled=false);current.querySelector('.record-draft-feedback')?.remove();}
+  acceptRecordSnapshot(sentDraft,{revision:saved.record_revision,values:sentDraft.sentValues,completed},row);
   if(!sentDraft.ownerId||lessonPlans.get(key)?.ownerId===sentDraft.ownerId)lessonPlans.observeRecord(ref,saved.record_revision);if(!sentDraft.ownerId&&saved.target)applyCalendarTarget(ref,saved.target,saved.record_revision);showRetainedRecordDrafts();
- }catch(error){sentDraft.unknown=!!(error.unknown||error.status>=500||error.code==='LESSON_HISTORY_RELOAD');sentDraft.conflict=!sentDraft.unknown;persistRecordDraft(sentDraft);showRetainedRecordDrafts();showRowRecordRecovery(row,sentDraft);showActionError(error);}finally{sentDraft.busy=false;if(recordDrafts.get(key)===sentDraft){showRetainedRecordDrafts();showRowRecordRecovery(row,sentDraft);}}
+ }catch(error){sentDraft.unknown=!!(error.unknown||error.status>=500||error.code==='LESSON_HISTORY_RELOAD');sentDraft.conflict=!sentDraft.unknown;persistRecordDraft(sentDraft);showRetainedRecordDrafts();matchingRecordRows(sentDraft).forEach(current=>showRowRecordRecovery(current,sentDraft));showActionError(error);}finally{sentDraft.busy=false;if(recordDrafts.get(key)===sentDraft){showRetainedRecordDrafts();matchingRecordRows(sentDraft).forEach(current=>showRowRecordRecovery(current,sentDraft));}}
 }
 
 function showRetainedRecordDrafts(){
  let panel=document.querySelector('#retained-record-drafts');if(!panel){panel=document.createElement('aside');panel.id='retained-record-drafts';els.recordTbody.closest('table').before(panel);}panel.replaceChildren();
  const entries=[...recordDrafts.values()].map(draft=>({draft,local:true}));for(const cached of pendingRecoveryCopies().filter(c=>c.context.startsWith('owner-record:')&&(!c.currentTab||!recordDrafts.has(lessonEventKey(c.target))))){const draft=restoredRecordDraft(cached);if(draft)entries.push({draft,local:false});}
- for(const {draft,local}of entries){const details=document.createElement('details'),title=document.createElement('summary'),text=document.createElement('pre'),message=document.createElement('p');title.textContent=(local?'保持中の未保存入力：':'別タブ・以前の予定の保持入力：')+draft.ref.title+' / '+draft.ref.start;text.textContent=['確認テスト：'+draft.values.test,'宿題：'+draft.values.homework,'授業メモ：'+draft.values.memo].join('\n');message.textContent=draft.operationId?'操作ID: '+draft.operationId:'';details.append(title,text,message);
- if(local&&draft.unknown){const verify=document.createElement('button');verify.type='button';verify.textContent='この記録の保存結果だけを照合';verify.onclick=()=>verifyRecordDraft(draft,message);details.append(verify);}const download=document.createElement('button');download.type='button';download.textContent='保持した3欄をファイルへ保存';download.onclick=()=>{const u=URL.createObjectURL(new Blob([JSON.stringify(draft,null,2)],{type:'application/json'})),a=document.createElement('a');a.href=u;a.download='works-record-recovery.json';a.click();setTimeout(()=>URL.revokeObjectURL(u),1000);};details.append(download);panel.append(details);}
+ for(const {draft,local}of entries){const details=document.createElement('details'),title=document.createElement('summary'),text=document.createElement('pre'),message=document.createElement('p');title.textContent=(local?'保持中の未保存入力：':'別タブ・以前の予定の保持入力：')+draft.ref.title+' / '+draft.ref.start;text.textContent=[draft,...(draft.alternatives||[])].map(copy=>[(copy.view==='curriculum'?'カリキュラム':copy.view==='record'?'日別':'保持入力')+' / 元の版 '+copy.revision,'確認テスト：'+copy.values.test,'宿題：'+copy.values.homework,'授業メモ：'+copy.values.memo,'完了：'+(copy.completed?'完了':'未完了')].join('\n')).join('\n\n');message.textContent=draft.operationId?'操作ID: '+draft.operationId:'';details.append(title,text,message);
+ if(local&&draft.unknown){const verify=document.createElement('button');verify.type='button';verify.textContent='この記録の保存結果だけを照合';verify.onclick=()=>verifyRecordDraft(draft,message);details.append(verify);}const download=document.createElement('button');download.type='button';download.textContent='保持した入力をファイルへ保存';download.onclick=()=>{const u=URL.createObjectURL(new Blob([JSON.stringify(draft,null,2)],{type:'application/json'})),a=document.createElement('a');a.href=u;a.download='works-record-recovery.json';a.click();setTimeout(()=>URL.revokeObjectURL(u),1000);};details.append(download);panel.append(details);}
 }
 window.addEventListener('beforeunload',event=>{if(recordDrafts.size||ownerMemos.hasEdits()){event.preventDefault();event.returnValue='';}});
 let goals = [];
