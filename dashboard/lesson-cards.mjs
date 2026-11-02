@@ -1,9 +1,11 @@
+import {ownerSemesterCounts} from '../shared/semester-counts.mjs?v=1';
+import {createOwnerMemoEditors} from '../shared/owner-memo.mjs?v=1';
 import {readNextLessonWithTemplate} from "../shared/next-lesson-read.mjs?v=1";
 import { curriculumSelectionName } from "../shared/student-profile-key.js";
-import {lessonRecordRows,renderPlanEditors,renderMemoEditors} from '../shared/lesson-record-view.mjs?v=4';
+import {lessonRecordRows,renderPlanEditors,renderMemoEditors} from '../shared/lesson-record-view.mjs?v=6-semester';
 import {lessonEventKey,isScheduledLesson} from '../shared/lesson-plan.js';
 import {lessonRecordNeedsReview} from '../shared/lesson-attribution.js';
-import {createLessonPlanController} from '../tutor/lesson-plan.js?v=7';
+import {createLessonPlanController} from '../tutor/lesson-plan.js?v=8';
 import {createStudentMemoStore} from '../tutor/student-memo.js?v=1';
 import {attachRecordCarousel} from '../tutor/record-carousel.mjs?v=3';
 import {attachRecordToasts} from '../tutor/record-toasts.mjs?v=2';
@@ -22,6 +24,7 @@ export function createHomeLessonCards(model,{session,getSessionToken,onExpired,r
  const valid=()=>active&&getSessionToken()===session;
  const api=lessonApi({session,isCurrent:valid,signal:readAbort.signal,onUnauthorized:()=>{if(active)onExpired();}});
  const call=async(path,opts)=>{try{return await api(path,opts);}catch(e){if(e.status===401&&active)onExpired();throw e;}};
+ const ownerMemos=createOwnerMemoEditors({request:call});
  const eligible=r=>isScheduledLesson(r.ref,model.settings?.excluded_titles||[]);
  // No guessed annotation removal or cross-calendar identity merging.
  const nameFor=title=>model.rows.some(r=>r.label===title&&eligible(r))?curriculumSelectionName(title):'';
@@ -59,11 +62,12 @@ export function createHomeLessonCards(model,{session,getSessionToken,onExpired,r
  function render(){if(!active)return;
   const problem=states().some(s=>['error','conflict'].includes(s.status))||names.some(n=>memos.get(n).status.endsWith('error'))||unknownMemos.size||unknownPlans.size;
   error.textContent=problem?'取得・保存・対応状態の確認が必要です。入力は保持しています。未確認の保存は再送しません。':'';element.querySelector('.home-lesson-reset').hidden=!problem;
-  renderPlanEditors(root,plans,{lessonPlanDate:date,resizeRecordInput:resize});renderMemoEditors(root,memos,{resizeRecordInput:resize});
+  renderPlanEditors(root,plans,{lessonPlanDate:date,resizeRecordInput:resize});renderMemoEditors(root,memos,{resizeRecordInput:resize});ownerMemos.render(root);
   for(const editor of root.querySelectorAll('.lesson-plan-editor'))if(unknownPlans.has(editor.dataset.planKey)){
    editor.querySelector('textarea').readOnly=true;const status=editor.querySelector('.lesson-plan-status');status.textContent='保存結果を確認できません。入力を保持し、再送を停止しています。授業管理で確認してください。';status.dataset.error='true';status.classList.remove('record-transient-status');editor.querySelector('.lesson-plan-action').disabled=true;
   }
-  for(const editor of root.querySelectorAll('.student-memo-editor')){
+
+ for(const editor of root.querySelectorAll('.student-memo-editor')){
    if(!editor.dataset.studentName){editor.querySelector('.student-memo-status').textContent='生徒名・所属の確認は授業管理から行ってください。';}
    const ack=editor.querySelector('.home-memo-ack');if(ack)ack.disabled=!editor.dataset.studentName||unknownMemos.has(editor.dataset.studentName)||memoConflicts.has(editor.dataset.studentName)||(pendingMemos.get(editor.dataset.studentName)>0)||(memos.get(editor.dataset.studentName).dirty&&memos.get(editor.dataset.studentName).value.trim()!==memoBases.get(editor.dataset.studentName));const acknowledged=ack?.checked;editor.querySelector('textarea').readOnly=!acknowledged;if(!acknowledged){editor.querySelector('textarea').value='';editor.querySelector('textarea').placeholder='共有先を確認すると表示・編集できます';resize(editor.querySelector('textarea'));if(!memos.get(editor.dataset.studentName).status.endsWith('error'))editor.querySelector('.student-memo-status').textContent='名前キーの確認後に取得します';}
    if(unknownMemos.has(editor.dataset.studentName)||memoConflicts.has(editor.dataset.studentName)){editor.querySelector('textarea').readOnly=true;const status=editor.querySelector('.student-memo-status');status.textContent='保存結果を確認できません。入力を保持し、再送を停止しています。授業管理で確認してください。';status.dataset.error='true';status.classList.remove('record-transient-status');editor.querySelector('button').hidden=true;}
@@ -79,10 +83,11 @@ export function createHomeLessonCards(model,{session,getSessionToken,onExpired,r
  for(const row of model.rows)if(!lessonRecordNeedsReview(row.record)||row.record.pending_allowed)plans.seed(row.ref,row.lessonPlan,plans.version,row.record.record_revision,row.record.attribution_status,row.record.owner_id||null,row.record.pending_context||null);
  root.innerHTML=lessonRecordRows(model.rows,{
   escapeHtml:esc,formatTimeOrPeriod:formatTime,lessonRecordNeedsReview,
-  lessonReviewRow:(_ref,_record,label,time)=>_record.pending_allowed?`<tr><td colspan="7"><strong>${esc(label)}</strong> ${time}<div class="pending-plan-label"><span>授業予定</span>${planEditor(_ref,label,'pending-record-plan','')}</div><p>未紐づけの予定単位下書きとしてD1へ保存します。生徒の履歴へは自動で移しません。</p><a class="pending-bind-link" href="/tutor/history.html?calendar_id=${encodeURIComponent(_ref.calendar_id)}&event_id=${encodeURIComponent(_ref.id)}">下書きと紐づけを確認</a></td></tr>`:_record.record_pending_operation?`<tr><td colspan="7"><strong>${esc(label)}</strong> ${time}<p role="status">保存結果を確認するまで再送を停止しています。</p><button type="button" class="calendar-record-reconcile" data-ref="${esc(JSON.stringify(_ref))}">保存結果を照合する</button></td></tr>`:`<tr><td colspan="7"><strong>${esc(label)}</strong> ${time}<p role="status">予定名・所属の対応確認が必要です。確認まで内容の表示と編集を停止しています。</p><a class="lesson-record-review" href="/tutor/">授業管理で確認する</a></td></tr>`,
+  lessonReviewRow:(_ref,_record,label,time)=>_record.pending_allowed?`<tr><td colspan="7"><strong>${esc(label)}</strong> ${time}<div class="pending-plan-label"><span>授業予定</span>${planEditor(_ref,label,'pending-record-plan','')}</div><p>未紐づけの予定単位下書きとしてD1へ保存します。生徒の履歴へは自動で移しません。</p><a class="pending-bind-link" href="/tutor/history.html?calendar_id=${encodeURIComponent(_ref.calendar_id)}&event_id=${encodeURIComponent(_ref.id)}">下書きと紐づけを確認</a><p><a class="series-start-link" href="/tutor/history.html?calendar_id=${encodeURIComponent(_ref.calendar_id)}&event_id=${encodeURIComponent(_ref.id)}&series_start=1">この授業から次回・共有メモの連動を開始</a></p></td></tr>`:_record.record_pending_operation?`<tr><td colspan="7"><strong>${esc(label)}</strong> ${time}<p role="status">保存結果を確認するまで再送を停止しています。</p><button type="button" class="calendar-record-reconcile" data-ref="${esc(JSON.stringify(_ref))}">保存結果を照合する</button></td></tr>`:`<tr><td colspan="7"><strong>${esc(label)}</strong> ${time}<p role="status">予定名・所属の対応確認が必要です。確認まで内容の表示と編集を停止しています。</p><a class="lesson-record-review" href="/tutor/">授業管理で確認する</a></td></tr>`,
   lightenHexColor:color=>/^#[0-9a-f]{6}$/i.test(color)?'#'+[1,3,5].map(i=>Math.round(parseInt(color.slice(i,i+2),16)*.25+255*.75).toString(16).padStart(2,'0')).join(''):'#e7e9ec',calendarName:id=>model.calendars.find(c=>c.id===id)?.summary||'カレンダー',lessonAttributionNotice:()=>'',
   lessonPlanEditor:planEditor,lessonPlanFeedback:feedback,recordStudentPrefName:nameFor,lessonEventKey
  });
+  if(model.countTermId)ownerSemesterCounts(model.rows,model.countTermId,call,valid).then(counts=>{if(!valid())return;for(const row of root.querySelectorAll('[data-event-id]')){const ref=JSON.parse(row.dataset.recordRef),count=counts.get(lessonEventKey(ref));if(!count)continue;const text=count.n+'/'+count.m+'回',cell=row.querySelector('[data-label="回数"]'),badge=row.querySelector('.record-card-meta span');if(cell)cell.textContent=text;if(badge)badge.textContent=text;}});
  for(const editor of root.querySelectorAll('.student-memo-editor')){
   const label=document.createElement('label');label.className='home-memo-confirm';const source=JSON.parse(editor.closest('tr').dataset.recordRef);
   label.innerHTML=`<input type="checkbox" class="home-memo-ack"> 予定「${esc(source.title)}」（${esc(model.calendars.find(c=>c.id===source.calendar_id)?.summary||"カレンダー")} ${formatTime(source.start)}）→ 生徒情報「${esc(editor.dataset.studentName)}」の共有先を確認して編集する`;
@@ -122,13 +127,13 @@ export function createHomeLessonCards(model,{session,getSessionToken,onExpired,r
  for(const row of model.rows)if(!lessonRecordNeedsReview(row.record))plans.loadNext(row.ref);
 
  function states(){return [...new Set(model.rows.flatMap(r=>[lessonEventKey(r.ref),plans.getLink(lessonEventKey(r.ref))?.targetKey]).filter(Boolean))].map(k=>plans.get(k)).filter(Boolean);}
- function pending(){return states().some(s=>s.pending)||[...pendingMemos.values()].some(n=>n>0);}
- function hasEdits(){return pending()||states().some(s=>s.dirty)||names.some(n=>memos.get(n).dirty&&memos.get(n).value.trim()!==memoBases.get(n))||unknownPlans.size>0||unknownMemos.size>0;}
+ function pending(){return ownerMemos.pending()||states().some(s=>s.pending)||[...pendingMemos.values()].some(n=>n>0);}
+ function hasEdits(){return ownerMemos.hasEdits()||pending()||states().some(s=>s.dirty)||names.some(n=>memos.get(n).dirty&&memos.get(n).value.trim()!==memoBases.get(n))||unknownPlans.size>0||unknownMemos.size>0;}
  return {element,session,day:model.day,readAt,hasEdits,pending,
   setEditing(value){editing=value;element.inert=value;render();},
   refreshLayout(){if(active){decorateTutor(element);render();}},
   pause(){paused=true;pausedScroll=root.scrollLeft;pausedFocus=element.contains(document.activeElement)?document.activeElement:null;pausedSelection=pausedFocus?.matches("textarea")?[pausedFocus.selectionStart,pausedFocus.selectionEnd]:null;},resume(){paused=false;restorePending=true;render();},scrollPosition(){return restorePending?pausedScroll:root.scrollLeft;},restoreScroll(value){root.scrollLeft=value;restorePending=false;if(pausedFocus?.isConnected&&!editing){pausedFocus.focus({preventScroll:true});if(pausedSelection)pausedFocus.setSelectionRange(...pausedSelection);}pausedFocus=null;pausedSelection=null;},
   canLeave(){if(!hasEdits())return true;if(pending()){onNotice('授業記録を保存中です。結果を確認してから移動してください。');return false;}return confirm('授業記録の未保存・未確認の入力を破棄して移動しますか？');},
-  destroy(){active=false;events.abort();readAbort.abort();observer.disconnect();carousel.destroy();toast.destroy();element.remove();}
+  destroy(){ownerMemos.dispose();active=false;events.abort();readAbort.abort();observer.disconnect();carousel.destroy();toast.destroy();element.remove();}
  };
 }

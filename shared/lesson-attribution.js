@@ -40,4 +40,4 @@ export function attributedLessonRecord(row, ref) {
     attribution_status:reason,attribution_notice:'予定名の対応確認が必要なため、旧記録を現在の内容として表示していません。',completed:0,
     lesson_plan:null,confirmation_test:null,homework:null,lesson_memo:null};
 }
-export const lessonRecordNeedsReview = row => ['excluded','event_recreated','owner_unassigned','legacy_unknown','known_change','title_changed','id_collision','target_unavailable'].includes(row?.attribution_status);
+export const lessonRecordNeedsReview = row => ['series_changed','series_unavailable','series_legacy_hold','excluded','event_recreated','owner_unassigned','legacy_unknown','known_change','title_changed','id_collision','target_unavailable'].includes(row?.attribution_status);

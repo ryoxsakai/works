@@ -1,3 +1,5 @@
+import {validCalendarDate,semesterForTarget,semesterCandidates} from '../../shared/lesson-semester.mjs';
+import {applicableSeriesRule,seriesRules,seriesParent,parentIdentity,originalTime,validSeriesParent,resolveSeriesOwner} from './lesson-series.js';
 import {lessonEventRef,sameLessonEvent,isScheduledLesson} from '../../shared/lesson-plan.js';
 import {calendarRecordValues,parseCalendarRecord,parsePlainCalendarRecord} from '../../shared/calendar-lesson-record.mjs';
 import {lessonTitleKey} from '../../shared/lesson-attribution.js';
@@ -106,21 +108,31 @@ export async function writePendingLessonPlan(env,body,deps){
   return {before:{pending_plan:old||null},after:result,statements:[guard(env,'NOT EXISTS(SELECT 1 FROM lesson_event_links WHERE calendar_id=? AND event_id=? AND record_id IS NOT NULL)',[ref.calendar_id,ref.id]),guard(env,'COALESCE((SELECT revision FROM lesson_pending_plans WHERE id=?),0)=?',[draft.id,current.record_revision]),statement(env,'INSERT INTO lesson_pending_plans VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET lesson_plan=excluded.lesson_plan,revision=excluded.revision,updated_at=excluded.updated_at',draft.id,draft.calendar_id,draft.event_id,draft.target_json,draft.event_identity_json,draft.lesson_plan,draft.revision,draft.created_at,draft.updated_at)]};
  });
 }
-export async function readEventOwnerRecord(env,target,event){
+export async function readEventOwnerRecord(env,target,event,deps){
  await policy(env,true);
  const observation={calendar_event_id:target.id,record_storage:'d1_owner',record_read_target:target};
  if(await first(env,'SELECT reason FROM lesson_history_exclusions WHERE calendar_id=? AND event_id=?',target.calendar_id,target.id)||event&&!isScheduledLesson(lessonEventRef(event,target.calendar_id)))return {...observation,attribution_status:'excluded',record_exists:false,record_revision:0,...calendarRecordValues({})};
  const link=await first(env,'SELECT * FROM lesson_event_links WHERE calendar_id=? AND event_id=?',target.calendar_id,target.id);
+ if(!link){const series=await resolveSeriesOwner(env,target,event,deps);if(series)return {...observation,...calendarRecordValues({}),...series};}
  if(!link?.record_id)return {...observation,record_exists:false,record_revision:0,attribution_status:'owner_unassigned',attribution_notice:'生徒・クラスの紐づけが必要です',...calendarRecordValues({}),...await readPendingLessonPlan(env,target,event)};
- const record=await first(env,'SELECT * FROM lesson_history_records WHERE id=?',link.record_id),old=JSON.parse(link.target_json);
+ let record;try{record=await first(env,'SELECT r.*,EXISTS(SELECT 1 FROM lesson_owner_memos m WHERE m.owner_id=r.owner_id) AS fixed_memo FROM lesson_history_records r WHERE r.id=?',link.record_id);}catch(error){if(!String(error.message).includes('no such table'))throw error;record=await first(env,'SELECT * FROM lesson_history_records WHERE id=?',link.record_id);}const old=JSON.parse(link.target_json),source=JSON.parse(record.source_json||'{}');
  const changed=lessonTitleKey(old.title)!==lessonTitleKey(target.title);
  const recreated=event&&encode(eventIdentity(event))!==link.event_identity_json;
- return {...observation,record_exists:true,record_revision:record.revision,record_id:record.id,owner_id:record.owner_id,record_calendar_id:target.calendar_id,record_title:old.title,attribution_status:recreated?'event_recreated':changed?'title_changed':'confirmed',...(changed||recreated?{...calendarRecordValues({}),attribution_notice:'予定名または予定の生成情報が変わりました。同じ生徒か、別の生徒かを確認してください'}:{...calendarRecordValues(record),completed:record.completed}),link_revision:link.revision};
+ return {...observation,record_exists:true,record_revision:record.revision,record_id:record.id,owner_id:record.owner_id,record_calendar_id:target.calendar_id,record_title:old.title,attribution_status:recreated?'event_recreated':changed?'title_changed':'confirmed',...(changed||recreated?{...calendarRecordValues({}),attribution_notice:'予定名または予定の生成情報が変わりました。同じ生徒か、別の生徒かを確認してください'}:{...calendarRecordValues(record),completed:record.completed}),link_revision:link.revision,...((record.fixed_memo||source.series_rule_id||['new','different_owner'].includes(source.binding_decision))?{owner_memo_storage:'owner_id'}:{})};
 }
+function currentSeriesGuard(env,shown,target){return guard(env,'EXISTS(SELECT 1 FROM lesson_series_owners WHERE id=? AND revision=?) AND NOT EXISTS(SELECT 1 FROM lesson_series_owners WHERE calendar_id=? AND series_id=? AND julianday(anchor_original)>julianday(?) AND julianday(anchor_original)<=julianday(?))',[shown.series_rule_id,shown.series_rule_revision,target.calendar_id,shown.series_id,shown.series_anchor_original,shown.series_original_time]);}
 export async function writeEventOwnerRecord(env,body,deps){
- await policy(env,true);const {ref,event}=await liveHistoryTarget(env,body.target,deps),shown=await readEventOwnerRecord(env,ref,event);
- if(shown.attribution_status!=='confirmed')throw fail('生徒・クラスの紐づけを確認してください');
+ await policy(env,true);
+ if(body.request_id){const old=await first(env,'SELECT q.*,a.action FROM lesson_history_requests q JOIN lesson_history_audit a ON a.id=q.id WHERE q.id=?',body.request_id);if(old?.action==='write_series_record'){if(old.digest!==await historyDigest({action:'write_series_record',body}))throw fail('操作IDの内容が一致しません');return JSON.parse(old.response_json);}}
+ const {ref,event}=await liveHistoryTarget(env,body.target,deps),shown=await readEventOwnerRecord(env,ref,event,deps);
+ if(shown.attribution_status!=='confirmed'||body.expected_owner_id&&body.expected_owner_id!==shown.owner_id)throw fail('生徒・クラスの紐づけを確認してください');
  if(body.record_revision!==shown.record_revision||body.expectedLessonPlan!==undefined&&shown.lesson_plan!==body.expectedLessonPlan)throw fail('授業内容が更新されています');
+ if(shown.series_rule_id&&!shown.record_id)return transaction(env,{...body,request_id:body.request_id||crypto.randomUUID()},'write_series_record',async()=>{
+  const fresh=await readEventOwnerRecord(env,ref,event,deps);if(fresh.series_rule_id!==shown.series_rule_id||fresh.owner_id!==shown.owner_id||fresh.record_id)throw fail('系列または紐づけが更新されました');
+  const record=newRecord(shown.owner_id,{lesson_date:ref.start,title_snapshot:ref.title,...patchValues(body.patch||{})},{series_rule_id:shown.series_rule_id});
+  return {before:{record:null},after:{...shown,...calendarRecordValues(record),completed:record.completed,record_id:record.id,record_exists:true,record_revision:1,link_revision:1,target:ref},statements:[
+   currentSeriesGuard(env,shown,ref),guard(env,'EXISTS(SELECT 1 FROM lesson_owners WHERE id=? AND revision=?)',[shown.owner_id,shown.owner_revision]),guard(env,'NOT EXISTS(SELECT 1 FROM lesson_event_links WHERE calendar_id=? AND event_id=?)',[ref.calendar_id,ref.id]),guard(env,'NOT EXISTS(SELECT 1 FROM lesson_history_exclusions WHERE calendar_id=? AND event_id=?)',[ref.calendar_id,ref.id]),guard(env,'NOT EXISTS(SELECT 1 FROM curriculum_entries WHERE calendar_event_id=?)',[ref.id]),recordInsert(env,record),statement(env,'INSERT INTO lesson_event_links VALUES(?,?,?,?,?,?)',ref.calendar_id,ref.id,record.id,1,encode(ref),encode(eventIdentity(event)))]};
+ });
  const saved=await editOwnerRecord(env,shown.record_id,{...body.patch,revision:body.record_revision,request_id:body.request_id||crypto.randomUUID(),expected_link:{calendar_id:ref.calendar_id,event_id:ref.id,revision:shown.link_revision}});
  return {...shown,...calendarRecordValues(saved.record),completed:saved.record.completed,record_revision:saved.record.revision,target:ref,operation_id:saved.operation_id};
 }
@@ -200,6 +212,128 @@ export async function importOwnerRecord(env,body,deps){
   return {before:fresh,after:{record},statements:guards};
  });
 }
+export async function previewSeriesStart(env,body,deps){
+ await policy(env,true);if(!ownerHistoryActive(env))throw fail('D1保存への切替後に開始してください');
+ const {event,ref}=await liveHistoryTarget(env,body.target,deps);
+ const proposed=body.new_owner;let owner;if(proposed){const name=text(proposed.name,'名前');if(!['student','class'].includes(proposed.kind))throw fail('生徒またはクラスを選択してください',400);owner={id:null,name,kind:proposed.kind,revision:0};}else owner=await ownerGuard(env,body);
+ const original=originalTime(event);if(!event.recurringEventId||!Number.isFinite(Date.parse(original)))throw fail('単発予定です。次の回は個別に同じ生徒・クラスへ紐づけてください');
+ const parent=await seriesParent(ref.calendar_id,event.recurringEventId,deps);if(!validSeriesParent(parent,event.recurringEventId)||event.iCalUID!==parent.iCalUID||lessonTitleKey(parent.summary)!==lessonTitleKey(ref.title))throw fail('親の繰返し予定と、この回の名前・生成情報を確認してください');
+ const link=await first(env,'SELECT * FROM lesson_event_links WHERE calendar_id=? AND event_id=?',ref.calendar_id,ref.id);if(link)throw fail('この回には紐づけ・解除履歴があります。既存の帰属確認を先に行ってください');
+ const rules=(await seriesRules(env,ref.calendar_id)).filter(r=>r.series_id===event.recurringEventId);
+ if(rules.some(r=>Date.parse(r.anchor_original)>=Date.parse(original)))throw fail('同じ系列には、この日以降の開始設定があります。既存設定を確認してください');
+ const links=await rows(env,'SELECT l.*,r.owner_id FROM lesson_event_links l LEFT JOIN lesson_history_records r ON r.id=l.record_id WHERE l.calendar_id=?',ref.calendar_id);
+ const conflicting=links.filter(l=>{const identity=JSON.parse(l.event_identity_json);return identity.recurringEventId===event.recurringEventId&&l.record_id&&l.owner_id!==owner.id&&(!identity.originalStartTime||Date.parse(identity.originalStartTime)>=Date.parse(original));});
+ if(conflicting.length)throw fail('この日以降に別の生徒・クラスの確定記録があります。開始範囲を個別に確認してください');
+ const legacy=!!await first(env,'SELECT calendar_event_id FROM curriculum_entries WHERE calendar_event_id=?',ref.id);
+ const preview={target:ref,owner_id:owner.id,owner_revision:owner.revision,new_owner:proposed?{name:owner.name,kind:owner.kind}:null,series_id:event.recurringEventId,anchor_original:new Date(original).toISOString(),parent_identity:parentIdentity(parent),expected_title:ref.title,rules_digest:await historyDigest(rules),rules_count:rules.length,legacy_at_anchor:legacy};
+ return {...preview,fingerprint:await historyDigest(preview),captured_at:new Date().toISOString(),pending_plan:await readPendingLessonPlan(env,ref,event)};
+}
+export async function startLessonSeries(env,body,deps){
+ await policy(env,true);return transaction(env,body,'start_series',async()=>{
+  if(!body.confirm_new_history||!body.preview||Date.now()-Date.parse(body.preview.captured_at)>900000||!Number.isFinite(Date.parse(body.preview.captured_at)))throw fail('この授業以降の新しい履歴開始を確認してください');
+  const fresh=await previewSeriesStart(env,{target:body.preview.target,owner_id:body.preview.owner_id,owner_revision:body.preview.owner_revision,new_owner:body.preview.new_owner},deps);if(fresh.fingerprint!==body.preview.fingerprint)throw fail('系列・所有者・開始予定が変更されました。比較を読み直してください');
+  return buildSeriesStart(env,fresh,deps);
+ });
+}
+async function buildSeriesStart(env,fresh,deps,sharedOwner=null,insertOwner=true){
+  const createdOwner=sharedOwner|| (fresh.new_owner?{id:crypto.randomUUID(),name:fresh.new_owner.name,kind:fresh.new_owner.kind,revision:1,created_at:new Date().toISOString()}:null);
+  const {ref,event}=await liveHistoryTarget(env,fresh.target,deps),rule={id:crypto.randomUUID(),calendar_id:ref.calendar_id,series_id:fresh.series_id,anchor_original:fresh.anchor_original,parent_identity_json:encode(fresh.parent_identity),expected_title:ref.title,owner_id:createdOwner?.id||fresh.owner_id,revision:1,created_at:new Date().toISOString()};
+  const record=newRecord(rule.owner_id,{lesson_date:ref.start,title_snapshot:ref.title},{series_rule_id:rule.id,explicit_new_history:true});
+  const conflictSQL="NOT EXISTS(SELECT 1 FROM lesson_event_links l JOIN lesson_history_records r ON r.id=l.record_id WHERE l.calendar_id=? AND json_extract(l.event_identity_json,'$.recurringEventId')=? AND r.owner_id<>? AND (json_extract(l.event_identity_json,'$.originalStartTime') IS NULL OR julianday(json_extract(l.event_identity_json,'$.originalStartTime'))>=julianday(?)))";
+  return {before:{preview:fresh},after:{rule,record,owner:createdOwner,link:{calendar_id:ref.calendar_id,event_id:ref.id,record_id:record.id,revision:1}},statements:[guard(env,'NOT EXISTS(SELECT 1 FROM lesson_event_links WHERE calendar_id=? AND event_id=?)',[ref.calendar_id,ref.id]),guard(env,'NOT EXISTS(SELECT 1 FROM lesson_history_exclusions WHERE calendar_id=? AND event_id=?)',[ref.calendar_id,ref.id]),...(createdOwner&&insertOwner?[statement(env,'INSERT INTO lesson_owners VALUES(?,?,?,?,?)',createdOwner.id,createdOwner.kind,createdOwner.name,1,createdOwner.created_at),statement(env,'INSERT INTO lesson_owner_aliases VALUES(?,?)',createdOwner.id,createdOwner.name)]:[guard(env,'EXISTS(SELECT 1 FROM lesson_owners WHERE id=? AND revision=?)',[rule.owner_id,fresh.owner_revision])]),guard(env,'(SELECT COUNT(*) FROM lesson_series_owners WHERE calendar_id=? AND series_id=?)=?',[ref.calendar_id,rule.series_id,fresh.rules_count]),guard(env,conflictSQL,[ref.calendar_id,rule.series_id,rule.owner_id,rule.anchor_original]),statement(env,'INSERT INTO lesson_series_owners VALUES(?,?,?,?,?,?,?,?,?)',...Object.values(rule)),recordInsert(env,record),statement(env,'INSERT INTO lesson_event_links VALUES(?,?,?,?,?,?)',ref.calendar_id,ref.id,record.id,1,encode(ref),encode(eventIdentity(event)))]};
+}
+export async function previewSemesterStart(env,body,deps){
+ await policy(env,true);if(!ownerHistoryActive(env))throw fail('D1保存への切替後に開始してください');
+ const {ref}=await liveHistoryTarget(env,body.target,deps),settings=await deps.settings();
+ const terms=await rows(env,'SELECT id,label AS name,start_date,end_date FROM terms');
+ let term;try{term=semesterForTarget(terms,ref,body.term_id);}catch(e){throw fail(e.message);}
+ if(!deps.events)throw fail('学期内の予定取得が利用できません',503);
+ const token=(await deps.token()).access_token,next=new Date(term.end_date+'T00:00:00+09:00');next.setUTCDate(next.getUTCDate()+1);
+ const events=await deps.events(token,ref.calendar_id,term.start_date+'T00:00:00+09:00',next.toISOString());
+ if(!Array.isArray(events)||events.length>2500)throw fail('学期の予定を完全に確認できません');
+ const links=await rows(env,'SELECT l.*,r.owner_id FROM lesson_event_links l LEFT JOIN lesson_history_records r ON r.id=l.record_id WHERE l.calendar_id=?',ref.calendar_id),legacy=await rows(env,'SELECT calendar_event_id FROM curriculum_entries'),excluded=await rows(env,'SELECT event_id FROM lesson_history_exclusions WHERE calendar_id=?',ref.calendar_id);
+ const byId=new Map(links.map(l=>[l.event_id,l])),legacyIds=new Set(legacy.map(l=>l.calendar_event_id)),observations=[];
+ const matching=events.filter(e=>lessonTitleKey(e.summary)===lessonTitleKey(ref.title));if(matching.length>40)throw fail('同名の予定が40件を超えます。開始範囲を個別に確認してください');
+ for(const event of matching){const link=byId.get(event.id);let status='owner_unassigned',owner_id=null,record_id=null;
+  if(link){const shown=await readEventOwnerRecord(env,lessonEventRef(event,ref.calendar_id),event,deps);status=shown.attribution_status;owner_id=shown.owner_id;record_id=shown.record_id;}
+  else {const shown=await resolveSeriesOwner(env,lessonEventRef(event,ref.calendar_id),event,deps);if(shown){status=shown.attribution_status;owner_id=shown.owner_id;}}
+  observations.push({event_id:event.id,link_exists:!!link,status,owner_id,record_id,legacy:legacyIds.has(event.id)});
+ }
+ let candidates;try{candidates=semesterCandidates({events,target:ref,term,excludedTitles:settings.excluded_titles||[],excludedIds:excluded.map(e=>e.event_id),observations,ownerId:body.owner_id||null});}catch(e){throw fail(e.message);}
+ const starts=[],grouped=new Map();for(const item of candidates.items.filter(i=>!i.reason&&!i.existing_owner_id)){
+  if(!item.series_id){item.reason='single_requires_confirmation';continue;}
+  if(!Number.isFinite(Date.parse(item.original_time)))throw fail('繰返しの個別回を確認できません');
+  const list=grouped.get(item.series_id)||[];list.push(item);grouped.set(item.series_id,list);
+ }
+ if(grouped.size>8)throw fail('同名の系列が多いため、系列ごとの確認が必要です');
+ for(const items of grouped.values()){
+  const first=[...items].sort((a,b)=>Date.parse(a.original_time)-Date.parse(b.original_time))[0];
+  const {captured_at,...start}=await previewSeriesStart(env,{target:first.target,owner_id:body.owner_id,owner_revision:body.owner_revision,new_owner:body.new_owner},deps);if(items.some(item=>item.event_identity.iCalUID!==start.parent_identity.iCalUID||!item.event_identity.created||!validCalendarDate(String(item.original_time).slice(0,10))))throw fail('学期内の個別回と親の生成情報が一致しません');starts.push(start);
+ }
+ if(!starts.length)throw fail('新しく開始できる繰返し系列がありません。既存の所属と単発予定を個別に確認してください');
+ // Recompute numbering after holding single events. No name-only single-event transfer.
+ let ordinal=0;const count=candidates.items.filter(i=>!i.reason).length;for(const item of candidates.items){delete item.ordinal;delete item.total;if(!item.reason){item.ordinal=++ordinal;item.total=count;}}
+ candidates.eligible_count=count;candidates.first_date=candidates.items.find(i=>!i.reason)?.target.start||null;candidates.selected_ordinal=candidates.items.find(i=>i.target.id===ref.id)?.ordinal||null;
+ if(!candidates.selected_ordinal)throw fail('選択予定は個別確認が必要です');
+ const result={target:ref,term,candidates,starts,owner_id:body.owner_id||null,owner_revision:body.owner_revision||0,new_owner:starts[0].new_owner};
+ return {...result,fingerprint:await historyDigest(result),captured_at:new Date().toISOString()};
+}
+export async function startSemesterSeries(env,body,deps){
+ await policy(env,true);return transaction(env,body,'start_semester_series',async()=>{
+  const old=body.preview,age=Date.now()-Date.parse(old?.captured_at);if(!body.confirm_new_history||!Number.isFinite(age)||age< -60000||age>900000)throw fail('学期内の候補と開始先の確認が必要です');
+  const fresh=await previewSemesterStart(env,{target:old.target,term_id:old.term.id,owner_id:old.owner_id,owner_revision:old.owner_revision,new_owner:old.new_owner},deps);
+  if(fresh.fingerprint!==old.fingerprint)throw fail('学期・予定・所属が変更されました。一括確認を読み直してください');
+  const createdOwner=fresh.new_owner?{id:crypto.randomUUID(),name:fresh.new_owner.name,kind:fresh.new_owner.kind,revision:1,created_at:new Date().toISOString()}:null,ownerId=createdOwner?.id||fresh.owner_id,statements=[],results=[];
+  for(const item of fresh.candidates.items.filter(i=>!i.reason&&!i.existing_owner_id))statements.push(guard(env,'NOT EXISTS(SELECT 1 FROM lesson_event_links WHERE calendar_id=? AND event_id=?)',[item.target.calendar_id,item.target.id]));
+  for(const [i,preview]of fresh.starts.entries()){
+   const part=await buildSeriesStart(env,{...preview,owner_id:ownerId,owner_revision:createdOwner?1:preview.owner_revision},deps,createdOwner,i===0);statements.push(...part.statements);results.push(part.after);
+  }
+  statements.push(guard(env,'EXISTS(SELECT 1 FROM terms WHERE id=? AND start_date=? AND end_date=?)',[fresh.term.id,fresh.term.start_date,fresh.term.end_date]));
+  for(const item of fresh.candidates.items.filter(i=>!i.reason&&!i.existing_owner_id))statements.push(guard(env,'NOT EXISTS(SELECT 1 FROM curriculum_entries WHERE calendar_event_id=?) AND NOT EXISTS(SELECT 1 FROM lesson_history_exclusions WHERE calendar_id=? AND event_id=?)',[item.target.id,item.target.calendar_id,item.target.id]));
+  return {before:{preview:fresh},after:{owner_id:ownerId,term:fresh.term,candidates:fresh.candidates,series:results},statements};
+ });
+}
+export async function readOwnerSemesterSchedule(env,ownerId,termId,deps){
+ await policy(env,true);if(!ownerHistoryActive(env))throw fail('保存先の切替後に確認してください');
+ const owner=await first(env,'SELECT * FROM lesson_owners WHERE id=?',ownerId),term=await first(env,'SELECT id,label AS name,start_date,end_date FROM terms WHERE id=?',termId);if(!owner||!term)throw fail('生徒・クラスと学期を選択してください',400);
+ if(!validCalendarDate(term.start_date)||!validCalendarDate(term.end_date)||term.start_date>term.end_date)throw fail('学期の期間を確認してください');
+ const settings=await deps.settings(),calendars=[...new Set(settings.selected_calendars||[])];if(calendars.length>20)throw fail('カレンダーが多いため個別確認が必要です');
+ const next=new Date(term.end_date+'T00:00:00+09:00');next.setUTCDate(next.getUTCDate()+1);const token=(await deps.token()).access_token,items=[];
+ for(const calendar of calendars){
+  const rules=await seriesRules(env,calendar),links=await rows(env,'SELECT l.event_id,r.owner_id FROM lesson_event_links l LEFT JOIN lesson_history_records r ON r.id=l.record_id WHERE l.calendar_id=?',calendar),linked=new Map(links.map(l=>[l.event_id,l.owner_id]));
+  if(!rules.some(r=>r.owner_id===ownerId)&&![...linked.values()].includes(ownerId))continue;
+  const events=await deps.events(token,calendar,term.start_date+'T00:00:00+09:00',next.toISOString()),seen=new Set();if(!Array.isArray(events)||events.length>2500)throw fail('学期の予定を完全に確認できません');
+  for(const event of events){
+   if(seen.has(event.id))throw fail('学期内の予定が重複しています');seen.add(event.id);
+   const ref=lessonEventRef(event,calendar);if(!isScheduledLesson(ref,settings.excluded_titles||[]))continue;if(!validCalendarDate(String(ref.start).slice(0,10))||!validCalendarDate(String(ref.end).slice(0,10)))throw fail('予定日時を確認できません');
+   const day=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(ref.start));if(day<term.start_date||day>term.end_date)continue;
+   if(linked.has(event.id)?linked.get(event.id)!==ownerId:applicableSeriesRule(event,rules)?.owner_id!==ownerId)continue;
+   const shown=await readEventOwnerRecord(env,ref,event,deps);if(shown.attribution_status!=='confirmed'||shown.owner_id!==ownerId)continue;
+   items.push({target:ref,owner_id:ownerId,record_id:shown.record_id||null,record_revision:shown.record_revision,completed:!!shown.completed});if(items.length>100)throw fail('学期内の授業が100件を超えます。個別確認してください');
+  }
+ }
+ items.sort((a,b)=>Date.parse(a.target.start)-Date.parse(b.target.start)||a.target.id.localeCompare(b.target.id));
+ const grouped=new Map();for(const item of items){const list=grouped.get(item.target.calendar_id)||[];list.push(item);grouped.set(item.target.calendar_id,list);}for(const group of grouped.values())group.forEach((item,i)=>{item.ordinal=i+1;item.total=group.length;});
+ return {owner_id:ownerId,owner_revision:owner.revision,term,items};
+}
+async function verifiedMemoOwner(env,ownerId,target,deps){
+ const owner=await first(env,'SELECT * FROM lesson_owners WHERE id=?',ownerId);if(!owner)throw fail('生徒・クラスを確認してください',404);if(!target)return {ref:null,shown:null,owner};
+ const {ref,event}=await liveHistoryTarget(env,target,deps),shown=await readEventOwnerRecord(env,ref,event,deps);if(shown.attribution_status!=='confirmed'||shown.owner_id!==ownerId)throw fail('共有メモの生徒・クラスが変更されています。入力を保持してください');return {ref,shown,owner};
+}
+export async function readOwnerMemo(env,ownerId,target,deps){
+ await policy(env,true);const {ref,owner}=await verifiedMemoOwner(env,ownerId,target,deps),memo=await first(env,'SELECT * FROM lesson_owner_memos WHERE owner_id=?',ownerId);return {owner_id:ownerId,owner_revision:owner.revision,target:ref,memo:memo?.memo||'',revision:memo?.revision||0};
+}
+export async function writeOwnerMemo(env,body,deps){
+ await policy(env,true);if(!ownerHistoryActive(env)||typeof body.memo!=='string'||body.memo.length>20000)throw fail('共有メモの保存条件を確認してください',400);
+ return transaction(env,body,'write_owner_memo',async()=>{
+  const {ref,shown,owner}=await verifiedMemoOwner(env,body.owner_id,body.target,deps),current=await first(env,'SELECT * FROM lesson_owner_memos WHERE owner_id=?',body.owner_id);
+  if(body.owner_revision!==owner.revision)throw fail('生徒・クラスの表示名・版が変わりました。再確認してください');
+  if((current?.revision||0)!==body.revision||(current?.memo||'')!==body.expected_memo)throw fail('別の画面で共有メモが更新されました。入力と最新内容を比較してください');
+  const ownership=!shown?guard(env,'EXISTS(SELECT 1 FROM lesson_owners WHERE id=? AND revision=?)',[owner.id,owner.revision]):shown.record_id?guard(env,'EXISTS(SELECT 1 FROM lesson_event_links l JOIN lesson_history_records r ON r.id=l.record_id WHERE l.calendar_id=? AND l.event_id=? AND l.revision=? AND r.owner_id=?)',[ref.calendar_id,ref.id,shown.link_revision,body.owner_id]):guard(env,'EXISTS(SELECT 1 FROM lesson_series_owners WHERE id=? AND revision=? AND owner_id=?) AND NOT EXISTS(SELECT 1 FROM lesson_event_links WHERE calendar_id=? AND event_id=?)',[shown.series_rule_id,shown.series_rule_revision,body.owner_id,ref.calendar_id,ref.id]);
+  const after={owner_id:body.owner_id,owner_revision:owner.revision,memo:body.memo,revision:(current?.revision||0)+1,target:ref};return {before:{memo:current||null},after,statements:[ownership,...(shown?.series_rule_id&&!shown.record_id?[currentSeriesGuard(env,shown,ref)]:[]),guard(env,'EXISTS(SELECT 1 FROM lesson_owners WHERE id=? AND revision=?)',[owner.id,owner.revision]),...(ref?[guard(env,'NOT EXISTS(SELECT 1 FROM lesson_history_exclusions WHERE calendar_id=? AND event_id=?)',[ref.calendar_id,ref.id])]:[]),guard(env,'COALESCE((SELECT revision FROM lesson_owner_memos WHERE owner_id=?),0)=?',[body.owner_id,body.revision]),statement(env,'INSERT INTO lesson_owner_memos VALUES(?,?,?,?) ON CONFLICT(owner_id) DO UPDATE SET memo=excluded.memo,revision=excluded.revision,updated_at=excluded.updated_at',body.owner_id,body.memo,after.revision,new Date().toISOString())]};
+ });
+}
+
 export async function handleOwnerHistory(env,request,url,deps){
  const path=url.pathname.replace('/api/lesson-history',''),method=request.method;
  const input=()=>readHistoryInput(request);
@@ -220,6 +354,13 @@ export async function handleOwnerHistory(env,request,url,deps){
   const clauses=['calendar_id IN ('+selected.map(()=>'?').join(',')+')'],args=[...selected];if(event){clauses.push('event_id=?');args.push(event);}
   return rows(env,'SELECT * FROM lesson_pending_plans WHERE '+clauses.join(' AND ')+' ORDER BY updated_at DESC,id LIMIT 200',...args);
  }
+ if(path==='/semester/schedules'&&method==='GET')return readOwnerSemesterSchedule(env,url.searchParams.get('owner_id'),url.searchParams.get('term_id'),deps);
+ if(path==='/semester/preview'&&method==='POST')return previewSemesterStart(env,await input(),deps);
+ if(path==='/semester/start'&&method==='POST')return startSemesterSeries(env,await input(),deps);
+ if(path==='/series/preview'&&method==='POST')return previewSeriesStart(env,await input(),deps);
+ if(path==='/series/start'&&method==='POST')return startLessonSeries(env,await input(),deps);
+ if(path==='/owner-memo'&&method==='GET'){let target;try{target=JSON.parse(url.searchParams.get('target'));}catch{throw fail('予定を再確認してください',400);}return readOwnerMemo(env,url.searchParams.get('owner_id'),target,deps);}
+ if(path==='/owner-memo'&&method==='PUT')return writeOwnerMemo(env,await input(),deps);
  if(path==='/audit'&&method==='GET')return rows(env,'SELECT * FROM lesson_history_audit WHERE id=?',url.searchParams.get('operation_id'));
  if(path==='/legacy'&&method==='GET')return rows(env,`SELECT c.calendar_event_id,i.calendar_id,i.title,i.revision,h.reason AS hold_reason FROM curriculum_entries c LEFT JOIN lesson_record_identity i ON i.event_id=c.calendar_event_id LEFT JOIN lesson_record_hold h ON h.event_id=c.calendar_event_id AND h.resolved_at IS NULL ORDER BY c.calendar_event_id`);
  if(path==='/locate'&&method==='POST'){
