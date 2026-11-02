@@ -126,3 +126,9 @@ CREATE TABLE IF NOT EXISTS google_auth (
   refresh_token TEXT NOT NULL,
   updated_at TEXT DEFAULT (datetime('now'))
 );
+
+-- Works ToDo data shared by the web app and MCP tools.
+CREATE TABLE IF NOT EXISTS todo_state (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  data TEXT NOT NULL
+);
