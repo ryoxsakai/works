@@ -313,7 +313,8 @@ function acceptRecordSnapshot(draft,saved,sourceRow){
  const rows=matchingRecordRows(draft),held=synchronizeRecordRows(rows,saved,sourceRow);
  // A view can be unmounted while a request is pending. Its recovery copy still matters.
  const copies=new Map((Array.isArray(draft.alternatives)?draft.alternatives:[]).map(copy=>[copy.view,copy]));
- held.forEach(copy=>copies.set(copy.view,copy));
+ // Restored DOM rows carry the latest server revision, not the draft's original base.
+ held.forEach(copy=>{if(!copies.has(copy.view))copies.set(copy.view,copy);});
  if(recordDrafts.get(lessonEventKey(draft.ref))===draft)recordDrafts.delete(lessonEventKey(draft.ref));draft.unknown=false;
  let recovery=null;
  if(copies.size){const [first,...alternatives]=copies.values();recovery={ref:draft.ref,ownerId:draft.ownerId,...first,alternatives,conflict:true,operationId:draft.operationId};recordDrafts.set(lessonEventKey(draft.ref),recovery);recovery.recoveryUnavailable=!persistRecordDraft(recovery);}else clearRecordDraft(draft);
