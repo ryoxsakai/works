@@ -1,3 +1,4 @@
+import {seriesRules,applicableSeriesRule} from './lesson-series.js';
 import { rawRecord, currentRecord, requireCurrent, prepareRecordWrite, commitRecords, readCommittedRecord, observeRecord } from './lesson-attribution.js';
 import { NEXT_LESSON_DAYS, lessonEventRef, sameLessonEvent, findNextLesson, isScheduledLesson } from "../../shared/lesson-plan.js";
 import {calendarRecordEligible,overlayCalendarLessonRecord,writeCalendarLessonRecord,calendarRecordsEnabled,loadCalendarStorageState} from './calendar-lesson-records.js';
@@ -33,18 +34,19 @@ async function uniqueRecordId(deps, context, ref) {
     throw failure(409, "複数カレンダーに同じ予定IDがあります。安全に連動できません", "LESSON_ID_COLLISION");
   }
 }
-async function planRecord(env, ref, event) {
-  if(ownerHistoryActive(env))return readEventOwnerRecord(env,ref,event);
+async function planRecord(env, ref, event,deps) {
+  if(ownerHistoryActive(env))return readEventOwnerRecord(env,ref,event,deps);
   const row=await loadCalendarStorageState(env,currentRecord(await observeRecord(env,ref),ref),ref);
   return event?overlayCalendarLessonRecord(env,row,{...event,calendar_id:ref.calendar_id}):row;
 }
 export async function readLessonPlan(env, calendarId, eventId, deps) {
   const context = await lookup(deps, calendarId, eventId);
   if(!ownerHistoryActive(env))await uniqueRecordId(deps, context, context.ref);
-  const record = await planRecord(env, context.ref,context.event);
-  return { target: context.ref, lesson_plan: record.lesson_plan || "", attribution_status: record.attribution_status, attribution_notice:record.attribution_notice || null, record_revision: record.record_revision,record_pending_operation:record.record_pending_operation,record_storage:record.pending_allowed?'d1_pending':record.record_storage,pending_context:record.pending_context,pending_allowed:record.pending_allowed,pending_storage_available:record.pending_storage_available };
+  const record = await planRecord(env, context.ref,context.event,deps);
+  return { target: context.ref, lesson_plan: record.lesson_plan || "", attribution_status: record.attribution_status,owner_id:record.owner_id, attribution_notice:record.attribution_notice || null, record_revision: record.record_revision,record_pending_operation:record.record_pending_operation,record_storage:record.pending_allowed?'d1_pending':record.record_storage,pending_context:record.pending_context,pending_allowed:record.pending_allowed,pending_storage_available:record.pending_storage_available };
 }
 export async function readNextLessonPlan(env, calendarId, eventId, deps) {
+  deps={...deps,seriesParents:new Map()};
   const context = await lookup(deps, calendarId, eventId);
   const source = context.ref;
   const validTime = Number.isFinite(Date.parse(source.end));
@@ -53,7 +55,7 @@ export async function readNextLessonPlan(env, calendarId, eventId, deps) {
   const eligibility = findNextLesson(source, [], context.settings.excluded_titles || []);
   if (eligibility.reason === "ineligible") return { source, ...eligibility, search_end: searchEnd, lesson_plan: "" };
   if(ownerHistoryActive(env)){
-    const record=await readEventOwnerRecord(env,source,context.event);
+    const record=await readEventOwnerRecord(env,source,context.event,deps);
     const base={source,source_owner_id:record.owner_id||null,search_end:searchEnd,template_initialization_available:false};
     if(record.attribution_status!=='confirmed')return {...base,target:null,reason:'owner_unassigned',lesson_plan:''};
     const events=await deps.events(context.token,calendarId,source.start,searchEnd);
@@ -61,12 +63,13 @@ export async function readNextLessonPlan(env, calendarId, eventId, deps) {
     const {results:bindings}=await env.DB.prepare('SELECT l.event_id,r.owner_id,0 AS excluded FROM lesson_event_links l LEFT JOIN lesson_history_records r ON r.id=l.record_id WHERE l.calendar_id=? UNION ALL SELECT event_id,NULL AS owner_id,1 AS excluded FROM lesson_history_exclusions WHERE calendar_id=?').bind(calendarId,calendarId).all();
     const owners=new Map(bindings.filter(link=>!link.excluded).map(link=>[link.event_id,link.owner_id]));
     const exclusions=new Set(bindings.filter(link=>link.excluded).map(link=>link.event_id));
+    const rules=await seriesRules(env,calendarId);
     const candidates=events.map(event=>({event,ref:lessonEventRef(event,calendarId)}))
       .filter(({ref})=>ref.id!==source.id&&!exclusions.has(ref.id)&&isScheduledLesson(ref,context.settings.excluded_titles||[])&&Date.parse(ref.start)>=Date.parse(source.end))
-      .filter(({ref})=>owners.get(ref.id)?owners.get(ref.id)===record.owner_id:lessonTitleKey(ref.title)===lessonTitleKey(source.title))
+      .filter(({ref,event})=>owners.has(ref.id)?owners.get(ref.id)===record.owner_id:applicableSeriesRule(event,rules)?applicableSeriesRule(event,rules).owner_id===record.owner_id:lessonTitleKey(ref.title)===lessonTitleKey(source.title))
       .sort((a,b)=>Date.parse(a.ref.start)-Date.parse(b.ref.start));
     if(!candidates.length||candidates[1]&&Date.parse(candidates[1].ref.start)===Date.parse(candidates[0].ref.start))return {...base,target:null,reason:candidates.length?'ambiguous':'none',lesson_plan:''};
-    const chosen=candidates[0],next=await readEventOwnerRecord(env,chosen.ref,chosen.event);
+    const chosen=candidates[0],next=await readEventOwnerRecord(env,chosen.ref,chosen.event,deps);
     if(next.attribution_status==='confirmed'&&next.owner_id===record.owner_id)return {...base,target:chosen.ref,...next};
     // Schedule discovery is not an ownership decision. Never expose/copy a candidate's record.
     return {...base,target:chosen.ref,reason:'owner_confirmation_required',owner_confirmation_required:true,owner_id:null,attribution_status:next.attribution_status,lesson_plan:next.pending_allowed?next.lesson_plan||'':'',record_revision:next.record_revision,pending_context:next.pending_context,pending_allowed:next.pending_allowed,pending_storage_available:next.pending_storage_available};
@@ -78,7 +81,7 @@ export async function readNextLessonPlan(env, calendarId, eventId, deps) {
   const targetEvent=calendarRecordsEnabled(env)?await deps.event(context.token,calendarId,result.target.id):null;
   if(calendarRecordsEnabled(env)&&!targetEvent)throw failure(409,'次回予定が削除されました','LESSON_TARGET_CHANGED');
   if(targetEvent&&!sameLessonEvent(lessonEventRef(targetEvent,calendarId),result.target))throw failure(409,'次回予定が取得中に変更されました','LESSON_TARGET_CHANGED');
-  const record = await planRecord(env, result.target,targetEvent);
+  const record = await planRecord(env, result.target,targetEvent,deps);
   const templateAvailable=!!targetEvent&&calendarRecordEligible(env,{...targetEvent,calendar_id:calendarId})&&!(targetEvent.description||'').trim()
     &&['new','confirmed'].includes(record.attribution_status)&&!record.record_pending_operation&&!Object.values(calendarRecordValues(record)).some(value=>value.trim());
   return { source, ...result, search_end: searchEnd, lesson_plan: record.lesson_plan || "", attribution_status: record.attribution_status, attribution_notice:record.attribution_notice || null, record_revision: record.record_revision,record_pending_operation:record.record_pending_operation,record_storage:record.record_storage,template_initialization_available:templateAvailable };
@@ -115,7 +118,7 @@ export async function writeLessonPlan(env, body, deps) {
     }
   }
   if(ownerHistoryActive(env)&&body.pending_context)return writePendingLessonPlan(env,body,deps);
-  if(ownerHistoryActive(env))return writeEventOwnerRecord(env,{target:body.target,patch:{lesson_plan:body.lesson_plan},record_revision:body.record_revision,expectedLessonPlan:body.expected_lesson_plan,request_id:body.request_id},deps);
+  if(ownerHistoryActive(env))return writeEventOwnerRecord(env,{target:body.target,patch:{lesson_plan:body.lesson_plan},record_revision:body.record_revision,expectedLessonPlan:body.expected_lesson_plan,request_id:body.request_id,expected_owner_id:body.expected_owner_id},deps);
   if(calendarRecordsEnabled(env))return writeCalendarLessonRecord(env,{target:body.target,patch:{lesson_plan:body.lesson_plan},recordRevision:body.record_revision,expectedLessonPlan:body.expected_lesson_plan},deps);
   const row = await rawRecord(env, eventId);
   requireCurrent(row, body.target);

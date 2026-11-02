@@ -1,12 +1,15 @@
+import {ownerSemesterCounts} from '../shared/semester-counts.mjs?v=1';
+import {readPendingRecovery,persistPendingRecovery,clearPendingRecovery,pendingRecoveryCopies} from './pending-plan-draft.mjs?v=2';
+import {createOwnerMemoEditors} from '../shared/owner-memo.mjs?v=1';
 import {boundedRead,precedingLegacyEvents,precedingOwnerEvents,recordTermScope} from './record-read.mjs?v=2';
 import {readNextLessonWithTemplate} from "../shared/next-lesson-read.mjs?v=1";
-import { lessonRecordRows, renderPlanEditors, renderMemoEditors, previousOwnerRecord } from "../shared/lesson-record-view.mjs?v=4";
+import { lessonRecordRows, renderPlanEditors, renderMemoEditors, previousOwnerRecord } from "../shared/lesson-record-view.mjs?v=6-semester";
 import { setUserAvatar } from "../shared/avatar.mjs?v=1";
 import { attachRecordCarousel } from "./record-carousel.mjs?v=3";
 import { attachRecordToasts } from "./record-toasts.mjs?v=2";
 import { startTutorPresentation } from "../shared/ui/tutor-presentation.mjs";
 startTutorPresentation();
-import { attributedLessonRecord, lessonRecordNeedsReview } from "../shared/lesson-attribution.js?v=2";
+import { attributedLessonRecord, lessonRecordNeedsReview } from "../shared/lesson-attribution.js?v=3";
 import {
   watchAuth,
   signOutUser,
@@ -16,8 +19,8 @@ import {
 import { getTheme, setTheme } from "../shared/theme.js?v=6";
 import { tokyoDateKey, shiftRecordDate, recordDateRange } from "./record-date.js?v=1";
 import { createStudentMemoStore } from "./student-memo.js?v=1";
-import { createLessonPlanController } from "./lesson-plan.js?v=7";
-import { lessonEventRef, lessonEventKey } from "../shared/lesson-plan.js?v=1";
+import { createLessonPlanController } from "./lesson-plan.js?v=8";
+import { isScheduledLesson, lessonEventRef, lessonEventKey } from "../shared/lesson-plan.js?v=1";
 
 const PASTEL_FALLBACK_COLORS = [
   "#c8e6c9",
@@ -238,6 +241,7 @@ const studentMemos = createStudentMemoStore({
   onChange: () => renderStudentMemos(),
 });
 
+const ownerMemos=createOwnerMemoEditors({request:(path,opts)=>apiFetch(path,opts||{},null)});
 const lessonPlans = createLessonPlanController({
   readCurrent:target=>apiFetch('/lesson-plan?'+new URLSearchParams({calendar_id:target.calendar_id,event_id:target.id}),{},null),
   readOperation:id=>apiFetch('/lesson-history/audit?operation_id='+encodeURIComponent(id),{},null),
@@ -289,16 +293,44 @@ let eventViewMode = localStorage.getItem(EVENT_VIEW_KEY) === "calendar" ? "calen
 let calendarCursor = startOfMonth(new Date());
 let listWeekCursor = startOfWeek(new Date());
 let selectedScheduleDate = formatDateOnly(new Date());
-let selectedRecordDate = tokyoDateKey();
+const requestedRecordDate=new URLSearchParams(location.search).get('record_date');
+let selectedRecordDate = /^\d{4}-\d{2}-\d{2}$/.test(requestedRecordDate||'')&&Number.isFinite(Date.parse(requestedRecordDate))&&new Date(requestedRecordDate).toISOString().slice(0,10)===requestedRecordDate?requestedRecordDate:tokyoDateKey();
 let recordTableRequest = 0;
 let recordRequestedTermScope=null;
 const recordDrafts=new Map();
-function rememberRecordDraft(row){if(!row)return;const ref=JSON.parse(row.dataset.recordRef);recordDrafts.set(lessonEventKey(ref),{ref,ownerId:row.dataset.recordOwner||null,revision:Number(row.dataset.recordRevision),values:Object.fromEntries(['test','homework','memo'].map(field=>[field,row.querySelector('.record-'+field).value]))});}
-function showRetainedRecordDrafts(){
- let panel=document.querySelector('#retained-record-drafts');if(!panel){panel=document.createElement('aside');panel.id='retained-record-drafts';els.recordTbody.closest('table').before(panel);}
- panel.replaceChildren();for(const draft of recordDrafts.values()){const details=document.createElement('details'),title=document.createElement('summary'),text=document.createElement('pre');title.textContent='保持中の未保存入力：'+draft.ref.title+' / '+draft.ref.start;text.textContent=['確認テスト：'+draft.values.test,'宿題：'+draft.values.homework,'授業メモ：'+draft.values.memo].join('\n');details.append(title,text);panel.append(details);}
+function recordRecoveryContext(draft){return draft.ownerId?'owner-record:'+draft.ownerId+':'+lessonEventKey(draft.ref):null;}
+function persistRecordDraft(draft){const recovery={recoveryContext:recordRecoveryContext(draft),target:draft.ref,value:JSON.stringify({values:draft.values,ownerId:draft.ownerId,completed:draft.completed,sentValues:draft.sentValues,conflict:!!draft.conflict}),base:'',recordRevision:draft.revision,operationId:draft.operationId,pendingUnknown:!!draft.unknown};persistPendingRecovery(recovery);return !recovery.recoveryUnavailable;}
+function clearRecordDraft(draft){clearPendingRecovery({recoveryContext:recordRecoveryContext(draft)});}
+function restoredRecordDraft(cached){try{const value=JSON.parse(cached.value);return {ref:cached.target,ownerId:value.ownerId,revision:cached.recordRevision,values:value.values,completed:value.completed,sentValues:value.sentValues,operationId:cached.operationId,unknown:!!cached.unknown,conflict:!!value.conflict};}catch{return null;}}
+function rememberRecordDraft(row){if(!row)return;const ref=JSON.parse(row.dataset.recordRef),old=recordDrafts.get(lessonEventKey(ref));if(old?.unknown||old?.busy||old?.conflict)return;const draft={ref,ownerId:row.dataset.recordOwner||null,revision:Number(row.dataset.recordRevision),values:Object.fromEntries(['test','homework','memo'].map(field=>[field,row.querySelector('.'+recordFieldPrefix(row)+'-'+field).value]))};recordDrafts.set(lessonEventKey(ref),draft);persistRecordDraft(draft);}
+async function verifyRecordDraft(draft,message){
+ try{const audit=(await apiFetch('/lesson-history/audit?operation_id='+encodeURIComponent(draft.operationId),{},null)).find(a=>a.id===draft.operationId&&['write_series_record','edit_record'].includes(a.action));if(!audit)throw Error('保存をまだ確認できません。同じ操作IDで照合し、再送しないでください');const after=JSON.parse(audit.after_json),saved=after.record||after;if(saved.owner_id!==draft.ownerId||!!saved.completed!==!!draft.completed||!['test','homework','memo'].every(k=>(saved[{test:'confirmation_test',homework:'homework',memo:'lesson_memo'}[k]]||'')===draft.sentValues[k]))throw Error('操作と保持中の内容の対応を確認できません');
+ const [fresh]=await apiFetch('/lesson-records',{method:'POST',body:JSON.stringify({targets:[draft.ref]})},null);if(fresh.owner_id!==draft.ownerId||!!fresh.completed!==!!draft.completed||fresh.attribution_status!=='confirmed'||JSON.stringify(fresh.record_read_target)!==JSON.stringify(draft.ref)||!['test','homework','memo'].every(k=>(fresh[{test:'confirmation_test',homework:'homework',memo:'lesson_memo'}[k]]||'')===draft.sentValues[k]))throw Error('保存後に予定または内容が変わっています。入力を保持し履歴で比較してください');
+ clearRecordDraft(draft);recordDrafts.delete(lessonEventKey(draft.ref));for(const row of document.querySelectorAll('tr[data-record-ref]'))if(JSON.stringify(JSON.parse(row.dataset.recordRef))===JSON.stringify(draft.ref)&&(row.dataset.recordOwner||null)===draft.ownerId){row.dataset.recordRevision=fresh.record_revision;row.dataset.completed=fresh.completed?'1':'0';if(row.querySelector('.curriculum-completed'))row.querySelector('.curriculum-completed').checked=!!fresh.completed;recordControls(row).forEach(el=>el.disabled=false);row.querySelector('.record-draft-feedback')?.remove();}if(lessonPlans.get(lessonEventKey(draft.ref))?.ownerId===draft.ownerId)lessonPlans.observeRecord(draft.ref,fresh.record_revision);showRetainedRecordDrafts();await loadRecordTable();
+ }catch(error){message.textContent=error.message;}
 }
-window.addEventListener('beforeunload',event=>{if(recordDrafts.size){event.preventDefault();event.returnValue='';}});
+function recordFieldPrefix(row){return row.querySelector('.record-test')?'record':'curriculum';}
+function recordControls(row){return row.querySelectorAll('.record-test,.record-homework,.record-memo,.curriculum-test,.curriculum-homework,.curriculum-memo,.curriculum-completed');}
+function showRowRecordRecovery(row,draft){row.querySelector('.record-draft-feedback')?.remove();if(!draft.unknown&&!draft.conflict)return;const details=document.createElement('details'),summary=document.createElement('summary'),message=document.createElement('p');details.className='record-draft-feedback';summary.textContent='保持した入力と保存結果を確認';message.textContent=(draft.busy?'保存中':draft.unknown?'結果不明・再送を停止しています。':'入力を保持して保存を停止しています。')+' 操作ID: '+(draft.operationId||'');message.style.overflowWrap='anywhere';details.append(summary,message);if(draft.unknown){const button=document.createElement('button');button.type='button';button.textContent='この記録の保存結果だけを照合';button.onclick=()=>verifyRecordDraft(draft,message);details.append(button);}row.cells[0].append(details);}
+function restoreRecordDraftRows(root){for(const row of root.querySelectorAll('tr[data-record-ref]')){const ref=JSON.parse(row.dataset.recordRef),key=lessonEventKey(ref);let draft=recordDrafts.get(key);if(!draft&&row.dataset.recordOwner){const cached=readPendingRecovery('owner-record:'+row.dataset.recordOwner+':'+key);if(cached){draft=restoredRecordDraft(cached);if(draft)recordDrafts.set(key,draft);}}if(!draft)continue;const prefix=recordFieldPrefix(row);if(JSON.stringify(ref)===JSON.stringify(draft.ref)&&Number(row.dataset.recordRevision)===draft.revision&&(row.dataset.recordOwner||null)===draft.ownerId){for(const [field,value]of Object.entries(draft.values))row.querySelector('.'+prefix+'-'+field).value=value;if(prefix==='curriculum'&&draft.completed!==undefined)row.querySelector('.curriculum-completed').checked=draft.completed;}if(draft.unknown||draft.conflict||JSON.stringify(ref)!==JSON.stringify(draft.ref)||Number(row.dataset.recordRevision)!==draft.revision||(row.dataset.recordOwner||null)!==draft.ownerId){recordControls(row).forEach(el=>el.disabled=true);showRowRecordRecovery(row,draft);}}}
+async function saveRecordFields(row){
+ const ref=JSON.parse(row.dataset.recordRef),key=lessonEventKey(ref),existing=recordDrafts.get(key);if(existing?.unknown||existing?.busy||existing?.conflict)return;rememberRecordDraft(row);const sentDraft=recordDrafts.get(key),prefix=recordFieldPrefix(row),completed=prefix==='curriculum'?row.querySelector('.curriculum-completed').checked:row.dataset.completed==='1';
+ sentDraft.operationId=crypto.randomUUID();sentDraft.unknown=true;sentDraft.busy=true;sentDraft.completed=completed;sentDraft.sentValues={...sentDraft.values};if(!persistRecordDraft(sentDraft)){sentDraft.busy=false;sentDraft.unknown=false;showActionError(Error('復旧コピーを保持できないため保存を停止しました'));return;}showRetainedRecordDrafts();recordControls(row).forEach(el=>el.disabled=true);
+ try{const saved=await apiFetch('/curriculum/'+encodeURIComponent(ref.id),{method:'PUT',body:JSON.stringify({target:ref,record_revision:sentDraft.revision,expected_owner_id:sentDraft.ownerId,request_id:sentDraft.operationId,completed,confirmation_test:sentDraft.values.test,homework:sentDraft.values.homework,lesson_memo:sentDraft.values.memo})},null);
+  if(sentDraft.ownerId&&saved.owner_id!==sentDraft.ownerId)throw Object.assign(Error('保存応答の共有先を確認できません'),{unknown:true});
+  clearRecordDraft(sentDraft);if(recordDrafts.get(key)===sentDraft)recordDrafts.delete(key);sentDraft.unknown=false;
+  for(const current of document.querySelectorAll('tr[data-record-ref]'))if(JSON.stringify(JSON.parse(current.dataset.recordRef))===JSON.stringify(ref)&&(current.dataset.recordOwner||null)===sentDraft.ownerId){current.dataset.recordRevision=saved.record_revision;current.dataset.completed=completed?'1':'0';recordControls(current).forEach(el=>el.disabled=false);current.querySelector('.record-draft-feedback')?.remove();}
+  if(!sentDraft.ownerId||lessonPlans.get(key)?.ownerId===sentDraft.ownerId)lessonPlans.observeRecord(ref,saved.record_revision);if(!sentDraft.ownerId&&saved.target)applyCalendarTarget(ref,saved.target,saved.record_revision);showRetainedRecordDrafts();
+ }catch(error){sentDraft.unknown=!!(error.unknown||error.status>=500||error.code==='LESSON_HISTORY_RELOAD');sentDraft.conflict=!sentDraft.unknown;persistRecordDraft(sentDraft);showRetainedRecordDrafts();showRowRecordRecovery(row,sentDraft);showActionError(error);}finally{sentDraft.busy=false;if(recordDrafts.get(key)===sentDraft){showRetainedRecordDrafts();showRowRecordRecovery(row,sentDraft);}}
+}
+
+function showRetainedRecordDrafts(){
+ let panel=document.querySelector('#retained-record-drafts');if(!panel){panel=document.createElement('aside');panel.id='retained-record-drafts';els.recordTbody.closest('table').before(panel);}panel.replaceChildren();
+ const entries=[...recordDrafts.values()].map(draft=>({draft,local:true}));for(const cached of pendingRecoveryCopies().filter(c=>c.context.startsWith('owner-record:')&&(!c.currentTab||!recordDrafts.has(lessonEventKey(c.target))))){const draft=restoredRecordDraft(cached);if(draft)entries.push({draft,local:false});}
+ for(const {draft,local}of entries){const details=document.createElement('details'),title=document.createElement('summary'),text=document.createElement('pre'),message=document.createElement('p');title.textContent=(local?'保持中の未保存入力：':'別タブ・以前の予定の保持入力：')+draft.ref.title+' / '+draft.ref.start;text.textContent=['確認テスト：'+draft.values.test,'宿題：'+draft.values.homework,'授業メモ：'+draft.values.memo].join('\n');message.textContent=draft.operationId?'操作ID: '+draft.operationId:'';details.append(title,text,message);
+ if(local&&draft.unknown){const verify=document.createElement('button');verify.type='button';verify.textContent='この記録の保存結果だけを照合';verify.onclick=()=>verifyRecordDraft(draft,message);details.append(verify);}const download=document.createElement('button');download.type='button';download.textContent='保持した3欄をファイルへ保存';download.onclick=()=>{const u=URL.createObjectURL(new Blob([JSON.stringify(draft,null,2)],{type:'application/json'})),a=document.createElement('a');a.href=u;a.download='works-record-recovery.json';a.click();setTimeout(()=>URL.revokeObjectURL(u),1000);};details.append(download);panel.append(details);}
+}
+window.addEventListener('beforeunload',event=>{if(recordDrafts.size||ownerMemos.hasEdits()){event.preventDefault();event.returnValue='';}});
 let goals = [];
 let candidateSchools = [];
 let editingGoalId = null;
@@ -542,7 +574,7 @@ async function loadRecordTable() {
       }
 
       const sameLabelEvents = rangeEvents
-        .filter((e) => e._calendarId === ev._calendarId && (e.summary || "").trim() === label)
+        .filter((e) => e._calendarId === ev._calendarId && (e.summary || "").trim() === label && isScheduledLesson(e,[...excludedTitles]))
         .sort((a, b) => {
           const aStart = a.start?.dateTime || a.start?.date || "";
           const bStart = b.start?.dateTime || b.start?.date || "";
@@ -578,7 +610,9 @@ async function loadRecordTable() {
       };
     });
 
+    for(const row of rows)if(row.record?.owner_id){row.n='—';row.m='—';}
     renderRecordTable(rows);
+    if(coveringTerm)ownerSemesterCounts(rows,coveringTerm.id,path=>apiFetch(path,{},null),isCurrent).then(counts=>{if(!isCurrent())return;for(const row of els.recordTbody.querySelectorAll('[data-event-id]')){const ref=JSON.parse(row.dataset.recordRef),count=counts.get(lessonEventKey(ref));if(!count)continue;const text=count.n+'/'+count.m+'回';const cell=row.querySelector('[data-label="回数"]'),badge=row.querySelector('.record-card-meta span');if(cell)cell.textContent=text;if(badge)badge.textContent=text;}});
   } catch (err) {
     if (!isCurrent()) return;
     els.recordTbody.innerHTML = `<tr><td colspan="7" role="status">授業記録を取得できませんでした。日付を切り替えて再試行してください。</td></tr>`;
@@ -590,11 +624,9 @@ function renderRecordTable(rows) {
   rows.filter((row) => !row.emptySlot && (!lessonRecordNeedsReview(row.record)||row.record.pending_allowed)).forEach((row) => lessonPlans.seed(row.ref, row.lessonPlan, row.planReadVersion, row.record.record_revision,row.record.attribution_status,row.record.owner_id||null,row.record.pending_context||null));
   els.recordTbody.innerHTML = lessonRecordRows(rows, { escapeHtml, formatTimeOrPeriod, lessonRecordNeedsReview, lessonReviewRow, lightenHexColor, calendarName: id => calendarColors.get(id)?.name, lessonAttributionNotice, lessonPlanEditor, lessonPlanFeedback, recordStudentPrefName, lessonEventKey });
   renderStudentMemos();
+  ownerMemos.render(els.recordTbody);
   renderLessonPlans();
-  for(const row of els.recordTbody.querySelectorAll('tr[data-record-ref]')){const ref=JSON.parse(row.dataset.recordRef),draft=recordDrafts.get(lessonEventKey(ref));if(!draft)continue;
-    if(JSON.stringify(ref)===JSON.stringify(draft.ref)&&Number(row.dataset.recordRevision)===draft.revision&&(row.dataset.recordOwner||null)===draft.ownerId){for(const [field,value]of Object.entries(draft.values))row.querySelector('.record-'+field).value=value;}
-    else{row.querySelectorAll('input,textarea,button').forEach(el=>el.disabled=true);const notice=document.createElement('p');notice.textContent='未保存入力と現在の予定・版が異なります。保持中の入力を確認してください。';row.cells[0].append(notice);}
-  }
+  restoreRecordDraftRows(els.recordTbody);
   showRetainedRecordDrafts();
   rows.filter((row) => !row.emptySlot&&!lessonRecordNeedsReview(row.record)).forEach((row) => lessonPlans.loadNext(row.ref));
   const names = new Set([...els.recordTbody.querySelectorAll(".student-memo-editor")].map((editor) => editor.dataset.studentName));
@@ -702,38 +734,7 @@ els.recordTbody.addEventListener("click", (e) => {
   goToCurriculum(link.dataset.name, term, link.dataset.calendarId);
 });
 
-els.recordTbody.addEventListener("change", async (e) => {
-  if (e.target.matches(".student-memo-input,.linked-lesson-plan")) return;
-  const row = e.target.closest("tr[data-event-id]");
-  if (!row) return;
-  const eventId = row.dataset.eventId;
-  rememberRecordDraft(row);
-  const sentDraft=recordDrafts.get(lessonEventKey(JSON.parse(row.dataset.recordRef)));
-  const completed = row.dataset.completed === "1";
-  const confirmationTest = row.querySelector(".record-test").value;
-  const homework = row.querySelector(".record-homework").value;
-  const lessonMemo = row.querySelector(".record-memo").value;
-  try {
-    const savedRecord = await apiFetch(`/curriculum/${encodeURIComponent(eventId)}`, {
-      method: "PUT",
-      body: JSON.stringify({
-        target: JSON.parse(row.dataset.recordRef),
-        record_revision: Number(row.dataset.recordRevision),
-        completed,
-        confirmation_test: confirmationTest,
-        homework,
-        lesson_memo: lessonMemo,
-      }),
-    });
-    if(recordDrafts.get(lessonEventKey(sentDraft.ref))===sentDraft)recordDrafts.delete(lessonEventKey(sentDraft.ref));
-    showRetainedRecordDrafts();
-    row.dataset.recordRevision = savedRecord.record_revision;
-    if(savedRecord.target)applyCalendarTarget(JSON.parse(row.dataset.recordRef),savedRecord.target,savedRecord.record_revision);
-    lessonPlans.observeRecord(JSON.parse(row.dataset.recordRef),savedRecord.record_revision);
-  } catch (err) {
-    showActionError(err);
-  }
-});
+els.recordTbody.addEventListener("change",e=>{if(e.target.matches('.student-memo-input,.linked-lesson-plan')||e.target.closest('.owner-memo-editor'))return;const row=e.target.closest('tr[data-event-id]');if(row)saveRecordFields(row);});
 
 els.recordDayBtns.forEach((btn) => {
   btn.addEventListener("click", async () => {
@@ -2565,7 +2566,7 @@ async function renderCurriculumTable(events, context = captureStudentContext()) 
       const checked = saved.completed ? "checked" : "";
       const ref = lessonEventRef(ev);
       lessonPlans.seed(ref, saved.lesson_plan || "", planReadVersion, saved.record_revision,saved.attribution_status,saved.owner_id||null);
-      return `<tr data-event-id="${escapeHtml(ev.id)}" data-record-ref="${escapeHtml(JSON.stringify(ref))}" data-record-revision="${saved.record_revision}" data-completed="${saved.completed ? 1 : 0}">
+      return `<tr data-event-id="${escapeHtml(ev.id)}" data-record-ref="${escapeHtml(JSON.stringify(ref))}" data-record-revision="${saved.record_revision}" data-record-owner="${escapeHtml(saved.owner_id||'')}" data-completed="${saved.completed ? 1 : 0}">
         <td><input type="checkbox" class="curriculum-completed" ${checked} /></td>
         <td>第${i + 1}回${lessonAttributionNotice(saved)}</td>
         <td>${formatCurriculumDate(start)}</td>
@@ -2576,38 +2577,12 @@ async function renderCurriculumTable(events, context = captureStudentContext()) 
       </tr>`;
     })
     .join("");
+  restoreRecordDraftRows(els.curriculumTbody);showRetainedRecordDrafts();
   renderLessonPlans();
 }
 
-els.curriculumTbody.addEventListener("change", async (e) => {
-  if (e.target.matches(".linked-lesson-plan")) return;
-  const row = e.target.closest("tr[data-event-id]");
-  if (!row) return;
-  const eventId = row.dataset.eventId;
-  const completed = row.querySelector(".curriculum-completed").checked;
-  row.dataset.completed = completed ? "1" : "0";
-  const confirmationTest = row.querySelector(".curriculum-test").value;
-  const homework = row.querySelector(".curriculum-homework").value;
-  const lessonMemo = row.querySelector(".curriculum-memo").value;
-  try {
-    const savedRecord = await apiFetch(`/curriculum/${encodeURIComponent(eventId)}`, {
-      method: "PUT",
-      body: JSON.stringify({
-        target: JSON.parse(row.dataset.recordRef),
-        record_revision: Number(row.dataset.recordRevision),
-        completed,
-        confirmation_test: confirmationTest,
-        homework,
-        lesson_memo: lessonMemo,
-      }),
-    });
-    row.dataset.recordRevision = savedRecord.record_revision;
-    if(savedRecord.target)applyCalendarTarget(JSON.parse(row.dataset.recordRef),savedRecord.target,savedRecord.record_revision);
-    lessonPlans.observeRecord(JSON.parse(row.dataset.recordRef),savedRecord.record_revision);
-  } catch (err) {
-    showActionError(err);
-  }
-});
+els.curriculumTbody.addEventListener("input",e=>{if(e.target.matches('.curriculum-test,.curriculum-homework,.curriculum-memo')){rememberRecordDraft(e.target.closest('tr[data-event-id]'));showRetainedRecordDrafts();}});
+els.curriculumTbody.addEventListener("change",e=>{if(e.target.matches('.linked-lesson-plan')||e.target.closest('.owner-memo-editor'))return;const row=e.target.closest('tr[data-event-id]');if(row)saveRecordFields(row);});
 
 // --- 目標(短期・中期・長期)。名前ごとにD1へ保存し、並べ替えはsort_orderの入れ替えで行う。
 // ページ上のカラムでは完了チェックのみ操作でき、追加・編集・削除・並べ替えは目標モーダル(設定モーダルと同じ
@@ -3580,7 +3555,7 @@ function escapeHtml(str) {
 
 function lessonReviewRow(ref,record,label,date) {
   if(record.attribution_status==='excluded')return `<tr><td colspan="7">${escapeHtml(label)} ${escapeHtml(date)}：授業履歴への取り込み・編集の対象外です。</td></tr>`;
-  if(record.attribution_status==='owner_unassigned'&&record.pending_allowed)return `<tr><td colspan="7"><strong>${escapeHtml(label)}</strong> ${escapeHtml(date)}<div class="pending-plan-label"><span>授業予定</span>${lessonPlanEditor(ref,label,'pending-record-plan','')}</div><p>未紐づけのため予定単位のD1下書きとして保存します。生徒の履歴へは自動で移しません。</p><a class="pending-bind-link" href="/tutor/history.html?calendar_id=${encodeURIComponent(ref.calendar_id)}&event_id=${encodeURIComponent(ref.id)}">下書きと紐づけを確認</a></td></tr>`;
+  if(record.attribution_status==='owner_unassigned'&&record.pending_allowed)return `<tr><td colspan="7"><strong>${escapeHtml(label)}</strong> ${escapeHtml(date)}<div class="pending-plan-label"><span>授業予定</span>${lessonPlanEditor(ref,label,'pending-record-plan','')}</div><p>未紐づけのため予定単位のD1下書きとして保存します。生徒の履歴へは自動で移しません。</p><a class="pending-bind-link" href="/tutor/history.html?calendar_id=${encodeURIComponent(ref.calendar_id)}&event_id=${encodeURIComponent(ref.id)}">下書きと紐づけを確認</a><p><a class="series-start-link" href="/tutor/history.html?calendar_id=${encodeURIComponent(ref.calendar_id)}&event_id=${encodeURIComponent(ref.id)}&series_start=1">この授業から次回・共有メモの連動を開始</a></p></td></tr>`;
   if(record.record_storage==='d1_owner'||record.attribution_status==='owner_unassigned')return `<tr><td colspan="7"><strong>${escapeHtml(label)}</strong> ${escapeHtml(date)}<p>生徒・クラスの紐づけを確認してください。保存済みの授業履歴は保持されています。</p><a href="/tutor/history.html?calendar_id=${encodeURIComponent(ref.calendar_id)}&event_id=${encodeURIComponent(ref.id)}">授業履歴で紐づけを確認</a></td></tr>`;
   if(record.record_pending_operation)return `<tr><td colspan="7"><strong>${escapeHtml(label)}</strong> ${escapeHtml(date)}<p role="status">カレンダー保存の結果確認が必要です。再送は停止しています。</p><button type="button" class="calendar-record-reconcile" data-ref="${escapeHtml(JSON.stringify(ref))}">保存結果を照合する</button><small role="status"></small></td></tr>`;
   return `<tr><td colspan="7"><strong>${escapeHtml(label)}</strong> ${escapeHtml(date)}

@@ -4424,13 +4424,13 @@ async function readObservedCurriculumEntries(env, targets, context = {}) {
   if(ownerHistoryActive(env)){
     const result=[];
     const calendars=new Map();for(const target of targets){const ids=calendars.get(target.id)||new Set();ids.add(target.calendar_id||target._calendarId);calendars.set(target.id,ids);}if([...calendars.values()].some(ids=>ids.size>1))throw httpError(409,'同じ予定IDを持つ複数カレンダーは固定IDの授業履歴画面で確認してください');
-    const deps={settings:()=>readSettings(env),token:()=>mintGoogleAccessToken(env),event:fetchCalendarEventWithToken};
+    const deps={settings:()=>readSettings(env),token:()=>mintGoogleAccessToken(env),event:fetchCalendarEventWithToken,seriesParents:new Map()};
     const {lessonEventRef,sameLessonEvent}=await import('../../shared/lesson-plan.js');
     const settings=await deps.settings(),token=(await deps.token()).access_token;
     for(const target of targets){const ref=lessonEventRef(target);if(!settings.selected_calendars?.includes(ref.calendar_id))throw httpError(403,'カレンダーを確認してください');const event=await deps.event(token,ref.calendar_id,ref.id);
       // A response must belong to the exact observation whose label the caller will render.
       if(!event||!sameLessonEvent(ref,lessonEventRef(event,ref.calendar_id))){result.push({calendar_event_id:ref.id,record_storage:'d1_owner',record_read_target:ref,attribution_status:'target_unavailable',record_target_unavailable:true,record_requires_reload:true});continue;}
-      result.push(await readEventOwnerRecord(env,ref,event));}
+      result.push(await readEventOwnerRecord(env,ref,event,deps));}
     return result;
   }
   const { lessonEventRef } = await import("../../shared/lesson-plan.js");
@@ -4543,7 +4543,7 @@ async function upsertCurriculumEntry(env, eventId, body) {
   if(env.LESSON_HISTORY_MODE==='reconcile')throw httpError(409,'D1移行の照合中です。授業内容の編集を一時停止しています');
   if (body.target?.id !== eventId) throw httpError(409, "予定を再読み込みしてください");
   const target = await verifiedLessonTarget(env, body.target);
-  if(ownerHistoryActive(env))return writeEventOwnerRecord(env,{target,patch:body,record_revision:body.record_revision,request_id:body.request_id},{settings:()=>readSettings(env),token:()=>mintGoogleAccessToken(env),event:fetchCalendarEventWithToken});
+  if(ownerHistoryActive(env))return writeEventOwnerRecord(env,{target,patch:body,record_revision:body.record_revision,request_id:body.request_id,expected_owner_id:body.expected_owner_id},{settings:()=>readSettings(env),token:()=>mintGoogleAccessToken(env),event:fetchCalendarEventWithToken});
   const { prepareRecordWrite, commitRecords, readCommittedRecord } = await import("./lesson-attribution.js");
   const patch = Object.fromEntries(["completed", ...SCHEDULE_TEXT_FIELDS].filter(field => body[field] !== undefined).map(field => [field, body[field]]));
   if(calendarRecordsEnabled(env))return writeCalendarLessonRecord(env,{target,patch,recordRevision:body.record_revision},{settings:()=>readSettings(env),token:()=>mintGoogleAccessToken(env)});
@@ -6335,7 +6335,7 @@ export default {
       if(url.pathname.startsWith('/api/lesson-history/')){
         if(browserSession.aud||browserSession.scope||browserSession.fid)throw httpError(401,'browser session required');
         if(request.method!=='GET'&&(request.headers.get('Origin')!==env.ALLOWED_ORIGIN||!request.headers.get('Content-Type')?.startsWith('application/json')))throw httpError(403,'same-origin JSON required');
-        const dependencies={settings:()=>readSettings(env),token:()=>mintGoogleAccessToken(env),event:fetchCalendarEventWithToken};
+        const dependencies={settings:()=>readSettings(env),token:()=>mintGoogleAccessToken(env),event:fetchCalendarEventWithToken,events:fetchCalendarEventsForSchedule,seriesParents:new Map()};
         return json(await handleOwnerHistory(env,request,url,dependencies),{...headers,'Cache-Control':'no-store'});
       }
 

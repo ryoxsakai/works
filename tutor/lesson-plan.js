@@ -1,4 +1,4 @@
-import {readPendingRecovery,persistPendingRecovery,clearPendingRecovery} from './pending-plan-draft.mjs?v=1';
+import {readPendingRecovery,persistPendingRecovery,clearPendingRecovery} from './pending-plan-draft.mjs?v=2';
 import { lessonEventKey, sameLessonEvent } from "../shared/lesson-plan.js";
 
 // All editors of one event share one draft and one write queue. Nothing is copied
@@ -19,14 +19,14 @@ export function createLessonPlanController({ readNext, write, readCurrent, readO
     const key = lessonEventKey(target);
     let state = plans.get(key);
     if (!state) {
-      state = { key, target, value, recordRevision, attributionStatus, ownerId, pendingContext, base: value, dirty: false, status: "ready", revision: 0, changedAt: version, pending: 0, queue: Promise.resolve() };
+      state = { key, target, value, recordRevision, attributionStatus, ownerId, pendingContext, recoveryContext:pendingContext|| (ownerId?'owner-plan:'+ownerId+':'+key:null), base: value, dirty: false, status: "ready", revision: 0, changedAt: version, pending: 0, queue: Promise.resolve() };
       plans.set(key, state);
-      const cached=pendingContext?readPendingRecovery(pendingContext):null;
-      if(cached&&cached.context===pendingContext&&sameLessonEvent(cached.target,target)){
+      const recoveryContext=state.recoveryContext;const cached=recoveryContext?readPendingRecovery(recoveryContext):null;
+      if(cached&&cached.context===recoveryContext&&sameLessonEvent(cached.target,target)){
         Object.assign(state,{value:cached.value,base:cached.base,recordRevision:cached.recordRevision,operationId:cached.operationId,sentValue:cached.sentValue,pendingUnknown:!!cached.unknown,dirty:true,status:cached.unknown||cached.recordRevision!==recordRevision?'conflict':'unsaved'});
       }
     } else if (!state.dirty && !state.pending && state.changedAt <= readVersion) {
-      Object.assign(state, { target, value, recordRevision, attributionStatus, ownerId, pendingContext, base: value, status: "ready" });
+      Object.assign(state, { target, value, recordRevision, attributionStatus, ownerId, pendingContext, recoveryContext:pendingContext|| (ownerId?'owner-plan:'+ownerId+':'+key:null), base: value, status: "ready" });
     }
     return state;
   }
@@ -60,7 +60,7 @@ export function createLessonPlanController({ readNext, write, readCurrent, readO
         if(result.owner_confirmation_required){
           link.target=result.target;link.targetKey=result.pending_allowed?seed(result.target,result.lesson_plan||'',readVersion,result.record_revision,result.attribution_status,null,result.pending_context).key:'';link.status=result.pending_allowed?'pending_owner':'owner_confirmation_required';notify();return;
         }
-        if (['legacy_unknown','known_change','title_changed','id_collision','target_unavailable'].includes(result.attribution_status)) {
+        if (['series_changed','series_unavailable','series_legacy_hold','legacy_unknown','known_change','title_changed','id_collision','target_unavailable'].includes(result.attribution_status)) {
           link.status='attribution'; link.targetKey=''; notify(); return;
         }
         link.target = result.target;
@@ -87,14 +87,14 @@ export function createLessonPlanController({ readNext, write, readCurrent, readO
       // Freeze both source and destination before an async boundary.
       const target = structuredClone(link?.target || state.target);
       const source = link ? structuredClone(link.source) : null;
-      const pendingContext=state.pendingContext,requestId=pendingContext?crypto.randomUUID():null;
+      const pendingContext=state.pendingContext,requestId=crypto.randomUUID();
       state.pending++; state.status = "saving"; notify();
       const save = state.queue.catch(() => {}).then(async () => {
         if (state.status === "conflict" || (linkKey && link?.status === "conflict")) return;
         try {
           const effectiveTarget=latestOwn(target),effectiveSource=latestOwn(source);
-          if(pendingContext){state.operationId=requestId;state.sentValue=value;state.pendingUnknown=true;persistPendingRecovery(state);}
-          const result = await write({ target:effectiveTarget, ...(effectiveSource ? { source:effectiveSource,...(Object.hasOwn(link.current||{},'source_owner_id')?{expected_source_owner_id:link.current.source_owner_id}:{}) } : {}), ...(pendingContext?{pending_context:pendingContext,request_id:requestId}:{}), expected_lesson_plan: state.base, record_revision:state.recordRevision, lesson_plan: value });
+          if(state.recoveryContext){state.operationId=requestId;state.sentValue=value;state.pendingUnknown=true;persistPendingRecovery(state);}
+          const result = await write({ target:effectiveTarget, ...(effectiveSource ? { source:effectiveSource,...(Object.hasOwn(link.current||{},'source_owner_id')?{expected_source_owner_id:link.current.source_owner_id}:{}) } : {}), request_id:requestId,...(state.ownerId?{expected_owner_id:state.ownerId}:{}),...(pendingContext?{pending_context:pendingContext}:{}), expected_lesson_plan: state.base, record_revision:state.recordRevision, lesson_plan: value });
           if(result.target)observeTarget(effectiveTarget,result.target);
           state.base = result.lesson_plan || "";
           state.pendingUnknown=false;state.operationId=null;
@@ -103,11 +103,11 @@ export function createLessonPlanController({ readNext, write, readCurrent, readO
           state.changedAt = ++version;
           if (state.revision === revision) { state.value = state.base; state.dirty = false; state.status = "saved"; }
           else state.status = "unsaved";
-          if(state.pendingContext){if(state.dirty)persistPendingRecovery(state);else clearPendingRecovery(state);}
+          if(state.recoveryContext){if(state.dirty)persistPendingRecovery(state);else clearPendingRecovery(state);}
         } catch (error) {
           state.status = error.status === 409 || error.unknown || error.code==='CALENDAR_WRITE_UNKNOWN' ? "conflict" : "error";
           state.message = error.message;
-          if(state.pendingContext){state.pendingUnknown=!!(error.unknown||error.code==='LESSON_HISTORY_RELOAD');persistPendingRecovery(state);}
+          if(state.recoveryContext){state.pendingUnknown=!!(error.unknown||error.code==='LESSON_HISTORY_RELOAD');persistPendingRecovery(state);}
           state.current = error.current;
           if (link && error.status === 409 && sameLessonEvent(link.target, target)) {
             link.status = "conflict"; link.current = error.current; link.message = error.message;
@@ -126,9 +126,9 @@ export function createLessonPlanController({ readNext, write, readCurrent, readO
     async verifyPending(key){
       const state=plans.get(key);if(!state?.pendingUnknown||!state.operationId||!readOperation||!readCurrent)return false;
       try{
-        const audits=await readOperation(state.operationId),audit=audits.find(a=>a.id===state.operationId&&a.action==='write_pending_plan');if(!audit)throw Error('保存結果をまだ確認できません。再送せず同じ操作IDで照合してください');
-        const saved=JSON.parse(audit.after_json);if(saved.pending_context!==state.pendingContext||saved.lesson_plan!==state.sentValue)throw Error('操作結果と保持中の入力の対応を確認できません');
-        const fresh=await readCurrent(state.target);if(!sameLessonEvent(fresh.target,state.target)||fresh.pending_context!==state.pendingContext)throw Error('予定・紐づけが変わりました。入力を保持して授業履歴で確認してください');
+        const audits=await readOperation(state.operationId),audit=audits.find(a=>a.id===state.operationId&&(state.pendingContext?a.action==='write_pending_plan':['write_series_record','edit_record'].includes(a.action)));if(!audit)throw Error('保存結果をまだ確認できません。再送せず同じ操作IDで照合してください');
+        const after=JSON.parse(audit.after_json),saved=after.record?{owner_id:after.record.owner_id,lesson_plan:after.record.lesson_plan,record_revision:after.record.revision}:after;if((state.pendingContext?saved.pending_context!==state.pendingContext:saved.owner_id!==state.ownerId)||saved.lesson_plan!==state.sentValue)throw Error('操作結果と保持中の入力の対応を確認できません');
+        const fresh=await readCurrent(state.target);if(!sameLessonEvent(fresh.target,state.target)||(state.pendingContext?fresh.pending_context!==state.pendingContext:fresh.owner_id!==state.ownerId||fresh.attribution_status!=='confirmed'))throw Error('予定・紐づけが変わりました。入力を保持して授業履歴で確認してください');
         state.pendingUnknown=false;state.operationId=null;
         if(fresh.record_revision!==saved.record_revision||fresh.lesson_plan!==saved.lesson_plan){state.status='conflict';state.message='保存後に別の更新があります。入力を保持して最新内容と比較してください';persistPendingRecovery(state);notify();return false;}
         state.base=fresh.lesson_plan;state.recordRevision=fresh.record_revision;state.dirty=state.value!==saved.lesson_plan;state.status=state.dirty?'unsaved':'saved';if(state.dirty)persistPendingRecovery(state);else clearPendingRecovery(state);notify();return true;

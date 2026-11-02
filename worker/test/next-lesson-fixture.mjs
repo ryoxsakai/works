@@ -136,6 +136,6 @@ const server=http.createServer(async(req,res)=>{
  }catch(error){res.writeHead(error.status||500,{'Content-Type':'application/json'});res.end(JSON.stringify({error:error.message,code:error.code,current:error.current}));}
 });
 await new Promise(resolve=>server.listen(port,'127.0.0.1',resolve));
-return {base:`http://127.0.0.1:${server.address().port}`,events,DB,control,today,async close(){await new Promise(resolve=>server.close(resolve));await mf.dispose();}};
+return {base:`http://127.0.0.1:${server.address().port}`,events,DB,env,deps,control,today,async close(){await new Promise(resolve=>server.close(resolve));await mf.dispose();}};
 }
 if(process.argv[1]===fileURLToPath(import.meta.url)){const fixture=await createFixture(8768);console.log(fixture.base+'/qa');}

@@ -1,9 +1,10 @@
+import {ownerSemesterCounts} from '../../shared/semester-counts.mjs';
 import {boundedRead} from '../record-read.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
-import {lessonEventRef,lessonEventKey} from '../../shared/lesson-plan.js';
+import {isScheduledLesson,lessonEventRef,lessonEventKey} from '../../shared/lesson-plan.js';
 import {attributedLessonRecord,lessonRecordNeedsReview} from '../../shared/lesson-attribution.js';
 import {sameLessonOwner,previousOwnerRecord,lessonRecordRows} from '../../shared/lesson-record-view.mjs';
 const source=readFileSync(new URL('../app.js',import.meta.url),'utf8');
@@ -29,7 +30,7 @@ test('actual daily table row builder selects the same owner across renamed label
  const event=(id,title,date)=>({id,_calendarId:'cal',summary:title,start:{dateTime:date},end:{dateTime:date},etag:id}),a=event('a-old','A','2026-10-20T10:00:00+09:00'),b=event('b-old','B','2026-10-21T10:00:00+09:00'),now=event('a-now','B','2026-11-01T10:00:00+09:00');
  const record=(event,owner)=>({calendar_event_id:event.id,record_storage:'d1_owner',record_read_target:lessonEventRef(event),owner_id:owner,attribution_status:'confirmed',lesson_plan:owner+' plan'});
  const entryMap=new Map([[a.id,record(a,'a')],[b.id,record(b,'b')],[now.id,record(now,'a')]]),start=source.indexOf('const rows = dayEvents.map((ev)'),end=source.indexOf('renderRecordTable(rows);',start);
- function build(rangeEvents){const state=vm.createContext({dayEvents:[now],rangeEvents,entryMap,lessonEventRef,attributedLessonRecord,previousOwnerRecord,calendarColors:new Map(),isExcludedScheduleEvent:()=>false,coveringTerm:null,planReadVersion:0});vm.runInContext(source.slice(start,end)+'\nglobalThis.result=rows;',state);return state.result[0];}
+ function build(rangeEvents){const state=vm.createContext({isScheduledLesson,excludedTitles:new Set(),ownerSemesterCounts,dayEvents:[now],rangeEvents,entryMap,lessonEventRef,attributedLessonRecord,previousOwnerRecord,calendarColors:new Map(),isExcludedScheduleEvent:()=>false,coveringTerm:null,planReadVersion:0});vm.runInContext(source.slice(start,end)+'\nglobalThis.result=rows;',state);return state.result[0];}
  assert.equal(build([a,b,now]).prevRecord.owner_id,'a');assert.equal(build([b,now]).prevLessonPlan,'');
 });
 test('shared card renderer independently refuses stale D1 content and another owners previous plan',()=>{
