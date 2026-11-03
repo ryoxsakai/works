@@ -1,14 +1,14 @@
 import {ownerSemesterCounts} from '../shared/semester-counts.mjs?v=1';
-import {createOwnerMemoEditors} from '../shared/owner-memo.mjs?v=1';
+import {createOwnerMemoEditors} from '../shared/owner-memo.mjs?v=2-autosave';
 import {readNextLessonWithTemplate} from "../shared/next-lesson-read.mjs?v=1";
 import { curriculumSelectionName } from "../shared/student-profile-key.js";
-import {lessonRecordRows,renderPlanEditors,renderMemoEditors} from '../shared/lesson-record-view.mjs?v=6-semester';
+import {lessonRecordRows,renderPlanEditors,renderMemoEditors} from '../shared/lesson-record-view.mjs?v=7-compact';
 import {lessonEventKey,isScheduledLesson} from '../shared/lesson-plan.js';
 import {lessonRecordNeedsReview} from '../shared/lesson-attribution.js';
 import {createLessonPlanController} from '../tutor/lesson-plan.js?v=8';
 import {createStudentMemoStore} from '../tutor/student-memo.js?v=1';
 import {attachRecordCarousel} from '../tutor/record-carousel.mjs?v=3';
-import {attachRecordToasts} from '../tutor/record-toasts.mjs?v=2';
+import {attachRecordToasts} from '../tutor/record-toasts.mjs?v=3-name';
 import {decorateTutor} from '../shared/ui/tutor-presentation.mjs';
 import {esc} from './model.mjs';
 import {lessonApi} from './lesson-model.mjs';

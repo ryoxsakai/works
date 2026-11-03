@@ -1,13 +1,13 @@
 import {ownerSemesterCounts} from '../shared/semester-counts.mjs?v=1';
 import {recordRowSnapshot,independentRecordRows,synchronizeRecordRows} from './record-row-sync.mjs?v=1';
 import {readPendingRecovery,persistPendingRecovery,clearPendingRecovery,pendingRecoveryCopies} from './pending-plan-draft.mjs?v=2';
-import {createOwnerMemoEditors} from '../shared/owner-memo.mjs?v=1';
+import {createOwnerMemoEditors} from '../shared/owner-memo.mjs?v=2-autosave';
 import {boundedRead,precedingLegacyEvents,precedingOwnerEvents,recordTermScope} from './record-read.mjs?v=2';
 import {readNextLessonWithTemplate} from "../shared/next-lesson-read.mjs?v=1";
-import { lessonRecordRows, renderPlanEditors, renderMemoEditors, previousOwnerRecord } from "../shared/lesson-record-view.mjs?v=6-semester";
+import { lessonRecordRows, renderPlanEditors, renderMemoEditors, previousOwnerRecord } from "../shared/lesson-record-view.mjs?v=7-compact";
 import { setUserAvatar } from "../shared/avatar.mjs?v=1";
 import { attachRecordCarousel } from "./record-carousel.mjs?v=3";
-import { attachRecordToasts } from "./record-toasts.mjs?v=2";
+import { attachRecordToasts } from "./record-toasts.mjs?v=3-name";
 import { startTutorPresentation } from "../shared/ui/tutor-presentation.mjs";
 startTutorPresentation();
 import { attributedLessonRecord, lessonRecordNeedsReview } from "../shared/lesson-attribution.js?v=3";

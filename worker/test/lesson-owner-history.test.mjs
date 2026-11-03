@@ -59,9 +59,9 @@ test('CAS and request IDs prevent stale overwrites and duplicate record creation
  assert.equal((await listOwnerRecords(env,owner.id))[0].homework,'winner');assert.equal(winner.record.revision,2);
  assert.equal((await env.DB.prepare('SELECT COUNT(*) AS n FROM lesson_history_guard').first()).n,0);
 });
-test('next lesson uses explicitly bound owner ID, not swapped or duplicate title; unbound additions stay blank',async t=>{
+test('same-name next cards retain their independent bound owners; unbound additions stay blank',async t=>{
  const {env,events,deps,owner,makeOwner,ref}=await setup(t);const other=await makeOwner('甲');await bind(env,owner,ref(),deps);await bind(env,other,ref(1),deps);await bind(env,owner,ref(2),deps);env.LESSON_HISTORY_MODE='active';
- const result=await readNextLessonPlan(env,'a',events[0].id,deps);assert.equal(result.target.id,events[2].id);assert.equal(result.owner_id,owner.id);
+ const result=await readNextLessonPlan(env,'a',events[0].id,deps);assert.equal(result.target.id,events[1].id);assert.equal(result.owner_id,other.id);assert.equal(result.source_owner_id,owner.id);
  events.push({...events[2],id:'unbound',summary:'甲'});assert.equal((await readEventOwnerRecord(env,lessonEventRef(events[3],'a'))).attribution_status,'owner_unassigned');
 });
 async function migratedFixture(t){
@@ -126,9 +126,9 @@ test('earlier unassigned candidate is not hidden behind a later confirmed lesson
  const {env,events,deps,owner,ref}=await setup(t);await bind(env,owner,ref(),deps);await bind(env,owner,ref(2),deps);env.LESSON_HISTORY_MODE='active';assert.equal((await readNextLessonPlan(env,'a',events[0].id,deps)).target.id,events[1].id);
  events.push({...events[1],id:'duplicate-unassigned'});const result=await readNextLessonPlan(env,'a',events[0].id,deps);assert.equal(result.reason,'ambiguous');assert.equal(result.target,null);assert.equal(result.lesson_plan,'');
 });
-test('owner mismatch is skipped, renamed/recreated same-owner target requires confirmation without private values',async t=>{
+test('same-name owner mismatch is reported before renamed/recreated same-owner targets',async t=>{
  const {env,events,deps,owner,makeOwner,ref}=await setup(t),other=await makeOwner('甲');await bind(env,owner,ref(),deps);await bind(env,other,ref(1),deps);await bind(env,owner,ref(2),deps);env.LESSON_HISTORY_MODE='active';
- events[2].summary='新しい名前';let result=await readNextLessonPlan(env,'a',events[0].id,deps);assert.equal(result.target.id,events[2].id);assert.equal(result.owner_confirmation_required,true);assert.equal(result.lesson_plan,'');
+ let result=await readNextLessonPlan(env,'a',events[0].id,deps);assert.equal(result.target.id,events[1].id);assert.equal(result.owner_id,other.id);assert.equal(result.owner_confirmation_required,undefined);assert.equal(result.lesson_plan,'');events[1].status='cancelled';events[2].summary='新しい名前';result=await readNextLessonPlan(env,'a',events[0].id,deps);assert.equal(result.target.id,events[2].id);assert.equal(result.owner_confirmation_required,true);assert.equal(result.lesson_plan,'');
  events[2].summary='乙';events[2].created='2026-11-02T00:00:00Z';result=await readNextLessonPlan(env,'a',events[0].id,deps);assert.equal(result.attribution_status,'event_recreated');assert.equal(result.owner_confirmation_required,true);
 });
 test('unassigned sources do not scan a year; bound sources batch bindings and avoid unrelated per-event D1 reads',async t=>{

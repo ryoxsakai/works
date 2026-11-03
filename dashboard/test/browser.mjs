@@ -277,7 +277,7 @@ try {
   assert.ok(
     (
       await page
-        .locator('[data-content="lessons"] .record-student-link')
+        .locator('[data-content="lessons"] .record-student-name')
         .first()
         .boundingBox()
     ).y < 700,
