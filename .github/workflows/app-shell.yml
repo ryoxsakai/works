@@ -18,6 +18,8 @@ jobs:
           cache-dependency-path: |
             prototype/package-lock.json
             worker/package-lock.json
+      - name: Prepare synthetic test fixture
+        run: node scripts/prepare-synthetic-test-fixture.mjs
       - run: npm ci --prefix prototype --ignore-scripts
       - run: npm ci --prefix worker --ignore-scripts
       - run: node --test worker/test/material-library-guarded.test.mjs worker/test/material-upload-races.test.mjs worker/test/material-code.test.mjs
