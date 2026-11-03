@@ -2,7 +2,7 @@ import {sameNameLessonCount} from '../shared/lesson-counts.mjs?v=1';
 import {recordRowSnapshot,independentRecordRows,synchronizeRecordRows} from './record-row-sync.mjs?v=1';
 import {readPendingRecovery,persistPendingRecovery,clearPendingRecovery,pendingRecoveryCopies} from './pending-plan-draft.mjs?v=2';
 import {createOwnerMemoEditors} from '../shared/owner-memo.mjs?v=2-autosave';
-import {boundedRead,precedingLegacyEvents,precedingOwnerEvents,recordTermScope} from './record-read.mjs?v=2';
+import {boundedRead,precedingLegacyEvents,precedingOwnerEvents,recordTermScope,studentNavigationEvent} from './record-read.mjs?v=3-navigation';
 import {readNextLessonWithTemplate} from "../shared/next-lesson-read.mjs?v=1";
 import { lessonRecordRows, renderPlanEditors, renderMemoEditors, previousOwnerRecord } from "../shared/lesson-record-view.mjs?v=8-student-link";
 import { setUserAvatar } from "../shared/avatar.mjs?v=1";
@@ -823,14 +823,14 @@ async function loadSignedInTutor(){
       await loadCalendarEvents();
       const params=new URLSearchParams(location.search),calendarId=params.get('student_calendar'),eventId=params.get('student_event');
       if(calendarId&&eventId){
-        const source=rawEvents.find(event=>event._calendarId===calendarId&&event.id===eventId);
+        const source=await studentNavigationEvent(rawEvents,{calendarId,eventId,day:params.get('record_date')},selectedCalendarIds,async day=>{const [start,end]=recordDateRange(day);return fetchCalendarEvents(start,end,{withCalendarId:true});});
         if(source&&selectedCalendarIds.has(calendarId)&&isScheduledLesson(source,[...excludedTitles])){
           const day=tokyoDateKey(new Date(source.start.dateTime));
           const term=terms.find(t=>selectedTermIds.has(t.id)&&day>=t.start_date&&day<=t.end_date);
           await goToCurriculum(source.summary||'',term,calendarId);
+          params.delete('student_calendar');params.delete('student_event');
+          history.replaceState(null,'',location.pathname+(params.size?'?'+params.toString():'')+location.hash);
         }else showActionError(new Error('元の授業を確認できません。授業予定から生徒を選択してください。'));
-        params.delete('student_calendar');params.delete('student_event');
-        history.replaceState(null,'',location.pathname+(params.size?'?'+params.toString():'')+location.hash);
       }
     }catch(error){if(request===calendarEventsRequest){showEventPlaceholder('授業予定を取得できませんでした。再読み込みしてください。');showActionError(error);}}
   }).catch(error=>{if(initialSchedule===calendarEventsRequest)showEventPlaceholder('授業予定の初期情報を取得できませんでした。再読み込みしてください。');showActionError(error);});

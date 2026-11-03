@@ -1,5 +1,5 @@
 import {sameNameLessonCount} from '../../shared/lesson-counts.mjs';
-import {recordTermScope} from '../record-read.mjs';
+import {recordTermScope,studentNavigationEvent} from '../record-read.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
@@ -8,6 +8,15 @@ import {tokyoDateKey,shiftRecordDate,recordDateRange} from '../record-date.js';
 import {attributedLessonRecord} from '../../shared/lesson-attribution.js';
 import {isScheduledLesson,lessonEventRef} from '../../shared/lesson-plan.js';
 const source=readFileSync(new URL('../app.js',import.meta.url),'utf8');
+test('student navigation re-reads the exact day when it is outside the loaded term',async()=>{
+ const event={id:'extra',_calendarId:'c1',start:{dateTime:'2026-11-03T08:50:00+09:00'}};
+ let reads=0;const read=async day=>{reads++;assert.equal(day,'2026-11-03');return [event]};
+ assert.equal(await studentNavigationEvent([],{calendarId:'c1',eventId:'extra',day:'2026-11-03'},new Set(['c1']),read),event);assert.equal(reads,1);
+ assert.equal(await studentNavigationEvent([event],{calendarId:'c1',eventId:'extra',day:'2026-11-03'},new Set(['c1']),read),event);assert.equal(reads,1);
+ assert.equal(await studentNavigationEvent([event],{calendarId:'c2',eventId:'extra',day:'2026-11-03'},new Set(['c1']),read),null);
+ assert.equal(await studentNavigationEvent([event],{calendarId:'c1',eventId:'extra',day:'2026-11-04'},new Set(['c1']),read),null);
+ assert.equal(await studentNavigationEvent([event,event],{calendarId:'c1',eventId:'extra',day:'2026-11-03'},new Set(['c1']),read),null);
+});
 function fn(name){const start=source.indexOf(`async function ${name}(`);return source.slice(start,source.indexOf('\n}',start)+2);}
 test('Tokyo date, civil day navigation and exclusive fetch boundaries',()=>{
   assert.equal(tokyoDateKey(new Date('2026-10-16T15:00:00Z')),'2026-10-17');
