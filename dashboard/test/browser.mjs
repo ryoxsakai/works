@@ -291,6 +291,7 @@ try {
   passed.push(
     "default widgets, all nine original routes, JST planned/deadline distinction, protected read-only observations without saves and lazy optional widgets",
   );
+  await page.locator("#open-home-settings").click();
   await page.locator("#dashboard-edit").click();
   await page.locator('[data-add="memo"]').click();
   await expect(page.locator('[data-content="memo"]')).toContainText(
@@ -484,6 +485,7 @@ try {
   passed.push(
     "optional catalogs, metadata/title-only rendering, accessible reorder, cancel creates no persistence",
   );
+  await page.locator("#open-home-settings").click();
   await page.locator("#dashboard-edit").click();
   await page.waitForFunction(() =>
     window.Sortable?.get(document.querySelector("#dashboard-widgets")),
@@ -519,6 +521,7 @@ try {
     "real desktop drag handle reorders draft; cancel restores canonical order",
   );
 
+  await page.locator("#open-home-settings").click();
   await page.locator("#dashboard-edit").click();
   await page.locator('[data-hide="lessons"]').click();
   await page.locator('[data-move="shortcuts"][data-step="-1"]').click();
@@ -564,6 +567,7 @@ try {
   await expect(page.locator("#dashboard-edit")).toBeEnabled();
   passed.push("per-user account-switch layout isolation");
 
+  await page.locator("#open-home-settings").click();
   await page.locator("#dashboard-edit").click();
   await page.locator('[data-add="memo"]').click();
   page.once("dialog", (d) => d.dismiss());
@@ -576,6 +580,7 @@ try {
       throw new DOMException("quota", "QuotaExceededError");
     };
   });
+  await page.locator("#open-home-settings").click();
   await page.locator("#dashboard-edit").click();
   await page.locator('[data-hide="todo"]').click();
   await page.locator("#dashboard-save").click();
@@ -716,7 +721,10 @@ try {
   const initial = interrupt.requests.filter(
     (r) => r.url === "/api/todo",
   ).length;
-  await interrupt.page.locator("#dashboard-refresh").dblclick();
+  await interrupt.page.locator("#open-home-settings").click();
+  await interrupt.page.locator("#dashboard-refresh").click();
+  await interrupt.page.locator("#open-home-settings").click();
+  await interrupt.page.locator("#dashboard-refresh").click();
   assert.equal(
     interrupt.requests.filter((r) => r.url === "/api/todo").length,
     initial,
@@ -780,6 +788,7 @@ try {
   await expect(empty.page.locator('[data-content="lessons"]')).toContainText(
     "今日の予定はありません",
   );
+  await empty.page.locator("#open-home-settings").click();
   await empty.page.locator("#dashboard-edit").click();
   while (await empty.page.locator("[data-hide]").count())
     await empty.page.locator("[data-hide]").first().click();
@@ -791,6 +800,7 @@ try {
   await expect(empty.page.locator("#dashboard-widgets")).toContainText(
     "ウィジェットは非表示",
   );
+  await empty.page.locator("#open-home-settings").click();
   await empty.page.locator("#dashboard-edit").click();
   empty.page.once("dialog", (d) => d.accept());
   await empty.page.locator("#dashboard-reset").click();
@@ -828,6 +838,7 @@ try {
   const touch = await fixture({ touch: true });
   await ready(touch.page);
   await touch.page.setViewportSize({ width: 390, height: 2400 });
+  await touch.page.locator("#open-home-settings").click();
   await touch.page.locator("#dashboard-edit").click();
   await touch.page.waitForFunction(() =>
     window.Sortable?.get(document.querySelector("#dashboard-widgets")),
@@ -874,11 +885,11 @@ try {
     await ui.page.emulateMedia({colorScheme: mode === 'light' ? 'dark' : 'light'});
     await ui.page.evaluate(async mode => { const {setTheme}=await import('/shared/theme.js?v=6'); setTheme(mode); }, mode);
     assert.equal(await ui.page.locator('body').evaluate(el=>getComputedStyle(el).colorScheme),mode);
-    const contrast=await ui.page.locator('#dashboard-edit').evaluate(el=>{
+    const contrast=await ui.page.locator('.dashboard-widget .widget-link').first().evaluate(el=>{
       const style=getComputedStyle(el);
       const canvas=document.createElement('canvas'); canvas.width=canvas.height=1; const ctx=canvas.getContext('2d');
       const luminance=color=>{ctx.fillStyle=color;ctx.fillRect(0,0,1,1);const c=Array.from(ctx.getImageData(0,0,1,1).data).slice(0,3).map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4;});return c[0]*.2126+c[1]*.7152+c[2]*.0722;};
-      const a=luminance(style.color),b=luminance(style.backgroundColor);return (Math.max(a,b)+.05)/(Math.min(a,b)+.05);
+      const a=luminance(style.color),b=luminance(getComputedStyle(el.closest('.dashboard-widget')).backgroundColor);return (Math.max(a,b)+.05)/(Math.min(a,b)+.05);
     });
     assert.ok(contrast>=4.5, `${mode} primary text contrast ${contrast}`);
   }
@@ -907,7 +918,8 @@ try {
     await expect(ui.page.locator('#home-navigation')).not.toHaveAttribute('open');
   }
   passed.push('shared Tutor menu labels/groups/Home current, keyboard/ESC/outside/repeated click and hover contrast at mobile/desktop in both themes');
-  await ui.page.locator('#dashboard-edit').click();
+  await ui.page.locator("#open-home-settings").click();
+  await ui.page.locator("#dashboard-edit").click();
   await expect.poll(()=>ui.page.evaluate(()=>!!window.Sortable?.get(document.querySelector('#dashboard-widgets')))).toBe(true);
   await ui.page.emulateMedia({reducedMotion:'reduce'});
   await expect.poll(()=>ui.page.evaluate(()=>window.Sortable.get(document.querySelector('#dashboard-widgets')).option('animation'))).toBe(0);
@@ -944,7 +956,7 @@ try {
   const dom = await fontSession.send("DOM.getDocument");
   const node = await fontSession.send("DOM.querySelector", {
     nodeId: dom.root.nodeId,
-    selector: ".dashboard-heading h2",
+    selector: ".dashboard-widget h3",
   });
   const used = await fontSession.send("CSS.getPlatformFontsForNode", {
     nodeId: node.nodeId,

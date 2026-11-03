@@ -30,6 +30,7 @@
     <link rel="stylesheet" href="/shared/ui/carousel-bootstrap.css?v=1" />
     <link rel="stylesheet" href="/tutor/record-carousel.css?v=1" />
     <link rel="stylesheet" href="/dashboard/lesson-cards.css?v=1" />
+    <link rel="stylesheet" href="/home-refined.css?v=1" />
   <link rel="stylesheet" href="/shared/owner-memo.css?v=1"></head>
   <body class="dashboard-home">
     <a class="skip-link" href="#dashboard-main">本文へ</a>
@@ -67,19 +68,7 @@
     <div class="dashboard-shell">
       <main id="dashboard-main" tabindex="-1">
         <p id="home-auth-error" class="error home-auth-error alert" role="alert"></p>
-        <div class="dashboard-heading">
-          <div>
-            <p id="dashboard-date" class="dashboard-muted"></p>
-            <h2>おかえりなさい</h2>
-            <p class="dashboard-muted">今日の予定と、よく使う機能をここに。</p>
-          </div>
-          <div class="dashboard-actions">
-            <button class="btn btn-outline" id="dashboard-refresh" type="button">更新</button
-            ><button id="dashboard-edit" type="button" class="btn btn-solid theme-primary">
-              表示を編集
-            </button>
-          </div>
-        </div>
+        <p id="dashboard-date" hidden></p>
         <p id="dashboard-message" class="alert" role="status" aria-live="polite"></p>
         <div id="dashboard-editor" class="dashboard-editor" hidden>
           <p>
@@ -123,6 +112,7 @@
         </button>
       </div>
       <div class="modal-tab-panel">
+        <h3>表示テーマ</h3>
         <div class="theme-options">
           <label
             ><input type="radio" name="home-theme" value="system" />
@@ -135,6 +125,11 @@
           <label
             ><input type="radio" name="home-theme" value="dark" /> ダーク</label
           >
+        </div>
+        <div class="home-settings-dashboard">
+          <h3>ホーム画面</h3>
+          <button id="dashboard-edit" type="button" class="btn btn-outline">ホーム画面の配置を編集</button>
+          <button id="dashboard-refresh" type="button" class="btn btn-outline">表示を更新</button>
         </div>
       </div>
     </dialog>
