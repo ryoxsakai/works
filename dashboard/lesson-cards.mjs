@@ -1,8 +1,7 @@
-import {ownerSemesterCounts} from '../shared/semester-counts.mjs?v=1';
 import {createOwnerMemoEditors} from '../shared/owner-memo.mjs?v=2-autosave';
 import {readNextLessonWithTemplate} from "../shared/next-lesson-read.mjs?v=1";
 import { curriculumSelectionName } from "../shared/student-profile-key.js";
-import {lessonRecordRows,renderPlanEditors,renderMemoEditors} from '../shared/lesson-record-view.mjs?v=7-compact';
+import {lessonRecordRows,renderPlanEditors,renderMemoEditors} from '../shared/lesson-record-view.mjs?v=8-student-link';
 import {lessonEventKey,isScheduledLesson} from '../shared/lesson-plan.js';
 import {lessonRecordNeedsReview} from '../shared/lesson-attribution.js';
 import {createLessonPlanController} from '../tutor/lesson-plan.js?v=8';
@@ -87,7 +86,6 @@ export function createHomeLessonCards(model,{session,getSessionToken,onExpired,r
   lightenHexColor:color=>/^#[0-9a-f]{6}$/i.test(color)?'#'+[1,3,5].map(i=>Math.round(parseInt(color.slice(i,i+2),16)*.25+255*.75).toString(16).padStart(2,'0')).join(''):'#e7e9ec',calendarName:id=>model.calendars.find(c=>c.id===id)?.summary||'カレンダー',lessonAttributionNotice:()=>'',
   lessonPlanEditor:planEditor,lessonPlanFeedback:feedback,recordStudentPrefName:nameFor,lessonEventKey
  });
-  if(model.countTermId)ownerSemesterCounts(model.rows,model.countTermId,call,valid).then(counts=>{if(!valid())return;for(const row of root.querySelectorAll('[data-event-id]')){const ref=JSON.parse(row.dataset.recordRef),count=counts.get(lessonEventKey(ref));if(!count)continue;const text=count.n+'/'+count.m+'回',cell=row.querySelector('[data-label="回数"]'),badge=row.querySelector('.record-card-meta span');if(cell)cell.textContent=text;if(badge)badge.textContent=text;}});
  for(const editor of root.querySelectorAll('.student-memo-editor')){
   const label=document.createElement('label');label.className='home-memo-confirm';const source=JSON.parse(editor.closest('tr').dataset.recordRef);
   label.innerHTML=`<input type="checkbox" class="home-memo-ack"> 予定「${esc(source.title)}」（${esc(model.calendars.find(c=>c.id===source.calendar_id)?.summary||"カレンダー")} ${formatTime(source.start)}）→ 生徒情報「${esc(editor.dataset.studentName)}」の共有先を確認して編集する`;
@@ -105,7 +103,7 @@ export function createHomeLessonCards(model,{session,getSessionToken,onExpired,r
  root.addEventListener('click',async e=>{
   if(!valid()||paused||editing)return;
   const reconcile=e.target.closest('.calendar-record-reconcile');if(reconcile&&!reconcile.disabled){reconcile.disabled=true;try{await call('/calendar-lesson-record/reconcile',{method:'POST',body:JSON.stringify({target:JSON.parse(reconcile.dataset.ref)})});element.dispatchEvent(new CustomEvent('home-lesson-discard-reload',{bubbles:true}));}catch(error){onNotice(error.message);reconcile.disabled=false;}return;}
-  if(e.target.closest('.record-student-link')){element.dispatchEvent(new CustomEvent('home-lesson-navigate',{bubbles:true}));return;}
+  const student=e.target.closest('.record-student-link');if(student){element.dispatchEvent(new CustomEvent('home-lesson-navigate',{bubbles:true,detail:{calendarId:student.dataset.calendarId,eventId:student.dataset.sourceEventId,day:model.day}}));return;}
   let button=e.target.closest('.record-recheck');if(button&&!button.disabled){button.closest('tr').querySelector('.record-next-plan .lesson-plan-action').click();return;}
   button=e.target.closest('.student-memo-retry');if(button&&!button.disabled){const name=button.closest('.student-memo-editor').dataset.studentName;if(unknownMemos.has(name))return;const s=memos.get(name);(s.status==='load-error'?memos.load(name,{refresh:true}):memos.save(name)).catch(()=>{});return;}
   button=e.target.closest('.lesson-plan-action');if(!button||button.disabled)return;
@@ -137,3 +135,4 @@ export function createHomeLessonCards(model,{session,getSessionToken,onExpired,r
   destroy(){ownerMemos.dispose();active=false;events.abort();readAbort.abort();observer.disconnect();carousel.destroy();toast.destroy();element.remove();}
  };
 }
+

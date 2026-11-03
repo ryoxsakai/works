@@ -1,3 +1,14 @@
+// Resolve the exact event in the selected calendar, including when its day is
+// outside the term range currently loaded for the schedule.
+export async function studentNavigationEvent(events,{calendarId,eventId,day},selectedCalendars,readDay){
+ if(!selectedCalendars.has(calendarId)||!eventId||!/^\d{4}-\d{2}-\d{2}$/.test(day||'')||!Number.isFinite(Date.parse(day))||new Date(day).toISOString().slice(0,10)!==day)return null;
+ const pick=list=>list.filter(e=>e._calendarId===calendarId&&e.id===eventId);
+ let found=pick(events);if(!found.length)found=pick(await readDay(day));
+ if(found.length!==1)return null;
+ const start=found[0].start?.dateTime,time=Date.parse(start);
+ if(!Number.isFinite(time)||new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit'}).format(time)!==day)return null;
+ return found[0];
+}
 let active=0;const waiting=[];
 function acquire(signal){return new Promise((resolve,reject)=>{const run=()=>{signal.removeEventListener('abort',abort);active++;let released=false;resolve(()=>{if(released)return;released=true;active--;waiting.shift()?.();});};const abort=()=>{const index=waiting.indexOf(run);if(index>=0)waiting.splice(index,1);reject(Object.assign(new Error('読み取りを中止しました'),{code:'READ_TIMEOUT'}));};if(signal.aborted)return abort();if(active<4)run();else{waiting.push(run);signal.addEventListener('abort',abort,{once:true});}});}
 // Read-only work has bounded concurrency and deadlines; writes never use this helper.
@@ -21,3 +32,4 @@ export function precedingOwnerEvents(event,records,rangeEvents){
 }
 
 export const recordTermScope=(terms,selected)=>JSON.stringify([...selected].sort().map(id=>{const term=terms.find(t=>t.id===id);return [id,term?.start_date||null,term?.end_date||null];}));
+

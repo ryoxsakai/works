@@ -174,7 +174,7 @@ export async function previewOwnerImport(env,target,deps){
  const hold=await first(env,'SELECT * FROM lesson_record_hold WHERE event_id=? AND resolved_at IS NULL',ref.id);
  const operation=await first(env,"SELECT * FROM calendar_lesson_migration WHERE event_id=? AND calendar_id=? AND status IN ('reserved','dispatching','unknown','verified') ORDER BY CASE WHEN status='verified' THEN 1 ELSE 0 END,rowid DESC LIMIT 1",ref.id,ref.calendar_id);
  if(hold||operation&&operation.status!=='verified')throw fail('保留中の記録です。先に操作履歴を確認してください');
- let values=calendarRecordValues(source),origin='legacy_d1',layout=null;
+ let values=calendarRecordValues(source || {}),origin='legacy_d1',layout=null;
  if(operation){
   const snapshot=JSON.parse(operation.snapshot_json),binding={...snapshot.binding,title:lessonTitleKey(snapshot.ref.title),generation:snapshot.after_generation??snapshot.binding.generation};
   if(binding.calendar_id!==ref.calendar_id||binding.event_id!==ref.id||binding.title!==lessonTitleKey(ref.title))throw fail('カレンダー記録の帰属確認が必要です');
@@ -373,3 +373,4 @@ export async function handleOwnerHistory(env,request,url,deps){
  if(path==='/import'&&method==='POST')return importOwnerRecord(env,await input(),deps);
  throw fail('not found',404);
 }
+

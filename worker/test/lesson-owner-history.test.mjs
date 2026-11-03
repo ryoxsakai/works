@@ -75,6 +75,14 @@ async function migratedFixture(t){
  const sql="INSERT INTO calendar_lesson_migration(id,event_id,calendar_id,record_revision,record_generation,status,snapshot_json,created_at,updated_at) VALUES('old','event-1','a',1,0,'verified',?,'old','old')";
  await env.DB.prepare(sql).bind(JSON.stringify(snapshot)).run();return setupValue;
 }
+test('preview handles a blank unbound event without creating records or suppressing calendar text',async t=>{
+ const {env,events,deps,ref}=await setup(t);
+ const preview=await previewOwnerImport(env,ref(),deps);
+ assert.equal(preview.source,null);assert.equal(preview.values.lesson_plan,'');assert.equal(preview.owner_confirmation_required,true);
+ assert.equal((await env.DB.prepare('SELECT COUNT(*) AS n FROM lesson_history_records').first()).n,0);
+ events[0].description='授業予定：要確認';
+ await assert.rejects(previewOwnerImport(env,ref(),deps),/個別照合/);
+});
 test('import takes latest Calendar values, preserves exact blanks/newlines and original DB, requires explicit owner confirmation',async t=>{
  const {env,events,deps,owner,ref}=await migratedFixture(t);const before=(await env.DB.prepare('SELECT * FROM curriculum_entries').all()).results;
  const preview=await previewOwnerImport(env,ref(),deps);assert.equal(preview.origin,'calendar_latest');assert.equal(preview.values.lesson_plan,'カレンダーの最新編集\n');
@@ -142,3 +150,4 @@ test('explicitly excluded bound and unbound occurrences are skipped before earli
  events.push({...events[2],id:'excluded-tie'});await env.DB.prepare("INSERT INTO lesson_history_exclusions VALUES('a','excluded-tie','excluded')").run();result=await readNextLessonPlan(env,'a',events[0].id,deps);assert.equal(result.target.id,events[2].id);assert.notEqual(result.reason,'ambiguous');
  await env.DB.prepare("INSERT INTO lesson_history_exclusions VALUES('a',?,'excluded')").bind(events[2].id).run();result=await readNextLessonPlan(env,'a',events[0].id,deps);assert.equal(result.target,null);assert.equal(result.reason,'none');
 });
+
