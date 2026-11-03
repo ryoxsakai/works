@@ -35,7 +35,7 @@ jobs:
       - run: node test/next-owner-cards.browser.mjs
       - run: node test/series-continuity.browser.mjs
       - run: node test/record-cross-view.browser.mjs
-      - run: node test/owner-memo.browser.mjs && node test/owner-memo-conflict.browser.mjs
+      - run: node test/owner-memo.browser.mjs && node test/owner-memo-conflict.browser.mjs && node test/owner-memo-autosave.browser.mjs
       - run: node test/home-lesson-cards.browser.mjs
       - run: node test/calendar-lesson-cards.browser.mjs
       - run: node test/calendar-migration-operator.browser.mjs

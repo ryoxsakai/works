@@ -45,3 +45,25 @@ test('semester confirmation refuses a non-anchor detach racing the atomic batch'
  f.env.DB={prepare:s=>real.prepare(s),batch:async statements=>{if(!raced){raced=true;await real.prepare('INSERT INTO lesson_event_links VALUES(?,?,?,?,?,?)').bind('a',f.events[3].id,null,1,JSON.stringify(f.ref(3)),'{}').run();}return real.batch(statements);}};
  await assert.rejects(startSemesterSeries(f.env,{request_id:uuid(),preview,confirm_new_history:true},f.deps));assert.equal((await real.prepare('SELECT count(*) n FROM lesson_series_owners').first()).n,0);assert.equal((await real.prepare('SELECT count(*) n FROM lesson_history_records').first()).n,0);assert.equal((await real.prepare('SELECT count(*) n FROM lesson_owners').first()).n,1);assert.equal((await real.prepare('SELECT record_id FROM lesson_event_links WHERE event_id=?').bind(f.events[3].id).first()).record_id,null);
 });
+
+test('earlier same-name foreign owner candidate is reported without skipping to a later owned lesson or merging records',async t=>{
+ const f=await fixture(t);await f.start();
+ const other=(await createLessonOwner(f.env,{request_id:uuid(),name:'合成クラス',kind:'class'})).owner;
+ await changeLessonBinding(f.env,{request_id:uuid(),target:f.ref(2),decision:'new',owner_id:other.id,owner_revision:1,link_revision:0},f.deps);
+ const before=(await f.DB.prepare('SELECT * FROM lesson_history_records ORDER BY id').all()).results;
+ const next=await readNextLessonPlan(f.env,'a',f.events[1].id,f.deps);
+ assert.equal(next.target.id,f.events[2].id);assert.equal(next.owner_confirmation_required,undefined);assert.equal(next.owner_id,other.id);assert.equal(next.source_owner_id,f.owner.id);assert.equal(next.lesson_plan,'');
+ assert.deepEqual((await f.DB.prepare('SELECT * FROM lesson_history_records ORDER BY id').all()).results,before);
+ await assert.rejects(writeLessonPlan(f.env,{source:next.source,target:next.target,record_revision:next.record_revision,expected_lesson_plan:'',expected_source_owner_id:f.owner.id,expected_owner_id:f.owner.id,lesson_plan:'must not merge',request_id:uuid()},f.deps));
+ assert.equal((await f.read(2)).owner_id,other.id);
+ const saved=await writeLessonPlan(f.env,{source:next.source,target:next.target,record_revision:next.record_revision,expected_lesson_plan:'',expected_source_owner_id:f.owner.id,expected_owner_id:other.id,lesson_plan:'next card only',request_id:uuid()},f.deps);
+ assert.equal(saved.lesson_plan,'next card only');assert.equal((await f.read(1)).lesson_plan,'');assert.equal((await f.read(2)).owner_id,other.id);
+});
+
+test('same-name candidate chronology handles Nov 14 before Dec 12 and refuses simultaneous ambiguity',async t=>{
+ const f=await fixture(t);await f.start();
+ const november=structuredClone(f.events[2]);november.id='november14';november.start.dateTime='2026-11-14T17:20:00+09:00';november.end.dateTime='2026-11-14T18:40:00+09:00';delete november.recurringEventId;delete november.originalStartTime;
+ f.events.splice(2,3,november);const december=structuredClone(november);december.id='december12';december.start.dateTime='2026-12-12T17:20:00+09:00';december.end.dateTime='2026-12-12T18:40:00+09:00';f.events.push(december);
+ const next=await readNextLessonPlan(f.env,'a',f.events[1].id,f.deps);assert.equal(next.target.id,'november14');assert.equal(next.reason,'owner_confirmation_required');assert.equal(next.lesson_plan,'');
+ f.events.push({...november,id:'same-time'});const ambiguous=await readNextLessonPlan(f.env,'a',f.events[1].id,f.deps);assert.equal(ambiguous.reason,'ambiguous');assert.equal(ambiguous.target,null);
+});

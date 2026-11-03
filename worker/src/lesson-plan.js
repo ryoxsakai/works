@@ -66,11 +66,17 @@ export async function readNextLessonPlan(env, calendarId, eventId, deps) {
     const rules=await seriesRules(env,calendarId);
     const candidates=events.map(event=>({event,ref:lessonEventRef(event,calendarId)}))
       .filter(({ref})=>ref.id!==source.id&&!exclusions.has(ref.id)&&isScheduledLesson(ref,context.settings.excluded_titles||[])&&Date.parse(ref.start)>=Date.parse(source.end))
-      .filter(({ref,event})=>owners.has(ref.id)?owners.get(ref.id)===record.owner_id:applicableSeriesRule(event,rules)?applicableSeriesRule(event,rules).owner_id===record.owner_id:lessonTitleKey(ref.title)===lessonTitleKey(source.title))
+      // Same-name schedule candidates must not disappear merely because their
+      // existing owner/series differs. Select chronologically, then verify the
+      // owner below before exposing a record or allowing a linked save.
+      .filter(({ref,event})=>lessonTitleKey(ref.title)===lessonTitleKey(source.title)||(owners.has(ref.id)?owners.get(ref.id)===record.owner_id:applicableSeriesRule(event,rules)?.owner_id===record.owner_id))
       .sort((a,b)=>Date.parse(a.ref.start)-Date.parse(b.ref.start));
     if(!candidates.length||candidates[1]&&Date.parse(candidates[1].ref.start)===Date.parse(candidates[0].ref.start))return {...base,target:null,reason:candidates.length?'ambiguous':'none',lesson_plan:''};
     const chosen=candidates[0],next=await readEventOwnerRecord(env,chosen.ref,chosen.event,deps);
-    if(next.attribution_status==='confirmed'&&next.owner_id===record.owner_id)return {...base,target:chosen.ref,...next};
+    // Link the actual next card by exact title within this calendar, without
+    // changing either owner or copying any record. Writes still verify both
+    // source ownership and the target's own revision/owner independently.
+    if(next.attribution_status==='confirmed'&&(next.owner_id===record.owner_id||lessonTitleKey(chosen.ref.title)===lessonTitleKey(source.title)))return {...base,target:chosen.ref,...next};
     // Schedule discovery is not an ownership decision. Never expose/copy a candidate's record.
     return {...base,target:chosen.ref,reason:'owner_confirmation_required',owner_confirmation_required:true,owner_id:null,attribution_status:next.attribution_status,lesson_plan:next.pending_allowed?next.lesson_plan||'':'',record_revision:next.record_revision,pending_context:next.pending_context,pending_allowed:next.pending_allowed,pending_storage_available:next.pending_storage_available};
   }

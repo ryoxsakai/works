@@ -30,7 +30,7 @@ export function attachRecordToasts(root, { duration = 4000 } = {}) {
       region.append(element);
       const slot = [...row.querySelectorAll(".record-card-meta > span")].map(el=>el.textContent).join(" ");
       const day = document.querySelector("#record-date-label")?.textContent || root.closest(".home-lesson-cards")?.querySelector(".home-lesson-day")?.textContent || "";
-      element.textContent = `${row.querySelector('.record-student-link').textContent.trim()}（${day} ${row.dataset.calendarName || ""} ${slot}）・${field}: ${text}`;
+      element.textContent = `${row.querySelector('.record-student-name,.record-student-link')?.textContent.trim() || '授業'}（${day} ${row.dataset.calendarName || ""} ${slot}）・${field}: ${text}`;
       const timer = setTimeout(() => { if (notices.get(key)?.element === element) { element.remove(); notices.delete(key); } }, duration);
       notices.set(key, {element, timer, row});
     });

@@ -93,3 +93,11 @@ test('fixed-owner first write retains UUID and input across reload, then audit/r
  try{const target=ref('series-lazy'),id='owner-series';let operation,writes=0;const options={readNext:async()=>{},write:async body=>{writes++;operation=body.request_id;throw Object.assign(Error('lost'),{unknown:true});},readOperation:async()=>[{id:operation,action:'write_series_record',after_json:JSON.stringify({owner_id:id,lesson_plan:'held owned plan',record_revision:1})}],readCurrent:async()=>({target,owner_id:id,attribution_status:'confirmed',lesson_plan:'held owned plan',record_revision:1})};const first=createLessonPlanController(options);first.seed(target,'',0,0,'confirmed',id);first.edit(lessonEventKey(target),'held owned plan');await assert.rejects(first.save(lessonEventKey(target)));assert.match(operation,/^[a-f0-9-]{36}$/);const reloaded=createLessonPlanController(options),state=reloaded.seed(target,'held owned plan',0,1,'confirmed',id);assert.equal(state.pendingUnknown,true);assert.equal(state.operationId,operation);await reloaded.save(state.key);assert.equal(writes,1);assert.equal(await reloaded.verifyPending(state.key),true);assert.equal(state.status,'saved');assert.equal(writes,1);
  }finally{globalThis.localStorage=previous;}
 });
+
+test('same-name next cards keep independent source and target owners and revision fences',async()=>{
+ const source=ref('one'),target=ref('two');let sent;
+ const store=createLessonPlanController({readNext:async()=>({source,target,source_owner_id:'source-owner',owner_id:'target-owner',attribution_status:'confirmed',record_revision:7,lesson_plan:'target plan'}),write:async body=>{sent=body;return {target,owner_id:'target-owner',record_revision:8,lesson_plan:body.lesson_plan};}});
+ store.seed(source,'source plan',0,3,'confirmed','source-owner');await store.loadNext(source);
+ const key=lessonEventKey(target);assert.equal(store.getLink(lessonEventKey(source)).status,'ready');store.edit(key,'edited target');await store.save(key,lessonEventKey(source));
+ assert.equal(sent.expected_source_owner_id,'source-owner');assert.equal(sent.expected_owner_id,'target-owner');assert.equal(sent.record_revision,7);assert.equal(sent.expected_lesson_plan,'target plan');assert.equal(store.get(lessonEventKey(source)).value,'source plan');
+});

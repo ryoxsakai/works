@@ -14,3 +14,12 @@
 .record-save-toasts { position: fixed; z-index: 60; bottom: max(1rem, env(safe-area-inset-bottom)); right: 1rem; width: min(26rem, calc(100vw - 2rem)); display: grid; gap: .5rem; pointer-events: none; }
 .record-save-toast { padding: .7rem 1rem; color: var(--fg); background: var(--bg-elevated); border: 1px solid var(--border); border-radius: .5rem; box-shadow: var(--card-shadow); overflow-wrap: anywhere; }
 @media print { .record-save-toasts, .record-recheck { display: none !important; } }
+
+/* The regular card exposes only name/icon/count, refresh and the three editors. */
+.record-panel .record-student-name { display:flex;align-items:center;gap:.4rem;min-width:0;overflow-wrap:anywhere;font-weight:600; }
+.record-panel .record-prev-info, .record-panel .owner-memo-binding { display:none; }
+.record-panel .owner-memo-status:not([data-attention="true"]) { position:absolute;top:0;left:0;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap; }
+
+.record-panel .student-memo-editor[data-status="ready"] .student-memo-status { position:absolute;top:0;left:0;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap; }
+
+.record-panel .record-student-memo { position:relative; }

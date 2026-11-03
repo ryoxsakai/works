@@ -258,7 +258,7 @@ async function selectedTheme(page) {
   const notes='共有するメモ\n二行目\n三行目';
   await page.locator('.record-day-btn[data-day="next"]').click();await memo.waitFor();
   assert.equal(await memo.inputValue(),notes,'same student on another day shares the note');
-  await page.locator('.record-student-link').filter({hasText:'サンプル生徒'}).click();
+  await page.locator('[data-page-tab=curriculum]').click();await page.locator('#student-selector button').filter({hasText:'サンプル生徒'}).click();
   const profileMemo=page.locator('#student-memo');
   await page.waitForFunction(()=>document.querySelector('#student-memo')?.disabled===false);
   assert.equal(await profileMemo.inputValue(),notes);
@@ -275,7 +275,7 @@ async function selectedTheme(page) {
   assert.equal(await editor('別の生徒').locator('textarea').inputValue(),'別生徒のメモ');
   await memo.fill('遅延保存');await memo.press('Tab');
   await page.waitForFunction(()=>document.querySelector('.record-student-memo')?.dataset.status==='saving');
-  await page.locator('.record-student-link').filter({hasText:'別の生徒'}).click();
+  await page.locator('[data-page-tab=curriculum]').click();await page.locator('#student-selector button').filter({hasText:'別の生徒'}).click();
   await page.waitForFunction(()=>document.querySelector('#student-memo')?.value==='別生徒のメモ');
   assert.equal(typeof releaseMemoSave,'function');releaseMemoSave();
   await page.waitForFunction(()=>document.querySelector('.record-student-memo')?.dataset.status==='saved');

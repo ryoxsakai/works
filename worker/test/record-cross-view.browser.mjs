@@ -17,7 +17,7 @@ f.events.splice(0,f.events.length,...['2026-11-03','2026-11-10'].map((d,i)=>({ca
 const owner=(await createLessonOwner(f.env,{request_id:crypto.randomUUID(),name:title,kind:'class'})).owner;
 for(const e of f.events)await changeLessonBinding(f.env,{request_id:crypto.randomUUID(),target:lessonEventRef(e,'qa'),link_revision:0,decision:'new',owner_id:owner.id,owner_revision:owner.revision},f.deps);
 let writes=0,lost=false,hold=null;
-const browser=await chromium.launch({headless:true}),errors=[];
+const browser=await chromium.launch({headless:true,executablePath:process.env.BROWSER_EXECUTABLE||undefined}),errors=[];
 let context=await browser.newContext({viewport:{width:1280,height:900}});
 const routeApi=async route=>{
  const req=route.request(),u=new URL(req.url()),body=req.method()==='GET'?null:req.postDataJSON();
@@ -38,7 +38,7 @@ const routeApi=async route=>{
 await context.route('**/api/**',routeApi);
 const stored=()=>f.DB.prepare("SELECT r.* FROM lesson_event_links l JOIN lesson_history_records r ON r.id=l.record_id WHERE l.event_id='sync-0'").first();
 const daily=p=>p.locator('#record-tbody tr[data-event-id="sync-0"]'),curr=p=>p.locator('#curriculum-tbody tr[data-event-id="sync-0"]');
-async function openBoth(p){p.on('pageerror',e=>errors.push(e.message));await p.clock.install({time:new Date('2026-11-03T00:00:00+09:00')});await p.goto(f.base+'/tutor/?record_date=2026-11-03');await expect(daily(p).locator('.record-plan')).toBeEditable();await p.getByRole('button',{name:title,exact:true}).click();await expect(curr(p).locator('.curriculum-homework')).toBeEditable();}
+async function openBoth(p){p.on('pageerror',e=>errors.push(e.message));await p.clock.install({time:new Date('2026-11-03T00:00:00+09:00')});await p.goto(f.base+'/tutor/?record_date=2026-11-03');await expect(daily(p).locator('.record-plan')).toBeEditable();await p.locator('[data-page-tab=curriculum]').click();await p.locator('#student-selector button').filter({hasText:title}).click();await expect(curr(p).locator('.curriculum-homework')).toBeEditable();}
 async function edit(p,view,field,value){
  const row=view==='record'?daily(p):curr(p);await row.locator('.'+view+'-'+field).evaluate((el,value)=>{el.value=value;el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));},value);
  await expect.poll(async()=>(await stored())[{test:'confirmation_test',homework:'homework',memo:'lesson_memo'}[field]]).toBe(value);
@@ -86,7 +86,7 @@ try{
  await input(daily(page),'record','memo','日別で確定したメモ',true);
  await expect.poll(async()=>(await stored()).lesson_memo).toBe('日別で確定したメモ');assert.equal((await stored()).completed,0);
  await expect(curr(page).locator('.curriculum-completed')).toBeChecked();await expect(curr(page).locator('.curriculum-completed')).toBeDisabled();await expect(page.locator('#retained-record-drafts')).toContainText('完了：完了');
- await page.reload();await page.getByRole('button',{name:'授業記録',exact:true}).click();await page.getByRole('button',{name:title,exact:true}).click();await expect(curr(page).locator('.curriculum-completed')).toBeChecked();await expect(curr(page).locator('.curriculum-completed')).toBeDisabled();
+ await page.reload();await page.getByRole('button',{name:'授業記録',exact:true}).click();await page.locator('[data-page-tab=curriculum]').click();await page.locator('#student-selector button').filter({hasText:title}).click();await expect(curr(page).locator('.curriculum-completed')).toBeChecked();await expect(curr(page).locator('.curriculum-completed')).toBeDisabled();
 
  // Unknown outcome verification acknowledges the committed snapshot, but does not
  // discard another view's pending input or resend the write after reload.
