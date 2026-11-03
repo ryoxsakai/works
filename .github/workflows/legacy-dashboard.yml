@@ -2,7 +2,7 @@ name: Test legacy menu dashboard
 on:
   pull_request:
     branches: [main]
-    paths: ['index.html', 'home.js', 'home.css', 'dashboard/**', 'shared/ui/**', 'shared/auth.js', 'shared/theme*', '.github/workflows/legacy-dashboard.yml']
+    paths: ['index.html', 'home.js', 'home.css', 'home-refined.css', 'dashboard/**', 'shared/ui/**', 'shared/auth.js', 'shared/theme*', '.github/workflows/legacy-dashboard.yml']
 permissions:
   contents: read
 jobs:

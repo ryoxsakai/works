@@ -27,7 +27,7 @@ const time = (value) =>
 const list = (items, render, empty, alwaysInclude) => {
   const { shown, total, hidden } = summaryPreview(items, alwaysInclude);
   return total
-    ? `<p class="dashboard-muted widget-count">全${total}件${hidden ? ` · ${shown.length}件表示` : ""}</p><ul>${shown.map((item) => `<li>${render(item)}</li>`).join("")}</ul>${hidden ? `<p class="dashboard-muted">残り${hidden}件は下のリンクから元の画面で確認できます。</p>` : ""}`
+    ? `<p class="dashboard-muted widget-count">全${total}件${hidden ? ` · ${shown.length}件表示` : ""}</p><ul>${shown.map((item) => `<li>${render(item)}</li>`).join("")}</ul>${hidden ? `<p class="dashboard-muted">残り${hidden}件は右上の「開く」から確認できます。</p>` : ""}`
     : `<p class="dashboard-muted">${empty}</p>`;
 };
 
@@ -123,7 +123,7 @@ export function createDashboard({
       })
       .join(
         "",
-      )}</div>${current().shortcuts.length ? "" : '<p class="dashboard-muted">表示を編集してリンクを追加できます。</p>'}`;
+      )}</div>${current().shortcuts.length ? "" : '<p class="dashboard-muted">設定からリンクを追加できます。</p>'}`;
   }
   function body(id, data) {
     if (id === "lessons") return data.unconfigured ? '<p class="dashboard-muted">授業管理の設定でカレンダーを選択してください。</p>' : !data.rows.length ? '<p class="dashboard-muted">今日の予定はありません。</p>' : '<p role="status">授業カードを準備中…</p>';
@@ -208,10 +208,10 @@ export function createDashboard({
       current()
         .widgets.map((id, index) => {
           const w = WIDGETS[id];
-          return `<section class="dashboard-widget card" data-id="${id}" aria-labelledby="widget-title-${id}">${draft ? `<div class="widget-tools"><button type="button" class="btn btn-outline drag-handle" aria-label="${w.title}をドラッグして移動">${icon("bx-move")}移動</button><button class="btn btn-outline" type="button" data-move="${id}" data-step="-1" ${index === 0 ? "disabled" : ""} aria-label="${w.title}を前へ">前へ</button><button class="btn btn-outline" type="button" data-move="${id}" data-step="1" ${index === current().widgets.length - 1 ? "disabled" : ""} aria-label="${w.title}を後へ">後へ</button><button class="btn btn-outline" type="button" data-hide="${id}" aria-label="${w.title}をホームから非表示">非表示</button></div>` : ""}<header><h3 id="widget-title-${id}">${icon(w.icon)}${w.title}</h3></header><p class="dashboard-muted widget-description">${w.description}</p><div data-content="${id}" aria-busy="${user && id !== "shortcuts" && !cache.has(id)}">${content(id)}</div>${w.path ? `<a class="widget-link" href="${w.path}">${w.title === "今日の授業" ? "授業管理" : id === "todo" ? "ToDo" : id === "materials" ? "教材管理" : id === "memo" ? "メモ" : "SS管理"}を開く ${icon("bx-right-arrow-alt")}</a>` : ""}</section>`;
+          return `<section class="dashboard-widget card" data-id="${id}" aria-labelledby="widget-title-${id}">${draft ? `<div class="widget-tools"><button type="button" class="btn btn-outline drag-handle" aria-label="${w.title}をドラッグして移動">${icon("bx-move")}移動</button><button class="btn btn-outline" type="button" data-move="${id}" data-step="-1" ${index === 0 ? "disabled" : ""} aria-label="${w.title}を前へ">前へ</button><button class="btn btn-outline" type="button" data-move="${id}" data-step="1" ${index === current().widgets.length - 1 ? "disabled" : ""} aria-label="${w.title}を後へ">後へ</button><button class="btn btn-outline" type="button" data-hide="${id}" aria-label="${w.title}をホームから非表示">非表示</button></div>` : ""}<header><h3 id="widget-title-${id}">${icon(w.icon)}${w.title}</h3>${w.path ? `<a class="widget-link" href="${w.path}" aria-label="${esc(w.title)}の画面を開く">開く ${icon("bx-right-arrow-alt")}</a>` : ""}</header><p class="dashboard-muted widget-description">${w.description}</p><div data-content="${id}" aria-busy="${user && id !== "shortcuts" && !cache.has(id)}">${content(id)}</div></section>`;
         })
         .join("") ||
-      '<p class="dashboard-muted">ウィジェットは非表示になっています。「表示を編集」から追加できます。全機能はメニューから開けます。</p>';
+      '<p class="dashboard-muted">ウィジェットは非表示になっています。設定から追加できます。全機能はメニューから開けます。</p>';
     mountLessons().then(()=>{if(lessonCards&&lessonCards===retainedCards)lessonCards.restoreScroll(cardScroll);});
     if (focus) document.querySelector(focus)?.focus();
     if (draft) enableDrag();
@@ -412,6 +412,7 @@ export function createDashboard({
   }
   $("dashboard-edit").onclick = () => {
     if (!user || draft) return;
+    $("home-settings-modal").close();
     if(lessonCards?.hasEdits()){lessonMessage("先に授業記録を保存・確認してください。入力は保持しています。");return;}
     draft = structuredClone(layout);
     draw("#dashboard-save");
@@ -419,7 +420,7 @@ export function createDashboard({
   };
   $("dashboard-cancel").onclick = () => {
     draft = null;
-    draw("#dashboard-edit");
+    draw("#open-home-settings");
     message("配置の変更を取り消しました。");
   };
   $("dashboard-save").onclick = () => {
@@ -430,7 +431,7 @@ export function createDashboard({
       localStorage.setItem(key, JSON.stringify(next));
       layout = next;
       draft = null;
-      draw("#dashboard-edit");
+      draw("#open-home-settings");
       message("このユーザー・ブラウザの配置を保存しました。");
     } catch {
       message(
@@ -452,6 +453,7 @@ export function createDashboard({
   };
   $("dashboard-refresh").onclick = () => {
     if (!user) return;
+    $("home-settings-modal").close();
     if(lessonCards?.hasEdits()){lessonMessage("授業記録の入力を保持しています。保存・確認後に更新してください。");for(const id of current().widgets)if(id!=="lessons")load(id,true);return;}
     if (date !== dayJst()) {
       if(lessonCards?.hasEdits()){message("日付が変わりました。授業記録の入力を保持しています。");return;}
@@ -570,9 +572,9 @@ export function createDashboard({
       );
     }
   });
-  $("home-settings-modal").addEventListener("close", () =>
-    $("open-home-settings").focus(),
-  );
+  $("home-settings-modal").addEventListener("close", () => {
+    if (!draft) $("open-home-settings").focus();
+  });
   updateDate();
   draw();
   return {
