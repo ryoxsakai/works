@@ -50,10 +50,10 @@ test('earlier same-name foreign owner candidate is reported without skipping to 
  const f=await fixture(t);await f.start();
  const other=(await createLessonOwner(f.env,{request_id:uuid(),name:'合成クラス',kind:'class'})).owner;
  await changeLessonBinding(f.env,{request_id:uuid(),target:f.ref(2),decision:'new',owner_id:other.id,owner_revision:1,link_revision:0},f.deps);
- const before=await f.DB.prepare('SELECT * FROM lesson_history_records ORDER BY id').all();
+ const before=(await f.DB.prepare('SELECT * FROM lesson_history_records ORDER BY id').all()).results;
  const next=await readNextLessonPlan(f.env,'a',f.events[1].id,f.deps);
  assert.equal(next.target.id,f.events[2].id);assert.equal(next.owner_confirmation_required,undefined);assert.equal(next.owner_id,other.id);assert.equal(next.source_owner_id,f.owner.id);assert.equal(next.lesson_plan,'');
- assert.deepEqual(await f.DB.prepare('SELECT * FROM lesson_history_records ORDER BY id').all(),before);
+ assert.deepEqual((await f.DB.prepare('SELECT * FROM lesson_history_records ORDER BY id').all()).results,before);
  await assert.rejects(writeLessonPlan(f.env,{source:next.source,target:next.target,record_revision:next.record_revision,expected_lesson_plan:'',expected_source_owner_id:f.owner.id,expected_owner_id:f.owner.id,lesson_plan:'must not merge',request_id:uuid()},f.deps));
  assert.equal((await f.read(2)).owner_id,other.id);
  const saved=await writeLessonPlan(f.env,{source:next.source,target:next.target,record_revision:next.record_revision,expected_lesson_plan:'',expected_source_owner_id:f.owner.id,expected_owner_id:other.id,lesson_plan:'next card only',request_id:uuid()},f.deps);
