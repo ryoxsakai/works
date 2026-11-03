@@ -33,8 +33,14 @@ await page.setViewportSize({width:390,height:1000});await expect(page.locator('.
 // Same persisted values are read by the original page, not copied into another event.
 await page.goto(f.base+'/tutor/');await expect(page.locator('#record-tbody tr[data-event-id="a"] .record-plan')).toHaveValue('別画面の計画');await expect(page.locator('#record-tbody tr[data-event-id="a"] .record-next-plan textarea')).toHaveValue('トップから次回へ');await expect(page.locator('#record-tbody tr[data-event-id="a"] .student-memo-input')).toHaveValue('応答が不明でも再送しない');
 await page.goto(f.base+'/');await expect(current('a')).toHaveValue('別画面の計画');await row('a').locator('.home-memo-ack').check();await expect(memo('a')).toHaveValue('応答が不明でも再送しない');assert.equal(f.control.writes.length,6);assert.equal(f.control.profileWrites.length,3);assert.deepEqual(errors,[]);
+// The name opens the exact calendar event's student tab after the dashboard leave guard.
+await row('a').getByRole('button',{name:'サンプル生徒の生徒情報を開く'}).click();
+await expect(page).toHaveURL(/\/tutor\//);await expect(page.locator('[data-page-tab="curriculum"]')).toHaveAttribute('aria-selected','true');
+await expect(page.locator('#curriculum-name')).toHaveValue('サンプル生徒');
+await page.goto(f.base+'/');await expect(current('a')).toHaveValue('別画面の計画');
 // A meaningful title change masks the previous record rather than adopting it.
 f.events.find(e=>e.id==='a').summary='別の生徒';f.events.find(e=>e.id==='a').etag='"a-renamed"';await page.locator('#open-home-settings').click();await page.locator('#dashboard-refresh').click();const held=page.locator('.home-lesson-cards tr').filter({hasText:'別の生徒'});await expect(held).toContainText('対応確認が必要');assert.equal(await held.locator('textarea').count(),0);assert(!(await held.innerText()).includes('別画面の計画'));assert.equal(await f.DB.prepare("SELECT * FROM student_prefs WHERE name='別の生徒'").first(),null);await expect(page.locator('.record-carousel-controls span')).toHaveText('1 / 4件');
 await page.evaluate(()=>window.qaAuth.onSignedOut());await expect(page.locator('.home-lesson-cards')).toHaveCount(0);assert(!(await page.locator('body').innerText()).includes('応答が不明でも再送しない'));
 console.log('PASS home cards: original controllers/APIs, explicit name-key acknowledgement, exact event persistence and original-page roundtrip, hidden values retained, one save/event, layout DOM retention, pending refresh/auth guards, profile CAS/draft/cancel/reload, eight layouts/themes, mobile-only Carousel, print all and logout privacy');
 }finally{await ctx.close();await browser.close();await f.close();}
+

@@ -14,6 +14,15 @@ test('empty/unconfigured lessons do not fetch record/profile data; malformed cal
  let called=0;const deps={api:async()=>{called++;return [];},googleToken:async()=>'',signal:new AbortController().signal};assert.deepEqual((await homeLessonModel({events:[],unconfigured:true},day,deps)).rows,[]);assert.equal(called,0);
  await assert.rejects(homeLessonModel({events:[event('a',10)],settings:{selected_calendars:['one']}},day,{...deps,googleToken:async()=>'oauth',fetcher:async()=>Response.json({items:[]})}),/カレンダー名/);
 });
+test('confirmed records still show all matching scheduled occurrences, including different series and empty ones',async()=>{
+ const events=Array.from({length:15},(_,i)=>event('event-'+i,10,'one',i<9?`2026-10-${String(i+1).padStart(2,'0')}`:i<11?'2026-10-30':`2026-11-${String(i-10).padStart(2,'0')}`));
+ events[10]=event('event-10',11,'one','2026-10-30');
+ const data={events:events.slice(9,11),settings:{selected_calendars:['one'],selected_term_ids:[2],excluded_titles:[]}};
+ const api=async(path,options)=>{if(path==='/terms')return [{id:2,start_date:'2026-10-01',end_date:'2026-11-05'}];if(path==='/periods')return [];const target=JSON.parse(options.body).targets[0];return [{calendar_event_id:target.id,record_storage:'d1_owner',record_read_target:target,record_revision:1,owner_id:'fixed-owner',attribution_status:'confirmed'}];};
+ const fetcher=async url=>Response.json({items:new URL(url).pathname.endsWith('calendarList')?[{id:'one',summary:'one'}]:events});
+ const model=await homeLessonModel(data,day,{api,googleToken:async()=>'oauth',signal:new AbortController().signal,fetcher});
+ assert.deepEqual(model.rows.map(row=>[row.n,row.m]),[[10,15],[11,15]]);
+});
 test('browser API captures the session, rejects stale/aborted reads and marks unknown writes without replay',async()=>{
  let current=true,calls=0;const signal=new AbortController();const api=lessonApi({session:'captured',isCurrent:()=>current,signal:signal.signal,fetcher:async(_u,options)=>{calls++;assert.equal(options.headers.Authorization,'Bearer captured');throw new TypeError('lost response');}});
  await assert.rejects(api('/lesson-plan',{method:'PUT',body:'{}'}),e=>e.unknown===true);assert.equal(calls,1);current=false;await assert.rejects(api('/student-prefs/guarded'),/stale/);assert.equal(calls,1);
@@ -34,3 +43,4 @@ test('changed duplicate snapshots or mismatched day/range reads fail closed inst
  const fetcher=async url=>Response.json({items:new URL(url).pathname.endsWith('calendarList')?[{id:'one',summary:'one'}]:[{...a,etag:'changed'}]});
  await assert.rejects(homeLessonModel({events:[a],settings},day,{api,googleToken:async()=>'oauth',signal:new AbortController().signal,fetcher}),/一致/);
 });
+

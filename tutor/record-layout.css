@@ -5,7 +5,7 @@
 .record-panel #record-table th:nth-child(5), .record-panel #record-table th:nth-child(6),
 .record-panel .record-memo, .record-panel .record-next-plan .lesson-plan-target:not([data-conflict="true"]):not([data-review="true"]) { display: none !important; }
 .record-panel #record-table tr[data-event-id] td:nth-child(7)::before { display: none; }
-.record-panel .record-card-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: .5rem; flex-wrap: wrap; }
+.record-panel .record-card-heading { display: flex; align-items: center; justify-content: space-between; gap: .5rem; flex-wrap: wrap; }
 .record-panel .record-card-meta { display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: .5rem; margin-left: auto; max-width: 100%; color: var(--muted); font-size: .75rem; overflow-wrap: anywhere; }
 .record-panel .record-card-heading .record-student-link { flex: 1 1 10rem; min-width: 0; }
 .record-panel .record-recheck { min-width: 44px; min-height: 44px; padding: .4rem; }
@@ -23,3 +23,4 @@
 .record-panel .student-memo-editor[data-status="ready"] .student-memo-status { position:absolute;top:0;left:0;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap; }
 
 .record-panel .record-student-memo { position:relative; }
+

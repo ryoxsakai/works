@@ -10,7 +10,7 @@ import {
 } from "./shared/auth.js?v=12";
 import { getTheme, setTheme } from "./shared/theme.js?v=6";
 
-import { createDashboard } from "./dashboard/dashboard.mjs?v=11-refined";
+import { createDashboard } from "./dashboard/dashboard.mjs?v=12-lesson";
 const homeNavigation = document.querySelector(".works-navigation");
 homeNavigation.id = "home-navigation";
 // Keep the shared popover from covering dashboard edit controls when tabbing out.
@@ -183,3 +183,4 @@ watchAuth({
   onSignedIn: showSignedIn,
   onSignedOut: showSignedOut,
 });
+

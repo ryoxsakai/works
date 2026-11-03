@@ -1,4 +1,4 @@
-import { homeLessonModel, lessonApi } from "./lesson-model.mjs?v=3-semester";
+import { homeLessonModel, lessonApi } from "./lesson-model.mjs?v=4-name-count";
 import {
   MODULES,
   WIDGETS,
@@ -106,7 +106,7 @@ export function createDashboard({
     if(!host||!user)return;
     if(lessonCards){placeLessonCards(host);return;}
     if(!model?.rows?.length)return;
-    cardImport ||= import('./lesson-cards.mjs?v=7-compact');
+    cardImport ||= import('./lesson-cards.mjs?v=8-student-link');
     try {
       const {createHomeLessonCards}=await cardImport;
       if(request!==epoch||pagePaused||!user||cache.get('lessons')?.data!==model||!current().widgets.includes('lessons'))return;
@@ -525,7 +525,7 @@ export function createDashboard({
   $("dashboard-widgets").addEventListener('home-lesson-discard-reload',()=>{
     lessonCards?.destroy();lessonCards=null;cache.delete('lessons');load('lessons',true);
   });
-  $("dashboard-widgets").addEventListener("home-lesson-navigate",()=>{if(dismiss())location.assign("/tutor/");});
+  $("dashboard-widgets").addEventListener("home-lesson-navigate",(event)=>{if(!dismiss())return;const {calendarId,eventId,day}=event.detail||{};if(!calendarId||!eventId||!day)return;location.assign("/tutor/?"+new URLSearchParams({record_date:day,student_calendar:calendarId,student_event:eventId}));});
   window.addEventListener("beforeunload", (e) => {
     if (changed() || lessonCards?.hasEdits()) {
       e.preventDefault();
@@ -589,3 +589,4 @@ export function createDashboard({
     },
   };
 }
+

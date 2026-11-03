@@ -1,10 +1,10 @@
-import {ownerSemesterCounts} from '../shared/semester-counts.mjs?v=1';
+import {sameNameLessonCount} from '../shared/lesson-counts.mjs?v=1';
 import {recordRowSnapshot,independentRecordRows,synchronizeRecordRows} from './record-row-sync.mjs?v=1';
 import {readPendingRecovery,persistPendingRecovery,clearPendingRecovery,pendingRecoveryCopies} from './pending-plan-draft.mjs?v=2';
 import {createOwnerMemoEditors} from '../shared/owner-memo.mjs?v=2-autosave';
 import {boundedRead,precedingLegacyEvents,precedingOwnerEvents,recordTermScope} from './record-read.mjs?v=2';
 import {readNextLessonWithTemplate} from "../shared/next-lesson-read.mjs?v=1";
-import { lessonRecordRows, renderPlanEditors, renderMemoEditors, previousOwnerRecord } from "../shared/lesson-record-view.mjs?v=7-compact";
+import { lessonRecordRows, renderPlanEditors, renderMemoEditors, previousOwnerRecord } from "../shared/lesson-record-view.mjs?v=8-student-link";
 import { setUserAvatar } from "../shared/avatar.mjs?v=1";
 import { attachRecordCarousel } from "./record-carousel.mjs?v=3";
 import { attachRecordToasts } from "./record-toasts.mjs?v=3-name";
@@ -599,7 +599,7 @@ async function loadRecordTable() {
           return aStart.localeCompare(bStart);
         });
       const n = sameLabelEvents.findIndex((e) => e.id === ev.id) + 1;
-      const m = sameLabelEvents.length;
+      const count = sameNameLessonCount(ev, rangeEvents, [...excludedTitles]);
       const saved = attributedLessonRecord(entryMap.get(ev.id), lessonEventRef(ev));
       const previous=saved.record_storage==='d1_owner'?previousOwnerRecord(saved,ev,rangeEvents,e=>attributedLessonRecord(entryMap.get(e.id),lessonEventRef(e))):null;
       const prevEvent = saved.record_storage==='d1_owner'?previous?.event:n > 1 ? sameLabelEvents[n - 2] : null;
@@ -611,8 +611,8 @@ async function loadRecordTable() {
         calendarId: ev._calendarId,
         label,
         termId: coveringTerm ? coveringTerm.id : "",
-        n: n || 1,
-        m: m || 1,
+        n: count.n,
+        m: count.m,
         start,
         iconColor: calendar?.raw || "",
         record: saved,
@@ -628,9 +628,7 @@ async function loadRecordTable() {
       };
     });
 
-    for(const row of rows)if(row.record?.owner_id){row.n='—';row.m='—';}
     renderRecordTable(rows);
-    if(coveringTerm)ownerSemesterCounts(rows,coveringTerm.id,path=>apiFetch(path,{},null),isCurrent).then(counts=>{if(!isCurrent())return;for(const row of els.recordTbody.querySelectorAll('[data-event-id]')){const ref=JSON.parse(row.dataset.recordRef),count=counts.get(lessonEventKey(ref));if(!count)continue;const text=count.n+'/'+count.m+'回';const cell=row.querySelector('[data-label="回数"]'),badge=row.querySelector('.record-card-meta span');if(cell)cell.textContent=text;if(badge)badge.textContent=text;}});
   } catch (err) {
     if (!isCurrent()) return;
     els.recordTbody.innerHTML = `<tr><td colspan="7" role="status">授業記録を取得できませんでした。日付を切り替えて再試行してください。</td></tr>`;
@@ -821,7 +819,20 @@ async function loadSignedInTutor(){
     const selected=generation===studentGeneration&&initialName===els.curriculumName.value?saved:{name:els.curriculumName.value,group:studentGroup,yearId:els.curriculumYearSelect.value,termId:els.curriculumTermSelect.value};
     renderYearGroups();renderCurriculumYearOptions();restoreCurriculumState(selected);renderCurriculumSearchSummary();
     const request=calendarEventsRequest+1;
-    try{await loadCalendarEvents();}catch(error){if(request===calendarEventsRequest){showEventPlaceholder('授業予定を取得できませんでした。再読み込みしてください。');showActionError(error);}}
+    try{
+      await loadCalendarEvents();
+      const params=new URLSearchParams(location.search),calendarId=params.get('student_calendar'),eventId=params.get('student_event');
+      if(calendarId&&eventId){
+        const source=rawEvents.find(event=>event._calendarId===calendarId&&event.id===eventId);
+        if(source&&selectedCalendarIds.has(calendarId)&&isScheduledLesson(source,[...excludedTitles])){
+          const day=tokyoDateKey(new Date(source.start.dateTime));
+          const term=terms.find(t=>selectedTermIds.has(t.id)&&day>=t.start_date&&day<=t.end_date);
+          await goToCurriculum(source.summary||'',term,calendarId);
+        }else showActionError(new Error('元の授業を確認できません。授業予定から生徒を選択してください。'));
+        params.delete('student_calendar');params.delete('student_event');
+        history.replaceState(null,'',location.pathname+(params.size?'?'+params.toString():'')+location.hash);
+      }
+    }catch(error){if(request===calendarEventsRequest){showEventPlaceholder('授業予定を取得できませんでした。再読み込みしてください。');showActionError(error);}}
   }).catch(error=>{if(initialSchedule===calendarEventsRequest)showEventPlaceholder('授業予定の初期情報を取得できませんでした。再読み込みしてください。');showActionError(error);});
   renderExcludedTitleList();
   const optional=[()=>loadGoalTemplates(),()=>loadPeriods(),()=>loadMaterials(),async()=>{studentDirectory=await apiFetch('/students');}];
@@ -3669,3 +3680,4 @@ document.querySelector("#initialize-lesson-baselines").addEventListener("click",
 attachRecordToasts(els.recordTbody);
 
 attachRecordCarousel(els.recordTbody);
+
