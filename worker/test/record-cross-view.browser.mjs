@@ -90,10 +90,15 @@ try{
 
  // Unknown outcome verification acknowledges the committed snapshot, but does not
  // discard another view's pending input or resend the write after reload.
- page=await freshPage();await input(daily(page),'record','memo','応答不明でも残す独立入力');lost=true;await input(curr(page),'curriculum','test','応答不明だが保存済みのテスト',true);
+ page=await freshPage();await input(daily(page),'record','memo','応答不明でも残す独立入力');const originalRevision=Number(await daily(page).getAttribute('data-record-revision'));lost=true;await input(curr(page),'curriculum','test','応答不明だが保存済みのテスト',true);
  await expect.poll(()=>lost).toBe(false);await expect(page.locator('#retained-record-drafts')).toContainText('応答不明でも残す独立入力');const beforeVerify=writes;
  await page.reload();await page.getByRole('button',{name:'授業記録',exact:true}).click();await page.locator('#retained-record-drafts summary').click();await page.getByRole('button',{name:'この記録の保存結果だけを照合',exact:true}).click();
  await expect(page.locator('#retained-record-drafts')).toContainText('応答不明でも残す独立入力');await expect(page.getByRole('button',{name:'この記録の保存結果だけを照合',exact:true})).toHaveCount(0);await expect(daily(page).locator('.record-memo')).toHaveValue('応答不明でも残す独立入力');await expect(daily(page).locator('.record-memo')).toBeDisabled();assert.equal(writes,beforeVerify);
+ await expect(page.locator('#retained-record-drafts')).toContainText('元の版 '+originalRevision);
+ const recoveryCopy=()=>page.evaluate(()=>JSON.parse(localStorage.getItem(Object.keys(localStorage).find(k=>k.startsWith('works_pending_plan_draft_v1:')))));
+ const verifiedCopy=await recoveryCopy();assert.equal(verifiedCopy.recordRevision,originalRevision);assert.equal(JSON.parse(verifiedCopy.value).values.memo,'応答不明でも残す独立入力');assert.equal(JSON.parse(verifiedCopy.value).conflict,true);
+ await page.reload();await page.getByRole('button',{name:'授業記録',exact:true}).click();await expect(daily(page).locator('.record-memo')).toHaveValue('応答不明でも残す独立入力');await expect(daily(page).locator('.record-memo')).toBeDisabled();assert.equal((await recoveryCopy()).recordRevision,originalRevision);
+ await input(daily(page),'record','test','保存を試しても停止',true);await expect(daily(page).locator('.record-test')).toBeDisabled();assert.equal((await stored()).confirmation_test,'応答不明だが保存済みのテスト');assert.equal(writes,beforeVerify);
 
  // If rewriting the recovery copy fails after a successful save, keep the
  // pre-dispatch copy (including the sibling) so audit verification can recover it.
