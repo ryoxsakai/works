@@ -4,6 +4,15 @@ import {readFile} from 'node:fs/promises';
 import {createProductionContext,safeShellRoute} from '../production/context.mjs';
 function authFixture(){let calls=0,logout=0;return {watchAuth({onSignedIn}){calls++;onSignedIn({email:'fixture@example.test'});},getSessionToken:()=> 'fixture-token',async signOutUser(){logout++;},get calls(){return calls;},get logouts(){return logout;}};}
 const row={id:'fixture-1',name:'Synthetic project',status:'問題作成中',deadline:'2026-11-01',memo:'fixture',remaining_days:4,progress:99,last_source_email_subject:'not part of UI'};
+test('unassigned-record fallback recognizes only the explicit code and permits only the bounded read method',async()=>{
+ const calls=[];let code='LESSON_OWNER_BINDING_REQUIRED';
+ const context=createProductionContext(authFixture(),{fetcher:async(path,options)=>{calls.push({path,options});return path.startsWith('/api/lesson-record?')?Response.json({code},{status:409}):Response.json([]);}});
+ await assert.rejects(context.request('/api/lesson-record?calendar_id=a&event_id=b'),error=>error.status===409&&error.code===code);
+ assert.deepEqual(await context.request('/api/lesson-records',{method:'POST',body:{targets:[]}}),[]);
+ await assert.rejects(context.request('/api/lesson-records'),/Unsupported/);
+ code='OTHER_CONFLICT';await assert.rejects(context.request('/api/lesson-record?calendar_id=a&event_id=b'),error=>error.status===409&&!error.code);
+ assert.equal(calls.length,3);
+});
 test('production uses existing auth once and only authenticated no-store GET, without sample fields',async()=>{
  const auth=authFixture(),requests=[];const context=createProductionContext(auth,{storage:null,fetcher:async(url,options)=>{requests.push({url,options});return Response.json([row]);}});
  const [a,b]=await Promise.all([context.session.init(),context.session.init()]);assert.equal(a,b);assert.equal(auth.calls,1);
