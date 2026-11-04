@@ -661,14 +661,15 @@ try {
     await requested;
     await expect(host).toHaveAttribute('aria-busy', 'true');
     await expect(host.locator('.card-loading')).toHaveCount(0);
-    await input.focus();
+    await input.click();
+    await expect(input, `${mode}: focus established before releasing the read`).toBeFocused();
     if (mode !== 'focus') await input.fill('応答待ち中に入力した合成下書き');
     const value = await input.inputValue();
     releaseRefresh();
     await expect(host).toHaveAttribute('aria-busy', 'false');
     await expect(input).toHaveValue(value);
-    await expect(input).toBeFocused();
-    assert.equal(await input.evaluate(el => el === window.qaRetainedInput), true);
+    assert.equal(await input.evaluate(el => el === window.qaRetainedInput), true, `${mode}: refresh replaced the input`);
+    await expect(input, `${mode}: focus after read completion`).toBeFocused();
     assert.equal(retained.requests.some(r => r.method !== 'GET' && r.url.startsWith('/api/') && r.url !== '/api/lesson-records'), false);
     assert.deepEqual(retained.errors, []);
     // Closing a fixture is not a user save or navigation; discard only in-memory QA state.
