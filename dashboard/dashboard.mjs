@@ -37,7 +37,7 @@ export function createDashboard({
   getGoogleAccessToken,
   onExpired = () => {},
 }) {
-  let lessonCards = null, cardImport = null, capturedSession = "", lessonNotice = "";
+  let lessonCards = null, cardImport = null, cardFactory = null, capturedSession = "", lessonNotice = "";
   let layoutReady = false,
     midnightTimer;
   let user = null,
@@ -111,7 +111,10 @@ export function createDashboard({
     host.setAttribute('aria-busy', 'true');
     cardImport ||= import('./lesson-cards.mjs?v=8-student-link');
     try {
-      const {createHomeLessonCards}=await cardImport;
+      // Reuse the loaded factory synchronously: a cached refresh must not paint
+      // a preparation skeleton between the old cards and their replacement.
+      const createHomeLessonCards = cardFactory || (await cardImport).createHomeLessonCards;
+      cardFactory = createHomeLessonCards;
       if(request!==epoch||pagePaused||!user||cache.get('lessons')?.data!==model||!current().widgets.includes('lessons'))return;
       if(!lessonCards)lessonCards=createHomeLessonCards(model,{session:capturedSession,getSessionToken,onExpired:expire,reload:()=>load('lessons',true),onNotice:lessonMessage,onStateChange:clearLessonMessage,readAt:cache.get("lessons")?.at});
       const target=document.querySelector('[data-content="lessons"]');
@@ -266,6 +269,10 @@ export function createDashboard({
   function patchContent(id) {
     const el = document.querySelector(`[data-content="${id}"]`);
     if (el) {
+      if (id === 'lessons' && cardFactory && cache.get(id)?.data?.rows?.length) {
+        mountLessons();
+        return;
+      }
       el.innerHTML = content(id);
       el.setAttribute("aria-busy", "false");
       if(id==="lessons")mountLessons();

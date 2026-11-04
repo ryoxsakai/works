@@ -21,6 +21,9 @@ try {
  await page.emulateMedia({reducedMotion:'reduce'});
  assert.equal(await loading.locator('span').first().evaluate(el=>getComputedStyle(el).animationName),'none');
  await page.screenshot({path:new URL('loading-reduced.png',out).pathname});
+ await page.evaluate(() => { dispatchEvent(new PageTransitionEvent('pagehide', {persisted:true})); dispatchEvent(new PageTransitionEvent('pageshow', {persisted:true})); });
+ await expect(loading).toBeVisible();
+ await expect(page.locator('#record-tbody')).toHaveAttribute('aria-busy','true');
  release();
  const row=id=>page.locator(`#record-tbody tr[data-event-id="${id}"]`),next=row('a').locator('.record-next-plan textarea');
  await expect(next).toHaveValue('既存の次回予定');
@@ -58,6 +61,13 @@ try {
  await page.locator('[data-day="next"]').click();
  await page.locator('[data-day="prev"]').click();
  await expect(next).toHaveValue('別の編集');
+ await expect(page.locator('#record-tbody')).toHaveAttribute('aria-busy','false');
+ await page.route('**/qa-away.html', route => route.fulfill({contentType:'text/html',body:'<!doctype html><title>Tutor history fixture</title><h1>Tutor history fixture</h1>'}));
+ await page.goto(f.base+'/qa-away.html');
+ await page.goBack(); await expect(next).toHaveValue('別の編集');
+ await expect(page.locator('#record-tbody')).toHaveAttribute('aria-busy','false');
+ await page.goForward(); await expect(page.locator('h1')).toHaveText('Tutor history fixture');
+ await page.goBack(); await expect(next).toHaveValue('別の編集');
  await expect(page.locator('#record-tbody')).toHaveAttribute('aria-busy','false');
  console.log('PASS record layout: eight viewport/themes, retained hidden data, linked save, toast renewal/expiry, failure/CAS persistent gates, keyboard refresh, reload and print');
 }finally{await browser.close();await f.close();}

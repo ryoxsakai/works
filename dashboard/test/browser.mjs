@@ -636,6 +636,88 @@ try {
   passed.push("legacy theme settings, dark screenshot and dialog focus return");
   assert.deepEqual(f.errors, []);
   await f.close();
+  // Hold the refresh after it starts, then acquire focus / create a draft.
+  // Check the same DOM node, value and focus after success and failure settle.
+  for (const mode of ['focus', 'edit', 'edit-failure']) {
+    const retained = await fixture();
+    await ready(retained.page);
+    const host = retained.page.locator('[data-content="lessons"]');
+    await expect(host).toHaveAttribute('aria-busy', 'false');
+    const input = host.locator('textarea.record-plan').first();
+    await expect(input).toBeEditable();
+    await input.evaluate(el => { window.qaRetainedInput = el; });
+    let releaseRefresh, started;
+    const held = new Promise(resolve => { releaseRefresh = resolve; });
+    const requested = new Promise(resolve => { started = resolve; });
+    await retained.page.route('**/api/settings', async route => {
+      started();
+      await held;
+      await route.fulfill(mode === 'edit-failure'
+        ? {status: 503, json: {error: 'synthetic refresh failure'}}
+        : {json: {selected_calendars: ['fixture'], excluded_titles: ['除外']}});
+    });
+    await retained.page.locator('#open-home-settings').click();
+    await retained.page.locator('#dashboard-refresh').click();
+    await requested;
+    await expect(host).toHaveAttribute('aria-busy', 'true');
+    await expect(host.locator('.card-loading')).toHaveCount(0);
+    await input.focus();
+    if (mode !== 'focus') await input.fill('応答待ち中に入力した合成下書き');
+    const value = await input.inputValue();
+    releaseRefresh();
+    await expect(host).toHaveAttribute('aria-busy', 'false');
+    await expect(input).toHaveValue(value);
+    await expect(input).toBeFocused();
+    assert.equal(await input.evaluate(el => el === window.qaRetainedInput), true);
+    assert.equal(retained.requests.some(r => r.method !== 'GET' && r.url.startsWith('/api/') && r.url !== '/api/lesson-records'), false);
+    assert.deepEqual(retained.errors, []);
+    // Closing a fixture is not a user save or navigation; discard only in-memory QA state.
+    await retained.close();
+  }
+  passed.push('refresh responses preserve a newly focused editor and newly typed draft, on success and failure, without replacing the node or writing data');
+
+  const fast = await fixture({init: () => {
+    window.qaSkeletonEvents = [];
+    const active = new Map();
+    new MutationObserver(() => {
+      for (const id of ['lessons', 'todo']) {
+        const shown = !!document.querySelector(`[data-content="${id}"] .card-loading`);
+        if (shown !== !!active.get(id)) {
+          window.qaSkeletonEvents.push({id, shown, at: performance.now()});
+          active.set(id, shown);
+        }
+      }
+    }).observe(document, {subtree: true, childList: true});
+  }});
+  await ready(fast.page);
+  for (const id of ['lessons', 'todo']) await expect(fast.page.locator(`[data-content="${id}"]`)).toHaveAttribute('aria-busy', 'false');
+  const initialLoading = await fast.page.evaluate(() => window.qaSkeletonEvents);
+  for (const id of ['lessons', 'todo']) {
+    const events = initialLoading.filter(e => e.id === id);
+    assert.equal(events.at(-1)?.shown || false, false);
+    for (let i = 0; i < events.length - 1; i += 2) {
+      assert.equal(events[i].shown, true);
+      assert.equal(events[i+1].shown, false);
+      assert.ok(events[i+1].at >= events[i].at);
+    }
+  }
+  await fast.page.evaluate(() => { window.qaSkeletonEvents = []; });
+  await fast.page.locator('#open-home-settings').click();
+  await fast.page.locator('#dashboard-refresh').click();
+  await expect(fast.page.locator('[data-content="lessons"] [data-refresh-status]')).toHaveCount(0);
+  await expect(fast.page.locator('[data-content="lessons"]')).toHaveAttribute('aria-busy', 'false');
+  await expect(fast.page.locator('[data-content="todo"]')).toHaveAttribute('aria-busy', 'false');
+  assert.deepEqual(await fast.page.evaluate(() => window.qaSkeletonEvents), []);
+  console.log('Fast initial skeleton DOM transitions: ' + JSON.stringify(initialLoading));
+  await fast.page.route('**/qa-away.html', route => route.fulfill({contentType:'text/html', body:'<!doctype html><title>Local history fixture</title><h1>Local history fixture</h1>'}));
+  await fast.page.goto(base + '/qa-away.html');
+  await fast.page.goBack(); await ready(fast.page);
+  await fast.page.goForward(); await expect(fast.page.locator('h1')).toHaveText('Local history fixture');
+  await fast.page.goBack(); await ready(fast.page);
+  assert.deepEqual(fast.errors, []);
+  await fast.close();
+  passed.push('immediate reads settle without an animation wait; cached fast refresh inserts no skeleton; actual back/forward restores home');
+
   const delayed = await fixture({ holdTodo: true });
   await expect(delayed.page.locator('[data-content="lessons"]')).toContainText(
     "サンプル生徒 A",
