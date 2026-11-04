@@ -1,4 +1,5 @@
 import {sameNameLessonCount} from '../shared/lesson-counts.mjs?v=1';
+import {unassignedLessonDisplay} from '../shared/unassigned-lesson.mjs?v=1';
 import {recordRowSnapshot,independentRecordRows,synchronizeRecordRows} from './record-row-sync.mjs?v=1';
 import {readPendingRecovery,persistPendingRecovery,clearPendingRecovery,pendingRecoveryCopies} from './pending-plan-draft.mjs?v=2';
 import {createOwnerMemoEditors} from '../shared/owner-memo.mjs?v=2-autosave';
@@ -21,7 +22,7 @@ import { getTheme, setTheme } from "../shared/theme.js?v=6";
 import { tokyoDateKey, shiftRecordDate, recordDateRange } from "./record-date.js?v=1";
 import { createStudentMemoStore } from "./student-memo.js?v=1";
 import { createLessonPlanController } from "./lesson-plan.js?v=8";
-import { isScheduledLesson, lessonEventRef, lessonEventKey } from "../shared/lesson-plan.js?v=1";
+import { isScheduledLesson, lessonEventRef, lessonEventKey, sameLessonEvent } from "../shared/lesson-plan.js?v=1";
 
 const PASTEL_FALLBACK_COLORS = [
   "#c8e6c9",
@@ -662,7 +663,17 @@ function lessonPlanDate(ref) {
   const end = new Intl.DateTimeFormat("ja-JP", { timeZone: "Asia/Tokyo", hour: "2-digit", minute: "2-digit" }).format(new Date(ref.end));
   return `${start}–${end}`;
 }
-function renderLessonPlans() { renderPlanEditors(document, lessonPlans, { lessonPlanDate, resizeRecordInput }); }
+function renderLessonPlans() {
+  renderPlanEditors(document, lessonPlans, { lessonPlanDate, resizeRecordInput });
+  for (const row of document.querySelectorAll('[data-unassigned-progress][data-pending-key]')) {
+    const state=lessonPlans.get(row.dataset.pendingKey),input=row.querySelector('textarea');
+    if(!state || !input)continue;
+    const show=value=>{input.value=value;input.defaultValue=value;};
+    let observed;try{observed=JSON.parse(row.dataset.pendingTarget);}catch{show('');continue;}
+    if(state.ownerId || state.pendingUnknown || state.status==='conflict' || state.pendingContext!==row.dataset.pendingContext || !sameLessonEvent(state.target,observed)){show('');continue;}
+    if(!state.dirty && !state.pending)show(state.base||'');
+  }
+}
 
 document.addEventListener("click", (event) => {
   const refresh = event.target.closest(".record-recheck");
@@ -2586,15 +2597,26 @@ async function renderCurriculumTable(events, context = captureStudentContext(), 
   const entries = await readRecordEntries(events,context);
   assertStudentContext(context);
   const entryMap = new Map(entries.map((entry) => [entry.calendar_event_id, entry]));
+  const retainedCopies = pendingRecoveryCopies();
 
   els.curriculumTbody.innerHTML = events
     .map((ev) => {
       const saved = attributedLessonRecord(entryMap.get(ev.id), lessonEventRef(ev));
       const start = ev.start?.dateTime || ev.start?.date || "";
       const count = sameNameLessonCount(ev, countEvents, [...excludedTitles]);
+      const ref = lessonEventRef(ev), key = lessonEventKey(ref), unassigned = unassignedLessonDisplay(saved, ref);
+      const plan = lessonPlans.get(key);
+      const retained = recordDrafts.has(key) || plan?.dirty || plan?.pending || plan?.status === 'conflict' ||
+        retainedCopies.some(copy => copy.target && lessonEventKey(copy.target) === key);
+      if (unassigned && !retained) {
+        const label = escapeHtml(ev.summary || '授業');
+        return `<tr data-unassigned-progress data-pending-key="${escapeHtml(key)}" data-pending-target="${escapeHtml(JSON.stringify(ref))}" data-pending-context="${escapeHtml(unassigned.pendingContext)}"><td><input type="checkbox" disabled aria-label="${label}の完了（未紐付けのため編集不可）"></td>
+          <td>${count.n}/${count.m}回</td><td>${formatCurriculumDate(start)}</td>
+          <td><textarea rows="2" disabled aria-label="${label}の授業予定（未紐付けのため編集不可）">${escapeHtml(unassigned.lessonPlan)}</textarea></td>
+          ${['確認テスト','宿題','授業メモ'].map(field=>`<td><textarea rows="2" disabled aria-label="${label}の${field}（未紐付けのため編集不可）"></textarea></td>`).join('')}</tr>`;
+      }
       if (lessonRecordNeedsReview(saved)) return lessonReviewRow(lessonEventRef(ev),saved,ev.summary || "授業",formatCurriculumDate(start)).replace('</strong>', `</strong> <small class="semester-candidate-count">${count.n}/${count.m}回（同名予定・所属未確定）</small>`);
       const checked = saved.completed ? "checked" : "";
-      const ref = lessonEventRef(ev);
       lessonPlans.seed(ref, saved.lesson_plan || "", planReadVersion, saved.record_revision,saved.attribution_status,saved.owner_id||null);
       return `<tr data-event-id="${escapeHtml(ev.id)}" data-record-ref="${escapeHtml(JSON.stringify(ref))}" data-record-revision="${saved.record_revision}" data-record-owner="${escapeHtml(saved.owner_id||'')}" data-completed="${saved.completed ? 1 : 0}">
         <td><input type="checkbox" class="curriculum-completed" ${checked} /></td>

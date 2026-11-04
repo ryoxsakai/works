@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFileSync} from 'node:fs';
 import {sameNameLessonCount} from '../../shared/lesson-counts.mjs';
-import {lessonEventRef} from '../../shared/lesson-plan.js';
+import {lessonEventRef,lessonEventKey} from '../../shared/lesson-plan.js';
+import {unassignedLessonDisplay} from '../../shared/unassigned-lesson.mjs';
 import {recordDateRange} from '../record-date.js';
 
 const source=readFileSync(new URL('../app.js',import.meta.url),'utf8');
@@ -16,11 +17,11 @@ test('curriculum keeps displayed records but counts each calendar and exact norm
  const skipped=event('skip','2026-10-09','one','Ａ 英語 休講'),different=event('different','2026-10-11','one','Ａ 英語 別講座');
  const all=[a,b,c,x,y,skipped,different],displayed=[b,y,skipped];
  const elements={curriculumTbody:{innerHTML:''}},seeded=[];
- const state=vm.createContext({els:elements,excludedTitles:new Set(),sameNameLessonCount,lessonEventRef,
+ const state=vm.createContext({els:elements,excludedTitles:new Set(),sameNameLessonCount,lessonEventRef,lessonEventKey,unassignedLessonDisplay,recordDrafts:new Map(),pendingRecoveryCopies:()=>[],
   assertStudentContext(){},readRecordEntries:async rows=>rows.map(row=>({calendar_event_id:row.id,record_revision:3,attribution_status:row.id==='y'?'owner_unassigned':'confirmed'})),
   attributedLessonRecord:value=>value,lessonRecordNeedsReview:value=>value.attribution_status==='owner_unassigned',
   lessonReviewRow:(_ref,_record,label)=>`<tr><td><strong>${label}</strong><p>確認が必要</p></td></tr>`,
-  formatCurriculumDate:value=>value,lessonPlans:{version:0,seed:(...args)=>seeded.push(args)},
+  formatCurriculumDate:value=>value,lessonPlans:{version:0,get:()=>null,seed:(...args)=>seeded.push(args)},
   escapeHtml:String,lessonAttributionNotice:()=>'',lessonPlanEditor:()=>'<textarea></textarea>',
   restoreRecordDraftRows(){},showRetainedRecordDrafts(){},renderLessonPlans(){},captureStudentContext:()=>({})});
  vm.runInContext(extract('async function renderCurriculumTable(', '\nels.curriculumTbody.addEventListener("input"'),state);
