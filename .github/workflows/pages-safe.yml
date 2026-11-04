@@ -1,0 +1,79 @@
+# Switch Pages source to GitHub Actions before merging this workflow. A branch
+# source would still run GitHub's separate, unfiltered Pages build on a push.
+name: Publish filtered Pages
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/pages-safe.yml'
+      - 'scripts/stage-pages.mjs'
+      - 'scripts/test/**'
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Check staging safeguards without publishing
+        run: node --test scripts/test/*.test.mjs
+
+  build:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Check Pages source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          source_type=$(gh api "repos/${GITHUB_REPOSITORY}/pages" --jq '.build_type')
+          if [ "$source_type" != workflow ]; then
+            echo 'Pages is not configured for the filtered workflow.'
+            exit 1
+          fi
+      - name: Check staging safeguards
+        run: node --test scripts/test/*.test.mjs
+      - name: Prepare filtered site
+        run: node scripts/stage-pages.mjs "$RUNNER_TEMP/works-pages"
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+      - name: Upload filtered site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{ runner.temp }}/works-pages
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
