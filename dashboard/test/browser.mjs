@@ -27,6 +27,7 @@ const mime = {
   ".woff2": "font/woff2",
 };
 let passed = [];
+const unexpectedRequests = [];
 const fullPageEvidence = [];
 async function fullPageAtTop(page, options) {
   await page.evaluate(() => scrollTo(0, 0));
@@ -47,7 +48,10 @@ async function fullPageAtTop(page, options) {
   return page.screenshot(options);
 }
 
+let fixtureSequence = 0;
 async function fixture(options = {}) {
+  const fixtureLabel = options.label || `fixture-${++fixtureSequence}`;
+  let closing = false;
   const ctx = await browser.newContext({
     viewport: { width: 1440, height: 1000 },
     timezoneId: "America/Los_Angeles",
@@ -178,8 +182,11 @@ async function fixture(options = {}) {
           { name: "完了案件", status: "完了", deadline: "2026-10-29" },
         ],
       });
-    if (u.pathname.startsWith("/api/"))
-      throw Error("Unexpected API " + u.pathname);
+    if (u.pathname.startsWith("/api/")) {
+      const diagnostic = `Unexpected ${r.request().method()} API ${u.pathname} in ${fixtureLabel}, closing=${closing}`;
+      errors.push(diagnostic); unexpectedRequests.push(diagnostic); console.error(diagnostic);
+      return r.fulfill({status:503,json:{error:'Unexpected synthetic fixture request'}});
+    }
     const file = path.join(
       root,
       u.pathname.endsWith("/") ? u.pathname + "index.html" : u.pathname,
@@ -213,6 +220,7 @@ async function fixture(options = {}) {
       failTodo = false;
     },
     async close() {
+      closing = true;
       // A context-close can blur a dirty editor before dispatching pagehide on
       // some Chromium versions. Exercise the real page's pause/abort lifecycle
       // first; teardown is not an instruction to autosave a fixture draft.
@@ -643,7 +651,7 @@ try {
   // Hold the refresh after it starts, then acquire focus / create a draft.
   // Check the same DOM node, value and focus after success and failure settle.
   for (const mode of ['focus', 'edit', 'edit-failure']) {
-    const retained = await fixture();
+    const retained = await fixture({label: `retained-${mode}`});
     await ready(retained.page);
     const host = retained.page.locator('[data-content="lessons"]');
     await expect(host).toHaveAttribute('aria-busy', 'false');
@@ -683,7 +691,7 @@ try {
   passed.push('refresh responses preserve a newly focused editor and newly typed draft, on success and failure, without replacing the node or writing data');
 
   // Read snapshot arrives after an edit has already autosaved and lost focus.
-  const savedDuringRead = await fixture();
+  const savedDuringRead = await fixture({label: "autosaved-stale-read"});
   await ready(savedDuringRead.page);
   const savedHost = savedDuringRead.page.locator('[data-content="lessons"]');
   await expect(savedHost).toHaveAttribute('aria-busy', 'false');
@@ -726,7 +734,7 @@ try {
   // A late response from ANY widget must not clear newly edited lesson cards
   // when JST crosses midnight, even before the normal rollover timer runs.
   for (const boundary of ['lessons','todo']) {
-    const midnightDraft = await fixture(); await ready(midnightDraft.page);
+    const midnightDraft = await fixture({label: `midnight-${boundary}`}); await ready(midnightDraft.page);
     const lessonHost = midnightDraft.page.locator('[data-content="lessons"]');
     await expect(lessonHost).toHaveAttribute('aria-busy','false');
     const input = lessonHost.locator('textarea.record-plan').first();
@@ -1152,6 +1160,7 @@ try {
     path.join(artifacts, "results.json"),
     JSON.stringify({ passed }, null, 2),
   );
+  assert.deepEqual(unexpectedRequests, []);
   console.log(JSON.stringify({ passed }, null, 2));
 } finally {
   await browser.close();
