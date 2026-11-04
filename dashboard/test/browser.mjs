@@ -213,6 +213,10 @@ async function fixture(options = {}) {
       failTodo = false;
     },
     async close() {
+      // A context-close can blur a dirty editor before dispatching pagehide on
+      // some Chromium versions. Exercise the real page's pause/abort lifecycle
+      // first; teardown is not an instruction to autosave a fixture draft.
+      await page.evaluate(() => dispatchEvent(new PageTransitionEvent('pagehide')));
       this.release();
       await ctx.close();
     },
@@ -674,6 +678,7 @@ try {
     assert.deepEqual(retained.errors, []);
     // Closing a fixture is not a user save or navigation; discard only in-memory QA state.
     await retained.close();
+    assert.equal(retained.requests.some(r => r.method !== 'GET' && r.url.startsWith('/api/') && r.url !== '/api/lesson-records'), false, `${mode}: teardown wrote a fixture draft`);
   }
   passed.push('refresh responses preserve a newly focused editor and newly typed draft, on success and failure, without replacing the node or writing data');
 
