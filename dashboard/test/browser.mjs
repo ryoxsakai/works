@@ -230,6 +230,20 @@ async function fixture(options = {}) {
     },
   };
 }
+async function refreshFromSettings(page) {
+  await page.locator('#open-home-settings').click();
+  await page.evaluate(() => {
+    window.qaSettingsClosed = false;
+    document.querySelector('#home-settings-modal').addEventListener('close', () => {
+      window.qaSettingsClosed = true;
+    }, {once:true});
+  });
+  await page.locator('#dashboard-refresh').click();
+  // Native dialog closure restores the opener's focus. Start editor interaction
+  // only after that lifecycle event, as a real user would, rather than racing it.
+  await page.waitForFunction(() => window.qaSettingsClosed);
+  await expect(page.locator('#home-settings-modal')).not.toBeVisible();
+}
 async function ready(page) {
   await expect(page.locator('[data-content="todo"]')).toContainText(
     "持ち越しの教材確認",
@@ -668,8 +682,7 @@ try {
         ? {status: 503, json: {error: 'synthetic refresh failure'}}
         : {json: {selected_calendars: ['fixture'], excluded_titles: ['除外']}});
     });
-    await retained.page.locator('#open-home-settings').click();
-    await retained.page.locator('#dashboard-refresh').click();
+    await refreshFromSettings(retained.page);
     await requested;
     await expect(host).toHaveAttribute('aria-busy', 'true');
     await expect(host.locator('.card-loading')).toHaveCount(0);
@@ -709,8 +722,7 @@ try {
     const body = route.request().postDataJSON(); writes.push(body);
     return route.fulfill({json:{target:body.target,lesson_plan:body.lesson_plan,record_revision:writes.length}});
   });
-  await savedDuringRead.page.locator('#open-home-settings').click();
-  await savedDuringRead.page.locator('#dashboard-refresh').click();
+  await refreshFromSettings(savedDuringRead.page);
   await oldReadStarted;
   await savedInput.fill('読込待ち中に自動保存した合成予定');
   await savedDuringRead.page.locator('#home-auth-action').focus();
@@ -746,8 +758,7 @@ try {
       started(); await held; await route.fulfill({json: boundary === 'lessons' ? [] : {tasks:[]}});
     });
     await midnightDraft.page.clock.setFixedTime(new Date('2026-10-29T14:59:59Z'));
-    await midnightDraft.page.locator('#open-home-settings').click();
-    await midnightDraft.page.locator('#dashboard-refresh').click(); await requested;
+    await refreshFromSettings(midnightDraft.page); await requested;
     await input.fill('日付またぎ中の未保存合成下書き');
     await midnightDraft.page.clock.setFixedTime(new Date('2026-10-29T15:00:01Z'));
     release();
