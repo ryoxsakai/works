@@ -3,7 +3,7 @@
 .record-carousel-controls span { color: var(--fg); font-size: .8rem; }
 .record-carousel-controls[hidden] { display: none; }
 @media screen and (max-width:640px) {
- .record-panel #record-table tbody.carousel-inner { display: flex; align-items: flex-start; gap: 0; }
+ .record-panel #record-table tbody.carousel-inner { display: flex; align-items: flex-start; gap: .5rem; }
  .record-panel #record-table tbody.carousel-inner > tr.carousel-item { flex: 0 0 100%; min-width: 0; box-sizing: border-box; }
  /* Input editing/selection retains vertical page scroll; swipe on card surfaces. */
  .record-panel .carousel-inner :is(input,textarea,button,a) { touch-action: pan-y; }

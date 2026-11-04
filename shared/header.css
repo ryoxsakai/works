@@ -16,7 +16,7 @@
   border: 0;
   border-bottom: 1px solid var(--border);
   border-radius: 0;
-  box-shadow: none;
+  box-shadow: 0 1px 3px rgb(15 23 42 / .06), 0 4px 12px rgb(15 23 42 / .04);
   background: var(--bg-elevated);
   color: var(--fg);
   font-family: "M PLUS 1p", system-ui, sans-serif;

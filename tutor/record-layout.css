@@ -12,7 +12,7 @@
 .record-panel .record-next-plan .lesson-plan-action[data-action="recheck"] { display: none; }
 .record-panel .record-transient-status { display: none; }
 .record-save-toasts { position: fixed; z-index: 60; bottom: max(1rem, env(safe-area-inset-bottom)); right: 1rem; width: min(26rem, calc(100vw - 2rem)); display: grid; gap: .5rem; pointer-events: none; }
-.record-save-toast { padding: .7rem 1rem; color: var(--fg); background: var(--bg-elevated); border: 1px solid var(--border); border-radius: .5rem; box-shadow: var(--card-shadow); overflow-wrap: anywhere; }
+.record-save-toasts .record-save-toast { padding: .7rem 1rem; font-size: .5rem; color: #fff; background: linear-gradient(120deg, rgb(30 64 175 / .92), rgb(91 33 182 / .92)); border: 1px solid var(--border); border-radius: .5rem; box-shadow: 0 2px 4px rgb(30 41 59 / .08), 0 6px 16px rgb(76 29 149 / .10); overflow-wrap: anywhere; }
 @media print { .record-save-toasts, .record-recheck { display: none !important; } }
 
 /* The regular card exposes only name/icon/count, refresh and the three editors. */
