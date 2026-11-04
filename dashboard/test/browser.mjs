@@ -27,6 +27,7 @@ const mime = {
   ".woff2": "font/woff2",
 };
 let passed = [];
+const unexpectedRequests = [];
 const fullPageEvidence = [];
 async function fullPageAtTop(page, options) {
   await page.evaluate(() => scrollTo(0, 0));
@@ -47,7 +48,10 @@ async function fullPageAtTop(page, options) {
   return page.screenshot(options);
 }
 
+let fixtureSequence = 0;
 async function fixture(options = {}) {
+  const fixtureLabel = options.label || `fixture-${++fixtureSequence}`;
+  let closing = false;
   const ctx = await browser.newContext({
     viewport: { width: 1440, height: 1000 },
     timezoneId: "America/Los_Angeles",
@@ -178,8 +182,11 @@ async function fixture(options = {}) {
           { name: "完了案件", status: "完了", deadline: "2026-10-29" },
         ],
       });
-    if (u.pathname.startsWith("/api/"))
-      throw Error("Unexpected API " + u.pathname);
+    if (u.pathname.startsWith("/api/")) {
+      const diagnostic = `Unexpected ${r.request().method()} API ${u.pathname} in ${fixtureLabel}, closing=${closing}`;
+      errors.push(diagnostic); unexpectedRequests.push(diagnostic); console.error(diagnostic);
+      return r.fulfill({status:503,json:{error:'Unexpected synthetic fixture request'}});
+    }
     const file = path.join(
       root,
       u.pathname.endsWith("/") ? u.pathname + "index.html" : u.pathname,
@@ -213,10 +220,29 @@ async function fixture(options = {}) {
       failTodo = false;
     },
     async close() {
+      closing = true;
+      // A context-close can blur a dirty editor before dispatching pagehide on
+      // some Chromium versions. Exercise the real page's pause/abort lifecycle
+      // first; teardown is not an instruction to autosave a fixture draft.
+      await page.evaluate(() => dispatchEvent(new PageTransitionEvent('pagehide')));
       this.release();
       await ctx.close();
     },
   };
+}
+async function refreshFromSettings(page) {
+  await page.locator('#open-home-settings').click();
+  await page.evaluate(() => {
+    window.qaSettingsClosed = false;
+    document.querySelector('#home-settings-modal').addEventListener('close', () => {
+      window.qaSettingsClosed = true;
+    }, {once:true});
+  });
+  await page.locator('#dashboard-refresh').click();
+  // Native dialog closure restores the opener's focus. Start editor interaction
+  // only after that lifecycle event, as a real user would, rather than racing it.
+  await page.waitForFunction(() => window.qaSettingsClosed);
+  await expect(page.locator('#home-settings-modal')).not.toBeVisible();
 }
 async function ready(page) {
   await expect(page.locator('[data-content="todo"]')).toContainText(
@@ -636,10 +662,172 @@ try {
   passed.push("legacy theme settings, dark screenshot and dialog focus return");
   assert.deepEqual(f.errors, []);
   await f.close();
+  // Hold the refresh after it starts, then acquire focus / create a draft.
+  // Check the same DOM node, value and focus after success and failure settle.
+  for (const mode of ['focus', 'edit', 'edit-failure']) {
+    const retained = await fixture({label: `retained-${mode}`});
+    await ready(retained.page);
+    const host = retained.page.locator('[data-content="lessons"]');
+    await expect(host).toHaveAttribute('aria-busy', 'false');
+    const input = host.locator('textarea.record-plan').first();
+    await expect(input).toBeEditable();
+    await input.evaluate(el => { window.qaRetainedInput = el; });
+    let releaseRefresh, started;
+    const held = new Promise(resolve => { releaseRefresh = resolve; });
+    const requested = new Promise(resolve => { started = resolve; });
+    await retained.page.route('**/api/settings', async route => {
+      started();
+      await held;
+      await route.fulfill(mode === 'edit-failure'
+        ? {status: 503, json: {error: 'synthetic refresh failure'}}
+        : {json: {selected_calendars: ['fixture'], excluded_titles: ['除外']}});
+    });
+    await refreshFromSettings(retained.page);
+    await requested;
+    await expect(host).toHaveAttribute('aria-busy', 'true');
+    await expect(host.locator('.card-loading')).toHaveCount(0);
+    await input.click();
+    await expect(input, `${mode}: focus established before releasing the read`).toBeFocused();
+    if (mode !== 'focus') await input.fill('応答待ち中に入力した合成下書き');
+    const value = await input.inputValue();
+    releaseRefresh();
+    await expect(host).toHaveAttribute('aria-busy', 'false');
+    await expect(input).toHaveValue(value);
+    assert.equal(await input.evaluate(el => el === window.qaRetainedInput), true, `${mode}: refresh replaced the input`);
+    await expect(input, `${mode}: focus after read completion`).toBeFocused();
+    assert.equal(retained.requests.some(r => r.method !== 'GET' && r.url.startsWith('/api/') && r.url !== '/api/lesson-records'), false);
+    assert.deepEqual(retained.errors, []);
+    // Closing a fixture is not a user save or navigation; discard only in-memory QA state.
+    await retained.close();
+    assert.equal(retained.requests.some(r => r.method !== 'GET' && r.url.startsWith('/api/') && r.url !== '/api/lesson-records'), false, `${mode}: teardown wrote a fixture draft`);
+  }
+  passed.push('refresh responses preserve a newly focused editor and newly typed draft, on success and failure, without replacing the node or writing data');
+
+  // Read snapshot arrives after an edit has already autosaved and lost focus.
+  const savedDuringRead = await fixture({label: "autosaved-stale-read"});
+  await ready(savedDuringRead.page);
+  const savedHost = savedDuringRead.page.locator('[data-content="lessons"]');
+  await expect(savedHost).toHaveAttribute('aria-busy', 'false');
+  const savedInput = savedHost.locator('textarea.record-plan').first();
+  await savedInput.evaluate(el => { window.qaSavedInput = el; });
+  let releaseOldRead, signalRead;
+  const oldReadHeld = new Promise(resolve => { releaseOldRead = resolve; });
+  const oldReadStarted = new Promise(resolve => { signalRead = resolve; });
+  await savedDuringRead.page.route('**/api/lesson-records', async route => {
+    const oldSnapshot = []; // The already observed empty/revision-zero read.
+    signalRead(); await oldReadHeld; await route.fulfill({json: oldSnapshot});
+  });
+  const writes = [];
+  await savedDuringRead.page.route('**/api/lesson-plan', route => {
+    const body = route.request().postDataJSON(); writes.push(body);
+    return route.fulfill({json:{target:body.target,lesson_plan:body.lesson_plan,record_revision:writes.length}});
+  });
+  await refreshFromSettings(savedDuringRead.page);
+  await oldReadStarted;
+  await savedInput.fill('読込待ち中に自動保存した合成予定');
+  await savedDuringRead.page.locator('#home-auth-action').focus();
+  await expect(savedInput.locator('..').locator('.lesson-plan-status')).toContainText('保存済み');
+  assert.equal(writes.length,1);
+  await expect(savedInput).not.toBeFocused();
+  releaseOldRead();
+  await expect(savedHost).toHaveAttribute('aria-busy','false');
+  await expect(savedInput).toHaveValue('読込待ち中に自動保存した合成予定');
+  assert.equal(await savedInput.evaluate(el => el === window.qaSavedInput),true);
+  await savedInput.fill('保存後の次の合成予定');
+  await savedDuringRead.page.locator('#home-auth-action').focus();
+  await expect.poll(() => writes.length).toBe(2);
+  assert.equal(writes[1].record_revision,1);
+  assert.equal(writes[1].expected_lesson_plan,'読込待ち中に自動保存した合成予定');
+  await expect(savedInput.locator('..').locator('.lesson-plan-status')).toContainText('保存済み');
+  assert.deepEqual(savedDuringRead.errors,[]);
+  await savedDuringRead.close();
+  passed.push('stale refresh cannot roll back an autosaved unfocused lesson value or its next-write revision');
+
+  // A late response from ANY widget must not clear newly edited lesson cards
+  // when JST crosses midnight, even before the normal rollover timer runs.
+  for (const boundary of ['lessons','todo']) {
+    const midnightDraft = await fixture({label: `midnight-${boundary}`}); await ready(midnightDraft.page);
+    const lessonHost = midnightDraft.page.locator('[data-content="lessons"]');
+    await expect(lessonHost).toHaveAttribute('aria-busy','false');
+    const input = lessonHost.locator('textarea.record-plan').first();
+    await input.evaluate(el => { window.qaMidnightInput = el; });
+    let release, started;
+    const held = new Promise(resolve => { release = resolve; });
+    const requested = new Promise(resolve => { started = resolve; });
+    await midnightDraft.page.route(boundary === 'lessons' ? '**/api/lesson-records' : '**/api/todo', async route => {
+      started(); await held; await route.fulfill({json: boundary === 'lessons' ? [] : {tasks:[]}});
+    });
+    await midnightDraft.page.clock.setFixedTime(new Date('2026-10-29T14:59:59Z'));
+    await refreshFromSettings(midnightDraft.page); await requested;
+    await input.fill('日付またぎ中の未保存合成下書き');
+    await midnightDraft.page.clock.setFixedTime(new Date('2026-10-29T15:00:01Z'));
+    release();
+    await expect(midnightDraft.page.locator(`[data-content="${boundary}"]`)).toHaveAttribute('aria-busy','false');
+    await expect(input).toHaveValue('日付またぎ中の未保存合成下書き');
+    await expect(input).toBeFocused();
+    assert.equal(await input.evaluate(el => el === window.qaMidnightInput),true);
+    await expect(midnightDraft.page.locator('#dashboard-message')).toContainText('日付が変わりました');
+    assert.deepEqual(midnightDraft.errors,[]); await midnightDraft.close();
+  }
+  passed.push('JST midnight responses from lesson and Todo reads preserve newly edited lesson cards before rollover');
+
+  const fast = await fixture({init: () => {
+    window.qaSkeletonEvents = [];
+    const active = new Map();
+    new MutationObserver(() => {
+      for (const id of ['lessons', 'todo']) {
+        const shown = !!document.querySelector(`[data-content="${id}"] .card-loading`);
+        if (shown !== !!active.get(id)) {
+          window.qaSkeletonEvents.push({id, shown, at: performance.now()});
+          active.set(id, shown);
+        }
+      }
+    }).observe(document, {subtree: true, childList: true});
+  }});
+  await ready(fast.page);
+  for (const id of ['lessons', 'todo']) await expect(fast.page.locator(`[data-content="${id}"]`)).toHaveAttribute('aria-busy', 'false');
+  const initialLoading = await fast.page.evaluate(() => window.qaSkeletonEvents);
+  for (const id of ['lessons', 'todo']) {
+    const events = initialLoading.filter(e => e.id === id);
+    assert.equal(events.at(-1)?.shown || false, false);
+    for (let i = 0; i < events.length - 1; i += 2) {
+      assert.equal(events[i].shown, true);
+      assert.equal(events[i+1].shown, false);
+      assert.ok(events[i+1].at >= events[i].at);
+    }
+  }
+  await fast.page.evaluate(() => { window.qaSkeletonEvents = []; });
+  await fast.page.locator('#open-home-settings').click();
+  await fast.page.locator('#dashboard-refresh').click();
+  await expect(fast.page.locator('[data-content="lessons"] [data-refresh-status]')).toHaveCount(0);
+  await expect(fast.page.locator('[data-content="lessons"]')).toHaveAttribute('aria-busy', 'false');
+  await expect(fast.page.locator('[data-content="todo"]')).toHaveAttribute('aria-busy', 'false');
+  assert.deepEqual(await fast.page.evaluate(() => window.qaSkeletonEvents), []);
+  console.log('Fast initial skeleton DOM transitions: ' + JSON.stringify(initialLoading));
+  await fast.page.route('**/qa-away.html', route => route.fulfill({contentType:'text/html', body:'<!doctype html><title>Local history fixture</title><h1>Local history fixture</h1>'}));
+  await fast.page.goto(base + '/qa-away.html');
+  await fast.page.goBack(); await ready(fast.page);
+  await fast.page.goForward(); await expect(fast.page.locator('h1')).toHaveText('Local history fixture');
+  await fast.page.goBack(); await ready(fast.page);
+  assert.deepEqual(fast.errors, []);
+  await fast.close();
+  passed.push('immediate reads settle without an animation wait; cached fast refresh inserts no skeleton; actual back/forward restores home');
+
   const delayed = await fixture({ holdTodo: true });
   await expect(delayed.page.locator('[data-content="lessons"]')).toContainText(
     "サンプル生徒 A",
   );
+  const pendingHost = delayed.page.locator('[data-content="todo"]');
+  await expect(pendingHost).toHaveAttribute('aria-busy', 'true');
+  await expect(pendingHost.locator('.card-loading-shapes')).toHaveAttribute('aria-hidden', 'true');
+  for (const width of [390, 1440]) for (const theme of ['light', 'dark']) {
+    await delayed.page.setViewportSize({width, height: 1000});
+    await delayed.page.evaluate(theme => document.documentElement.dataset.theme = theme, theme);
+    await delayed.page.screenshot({path: path.join(artifacts, `loading-${width}-${theme}.png`), fullPage: true});
+  }
+  await delayed.page.emulateMedia({reducedMotion: 'reduce'});
+  assert.equal(await pendingHost.locator('.card-loading-shapes span').first().evaluate(el => getComputedStyle(el).animationName), 'none');
+  await delayed.page.screenshot({path: path.join(artifacts, 'loading-reduced-motion.png'), fullPage: true});
   await delayed.page.locator("#home-auth-action").click();
   delayed.release();
   await expect(delayed.page.locator("#home-auth-action")).toHaveAttribute(
@@ -983,6 +1171,7 @@ try {
     path.join(artifacts, "results.json"),
     JSON.stringify({ passed }, null, 2),
   );
+  assert.deepEqual(unexpectedRequests, []);
   console.log(JSON.stringify({ passed }, null, 2));
 } finally {
   await browser.close();
