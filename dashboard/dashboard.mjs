@@ -38,6 +38,7 @@ export function createDashboard({
   onExpired = () => {},
 }) {
   let lessonCards = null, cardImport = null, cardFactory = null, capturedSession = "", lessonNotice = "";
+  let lessonEditGeneration = 0;
   let layoutReady = false,
     midnightTimer;
   let user = null,
@@ -94,8 +95,11 @@ export function createDashboard({
         weekday: "long",
       }) + " · 日本時間";
   }
+  function protectLessonState(generation = lessonEditGeneration) {
+    return lessonCards && (lessonCards.hasEdits() || lessonCards.element.contains(document.activeElement) || generation !== lessonEditGeneration);
+  }
   function rollover() {
-    if (lessonCards?.hasEdits()) { message('日付が変わりました。授業記録の入力を保持しています。保存・確認後に更新してください。'); midnightTimer=setTimeout(rollover,60000); return; }
+    if (protectLessonState()) { message('日付が変わりました。授業記録の入力を保持しています。保存・確認後に更新してください。'); midnightTimer=setTimeout(rollover,60000); return; }
     invalidate(); updateDate(); if(!pagePaused)draw();
   }
   function placeLessonCards(host){
@@ -293,7 +297,8 @@ export function createDashboard({
     if (!force && cache.has(id)) return;
     const controller = new AbortController(),
       request = epoch,
-      requestedDay = date;
+      requestedDay = date,
+      requestedLessonGeneration = lessonEditGeneration;
     let timedOut = false;
     const timeout = setTimeout(() => {
       timedOut = true;
@@ -323,12 +328,22 @@ export function createDashboard({
       )
         return;
       if (requestedDay !== dayJst()) {
+        // Every widget can finish across midnight. Keep the old-day lesson
+        // controller if the user edited it while ANY of these reads was pending.
+        if (protectLessonState(requestedLessonGeneration)) {
+          el?.querySelector('[data-refresh-status]')?.remove();
+          el?.setAttribute('aria-busy', 'false');
+          lessonMessage('日付が変わりました。授業記録の入力を保持しています。保存・確認後に更新してください。');
+          clearTimeout(midnightTimer);
+          midnightTimer = setTimeout(rollover, 60000);
+          return;
+        }
         invalidate();
         updateDate();
         draw();
         return;
       }
-      if(id === "lessons" && lessonCards && (lessonCards.hasEdits() || lessonCards.element.contains(document.activeElement))) {
+      if(id === "lessons" && protectLessonState(requestedLessonGeneration)) {
         el?.querySelector('[data-refresh-status]')?.remove();
         el?.setAttribute('aria-busy', 'false');
         lessonMessage('授業記録の入力を保持しています。保存・確認後に更新してください。');
@@ -339,7 +354,7 @@ export function createDashboard({
       patchContent(id);
     } catch (e) {
       if (request === epoch && (!controller.signal.aborted || timedOut)) {
-        if(e.status !== 401 && id === 'lessons' && lessonCards && (lessonCards.hasEdits() || lessonCards.element.contains(document.activeElement))) {
+        if(e.status !== 401 && id === 'lessons' && protectLessonState(requestedLessonGeneration)) {
           el?.querySelector('[data-refresh-status]')?.remove();
           el?.setAttribute('aria-busy', 'false');
           lessonMessage('更新できませんでした。授業記録の入力を保持しています。保存・確認後に更新してください。');
@@ -546,6 +561,11 @@ export function createDashboard({
     },
     true,
   );
+  // Keep a monotonic edit fence even after blur/autosave clears dirty and
+  // pending state. Programmatic render assignments do not emit input/change.
+  for (const type of ['input', 'change']) $("dashboard-widgets").addEventListener(type, event => {
+    if (event.target.matches('input, textarea, select') && event.target.closest('.home-lesson-cards')) lessonEditGeneration++;
+  }, true);
   $("dashboard-widgets").addEventListener('home-lesson-discard-reload',()=>{
     lessonCards?.destroy();lessonCards=null;cache.delete('lessons');load('lessons',true);
   });

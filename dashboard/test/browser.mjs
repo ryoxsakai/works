@@ -676,6 +676,76 @@ try {
   }
   passed.push('refresh responses preserve a newly focused editor and newly typed draft, on success and failure, without replacing the node or writing data');
 
+  // Read snapshot arrives after an edit has already autosaved and lost focus.
+  const savedDuringRead = await fixture();
+  await ready(savedDuringRead.page);
+  const savedHost = savedDuringRead.page.locator('[data-content="lessons"]');
+  await expect(savedHost).toHaveAttribute('aria-busy', 'false');
+  const savedInput = savedHost.locator('textarea.record-plan').first();
+  await savedInput.evaluate(el => { window.qaSavedInput = el; });
+  let releaseOldRead, signalRead;
+  const oldReadHeld = new Promise(resolve => { releaseOldRead = resolve; });
+  const oldReadStarted = new Promise(resolve => { signalRead = resolve; });
+  await savedDuringRead.page.route('**/api/lesson-records', async route => {
+    const oldSnapshot = []; // The already observed empty/revision-zero read.
+    signalRead(); await oldReadHeld; await route.fulfill({json: oldSnapshot});
+  });
+  const writes = [];
+  await savedDuringRead.page.route('**/api/lesson-plan', route => {
+    const body = route.request().postDataJSON(); writes.push(body);
+    return route.fulfill({json:{target:body.target,lesson_plan:body.lesson_plan,record_revision:writes.length}});
+  });
+  await savedDuringRead.page.locator('#open-home-settings').click();
+  await savedDuringRead.page.locator('#dashboard-refresh').click();
+  await oldReadStarted;
+  await savedInput.fill('読込待ち中に自動保存した合成予定');
+  await savedDuringRead.page.locator('#home-auth-action').focus();
+  await expect(savedInput.locator('..').locator('.lesson-plan-status')).toContainText('保存済み');
+  assert.equal(writes.length,1);
+  await expect(savedInput).not.toBeFocused();
+  releaseOldRead();
+  await expect(savedHost).toHaveAttribute('aria-busy','false');
+  await expect(savedInput).toHaveValue('読込待ち中に自動保存した合成予定');
+  assert.equal(await savedInput.evaluate(el => el === window.qaSavedInput),true);
+  await savedInput.fill('保存後の次の合成予定');
+  await savedDuringRead.page.locator('#home-auth-action').focus();
+  await expect.poll(() => writes.length).toBe(2);
+  assert.equal(writes[1].record_revision,1);
+  assert.equal(writes[1].expected_lesson_plan,'読込待ち中に自動保存した合成予定');
+  await expect(savedInput.locator('..').locator('.lesson-plan-status')).toContainText('保存済み');
+  assert.deepEqual(savedDuringRead.errors,[]);
+  await savedDuringRead.close();
+  passed.push('stale refresh cannot roll back an autosaved unfocused lesson value or its next-write revision');
+
+  // A late response from ANY widget must not clear newly edited lesson cards
+  // when JST crosses midnight, even before the normal rollover timer runs.
+  for (const boundary of ['lessons','todo']) {
+    const midnightDraft = await fixture(); await ready(midnightDraft.page);
+    const lessonHost = midnightDraft.page.locator('[data-content="lessons"]');
+    await expect(lessonHost).toHaveAttribute('aria-busy','false');
+    const input = lessonHost.locator('textarea.record-plan').first();
+    await input.evaluate(el => { window.qaMidnightInput = el; });
+    let release, started;
+    const held = new Promise(resolve => { release = resolve; });
+    const requested = new Promise(resolve => { started = resolve; });
+    await midnightDraft.page.route(boundary === 'lessons' ? '**/api/lesson-records' : '**/api/todo', async route => {
+      started(); await held; await route.fulfill({json: boundary === 'lessons' ? [] : {tasks:[]}});
+    });
+    await midnightDraft.page.clock.setFixedTime(new Date('2026-10-29T14:59:59Z'));
+    await midnightDraft.page.locator('#open-home-settings').click();
+    await midnightDraft.page.locator('#dashboard-refresh').click(); await requested;
+    await input.fill('日付またぎ中の未保存合成下書き');
+    await midnightDraft.page.clock.setFixedTime(new Date('2026-10-29T15:00:01Z'));
+    release();
+    await expect(midnightDraft.page.locator(`[data-content="${boundary}"]`)).toHaveAttribute('aria-busy','false');
+    await expect(input).toHaveValue('日付またぎ中の未保存合成下書き');
+    await expect(input).toBeFocused();
+    assert.equal(await input.evaluate(el => el === window.qaMidnightInput),true);
+    await expect(midnightDraft.page.locator('#dashboard-message')).toContainText('日付が変わりました');
+    assert.deepEqual(midnightDraft.errors,[]); await midnightDraft.close();
+  }
+  passed.push('JST midnight responses from lesson and Todo reads preserve newly edited lesson cards before rollover');
+
   const fast = await fixture({init: () => {
     window.qaSkeletonEvents = [];
     const active = new Map();
