@@ -1,3 +1,4 @@
+import { cardLoading } from "../shared/card-loading.mjs?v=1";
 import {sameNameLessonCount} from '../shared/lesson-counts.mjs?v=1';
 import {unassignedLessonDisplay} from '../shared/unassigned-lesson.mjs?v=1';
 import {recordRowSnapshot,independentRecordRows,synchronizeRecordRows} from './record-row-sync.mjs?v=1';
@@ -520,7 +521,8 @@ async function loadRecordTable() {
   const isCurrent = () => request === recordTableRequest && dayStr === selectedRecordDate
     && calendars === [...selectedCalendarIds].sort().join("\n") && selectedTerms === recordTermScope(terms,selectedTermIds);
   renderRecordDateLabel();
-  els.recordTbody.innerHTML = `<tr><td colspan="7" role="status">授業記録を読み込んでいます…</td></tr>`;
+  els.recordTbody.setAttribute("aria-busy", "true");
+  els.recordTbody.innerHTML = `<tr><td colspan="7">${cardLoading("授業記録を読み込んでいます…")}</td></tr>`;
   try {
     const token = getSessionToken();
     if (!token) {
@@ -571,7 +573,7 @@ async function loadRecordTable() {
     if (!isCurrent()) return;
 
     const planReadVersion = lessonPlans.version;
-    const dayEntries = await readRecordEntries(dayEvents,null,{isCurrent,onProgress:(done,total)=>{if(isCurrent())els.recordTbody.innerHTML=`<tr><td colspan="7" role="status">授業記録を読み込んでいます… ${done}/${total}</td></tr>`;}});
+    const dayEntries = await readRecordEntries(dayEvents,null,{isCurrent,onProgress:(done,total)=>{if(isCurrent())els.recordTbody.querySelector(".card-loading p").textContent=`授業記録を読み込んでいます… ${done}/${total}`;}});
     if (!isCurrent()) return;
     const previousEntries = await readPreviousEntries(dayEvents,rangeEvents,dayEntries,isCurrent);
     const entries = [...dayEntries,...previousEntries];
@@ -634,6 +636,8 @@ async function loadRecordTable() {
     if (!isCurrent()) return;
     els.recordTbody.innerHTML = `<tr><td colspan="7" role="status">授業記録を取得できませんでした。日付を切り替えて再試行してください。</td></tr>`;
     throw err;
+  } finally {
+    if (isCurrent()) els.recordTbody.setAttribute("aria-busy", "false");
   }
 }
 

@@ -1,3 +1,4 @@
+import { cardLoading } from "../shared/card-loading.mjs?v=1";
 import { homeLessonModel, lessonApi } from "./lesson-model.mjs?v=4-name-count";
 import {
   MODULES,
@@ -99,6 +100,7 @@ export function createDashboard({
   }
   function placeLessonCards(host){
     const updated=document.createElement('p');updated.className='widget-updated';updated.textContent='取得 '+time(lessonCards.readAt);
+    host.setAttribute("aria-busy", "false");
     host.replaceChildren(lessonCards.element,updated);lessonCards.setEditing(!!draft);lessonCards.refreshLayout();
   }
   async function mountLessons() {
@@ -106,6 +108,7 @@ export function createDashboard({
     if(!host||!user)return;
     if(lessonCards){placeLessonCards(host);return;}
     if(!model?.rows?.length)return;
+    host.setAttribute('aria-busy', 'true');
     cardImport ||= import('./lesson-cards.mjs?v=8-student-link');
     try {
       const {createHomeLessonCards}=await cardImport;
@@ -113,7 +116,7 @@ export function createDashboard({
       if(!lessonCards)lessonCards=createHomeLessonCards(model,{session:capturedSession,getSessionToken,onExpired:expire,reload:()=>load('lessons',true),onNotice:lessonMessage,onStateChange:clearLessonMessage,readAt:cache.get("lessons")?.at});
       const target=document.querySelector('[data-content="lessons"]');
       if(target)placeLessonCards(target);
-    } catch(e) { if(request===epoch){host.textContent='授業カードを表示できませんでした。再読み込みしてください。';} }
+    } catch(e) { if(request===epoch){host.setAttribute('aria-busy', 'false');host.textContent='授業カードを表示できませんでした。再読み込みしてください。';} }
   }
   function shortcutBody() {
     return `<div class="dashboard-shortcut-links">${current()
@@ -126,7 +129,7 @@ export function createDashboard({
       )}</div>${current().shortcuts.length ? "" : '<p class="dashboard-muted">設定からリンクを追加できます。</p>'}`;
   }
   function body(id, data) {
-    if (id === "lessons") return data.unconfigured ? '<p class="dashboard-muted">授業管理の設定でカレンダーを選択してください。</p>' : !data.rows.length ? '<p class="dashboard-muted">今日の予定はありません。</p>' : '<p role="status">授業カードを準備中…</p>';
+    if (id === "lessons") return data.unconfigured ? '<p class="dashboard-muted">授業管理の設定でカレンダーを選択してください。</p>' : !data.rows.length ? '<p class="dashboard-muted">今日の予定はありません。</p>' : cardLoading('授業カードを準備中…');
     if (id === "todo") {
       const { planned, due } = todoSummary(data, date);
       return (
@@ -176,7 +179,7 @@ export function createDashboard({
     const v = cache.get(id);
     if (v?.error)
       return `<p class="alert" role="alert">${esc(v.error)}</p><button class="btn btn-outline" type="button" data-retry="${id}">再試行</button>`;
-    if (!v) return '<p class="dashboard-muted" role="status">読み込み中…</p>';
+    if (!v) return cardLoading();
     return (
       body(id, v.data) + `<p class="widget-updated">更新 ${esc(time(v.at))}</p>`
     );
@@ -271,7 +274,6 @@ export function createDashboard({
   async function load(id, force = false) {
     if(id==="lessons"&&lessonCards){
       if(lessonCards.hasEdits()||lessonCards.element.contains(document.activeElement)){if(force)lessonMessage("授業記録の入力を保持しています。保存・確認後に更新してください。");return;}
-      if(force){lessonCards.destroy();lessonCards=null;cache.delete(id);}
     }
     if (
       !user ||
@@ -294,7 +296,8 @@ export function createDashboard({
     const el = document.querySelector(`[data-content="${id}"]`);
     if (el) {
       el.setAttribute("aria-busy", "true");
-      if (force) el.innerHTML = '<p role="status">更新中…</p>';
+      if (!cache.get(id)?.data) el.innerHTML = cardLoading();
+      else if (!el.querySelector('[data-refresh-status]')) el.insertAdjacentHTML('beforeend', '<p data-refresh-status role="status">更新中…</p>');
     }
     let abortHandler;
     const aborted = new Promise((_, reject) => {
@@ -318,10 +321,24 @@ export function createDashboard({
         draw();
         return;
       }
+      if(id === "lessons" && lessonCards && (lessonCards.hasEdits() || lessonCards.element.contains(document.activeElement))) {
+        el?.querySelector('[data-refresh-status]')?.remove();
+        el?.setAttribute('aria-busy', 'false');
+        lessonMessage('授業記録の入力を保持しています。保存・確認後に更新してください。');
+        return;
+      }
+      if(id === "lessons"){lessonCards?.destroy();lessonCards=null;}
       cache.set(id, { data, at: Date.now() });
       patchContent(id);
     } catch (e) {
       if (request === epoch && (!controller.signal.aborted || timedOut)) {
+        if(e.status !== 401 && id === 'lessons' && lessonCards && (lessonCards.hasEdits() || lessonCards.element.contains(document.activeElement))) {
+          el?.querySelector('[data-refresh-status]')?.remove();
+          el?.setAttribute('aria-busy', 'false');
+          lessonMessage('更新できませんでした。授業記録の入力を保持しています。保存・確認後に更新してください。');
+          return;
+        }
+        if(id === "lessons"){lessonCards?.destroy();lessonCards=null;}
         cache.set(id, {
           error: timedOut
             ? "取得に時間がかかっています。再試行できます。"

@@ -1,3 +1,4 @@
+import {cardLoading} from "../../shared/card-loading.mjs";
 import {sameNameLessonCount} from '../../shared/lesson-counts.mjs';
 import {recordTermScope,studentNavigationEvent} from '../record-read.mjs';
 import test from 'node:test';
@@ -35,8 +36,8 @@ test('two date buttons accumulate days from the displayed date',async()=>{
   assert.deepEqual(loaded,['2026-12-31','2026-12-30','2026-12-31']);
 });
 function setup(overrides={}){
-  const state=vm.createContext({isScheduledLesson,excludedTitles:new Set(),sameNameLessonCount,recordTermScope,lessonPlans:{version:0},lessonEventRef,attributedLessonRecord,recordTableRequest:0,selectedRecordDate:'2026-10-17',selectedCalendarIds:new Set(['qa']),selectedTermIds:new Set(),terms:[],calendarColors:new Map(),
-    els:{recordTbody:{innerHTML:'',querySelectorAll:()=>[]}},getSessionToken:()=>true,renderRecordDateLabel(){},recordDateRange,shiftRecordDate,isExcludedScheduleEvent:()=>false,
+  const state=vm.createContext({cardLoading,isScheduledLesson,excludedTitles:new Set(),sameNameLessonCount,recordTermScope,lessonPlans:{version:0},lessonEventRef,attributedLessonRecord,recordTableRequest:0,selectedRecordDate:'2026-10-17',selectedCalendarIds:new Set(['qa']),selectedTermIds:new Set(),terms:[],calendarColors:new Map(),
+    els:{recordTbody:{innerHTML:'',attributes:{},setAttribute(name,value){this.attributes[name]=value;},querySelector:()=>({textContent:''}),querySelectorAll:()=>[]}},getSessionToken:()=>true,renderRecordDateLabel(){},recordDateRange,shiftRecordDate,isExcludedScheduleEvent:()=>false,
     readPreviousEntries:async()=>[],readRecordEntries:async()=>state.apiFetch(),fetchCalendarEvents:async()=>[],apiFetch:async()=>[],renderRecordTable:rows=>{state.rendered=rows;},...overrides});
   vm.runInContext(fn('loadRecordTable'),state);return state;
 }
@@ -54,9 +55,12 @@ for(const stage of ['day','range','entries']){
     }});
     const old=state.loadRecordTable();
     while(!release)await Promise.resolve();
+    assert.equal(state.els.recordTbody.attributes['aria-busy'], 'true');
+    assert.match(state.els.recordTbody.innerHTML, /card-loading/);
     state.selectedRecordDate='2026-10-16';await state.loadRecordTable();
     release(stage==='entries'?[]:[ev('2026-10-17')]);await old;
     assert.equal(state.rendered[0].eventId,'2026-10-16');
+    assert.equal(state.els.recordTbody.attributes['aria-busy'], 'false');
   });
 }
 test('old errors are suppressed while current errors replace the loading row',async()=>{
@@ -68,6 +72,8 @@ test('old errors are suppressed while current errors replace the loading row',as
   state.fetchCalendarEvents=async()=>{throw new Error('current request');};
   await assert.rejects(state.loadRecordTable(),/current request/);
   assert.match(state.els.recordTbody.innerHTML,/取得できません/);
+  assert.equal(state.els.recordTbody.attributes['aria-busy'], 'false');
+  assert(!state.els.recordTbody.innerHTML.includes('card-loading'));
 });
 test('fetch uses Tokyo day boundaries and preserves record payloads',async()=>{
   const ranges=[];const state=setup({fetchCalendarEvents:async(min,max)=>{ranges.push([min,max]);return [ev('2026-10-17')];},apiFetch:async()=>[{calendar_event_id:'2026-10-17',record_exists:true,record_calendar_id:'qa',record_title:'サンプル',record_revision:1,lesson_plan:'既存の日本語\n二行目',homework:'宿題'}]});

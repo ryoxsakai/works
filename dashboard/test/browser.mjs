@@ -640,6 +640,17 @@ try {
   await expect(delayed.page.locator('[data-content="lessons"]')).toContainText(
     "サンプル生徒 A",
   );
+  const pendingHost = delayed.page.locator('[data-content="todo"]');
+  await expect(pendingHost).toHaveAttribute('aria-busy', 'true');
+  await expect(pendingHost.locator('.card-loading-shapes')).toHaveAttribute('aria-hidden', 'true');
+  for (const width of [390, 1440]) for (const theme of ['light', 'dark']) {
+    await delayed.page.setViewportSize({width, height: 1000});
+    await delayed.page.evaluate(theme => document.documentElement.dataset.theme = theme, theme);
+    await delayed.page.screenshot({path: path.join(artifacts, `loading-${width}-${theme}.png`), fullPage: true});
+  }
+  await delayed.page.emulateMedia({reducedMotion: 'reduce'});
+  assert.equal(await pendingHost.locator('.card-loading-shapes span').first().evaluate(el => getComputedStyle(el).animationName), 'none');
+  await delayed.page.screenshot({path: path.join(artifacts, 'loading-reduced-motion.png'), fullPage: true});
   await delayed.page.locator("#home-auth-action").click();
   delayed.release();
   await expect(delayed.page.locator("#home-auth-action")).toHaveAttribute(
