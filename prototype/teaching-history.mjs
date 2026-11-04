@@ -1,12 +1,13 @@
 import {recordDateRange,shiftRecordDate} from '../tutor/record-date.js';
 import {lessonEventRef,sameLessonEvent} from '../shared/lesson-plan.js';
+import {sameNameLessonCount} from '../shared/lesson-counts.mjs';
 import {validDay} from './teaching-model.mjs';
 // Mirrors Tutor loadRecordTable: first selected covering term, otherwise +/-90
-// civil days; title matching is trim-only, deliberately not next-link NFKC matching.
+// civil days. Count positions use the shared same-calendar/title rule.
 export function teachingScope(day,settings,terms=[]){
  if(!validDay(day))throw new Error('授業日を確認してください。');
  if(!Array.isArray(terms)||terms.some(row=>!row||typeof row.start_date!=='string'||typeof row.end_date!=='string'))throw new Error('学期の情報を確認してください。');
- const selected=new Set(settings.selected_term_ids||[]),term=terms.find(row=>selected.has(row.id)&&day>=row.start_date&&day<=row.end_date);
+ const selected=new Set((settings.selected_term_ids||[]).map(String)),term=terms.find(row=>selected.has(String(row.id))&&day>=row.start_date&&day<=row.end_date);
  const first=term?term.start_date:shiftRecordDate(day,-90),last=term?term.end_date:shiftRecordDate(day,90);
  if(!validDay(first)||!validDay(last)||first>last)throw new Error('学期の期間を確認してください。');
  return {first,last,term:term?{id:term.id,label:term.label}:null,range:recordDateRange(first,last)};
@@ -20,7 +21,7 @@ export function teachingHistory(current,events,settings){
  if(own&&!sameLessonEvent(own,ref))return {state:'changed',previous:null};
  const identities=selected.map(event=>event.id);if(new Set(identities).size!==identities.length)return {state:'duplicate',previous:null};
  const index=selected.findIndex(event=>event.id===ref.id),previous=index>0?selected[index-1]:null;
- const count={n:index+1||1,m:selected.length||1};
+ const count=sameNameLessonCount(current,events,settings.excluded_titles||[]);
  if(previous&&(raw.some(event=>event.id===previous.id&&event.calendar_id!==previous.calendar_id)||selected.filter(event=>Date.parse(event.start)===Date.parse(previous.start)).length>1||Date.parse(previous.start)===Date.parse(ref.start)))return {...count,state:'ambiguous',previous:null};
  return {...count,state:index<0?'missing':'ready',previous};
 }

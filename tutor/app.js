@@ -952,7 +952,7 @@ function formatDateOnly(d) {
 async function loadSettings() {
   const settings = await apiFetch("/settings");
   selectedCalendarIds = new Set(settings.selected_calendars || []);
-  selectedTermIds = new Set(settings.selected_term_ids || []);
+  selectedTermIds = new Set((settings.selected_term_ids || []).map(Number));
   excludedTitles = new Set(settings.excluded_titles || []);
 }
 
@@ -2470,7 +2470,8 @@ function captureStudentContext() {
   return { generation: studentGeneration, name: els.curriculumName.value.trim(), group: studentGroup,
     year: els.curriculumYearSelect.value, term: els.curriculumTermSelect.value,
     selectedTerms: [...selectedTermIds].sort().join(","),
-    calendars: [...selectedCalendarIds].sort().join("\n") };
+    calendars: [...selectedCalendarIds].sort().join("\n"),
+    excludedTitles: JSON.stringify([...excludedTitles].sort()) };
 }
 function isCurrentStudentContext(context) {
   const current = captureStudentContext();
@@ -2558,8 +2559,7 @@ async function loadCurriculumEvents(context = captureStudentContext()) {
     return;
   }
 
-  const timeMin = new Date(`${term.start_date}T00:00:00`).toISOString();
-  const timeMax = new Date(`${term.end_date}T23:59:59`).toISOString();
+  const [timeMin, timeMax] = recordDateRange(term.start_date, term.end_date);
   const events = await fetchCalendarEvents(timeMin, timeMax, { withCalendarId: true });
   assertStudentContext(context);
   const choice = studentChoices.find((item) => item.name === name && item.group === studentGroup);
@@ -2572,10 +2572,10 @@ async function loadCurriculumEvents(context = captureStudentContext()) {
       return aStart.localeCompare(bStart);
     });
 
-  await renderCurriculumTable(matched, context);
+  await renderCurriculumTable(matched, context, events);
 }
 
-async function renderCurriculumTable(events, context = captureStudentContext()) {
+async function renderCurriculumTable(events, context = captureStudentContext(), countEvents = events) {
   assertStudentContext(context);
   if (events.length === 0) {
     els.curriculumTbody.innerHTML = `<tr><td colspan="7">該当する予定がありません</td></tr>`;
@@ -2588,16 +2588,17 @@ async function renderCurriculumTable(events, context = captureStudentContext()) 
   const entryMap = new Map(entries.map((entry) => [entry.calendar_event_id, entry]));
 
   els.curriculumTbody.innerHTML = events
-    .map((ev, i) => {
+    .map((ev) => {
       const saved = attributedLessonRecord(entryMap.get(ev.id), lessonEventRef(ev));
       const start = ev.start?.dateTime || ev.start?.date || "";
-      if (lessonRecordNeedsReview(saved)) return lessonReviewRow(lessonEventRef(ev),saved,ev.summary || "授業",formatCurriculumDate(start));
+      const count = sameNameLessonCount(ev, countEvents, [...excludedTitles]);
+      if (lessonRecordNeedsReview(saved)) return lessonReviewRow(lessonEventRef(ev),saved,ev.summary || "授業",formatCurriculumDate(start)).replace('</strong>', `</strong> <small class="semester-candidate-count">${count.n}/${count.m}回（同名予定・所属未確定）</small>`);
       const checked = saved.completed ? "checked" : "";
       const ref = lessonEventRef(ev);
       lessonPlans.seed(ref, saved.lesson_plan || "", planReadVersion, saved.record_revision,saved.attribution_status,saved.owner_id||null);
       return `<tr data-event-id="${escapeHtml(ev.id)}" data-record-ref="${escapeHtml(JSON.stringify(ref))}" data-record-revision="${saved.record_revision}" data-record-owner="${escapeHtml(saved.owner_id||'')}" data-completed="${saved.completed ? 1 : 0}">
         <td><input type="checkbox" class="curriculum-completed" ${checked} /></td>
-        <td>第${i + 1}回${lessonAttributionNotice(saved)}</td>
+        <td>${count.n}/${count.m}回${lessonAttributionNotice(saved)}</td>
         <td>${formatCurriculumDate(start)}</td>
         <td>${lessonPlanEditor(ref, ev.summary || "授業", "curriculum-plan",saved.owner_id||"")}</td>
         <td><textarea class="curriculum-test" rows="2">${escapeHtml(saved.confirmation_test || "")}</textarea></td>
