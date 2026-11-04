@@ -9,7 +9,7 @@ export function unassignedLessonDisplay(row, target) {
       row.record_pending_operation || row.pending_allowed !== true ||
       row.pending_storage_available !== true || typeof row.pending_exists !== 'boolean' ||
       typeof row.pending_context !== 'string' || !row.pending_context ||
-      !Number.isSafeInteger(row.record_revision) || row.record_revision < 0 ||
+      !Number.isSafeInteger(row.record_revision) || (row.pending_exists ? row.record_revision < 1 : row.record_revision !== 0) ||
       row.completed || row.confirmation_test || row.homework || row.lesson_memo ||
       typeof row.lesson_plan !== 'string' || (!row.pending_exists && row.lesson_plan !== '')) return null;
   return {lessonPlan: row.lesson_plan, pendingContext: row.pending_context};

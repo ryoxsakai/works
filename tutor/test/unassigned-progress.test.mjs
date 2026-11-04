@@ -12,7 +12,7 @@ const row=(changes={})=>({calendar_event_id:target.id,record_storage:'d1_owner',
 test('only a verified, readable unassigned occurrence can be rendered read-only',()=>{
  assert.deepEqual(unassignedLessonDisplay(row(),target),{lessonPlan:'',pendingContext:'synthetic-context'});
  assert.deepEqual(unassignedLessonDisplay(row({pending_exists:true,record_revision:2,lesson_plan:'予定の下書き'}),target),{lessonPlan:'予定の下書き',pendingContext:'synthetic-context'});
- for(const changed of [{record_read_target:{...target,calendar_id:'other'}},{calendar_event_id:'other'},{attribution_status:'target_unavailable'},{record_exists:true},{owner_id:'other-owner'},{record_hold_active:true},{record_collision:true},{record_pending_operation:'unknown'},{record_requires_reload:true},{pending_storage_available:false},{pending_allowed:false},{pending_exists:undefined},{lesson_plan:'unexpected'},{homework:'unexpected'}]) assert.equal(unassignedLessonDisplay(row(changed),target),null);
+ for(const changed of [{record_read_target:{...target,calendar_id:'other'}},{calendar_event_id:'other'},{attribution_status:'target_unavailable'},{record_exists:true},{owner_id:'other-owner'},{record_hold_active:true},{record_collision:true},{record_pending_operation:'unknown'},{record_requires_reload:true},{pending_storage_available:false},{pending_allowed:false},{pending_exists:undefined},{record_revision:1},{pending_exists:true,record_revision:0},{lesson_plan:'unexpected'},{homework:'unexpected'}]) assert.equal(unassignedLessonDisplay(row(changed),target),null);
 });
 
 test('student progress keeps seven normal cells and does not create a save target',async()=>{
@@ -22,7 +22,7 @@ test('student progress keeps seven normal cells and does not create a save targe
  vm.runInContext(source.slice(start,end),state);
  await state.renderCurriculumTable([event],{},[event]);
  assert.match(els.curriculumTbody.innerHTML,/data-unassigned-progress/);assert.equal((els.curriculumTbody.innerHTML.match(/<td/g)||[]).length,7);assert.equal((els.curriculumTbody.innerHTML.match(/disabled/g)||[]).length,5);assert.doesNotMatch(els.curriculumTbody.innerHTML,/data-record-ref|data-event-id|保持・確認/);
- saved=row({pending_exists:true,lesson_plan:'<下書き>'});await state.renderCurriculumTable([event],{},[event]);assert.match(els.curriculumTbody.innerHTML,/&lt;下書き&gt;/);
+ saved=row({pending_exists:true,record_revision:1,lesson_plan:'<下書き>'});await state.renderCurriculumTable([event],{},[event]);assert.match(els.curriculumTbody.innerHTML,/&lt;下書き&gt;/);
  plans.set(lessonEventKey(target),{dirty:true});await state.renderCurriculumTable([event],{},[event]);assert.match(els.curriculumTbody.innerHTML,/保持・確認/);
  plans.clear();copies.push({target,value:'保持入力'});await state.renderCurriculumTable([event],{},[event]);assert.match(els.curriculumTbody.innerHTML,/保持・確認/);copies.length=0;drafts.set(lessonEventKey(target),{});await state.renderCurriculumTable([event],{},[event]);assert.match(els.curriculumTbody.innerHTML,/保持・確認/);drafts.clear();saved=row({pending_storage_available:false});await state.renderCurriculumTable([event],{},[event]);assert.match(els.curriculumTbody.innerHTML,/保持・確認/);
 });
