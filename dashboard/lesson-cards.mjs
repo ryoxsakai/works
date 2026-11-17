@@ -1,7 +1,7 @@
 import {createOwnerMemoEditors} from '../shared/owner-memo.mjs?v=2-autosave';
 import {readNextLessonWithTemplate} from "../shared/next-lesson-read.mjs?v=1";
 import { curriculumSelectionName } from "../shared/student-profile-key.js";
-import {lessonRecordRows,renderPlanEditors,renderMemoEditors} from '../shared/lesson-record-view.mjs?v=8-student-link';
+import {lessonRecordRows,renderPlanEditors,renderMemoEditors} from '../shared/lesson-record-view.mjs?v=9-todo';
 import {lessonEventKey,isScheduledLesson} from '../shared/lesson-plan.js';
 import {lessonRecordNeedsReview} from '../shared/lesson-attribution.js';
 import {createLessonPlanController} from '../tutor/lesson-plan.js?v=8';

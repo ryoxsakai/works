@@ -6,7 +6,7 @@ import {readPendingRecovery,persistPendingRecovery,clearPendingRecovery,pendingR
 import {createOwnerMemoEditors} from '../shared/owner-memo.mjs?v=2-autosave';
 import {boundedRead,precedingLegacyEvents,precedingOwnerEvents,recordTermScope,studentNavigationEvent} from './record-read.mjs?v=3-navigation';
 import {readNextLessonWithTemplate} from "../shared/next-lesson-read.mjs?v=1";
-import { lessonRecordRows, renderPlanEditors, renderMemoEditors, previousOwnerRecord } from "../shared/lesson-record-view.mjs?v=8-student-link";
+import { lessonRecordRows, renderPlanEditors, renderMemoEditors, previousOwnerRecord } from "../shared/lesson-record-view.mjs?v=9-todo";
 import { setUserAvatar } from "../shared/avatar.mjs?v=1";
 import { attachRecordCarousel } from "./record-carousel.mjs?v=3";
 import { attachRecordToasts } from "./record-toasts.mjs?v=3-name";
@@ -490,7 +490,7 @@ function setActivePageTab(tab) {
   requestAnimationFrame(() => { resizeRecordInputs(); renderStudentMemos(); renderLessonPlans(); });
 }
 
-setActivePageTab(localStorage.getItem(ACTIVE_PAGE_TAB_KEY) || "record");
+setActivePageTab(new URLSearchParams(location.search).has("todo_event") ? "record" : localStorage.getItem(ACTIVE_PAGE_TAB_KEY) || "record");
 
 els.pageTabBtns.forEach((btn) => {
   btn.addEventListener("click", () => setActivePageTab(btn.dataset.pageTab));
@@ -644,6 +644,15 @@ async function loadRecordTable() {
 function renderRecordTable(rows) {
   rows.filter((row) => !row.emptySlot && (!lessonRecordNeedsReview(row.record)||row.record.pending_allowed)).forEach((row) => lessonPlans.seed(row.ref, row.lessonPlan, row.planReadVersion, row.record.record_revision,row.record.attribution_status,row.record.owner_id||null,row.record.pending_context||null));
   els.recordTbody.innerHTML = lessonRecordRows(rows, { escapeHtml, formatTimeOrPeriod, lessonRecordNeedsReview, lessonReviewRow, lightenHexColor, calendarName: id => calendarColors.get(id)?.name, lessonAttributionNotice, lessonPlanEditor, lessonPlanFeedback, recordStudentPrefName, lessonEventKey });
+  const linked = new URLSearchParams(location.search);
+  if (linked.has("todo_event")) {
+    const row=[...els.recordTbody.querySelectorAll("[data-record-ref]")].find(el=>{
+      const ref=JSON.parse(el.dataset.recordRef);
+      return ref.id===linked.get("todo_event") && ref.calendar_id===linked.get("todo_calendar");
+    });
+    row?.scrollIntoView({block:"nearest"});
+    row?.querySelector(".record-student-link")?.focus({preventScroll:true});
+  }
   renderStudentMemos();
   ownerMemos.render(els.recordTbody);
   renderLessonPlans();
@@ -712,6 +721,13 @@ document.addEventListener("click", async (event) => {
 function recordStudentPrefName(title) {
   return studentChoices.some((item) => item.name === title) ? title : curriculumSelectionName(title);
 }
+
+document.querySelector("#student-todo").onclick=()=>{
+  const name=els.curriculumName.value;
+  if (!name || navigatingStudent || selectingStudent) {showActionError(new Error("生徒を選択してください"));return;}
+  const hash=new URLSearchParams({kind:"student",name,group:studentGroup||""});
+  window.open("/todo/#"+hash,"_blank","noopener");
+};
 
 function renderStudentMemos() { renderMemoEditors(document, studentMemos, { isProfileDisabled: (input, name) => input === els.studentMemoInput && (loadedPrefName !== name || navigatingStudent || selectingStudent), resizeRecordInput }); }
 
@@ -837,7 +853,11 @@ async function loadSignedInTutor(){
     try{
       await loadCalendarEvents();
       const params=new URLSearchParams(location.search),calendarId=params.get('student_calendar'),eventId=params.get('student_event');
-      if(calendarId&&eventId){
+      if(params.has("todo_student")) {
+        const choice=studentChoices.find(i=>i.name===params.get("todo_student") && (!params.get("todo_group") || i.group===params.get("todo_group")));
+        if(choice){studentGroup=choice.group;await goToCurriculum(choice.name,null,choice.calendarIds?.[0]);}
+        else showActionError(new Error("紐付け元の生徒が現在の表示期間・教室に見つかりません"));
+      } else if(calendarId&&eventId){
         const source=await studentNavigationEvent(rawEvents,{calendarId,eventId,day:params.get('record_date')},selectedCalendarIds,async day=>{const [start,end]=recordDateRange(day);return fetchCalendarEvents(start,end,{withCalendarId:true});});
         if(source&&selectedCalendarIds.has(calendarId)&&isScheduledLesson(source,[...excludedTitles])){
           const day=tokyoDateKey(new Date(source.start.dateTime));

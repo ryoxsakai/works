@@ -1,0 +1,389 @@
+/* The Works header and theme supply the same surfaces in both color schemes. */
+.todo-page .todo-main {
+  max-width: 1360px;
+  padding: clamp(16px, 3vw, 40px) clamp(12px, 4vw, 48px) 5rem;
+}
+.planner-layout {
+  display: grid;
+  grid-template-columns: minmax(185px, 235px) minmax(0, 1fr);
+  gap: clamp(20px, 4vw, 64px);
+  align-items: start;
+}
+.planner-sidebar {
+  border-inline-end: 1px solid var(--line);
+  padding-inline-end: 18px;
+  min-width: 0;
+}
+.planner-sidebar nav {
+  display: grid;
+  gap: 2px;
+}
+.planner-sidebar nav .btn {
+  width: 100%;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  text-align: start;
+  overflow-wrap: anywhere;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--ink);
+  min-height: 40px;
+  padding: 7px 12px;
+}
+.planner-sidebar nav b {
+  width: 1.25em;
+  text-align: center;
+  color: var(--muted);
+}
+.planner-sidebar nav .btn[aria-current="page"],
+.planner-sidebar nav .btn:hover {
+  background: color-mix(in srgb, var(--accent) 13%, var(--panel));
+  color: var(--ink);
+}
+.planner-sidebar nav [aria-current="page"] {
+  font-weight: 700;
+}
+.planner-sidebar nav small {
+  margin-inline-start: auto;
+}
+.side-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 18px;
+}
+.side-heading h3 {
+  font-size: 0.87rem;
+  color: var(--muted);
+  margin: 0;
+  padding-inline-start: 12px;
+}
+.side-heading .btn {
+  border: 0;
+  background: none;
+}
+#projects > div {
+  padding-inline-start: calc(var(--level) * 12px);
+}
+.project-dot {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  flex: 0 0 11px;
+  background: var(--dot);
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--ink) 18%, transparent);
+}
+.planner-content {
+  min-width: 0;
+}
+.planner-content .heading {
+  margin-bottom: 14px;
+}
+.planner-content .heading h2 {
+  font-size: clamp(1.65rem, 3vw, 2.1rem);
+  letter-spacing: -0.025em;
+  overflow-wrap: anywhere;
+}
+#today-label {
+  font-size: 0.83rem;
+  margin: 0;
+}
+.planner-content .capture {
+  padding: 5px;
+  border-radius: 12px;
+}
+.capture-destination,
+.display-options,
+.planner-filters {
+  font-size: 0.85rem;
+}
+.capture-destination {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  margin: 5px 0;
+}
+.capture-destination select,
+.display-options select {
+  width: auto;
+}
+.planner-filters {
+  margin: 8px 0;
+}
+.planner-filters summary,
+.planner-settings summary,
+.deadline-panel summary,
+.row-menu summary {
+  cursor: pointer;
+}
+.planner-filters .toolbar {
+  margin: 10px 0;
+}
+.planner-settings {
+  padding: 12px 6px;
+  margin-top: 20px;
+  border-top: 1px solid var(--line);
+}
+.planner-settings > div {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+.planner-settings .btn {
+  text-align: start;
+}
+.planner-settings small,
+#delivery-state {
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+}
+.display-options {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  border-bottom: 1px solid var(--line);
+  padding: 10px 0;
+}
+.display-options label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+.planner-list .group,
+.planner-content .board .group {
+  margin: 0;
+  padding: 0;
+  background: none;
+  border: 0;
+}
+.planner-list .group-heading {
+  margin-top: 15px;
+}
+.planner-content .planner-row {
+  display: flex;
+  flex-flow: row nowrap;
+  gap: 6px;
+  align-items: start;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 10px 0;
+  margin: 0;
+}
+.planner-row .task-body {
+  min-width: 0;
+  flex: 1;
+}
+.todo-page .planner-row .task-name {
+  display: block;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  text-align: start;
+  min-height: 32px;
+  line-height: 1.5;
+  margin: 0;
+  padding: 4px 0;
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+}
+.planner-row .task-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 9px;
+  justify-content: start;
+  font-size: 0.78rem;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.planner-row .done-toggle {
+  border: none;
+  background: none;
+  padding: 4px;
+  min-width: 36px;
+  min-height: 40px;
+  flex: none;
+}
+.planner-row .drag-grip {
+  cursor: grab;
+  touch-action: none;
+  flex: none;
+  align-self: center;
+  color: var(--muted);
+  padding: 4px;
+}
+.planner-row .tag-chip,
+.meta-project {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.todo-page .planner-row .tag-chip {
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  min-height: 24px;
+  font-size: 0.75rem;
+  padding: 0 7px;
+}
+.row-menu {
+  position: relative;
+  flex: none;
+}
+.row-menu summary {
+  padding: 8px;
+  min-height: 40px;
+  list-style: none;
+}
+.row-menu summary::-webkit-details-marker {
+  display: none;
+}
+.row-menu[open] {
+  z-index: 3;
+}
+.row-menu > div {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  width: 11rem;
+  padding: 5px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 6px 20px #0002;
+}
+.row-menu .btn {
+  display: block;
+  text-align: start;
+  width: 100%;
+  border: 0;
+  min-height: 32px;
+}
+.todo-page .deadline-panel {
+  padding: 10px 14px;
+  margin-top: 20px;
+}
+#quick-preview,
+#capture-source {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin-top: 4px;
+}
+#quick-preview:empty,
+#capture-source:empty,
+#notice:empty,
+#recovery:empty {
+  display: none;
+}
+#review-controls nav,
+#color-options,
+.label-options,
+#child-tasks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+#review-controls [aria-current],
+#color-options [aria-pressed="true"] {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+#color-options button,
+.label-options label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+#origin-link,
+#child-tasks {
+  margin-top: 8px;
+}
+#child-tasks span {
+  display: block;
+  width: 100%;
+}
+#mobile-nav {
+  display: none;
+}
+.planner-content .board {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(195px, 100%), 1fr));
+  overflow: visible;
+  gap: 12px;
+}
+.todo-page [hidden] {
+  display: none !important;
+}
+@media (max-width: 730px) {
+  .planner-layout {
+    display: block;
+  }
+  .planner-sidebar {
+    padding: 0;
+    border: 0;
+    margin-bottom: 10px;
+  }
+  #mobile-nav {
+    display: block;
+  }
+  #planner-menu {
+    display: none;
+  }
+  #planner-menu.is-open {
+    display: block;
+    background: var(--panel);
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+  }
+  .planner-row .task-meta {
+    gap: 4px 6px;
+  }
+  .planner-row .drag-grip {
+    padding: 7px 2px;
+  }
+  .planner-content .board {
+    display: block;
+  }
+  .planner-content .capture {
+    display: flex;
+    flex-direction: row;
+  }
+  .planner-content .capture input {
+    width: 0;
+    flex: 1;
+  }
+  .planner-content .capture button {
+    width: auto;
+  }
+  .row-menu .btn {
+    min-height: 44px;
+  }
+}
+
+.planner-sidebar nav .btn {
+  justify-content: flex-start;
+}
+.display-options label {
+  white-space: nowrap;
+}
+.display-options label select {
+  min-width: 5em;
+}
+.heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.task-body .task-name:focus-visible {
+  outline-offset: 0;
+}

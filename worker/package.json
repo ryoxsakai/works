@@ -25,5 +25,8 @@
     "dompurify": "3.4.17",
     "marked": "18.1.1",
     "wrangler": "^3.90.0"
+  },
+  "dependencies": {
+    "@block65/webcrypto-web-push": "2.0.0"
   }
 }

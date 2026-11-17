@@ -11,6 +11,10 @@
     <link rel="stylesheet" href="/shared/ui/todo-bootstrap.css?v=1" />
     <link rel="stylesheet" href="/shared/ui/todo-tokens.css?v=2" />
     <link rel="stylesheet" href="/shared/ui/button-states.css?v=1" />
+    <link rel="manifest" href="/todo/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/logo.png" />
+    <link rel="stylesheet" href="/todo/planner.css" />
+    <script defer src="/dashboard/vendor/Sortable-1.15.6.min.js"></script>
     <script type="module" src="/shared/header.js?v=4"></script>
   </head>
   <body class="todo-page todo-bootstrap">
@@ -25,28 +29,36 @@
       </div>
     </header>
     <main id="app" hidden class="todo-main">
-      <div class="heading">
-        <div>
-          <p class="eyebrow">ONE THING AT A TIME</p>
-          <h2>今日から、ひとつずつ。</h2>
-          <p id="today-label" class="muted"></p>
-        </div>
-        <button id="roles-open"><span data-works-icon="bx-user-circle"></span> 役割を管理</button>
-      </div>
-      <form id="capture" class="panel capture">
-        <label for="quick-title" class="sr-only">タスク名</label
-        ><input
-          id="quick-title"
-          maxlength="500"
-          required
-          placeholder="思いついたことを、ひとこと"
-        /><button class="primary" type="submit">＋ 追加</button>
-      </form>
-      <label class="capture-destination">追加先<select id="capture-day"><option value="">予定なし · インボックス</option><option value="0">今日の予定</option><option value="1">明日の予定</option></select></label>
-      <p class="hint">
-        タイトルだけで登録できます。役割・予定日・締切などは、あとから「詳細」で。
-      </p>
-      <div class="task-search"><label for="task-search">タスクを探す</label><input id="task-search" type="search" placeholder="タイトル・メモで検索" /><button id="clear-filters" type="button" hidden>絞り込みを解除</button></div>
+      <div class="planner-layout">
+        <aside class="planner-sidebar" aria-label="ToDoメニュー">
+          <button id="mobile-nav" type="button" aria-expanded="false" aria-controls="planner-menu">☰　一覧を選ぶ</button>
+          <div id="planner-menu">
+            <nav id="views" aria-label="タスク一覧"></nav>
+            <div class="side-heading"><h3>プロジェクト</h3><button id="new-project" aria-label="プロジェクトを管理">＋</button></div>
+            <nav id="projects" aria-label="プロジェクト"></nav>
+            <div class="side-heading"><h3>ラベル</h3><button id="new-label" aria-label="ラベルを管理">＋</button></div>
+            <nav id="labels" aria-label="ラベル"></nav>
+            <div class="side-heading"><h3>保存フィルター</h3><button id="new-filter" aria-label="フィルターを管理">＋</button></div>
+            <nav id="saved-filters" aria-label="保存フィルター"></nav>
+            <details class="planner-settings"><summary>設定・連携</summary><div>
+              <button id="roles-open">役割を管理</button><button id="categories-open">カテゴリを管理</button>
+              <button id="push-settings">この端末の通知を有効にする</button><button id="push-disable">この端末の通知を解除</button>
+              <label><input type="checkbox" id="calendar-sync"> Googleカレンダーに反映</label>
+              <small>予定日がある未完了タスクをメインカレンダーに反映します。オフにすると連携した予定を取り除きます。</small>
+              <button id="sync-status">連携状態を確認</button><output id="delivery-state" aria-live="polite"></output>
+            </div></details>
+          </div>
+        </aside>
+        <div class="planner-content">
+          <div class="heading"><div><h2 id="view-title">今日</h2><p id="today-label" class="muted"></p></div>
+          <div class="heading-actions"><button id="edit-view" hidden>編集</button><button id="new-task" class="primary">＋ タスク</button></div></div>
+          <form id="capture" class="panel capture">
+            <label for="quick-title" class="sr-only">クイック追加</label><input id="quick-title" maxlength="500" required placeholder="タスクを追加　例：明日 16:00 教材を確認 #代官山" />
+            <button class="primary" type="submit">追加</button>
+          </form>
+          <div id="quick-preview" aria-live="polite"></div><div id="capture-source"></div>
+          <label class="capture-destination">追加先<select id="capture-day"><option value="">指定なし</option><option value="0">今日の予定</option><option value="1">明日の予定</option></select></label>
+          <details class="planner-filters"><summary>検索・絞り込み</summary>      <div class="task-search"><label for="task-search">タスクを探す</label><input id="task-search" type="search" placeholder="タイトル・メモで検索" /><button id="clear-filters" type="button" hidden>絞り込みを解除</button></div>
       <div class="toolbar">
         <label
           >役割
@@ -59,25 +71,14 @@
             <option value="">すべて</option>
           </select></label
         >
-        <button id="categories-open" type="button"><span data-works-icon="bx-grid-alt"></span> カテゴリを管理</button>
-        <div class="view-switch btn-group" role="group" aria-label="表示切替">
-          <button id="list-view" aria-pressed="true"><span data-works-icon="bx-list-check"></span> 日付リスト</button
-          ><button id="board-view" aria-pressed="false"><span data-works-icon="bx-grid-alt"></span> カンバン</button>
-        </div>
-      </div>
-      <div id="notice" role="status" aria-live="polite"></div>
+      </div></details>
+      <div class="display-options"><div class="view-switch btn-group" role="group" aria-label="表示切替"><button id="list-view" aria-pressed="true">リスト</button><button id="board-view" aria-pressed="false">ボード</button></div>
+        <label>並べ替え <select id="task-sort"><option value="manual">手動</option><option value="plannedDay">予定日</option><option value="deadline">締切</option><option value="priority">優先度</option><option value="name">名前</option></select></label></div>
+            <div id="notice" role="status" aria-live="polite"></div>
       <div id="recovery"></div>
-      <section class="panel deadline-panel" aria-labelledby="deadline-heading">
-        <h3 id="deadline-heading">締切の確認</h3>
-        <p class="hint">
-          期限超過・7日以内の締切をすべて表示。予定日を動かしても締切は変わりません。
-        </p>
-        <div id="deadlines"></div>
-      </section>
-      <p id="task-count" class="hint" role="status"></p><div id="tasks" aria-label="タスク一覧"></div>
-      <p class="hint">
-        役割はあなた自身の担当です。会話からも同じToDoを更新できます。自動監視や繰り返しは設定されません。
-      </p>
+      <p id="task-count" class="hint" role="status"></p><div id="review-controls"></div><div id="tasks" aria-label="タスク一覧"></div>
+      <details class="panel deadline-panel"><summary>締切の確認 <span id="due-count"></span></summary><div id="deadlines"></div></details>
+      </div></div>
     </main>
     <div id="login-screen" class="login panel">
       <h2>Works ToDo管理</h2>
@@ -105,7 +106,7 @@
               <option value="done">完了</option>
             </select></label
           ><label
-            >重要度の詳細（任意）<select name="priority">
+             hidden>重要度の詳細（任意）<select name="priority">
               <option value="">指定なし</option>
               <option value="1">低</option>
               <option value="2">中</option>
@@ -113,6 +114,16 @@
             </select></label
           >
         </div>
+        <fieldset class="plan-fields"><legend>分類・予定</legend>
+          <div class="form-grid"><label>プロジェクト<select id="task-project"></select></label><label>セクション<input id="task-section" maxlength="100" list="known-sections"></label>
+          <label>親タスク<select id="task-parent"></select></label><label>優先度<select id="task-priority"><option value="1">P1・最優先</option><option value="2">P2・高</option><option value="3">P3・中</option><option value="4">P4・通常</option></select></label>
+          <label>開始時刻（日本時間）<input id="task-time" type="time"></label><label>所要時間（分）<input id="task-duration" type="number" min="1" max="1440" placeholder="30"></label>
+          <label>通知日時（日本時間）<input id="task-reminder" type="datetime-local"></label>
+          <label>繰り返し<select id="task-repeat"><option value="">なし</option><option value="fixed">予定日を基準に繰り返す</option><option value="after">完了日から繰り返す</option></select></label>
+          <label id="interval-field">間隔（日）<input id="task-interval" type="number" min="1" max="3650" value="7"></label></div>
+          <datalist id="known-sections"></datalist><div class="label-options" id="task-labels"></div><div id="origin-link"></div>
+          <div id="child-tasks"></div>
+        </fieldset>
         <label class="check-label"
           ><input type="checkbox" name="important" /> ★ 大切なタスク</label
         ><label
@@ -152,6 +163,15 @@
         <p id="detail-error" role="alert"></p>
       </form>
     </dialog>
+    <dialog id="organizer" aria-labelledby="organizer-title"><div class="dialog-head"><h2 id="organizer-title"></h2><button data-close aria-label="閉じる">×</button></div>
+      <label>編集対象<select id="organizer-item"></select></label><form id="organizer-form"><label>名前<input id="organizer-name" required maxlength="100"></label>
+      <label id="org-parent-field">親プロジェクト<select id="organizer-parent"></select></label>
+      <fieldset id="org-colors"><legend>表示色</legend><div id="color-options"></div></fieldset>
+      <div id="filter-fields"><label>検索語<input id="filter-query" maxlength="500"></label><div class="form-grid"><label>プロジェクト<select id="filter-project"></select></label><label>ラベル<select id="filter-label"></select></label>
+      <label>状態<select id="filter-status"><option value="">すべて</option><option value="pending">未着手</option><option value="doing">進行中</option><option value="waiting">連絡待ち</option><option value="done">完了</option></select></label>
+      <label>優先度<select id="filter-priority"><option value="">すべて</option><option>1</option><option>2</option><option>3</option><option>4</option></select></label></div>
+      <label><input type="checkbox" id="filter-due"> 期限超過・7日以内の締切</label></div>
+      <div id="organizer-order"><button type="button" id="org-up">↑ 上へ</button> <button type="button" id="org-down">↓ 下へ</button></div><p id="organizer-error" role="alert"></p><div class="dialog-actions"><button id="organizer-delete" type="button">削除</button><button type="submit" class="primary">保存</button></div></form></dialog>
     <dialog id="role-dialog" aria-labelledby="roles-heading">
       <div class="dialog-head">
         <h2 id="roles-heading">自分の役割</h2>
@@ -246,6 +266,6 @@
         ><button class="primary">カテゴリを追加</button>
       </form>
     </dialog>
-    <script type="module" src="/todo/todo.js?v=3"></script>
+    <script type="module" src="/todo/todo.js?v=4"></script>
   </body>
 </html>

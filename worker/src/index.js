@@ -5597,6 +5597,11 @@ async function writeTodo(env, state, cloneRequests) {
   const current = await readTodo(env);
   // Old clients cannot erase roles or operation receipts by omitting them.
   state = { ...state, roles: state.roles ?? current.roles };
+  if (Number.isInteger(state.revision) && state.revision !== current.revision) throw httpError(409, "変更が競合しました。再読み込みしてください");
+  if (state.planner || current.planner || state.tasks?.some(t => t?.plan)) {
+    const {preparePlanner} = await import("./todo-planner.js");
+    preparePlanner(state, current);
+  }
   validateTodo(state);
   if (!Number.isSafeInteger(state.revision) || state.revision < 0)
     throw todoError("revision is required");
@@ -5606,6 +5611,7 @@ async function writeTodo(env, state, cloneRequests) {
     tasks: state.tasks,
     categories: state.categories,
     roles: state.roles,
+    ...(state.planner && {planner: state.planner}),
     cloneRequests: cloneRequests ?? current.cloneRequests ?? {},
   });
   let result;
@@ -5666,6 +5672,7 @@ async function cloneTodo(env, args) {
     const task = {
       id: crypto.randomUUID(),
       name: source.name,
+      ...(source.plan && {plan:{project:source.plan.project, section:source.plan.section, labels:source.plan.labels, priority:source.plan.priority, source:source.plan.source}}),
       category: source.category,
       roleId: source.roleId ?? null,
       priority: source.priority,
@@ -5952,6 +5959,7 @@ async function callTodoTool(env, name, args = {}) {
           : "pending");
     for (const key of Object.keys(todoFields))
       if (Object.hasOwn(args, key)) task[key] = args[key];
+    if (Object.hasOwn(args,"priority") && task.plan) task.plan.priority = args.priority ? 4-args.priority : 4;
     if (args.status !== undefined) {
       task.progress =
         args.status === "done"
@@ -5976,6 +5984,7 @@ async function callTodoTool(env, name, args = {}) {
   }
   if (name === "delete_todo") {
     state.tasks = state.tasks.filter((t) => t.id !== args.id);
+    for (const child of state.tasks) if (child.plan?.parent === args.id) child.plan.parent = null;
     await writeTodo(env, state);
     return { ok: true };
   }
@@ -5983,6 +5992,10 @@ async function callTodoTool(env, name, args = {}) {
 }
 
 export default {
+  async scheduled(event, env, ctx) {
+    const {deliverTodoWork} = await import("./todo-delivery.js");
+    ctx.waitUntil(deliverTodoWork(env, () => readTodo(env), () => mintGoogleAccessToken(env)));
+  },
   async fetch(request, env) {
     const origin = env.ALLOWED_ORIGIN;
     const headers = corsHeaders(origin);
@@ -6074,9 +6087,14 @@ export default {
         if (browserSession.aud || browserSession.scope || browserSession.fid) throw httpError(401, "browser session required for KDP API");
         return await handleKdp(request, env, url, headers);
       }
+      if (url.pathname.startsWith("/api/todo/integrations/")) {
+        if (browserSession.aud || browserSession.scope || browserSession.fid) throw httpError(401, "browser session required");
+        const {integrationRequest} = await import("./todo-delivery.js");
+        return json(await integrationRequest(request, env, url.pathname.split("/").pop()), {...headers, "Cache-Control":"no-store"});
+      }
       if (url.pathname === "/api/todo/clone" && request.method === "POST") return json(await cloneTodo(env, await request.json()), headers);
       if (url.pathname === "/api/todo/clone" && request.method === "GET") return json((await readTodo(env)).cloneRequests?.[url.searchParams.get("request_id")]?.result ?? { found: false }, headers);
-      if (url.pathname === "/api/todo" && request.method === "GET") return json(await readTodo(env), headers);
+      if (url.pathname === "/api/todo" && request.method === "GET") return json({...await readTodo(env), plannerVersion:1}, headers);
       if (url.pathname === "/api/todo" && request.method === "PUT") return json(await writeTodo(env, await request.json()), headers);
 
 
