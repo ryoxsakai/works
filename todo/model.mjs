@@ -106,7 +106,7 @@ export function nextDay(rule, scheduled, completion) {
   );
   return addDays(base, periods * rule.days);
 }
-export function parseQuick(input, day) {
+export function parseQuick(input, day, scheduledDay = day) {
   const result = {
     name: "",
     labels: [],
@@ -130,7 +130,7 @@ export function parseQuick(input, day) {
     } else if (after) result.repeat = { mode: "after", days: Number(after[1]) };
     else if (value === "毎日") {
       result.repeat = { mode: "fixed", days: 1 };
-      result.day ||= day;
+      result.day ||= scheduledDay;
     } else if (["今日", "明日", "明後日"].includes(value))
       result.day = addDays(day, ["今日", "明日", "明後日"].indexOf(value));
     else if (validDay(value)) result.day = value;
@@ -141,7 +141,7 @@ export function parseQuick(input, day) {
     else if (/^@.{1,100}$/u.test(value)) result.labels.push(value.slice(1));
     else names.push(token);
   }
-  if (result.time || result.repeat) result.day ||= day;
+  if (result.time || result.repeat) result.day ||= scheduledDay;
   result.name = names.join(" ");
   return result;
 }

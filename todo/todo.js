@@ -1,4 +1,4 @@
-import {createPlanner} from "./planner-ui.mjs";
+import {createPlanner} from "./planner-ui.mjs?v=2";
 import { startTodoPresentation } from "../shared/ui/todo-presentation.mjs";
 startTodoPresentation();
 import {
@@ -16,6 +16,18 @@ const esc = (value) =>
         c
       ],
   );
+const header = document.querySelector(".works-header");
+new ResizeObserver(() => {
+  document.body.style.setProperty("--works-header-height", header.offsetHeight + "px");
+}).observe(header);
+function resizeCaptureSheet() {
+  const viewport = window.visualViewport;
+  if (!viewport) return;
+  const inset = Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop);
+  $("capture-sheet").style.setProperty("--keyboard-inset", inset + "px");
+}
+window.visualViewport?.addEventListener("resize", resizeCaptureSheet);
+window.visualViewport?.addEventListener("scroll", resizeCaptureSheet);
 const statusNames = {
   pending: "未着手",
   doing: "進行中",
@@ -101,8 +113,25 @@ async function api(path = "", options = {}) {
     });
   return body;
 }
-function message(text) {
+document.addEventListener("click", event => {
+  for (const menu of document.querySelectorAll(".row-menu[open]")) {
+    if (!menu.contains(event.target)) menu.open = false;
+  }
+});
+document.addEventListener("keydown", event => {
+  if (event.key === "Escape") {
+    const menu = document.querySelector(".row-menu[open]");
+    if (menu && !document.querySelector("dialog[open]")) {
+      menu.open = false;
+      menu.querySelector("summary").focus();
+    }
+  }
+});
+let noticeTimer;
+function message(text, temporary = false) {
+  clearTimeout(noticeTimer);
   $("notice").textContent = text;
+  if (temporary) noticeTimer = setTimeout(() => { $("notice").textContent = ""; }, 5000);
 }
 function setBusy(value) {
   busy = value;
@@ -150,7 +179,7 @@ async function save(next, success = "保存しました") {
     render();
     if (dialog?.open && epoch === dialogEpoch)
       dialog.dataset.baseRevision = String(state.revision);
-    message(success);
+    message(success, true);
     return true;
   } catch (error) {
     message(
@@ -195,7 +224,7 @@ function card(t) {
   const manual = $("task-sort").value === "manual";
   return `<article class="task-card planner-row" data-task="${esc(t.id)}">
     ${manual ? '<span class="drag-grip" aria-hidden="true" title="ドラッグして移動">⠿</span>' : ""}
-    <button class="done-toggle" data-action="complete" aria-label="${done ? "未着手に戻す" : "完了にする"}：${esc(t.name)}">${done ? "✓" : "○"}</button>
+    <button class="done-toggle" data-action="complete" aria-pressed="${done}" aria-label="${done ? "未着手に戻す" : "完了にする"}：${esc(t.name)}">${done ? "✓" : "○"}</button>
     <div class="task-body"><button class="task-name" data-action="detail" aria-label="詳細：${esc(t.name)}">${t.important ? "★ " : ""}${esc(t.name)}</button>
     <div class="task-meta">${planner.meta(t)}${roleBadge(t)}
     ${t.plannedDay ? `<small>予定 ${esc(t.plannedDay)}</small>` : ""}${t.deadline ? `<small class="${t.deadline < base && !done ? "overdue" : ""}">締切 ${esc(t.deadline)}</small>` : ""}
@@ -207,8 +236,8 @@ function card(t) {
     ${[1,3,7,14].map(n=>`<button data-action="clone" data-days="${n}" aria-label="${n===7?"1週間後":n===14?"2週間後":n+"日後"}に複製：${esc(t.name)}">${n}日後に複製</button>`).join("")}
     <button data-action="custom-clone">日付を選んで複製</button></div></details></article>`;
 }
-function group(title,tasks) {
-  return `<section class="group">${title ? `<div class="group-heading"><h3>${esc(title)}</h3><span>${tasks.length}</span></div>` : ""}<div class="task-rows">${tasks.map(card).join("")}</div></section>`;
+function group(title,tasks,date) {
+  return `<section class="group"${date ? ` id="agenda-${esc(date)}"` : ""}>${title ? `<div class="group-heading"><h3>${esc(title)}</h3>${date ? `<button data-add-day="${esc(date)}" aria-label="${esc(title)}にタスクを追加">＋</button>` : `<span>${tasks.length}</span>`}</div>` : ""}<div class="task-rows">${tasks.map(card).join("")}</div>${date && !tasks.length ? '<p class="agenda-empty">予定なし</p>' : ""}</section>`;
 }
 function render() {
   let role = $("role-filter").value,
@@ -255,7 +284,8 @@ function render() {
         )
         .join("")
     : '<p class="muted">7日以内・期限超過の締切はありません。</p>';
-  $("today-label").textContent = `${base} · 日本時間（Asia/Tokyo）`;
+  $("today-label").textContent = new Intl.DateTimeFormat("ja-JP", {month:"long",day:"numeric",weekday:"short",timeZone:"UTC"}).format(new Date(base));
+  $("today-label").title = base + " · 日本時間";
   $("due-count").textContent = due.length ? due.length + "件" : "";
   planner.renderList(list,mode,base);
   $("list-view").setAttribute("aria-pressed", mode === "list");
@@ -263,7 +293,7 @@ function render() {
   renderRecovery();
   setBusy(busy);
 }
-function openDialog(dialog) {
+function openDialog(dialog, replace = false) {
   dialogEpoch++;
   dialog.returnFocus = document.activeElement;
   dialog.dataset.baseRevision = String(state.revision);
@@ -271,7 +301,8 @@ function openDialog(dialog) {
   dialog.querySelector("[data-dialog-conflict]").hidden = true;
   setBusy(busy);
   dialog.showModal();
-  history.pushState({ todoDialog: dialog.id }, "");
+  if (replace) history.replaceState({ todoDialog: dialog.id }, "");
+  else history.pushState({ todoDialog: dialog.id }, "");
 }
 function restoreDialogFocus(target) {
   if (target && !target.isConnected) {
@@ -293,6 +324,8 @@ function closeDialog(dialog, fromBack = false) {
   if (!dialog.open) return;
   dialogEpoch++;
   dialog.close();
+  if (dialog.id === "detail") document.querySelector(".inspected")?.classList.remove("inspected");
+  if (dialog.id === "capture-sheet") planner.clearCapture();
   const target = dialog.returnFocus;
   if (target?.disabled) pendingFocusRestore = { target, epoch: dialogEpoch };
   else restoreDialogFocus(target);
@@ -399,7 +432,11 @@ function openDetail(id, show = true) {
   renderSteps();
   $("step-text").value = "";
   $("detail-error").textContent = "";
-  if (show) openDialog($("detail"));
+  if (show) {
+    const row = document.querySelector(`[data-task="${CSS.escape(id)}"]`);
+    row?.classList.add("inspected");
+    openDialog($("detail"));
+  }
 }
 $("step-add").onclick = () => {
   const input = $("step-text");
@@ -472,9 +509,11 @@ $("quick-title").onkeydown = (e) => {
 $("capture").onsubmit = async (e) => {
   e.preventDefault();
   if (busy) return;
+  const epoch = dialogEpoch;
+  if (!$("capture-sheet").open || $("capture-sheet").dataset.stale === "true") return;
   const name = $("quick-title").value.trim(),
     captureBase = today(),
-    plannedDay = $("capture-day").value === "" ? null : offset(captureBase, Number($("capture-day").value));
+    plannedDay = $("capture-day").value || null;
   if (!name) return;
   const next = structuredClone(state);
   next.tasks.push({
@@ -490,17 +529,22 @@ $("capture").onsubmit = async (e) => {
     status: "pending",
   });
   const task=next.tasks.at(-1);
-  try { planner.capture(next,task); } catch(error) {message(error.message);return;}
+  try { planner.capture(next,task); } catch(error) { $("capture-error").textContent = error.message; return; }
   if (await save(next, task.plannedDay ? task.plannedDay+" の予定に追加しました" : task.plan.project ? "プロジェクトに追加しました" : "インボックスに追加しました")) {
+    if (epoch !== dialogEpoch) return;
     $("quick-title").value = "";
     $("task-search").value = $("role-filter").value = $("category-filter").value = "";
     planner.captured(task);
-    $("quick-title").focus();
-  }
+  } else $("capture-error").textContent = $("notice").textContent;
 };
 $("tasks").onclick = async (e) => {
   const button = e.target.closest("button[data-action]");
-  if (!button || busy) return;
+  if (busy) return;
+  if (!button) {
+    const row = e.target.closest("[data-task]");
+    if (row && !e.target.closest("button,details,.drag-grip")) row.querySelector("[data-action=detail]").click();
+    return;
+  }
   const id = button.closest("[data-task]").dataset.task;
   if (button.dataset.action === "detail") openDetail(id);
   if (button.dataset.action === "clone")

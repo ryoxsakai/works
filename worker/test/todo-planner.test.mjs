@@ -37,6 +37,8 @@ test("Japanese quick capture, saved order, review and independent recurrence", (
     priority: 1,
   });
   assert.equal(parseQuick("明日の教材を準備", day).name, "明日の教材を準備");
+  assert.equal(parseQuick("16:00 教材確認", day, "2026-12-01").day, "2026-12-01");
+  assert.equal(parseQuick("明日 16:00 教材確認", day, "2026-12-01").day, "2026-11-19");
   const old = { tasks: [structuredClone(task)], planner: defaults() };
   const next = structuredClone(old);
   next.tasks[0].status = "done";

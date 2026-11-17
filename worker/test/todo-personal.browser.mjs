@@ -185,7 +185,21 @@ async function nav(page,id) {
   if(!await item.isVisible()) await page.locator('#mobile-nav').click();
   await item.click();
 }
+async function openCapture(page) {
+  const add = page.locator("#mobile-add");
+  await (await add.isVisible() ? add : page.locator("#new-task")).click();
+  await expect(page.locator("#quick-title")).toBeFocused();
+}
+async function showTasks(page) {
+  if (await page.locator("#mobile-nav").isVisible() && await page.locator("#mobile-nav").getAttribute("aria-expanded")==="true")
+    await page.locator("#mobile-nav").click();
+}
 async function openSection(page,selector) {
+  if (selector === ".planner-filters") {
+    await showTasks(page);
+    if (!await page.locator("#display-panel").isVisible()) await page.locator("#display-button").click();
+    return;
+  }
   const row=page.locator(selector);
   if(!await row.locator('summary').first().isVisible()) await page.locator('#mobile-nav').click();
   if(!await row.evaluate(el=>el.open)) await row.locator('summary').first().click();
@@ -209,10 +223,27 @@ try {
       );
       await page.goto(origin + "/todo/");
       await expect(page.locator("#app")).toBeVisible();
-      await expect(page.locator("#today-label")).toContainText(base);
+      await expect(page.locator("#today-label")).toHaveAttribute("title",new RegExp(base));
+      const type = await page.evaluate(() => {
+        const selectors = ["#today-label","#task-count","#display-button",".planner-row .task-name","#view-title",".works-header h1"];
+        return selectors.map(selector => {
+          const css = getComputedStyle(document.querySelector(selector));
+          return [css.fontFamily.split(",")[0].replaceAll('"',""),css.fontWeight];
+        });
+      });
+      assert.deepEqual(type,["200","200","300","400","400","400"].map(weight=>["Noto Sans JP",weight]));
+      const taskBounds = await page.locator("#tasks .task-card").nth(2).boundingBox();
+      assert.ok(taskBounds.y + taskBounds.height < 844, "first three tasks fit before scrolling");
+      if (width <= 390) {
+        assert.ok(taskBounds.x < 2 && taskBounds.width >= width-2, "edge-to-edge mobile rows");
+        await expect(page.locator("#mobile-add")).toBeVisible();
+      }
+      await openCapture(page);
       await expect(page.locator('#capture button')).toHaveClass(/btn-solid/);
       assert.equal(await page.locator('#capture button').evaluate(el=>getComputedStyle(el).whiteSpace),'nowrap');
       assert.ok((await page.locator('#capture button').boundingBox()).height<=56,'capture action stays one line');
+      await page.keyboard.press("Escape");
+      await expect(page.locator("#capture-sheet")).toBeHidden();
       const beforePresentation=JSON.stringify(await db()), beforePosts=postCount;
       await page.evaluate(async()=>{
         const {startTodoPresentation}=await import('/shared/ui/todo-presentation.mjs');
@@ -245,7 +276,7 @@ try {
       await expect(page.locator("#deadlines")).toContainText("today4");
       await page.locator("#clear-filters").click();
       await expect(page.locator("#task-search")).toBeFocused();
-      await expect(page.locator("#task-count")).toContainText("全8件");
+      await expect(page.locator("#task-count")).toHaveText("今日のタスク　5件");
       await expect(page.locator("#view-title")).toHaveText("今日");
       await expect(page.locator(".task-card")).toHaveCount(5);
       await nav(page,"all");
@@ -352,7 +383,9 @@ try {
     (await db()).tasks.length,
     "active renamed category normalizes filter and visible list together",
   );
+  await showTasks(page);
   await page.locator("#task-search").fill("not visible capture context");
+  await openCapture(page);
   await page.locator("#quick-title").fill("日本語の確定中");
   const beforeIme = (await db()).tasks.length;
   for (const fields of [{isComposing:true}, {keyCode:229}]) {
@@ -368,7 +401,9 @@ try {
   await expect(page.locator("#notice")).toContainText("インボックス");
   assert.equal((await db()).tasks.at(-1).plannedDay, null);
   await expect(page.locator("#task-search")).toHaveValue("");
-  await page.locator("#capture-day").selectOption("1");
+  await nav(page,"upcoming");
+  await page.locator('[data-add-day="2026-10-28"]').click();
+  await expect(page.locator("#capture-day")).toHaveValue("2026-10-28");
   await page.locator("#quick-title").fill("明日の保護者面談資料を準備");
   await page.locator("#quick-title").press("Enter");
   await expect(page.locator("#notice")).toContainText("2026-10-28");
@@ -382,7 +417,7 @@ try {
   assert.equal((await db()).tasks.at(-1).plannedDay, base);
   assert.equal((await db()).tasks.at(-1).deadline, null);
   await expect(page.locator(`[data-task="${newId}"] [data-action="detail"]`)).toBeFocused();
-  await page.locator("#capture-day").selectOption("");
+
 
   await page
     .getByRole("button", { name: "詳細：合成 today4", exact: true })
@@ -405,6 +440,7 @@ try {
     "students",
   );
   await page.keyboard.press("Escape");
+  await showTasks(page);
   await page
     .getByRole("button", { name: "詳細：合成 today0", exact: true })
     .click();
@@ -614,6 +650,7 @@ try {
 }
 
 async function verifyPlanner(page,db,origin,nav,rowMenu) {
+  await openCapture(page);
   await page.locator("#quick-title").fill("毎週水曜 12:15 配布資料 #代官山/冬期講習 @準備 @印刷 p1");
   await page.locator("#quick-title").press("Enter");
   await expect(page.locator("#view-title")).toHaveText("代官山 / 冬期講習");
@@ -625,6 +662,7 @@ async function verifyPlanner(page,db,origin,nav,rowMenu) {
   await page.locator("#organizer-form button[type=submit]").click();
   await expect(page.locator("#organizer")).toBeHidden();
   assert.equal((await db()).planner.projects.find(i=>i.id===first.plan.project).color,"green");
+  await openCapture(page);
   await page.locator("#quick-title").fill("板書案");
   await page.locator("#quick-title").press("Enter");
   await expect(page.locator("#tasks .planner-row")).toHaveCount(2);
@@ -632,6 +670,7 @@ async function verifyPlanner(page,db,origin,nav,rowMenu) {
   await rowMenu(page,secondTask.id);
   await page.locator('[data-task="'+secondTask.id+'"] [data-action=up]').click();
   await expect(page.locator("#tasks .task-name").first()).toHaveText("板書案");
+  await openSection(page,".planner-filters");
   await page.locator("#task-sort").selectOption("priority");
   await expect(page.locator("#tasks .task-name").first()).toHaveText("配布資料");
   const labelId=first.plan.labels[0];
@@ -669,5 +708,45 @@ async function verifyPlanner(page,db,origin,nav,rowMenu) {
   await page.locator("#quick-title").press("Enter");
   await expect(page.locator("#tasks .task-name").filter({hasText:"合成サブタスク"})).toBeVisible();
   assert.equal((await db()).tasks.at(-1).plan.parent,parent.id);
-  console.log("PASS nested projects, project and label colors, multiple labels, manual and priority order, saved filter, weekly review and student-linked capture");
+  await nav(page,"upcoming");
+  const nextWeek = page.locator('[data-week="7"]');
+  await nextWeek.click();
+  const dayButton = page.locator("[data-add-day]").first();
+  const planned = await dayButton.getAttribute("data-add-day");
+  await dayButton.click();
+  await expect(page.locator("#capture-day")).toHaveValue(planned);
+  await page.locator("#quick-title").fill("16:00 教材を確認");
+  await page.locator("#capture-project").selectOption(first.plan.project);
+  await page.locator("#capture-details summary").click();
+  await page.locator("#capture-reminder").fill(planned+"T15:30");
+  await page.locator("#capture-deadline").fill("2026-12-11");
+  await page.locator("#capture-tags").fill("教材作成 印刷");
+  await page.locator("#capture button[type=submit]").click();
+  await expect(page.locator("#capture-sheet")).toBeHidden();
+  const scheduled = (await db()).tasks.at(-1);
+  assert.equal(scheduled.plannedDay,planned);
+  assert.equal(scheduled.plan.time,"16:00");
+  assert.equal(scheduled.plan.project,first.plan.project);
+  assert.equal(scheduled.plan.labels.length,2);
+  assert.equal(scheduled.plan.reminder,planned+"T15:30");
+  assert.equal(scheduled.deadline,"2026-12-11");
+  await page.keyboard.press("q");
+  await expect(page.locator("#quick-title")).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#capture-sheet")).toBeHidden();
+  const lesson = new URLSearchParams({kind:"lesson", name:"合成読解講座", day:planned, event:"test-event", calendar:"test-calendar"});
+  await page.goto(origin+"/todo/#"+lesson);
+  await page.reload();
+  await expect(page.locator("#capture-source")).toContainText("合成読解講座");
+  await page.locator("#quick-title").fill("授業後の復習資料");
+  await page.locator("#capture button[type=submit]").click();
+  await expect(page.locator("#capture-sheet")).toBeHidden();
+  const linked = (await db()).tasks.at(-1);
+  assert.equal(linked.plan.source.event,"test-event");
+  await page.locator('[data-task="'+linked.id+'"] .task-name').click();
+  const lessonLink = new URL(await page.locator("#origin-link a").getAttribute("href"),origin);
+  assert.equal(lessonLink.searchParams.get("record_date"),planned);
+  assert.equal(lessonLink.searchParams.get("todo_event"),"test-event");
+  assert.equal(lessonLink.searchParams.get("todo_calendar"),"test-calendar");
+  console.log("PASS nested projects, colors, labels, sorting, saved filters, review, linked student and lesson capture, week navigation and scheduled capture with a reminder");
 }

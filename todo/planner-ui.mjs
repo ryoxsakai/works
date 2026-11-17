@@ -10,7 +10,7 @@ import {
   reviewItems,
   sortTasks,
   statusOf,
-} from "./model.mjs";
+} from "./model.mjs?v=2";
 export { createPlanner };
 function createPlanner({
   $,
@@ -29,7 +29,7 @@ function createPlanner({
   const views = {
     today: "今日",
     inbox: "インボックス",
-    upcoming: "今後",
+    upcoming: "近日予定",
     all: "すべてのタスク",
     review: "週次レビュー",
     done: "完了履歴",
@@ -49,6 +49,23 @@ function createPlanner({
     source,
     captureParent,
     dragging = [];
+  let selectedDay = null;
+  const collapsedProjects = new Set();
+  const fullDate = new Intl.DateTimeFormat("ja-JP", {
+    month: "long",
+    day: "numeric",
+    weekday: "short",
+    timeZone: "UTC",
+  });
+  function setBrowse(open) {
+    $("mobile-nav").setAttribute("aria-expanded", String(open));
+    $("planner-menu").classList.toggle("is-open", open);
+    $("app").classList.toggle("browsing", open);
+  }
+  function setDisplay(open) {
+    $("display-panel").hidden = !open;
+    $("display-button").setAttribute("aria-expanded", String(open));
+  }
   const s = () => state(),
     p = () => ({ ...defaults(), ...s().planner });
   const value = (id) => $(id).value;
@@ -72,8 +89,8 @@ function createPlanner({
   }
   function setView(id) {
     view = id;
-    $("mobile-nav").setAttribute("aria-expanded", "false");
-    $("planner-menu").classList.remove("is-open");
+    setBrowse(false);
+    if (view === "upcoming") selectedDay ||= today();
     try {
       $("task-sort").value =
         localStorage.getItem("works-todo-sort:" + view) || "manual";
@@ -122,6 +139,13 @@ function createPlanner({
           )?.name);
     $("view-title").textContent = title || "タスク";
     $("edit-view").hidden = !view.includes(":");
+    for (const button of document.querySelectorAll(
+      ".bottom-tabs [data-view]",
+    )) {
+      if (button.dataset.view === view)
+        button.setAttribute("aria-current", "page");
+      else button.removeAttribute("aria-current");
+    }
     $("views").innerHTML = Object.entries(views)
       .map(([id, name]) =>
         navButton(id, name, `<b aria-hidden="true">${icons[id]}</b>`),
@@ -138,13 +162,15 @@ function createPlanner({
     while (stack.length) {
       const item = stack.pop();
       tree.push(item);
+      if (collapsedProjects.has(item.id)) continue;
       for (const child of [...(children.get(item.id) || [])].reverse())
         stack.push(child);
     }
     $("projects").innerHTML = tree
       .map(
         (i) =>
-          `<div style="--level:${Math.min(4, ancestry(tree, i.id).length - 1)}">${navButton("project:" + i.id, i.name, dot(i.color))}</div>`,
+          `<div style="--level:${Math.min(4, ancestry(data.projects, i.id).length - 1)}">${navButton("project:" + i.id, i.name, dot(i.color))}
+          ${children.has(i.id) ? `<button class="branch-toggle" aria-label="${esc(i.name)}の下位プロジェクト" aria-expanded="${!collapsedProjects.has(i.id)}" data-branch="${esc(i.id)}">${collapsedProjects.has(i.id) ? "›" : "⌄"}</button>` : ""}</div>`,
       )
       .join("");
     $("labels").innerHTML = data.labels
@@ -175,6 +201,18 @@ function createPlanner({
     dragging = [];
     navbar();
     $("review-controls").replaceChildren();
+    const agenda = view === "upcoming" && mode === "list";
+    $("week-picker").hidden = !agenda;
+    const focusDay = selectedDay || day;
+    const monday = addDays(
+      focusDay,
+      -((new Date(focusDay).getUTCDay() + 6) % 7),
+    );
+    const week = Array.from({ length: 7 }, (_, i) => addDays(monday, i));
+    if (agenda) {
+      $("week-picker").innerHTML =
+        `<div class="week-tools"><button data-week="-7" aria-label="前の週">‹</button><strong>${Number(focusDay.slice(0, 4))}年${Number(focusDay.slice(5, 7))}月</strong><button data-week="7" aria-label="次の週">›</button><button data-day="${day}">今日へ</button></div><div class="week-days">${week.map((date, i) => `<button data-day="${date}" aria-label="${fullDate.format(new Date(date))}" aria-pressed="${date === focusDay}"><small>${"月火水木金土日"[i]}</small><b>${Number(date.slice(8))}</b></button>`).join("")}</div>`;
+    }
     const visible = list.filter((t) => {
       const active = statusOf(t) !== "done";
       if (view === "done") return !active;
@@ -185,7 +223,10 @@ function createPlanner({
             (t.deadline && t.deadline <= day))
         );
       if (view === "inbox") return isInbox(t);
-      if (view === "upcoming") return active && t.plannedDay > day;
+      if (view === "upcoming")
+        return (
+          active && (agenda ? week.includes(t.plannedDay) : t.plannedDay >= day)
+        );
       if (view.startsWith("project:"))
         return active && matchProject(t, view.slice(8));
       if (view.startsWith("label:"))
@@ -238,7 +279,10 @@ function createPlanner({
       sorted = sortTasks(items, value("task-sort"));
     }
     $("task-count").textContent =
-      sorted.length + "件表示 / 全" + s().tasks.length + "件";
+      (view === "today" ? "今日のタスク　" : "") +
+      sorted.length +
+      "件" +
+      ($("clear-filters").hidden ? "" : " · 絞り込み中");
     const groups = new Map();
     for (const t of sorted) {
       let key = "";
@@ -261,10 +305,42 @@ function createPlanner({
         k,
         groups.get(k) || [],
       ]);
-    else if (view === "upcoming") blocks.sort(([a], [b]) => a.localeCompare(b));
-    $("tasks").innerHTML = sorted.length
-      ? `<div class="${mode === "board" ? "board" : "planner-list"}">${blocks.map(([key, items]) => group(key, items)).join("")}</div>`
-      : `<p class="empty">${value("task-search").trim() || value("role-filter") || value("category-filter") ? "条件に合うタスクがありません。" : view === "today" ? "今日の予定と期限超過のタスクはありません。" : view === "review" ? "この項目はすべて整理できています。" : "該当するタスクはありません。"}</p>`;
+    else if (agenda)
+      blocks = week
+        .filter(
+          (date) =>
+            date >= (week.includes(day) && focusDay >= day ? day : monday),
+        )
+        .map((date) => [date, groups.get(date) || []]);
+    $("tasks").innerHTML =
+      sorted.length || agenda
+        ? `<div class="${mode === "board" ? "board" : "planner-list"}">${blocks.map(([key, items]) => (agenda ? group(fullDate.format(new Date(key)) + (key === day ? " · 今日" : key === addDays(day, 1) ? " · 明日" : ""), items, key) : group(key, items))).join("")}</div>`
+        : `<p class="empty">${value("task-search").trim() || value("role-filter") || value("category-filter") ? "条件に合うタスクがありません。" : view === "today" ? "今日の予定と期限超過のタスクはありません。" : view === "review" ? "この項目はすべて整理できています。" : "該当するタスクはありません。"}</p>`;
+    if (agenda) {
+      const nextDate = list
+        .filter((t) => statusOf(t) !== "done" && t.plannedDay > week[6])
+        .map((t) => t.plannedDay)
+        .sort()[0];
+      if (nextDate)
+        $("tasks").insertAdjacentHTML(
+          "beforeend",
+          `<button class="next-plan" data-day="${esc(nextDate)}">次の予定　${fullDate.format(new Date(nextDate))}　›</button>`,
+        );
+    }
+    if (view === "today" && mode === "list") {
+      const start = Date.parse(day + "T00:00:00+09:00");
+      const completed = list.filter((task) => {
+        if (statusOf(task) !== "done") return false;
+        if (task.completedAt === day) return true;
+        const stamp = Date.parse(task.completedAt);
+        return stamp >= start && stamp < start + 86400000;
+      });
+      if (completed.length)
+        $("tasks").insertAdjacentHTML(
+          "beforeend",
+          `<details class="completed-today"><summary>完了済み　${completed.length}件</summary>${group("", completed)}</details>`,
+        );
+    }
     if (value("task-sort") === "manual" && window.Sortable) {
       for (const el of $("tasks").querySelectorAll(".task-rows"))
         dragging.push(
@@ -302,7 +378,8 @@ function createPlanner({
     [ids[index], ids[target]] = [ids[target], ids[index]];
     return reorder(ids);
   }
-  const parse = () => parseQuick(value("quick-title"), today());
+  const parse = () =>
+    parseQuick(value("quick-title"), today(), value("capture-day") || today());
   function preview() {
     const q = parse();
     $("quick-preview").textContent = [
@@ -322,6 +399,24 @@ function createPlanner({
           (s().tasks.find((t) => t.id === captureParent)?.name || "")
         : "";
   }
+  function openCapture(date, parentId = null, replaceDialog = false) {
+    captureParent = parentId;
+    const projects = p().projects;
+    const parent = s().tasks.find((t) => t.id === parentId);
+    $("capture-project").innerHTML =
+      option("", "インボックス") +
+      projects
+        .map((item) => option(item.id, projectPath(projects, item.id)))
+        .join("");
+    $("capture-project").value =
+      parent?.plan?.project ||
+      (view.startsWith("project:") ? view.slice(8) : "");
+    $("capture-day").value = date ?? (view === "today" ? today() : "");
+    $("capture-error").textContent = "";
+    preview();
+    openDialog($("capture-sheet"), replaceDialog);
+    $("quick-title").focus();
+  }
   function capture(next, task) {
     const q = parse();
     if (!q.name) throw Error("タスク名を入力してください");
@@ -332,7 +427,7 @@ function createPlanner({
       color: "blue",
       createdDay: today(),
     });
-    let project = view.startsWith("project:") ? view.slice(8) : null;
+    let project = value("capture-project") || null;
     if (q.project) {
       let parent = null;
       const names = q.project.split("/").filter(Boolean);
@@ -358,7 +453,10 @@ function createPlanner({
       project = parent;
     }
     const labels = new Set(view.startsWith("label:") ? [view.slice(6)] : []);
-    for (const name of q.labels) {
+    for (const name of [
+      ...q.labels,
+      ...value("capture-tags").trim().split(/\s+/).filter(Boolean),
+    ]) {
       let item = data.labels.find((i) => i.name === name);
       if (!item) {
         item = mk(name);
@@ -368,23 +466,30 @@ function createPlanner({
     }
     task.name = q.name;
     task.plannedDay = q.day || task.plannedDay;
+    task.deadline = value("capture-deadline") || null;
     task.priority = q.priority && q.priority < 4 ? 4 - q.priority : null;
-    const parent = s().tasks.find((t) => t.id === captureParent);
     task.plan = {
-      project: project || parent?.plan?.project || null,
+      project,
       labels: [...labels],
       parent: captureParent || null,
       priority: q.priority || 4,
+      reminder: value("capture-reminder") || null,
       repeat: q.repeat,
       time: q.time,
       source: source || null,
     };
   }
-  function captured(task) {
+  function clearCapture() {
     source = null;
     captureParent = null;
-    if (params.has("kind"))
-      history.replaceState(null, "", location.pathname + location.search);
+    $("capture").reset();
+    $("capture-details").open = false;
+    preview();
+  }
+  function captured(task) {
+    if (task.plannedDay && task.plannedDay > today())
+      selectedDay = task.plannedDay;
+    closeDialog($("capture-sheet"));
     setView(
       task.plan?.project
         ? "project:" + task.plan.project
@@ -484,10 +589,8 @@ function createPlanner({
         .join("") +
       `<button type="button" id="add-child">＋ サブタスク</button>`;
     $("add-child").onclick = () => {
-      captureParent = t.id;
-      closeDialog($("detail"));
-      preview();
-      $("quick-title").focus();
+      closeDialog($("detail"), true);
+      openCapture(null, t.id, true);
     };
   }
   function readDetail(t) {
@@ -679,12 +782,44 @@ function createPlanner({
   $("new-label").onclick = () => manage("labels");
   $("new-filter").onclick = () => manage("filters");
   $("mobile-nav").onclick = () => {
-    $("mobile-nav").setAttribute(
-      "aria-expanded",
-      String($("planner-menu").classList.toggle("is-open")),
-    );
+    setBrowse(!$("planner-menu").classList.contains("is-open"));
+    window.scrollTo(0, 0);
+  };
+  $("display-button").onclick = () => setDisplay($("display-panel").hidden);
+  $("sidebar-search").onclick = $("mobile-search").onclick = () => {
+    setView("all");
+    setDisplay(true);
+    $("task-search").focus();
+  };
+  $("mobile-add").onclick = () =>
+    openCapture(view === "upcoming" ? selectedDay : null);
+  $("projects").onclick = (e) => {
+    const button = e.target.closest("[data-branch]");
+    if (!button) return;
+    const id = button.dataset.branch;
+    if (collapsedProjects.has(id)) collapsedProjects.delete(id);
+    else collapsedProjects.add(id);
+    navbar();
+    $("projects")
+      .querySelector(`[data-branch="${CSS.escape(id)}"]`)
+      ?.focus();
   };
   $("app").addEventListener("click", (e) => {
+    const control = e.target.closest("[data-add-day],[data-day],[data-week]");
+    if (control) {
+      if (control.dataset.addDay) return openCapture(control.dataset.addDay);
+      selectedDay =
+        control.dataset.day ||
+        addDays(selectedDay || today(), Number(control.dataset.week));
+      render();
+      const target = document.getElementById("agenda-" + selectedDay);
+      if (control.dataset.day && target)
+        target.scrollIntoView({ block: "nearest" });
+      $("week-picker")
+        .querySelector(`.week-days [data-day="${selectedDay}"]`)
+        ?.focus({ preventScroll: true });
+      return;
+    }
     const b = e.target.closest("[data-view],[data-label]");
     if (b) setView(b.dataset.view || "label:" + b.dataset.label);
   });
@@ -698,8 +833,7 @@ function createPlanner({
     $("interval-field").hidden = !value("task-repeat");
   };
   $("new-task").onclick = () => {
-    $("quick-title").focus();
-    $("quick-title").scrollIntoView({ block: "center" });
+    openCapture(view === "upcoming" ? selectedDay : null);
   };
   document.addEventListener("keydown", (e) => {
     if (
@@ -716,6 +850,7 @@ function createPlanner({
     }
   });
   $("quick-title").addEventListener("input", preview);
+  $("capture-day").addEventListener("input", preview);
   $("calendar-sync").onchange = async () => {
     const next = structuredClone(s());
     next.planner = { ...p(), calendar: $("calendar-sync").checked };
@@ -801,13 +936,25 @@ function createPlanner({
     preview();
     const task = new URLSearchParams(location.search).get("task");
     if (task && s().tasks.some((t) => t.id === task)) openDetail(task);
-    else if (source) $("quick-title").focus();
+    else if (source) {
+      const sourceUrl = location.href;
+      const alreadyOpen = history.state?.todoDialog === "capture-sheet";
+      if (!alreadyOpen)
+        history.replaceState(
+          history.state,
+          "",
+          location.pathname + location.search,
+        );
+      openCapture(null, null, alreadyOpen);
+      history.replaceState(history.state, "", sourceUrl);
+    }
   }
   return {
     initial,
     meta,
     renderList,
     capture,
+    clearCapture,
     captured,
     fillDetail,
     readDetail,
