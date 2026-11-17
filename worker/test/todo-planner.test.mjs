@@ -131,6 +131,10 @@ test("per-device encrypted reminders and Google create, retry, update, cleanup u
   globalThis.fetch = async (url, opts) => {
     if (url === endpoint) {
       assert.equal(opts.headers["content-encoding"], "aes128gcm");
+      assert.match(
+        opts.headers.authorization,
+        /^vapid t=[\w.-]+, k=[\w-]{87}$/,
+      );
       assert.equal(opts.body.byteLength, 4096);
       pushes++;
       return new Response(null, { status: 201 });

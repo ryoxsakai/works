@@ -757,7 +757,10 @@ function createPlanner({
       });
       const reg = await navigator.serviceWorker.ready;
       const key = await api("/integrations/key"),
-        bytes = Uint8Array.from(atob(key.publicKey), (c) => c.charCodeAt(0));
+        bytes = Uint8Array.from(
+          atob(key.publicKey.replaceAll("-", "+").replaceAll("_", "/")),
+          (c) => c.charCodeAt(0),
+        );
       const sub =
         (await reg.pushManager.getSubscription()) ||
         (await reg.pushManager.subscribe({

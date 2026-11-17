@@ -38,7 +38,12 @@ async function vapid(env) {
       .run();
     value = await cfg(db, "vapid");
   }
-  return { ...JSON.parse(value), subject: "mailto:" + env.ALLOWED_EMAIL };
+  const keys = JSON.parse(value);
+  const publicKey = keys.publicKey
+    .replaceAll("+", "-")
+    .replaceAll("/", "_")
+    .replace(/=+$/, "");
+  return { ...keys, publicKey, subject: "mailto:" + env.ALLOWED_EMAIL };
 }
 function checkedEndpoint(value) {
   let url;
