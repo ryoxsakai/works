@@ -49,3 +49,6 @@ binding = "WIKI_DB"
 database_name = "works-wiki-db"
 database_id = "a6e45689-9835-4ef5-aa34-06130be32bee"
 migrations_dir = "wiki-migrations"
+
+[triggers]
+crons = ["* * * * *"]

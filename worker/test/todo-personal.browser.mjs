@@ -180,6 +180,17 @@ const browser = await chromium.launch({
   headless: true,
   args: ["--no-sandbox"],
 });
+async function nav(page,id) {
+  const item=page.locator('[data-view="'+id+'"]').first();
+  if(!await item.isVisible()) await page.locator('#mobile-nav').click();
+  await item.click();
+}
+async function openSection(page,selector) {
+  const row=page.locator(selector);
+  if(!await row.locator('summary').first().isVisible()) await page.locator('#mobile-nav').click();
+  if(!await row.evaluate(el=>el.open)) await row.locator('summary').first().click();
+}
+const rowMenu=(page,id)=>openSection(page,'[data-task="'+id+'"] .row-menu');
 try {
   for (const width of [320, 390, 1440])
     for (const theme of ["light", "dark"]) {
@@ -228,33 +239,17 @@ try {
         inputStyle.color,
         await page.locator("html").evaluate(el=>getComputedStyle(el).getPropertyValue("--fg").trim()).then(value=>{const c=value.match(/\w\w/g).slice(0,3).map(x=>parseInt(x,16));return `rgb(${c.join(", ")})`;}),
       );
+      await openSection(page,".planner-filters");
       await page.locator("#task-search").fill("no such teacher task");
       await expect(page.locator("#tasks")).toContainText("条件に合うタスクがありません");
       await expect(page.locator("#deadlines")).toContainText("today4");
       await page.locator("#clear-filters").click();
       await expect(page.locator("#task-search")).toBeFocused();
       await expect(page.locator("#task-count")).toContainText("全8件");
-      const groups = page.locator(".group");
-      await expect(
-        groups
-          .filter({
-            has: page.getByRole("heading", {
-              name: "今日のフォーカス",
-              exact: true,
-            }),
-          })
-          .locator(".task-card"),
-      ).toHaveCount(3);
-      await expect(
-        groups
-          .filter({
-            has: page.getByRole("heading", {
-              name: "今日・持ち越しの残り",
-              exact: true,
-            }),
-          })
-          .locator(".task-card"),
-      ).toHaveCount(2);
+      await expect(page.locator("#view-title")).toHaveText("今日");
+      await expect(page.locator(".task-card")).toHaveCount(5);
+      await nav(page,"all");
+      await rowMenu(page,"today0");
       const cardHeight = await page.locator('[data-task="today0"]').evaluate(e => e.getBoundingClientRect().height);
       assert.ok(cardHeight < 330, `compact card ${width}/${theme}: ${cardHeight}`);
       for (const n of [1,3,7,14]) await expect(page.locator(`[data-task="today0"] [data-days="${n}"]`)).toBeVisible();
@@ -328,7 +323,10 @@ try {
   await page.clock.install({ time: new Date("2026-10-26T15:30:00Z") });
   await page.goto(origin + "/todo/");
   await expect(page.locator("#app")).toBeVisible();
+  await nav(page,"all");
+  await openSection(page,".planner-filters");
   await page.locator("#category-filter").selectOption("スクールサポート");
+  await openSection(page,".planner-settings");
   await page.locator("#categories-open").click();
   await page.locator("#categories-form [name=name]").fill("合成カテゴリ");
   await page.locator("#categories-form button").click();
@@ -377,6 +375,8 @@ try {
   assert.equal((await db()).tasks.at(-1).plannedDay, "2026-10-28");
   assert.equal((await db()).tasks.at(-1).deadline, null);
   const newId = (await db()).tasks.at(-1).id;
+  await nav(page,"all");
+  await rowMenu(page,newId);
   await page.locator(`[data-task="${newId}"] [data-action="plan-today"]`).click();
   await expect(page.locator("#notice")).toContainText("締切は変更していません");
   assert.equal((await db()).tasks.at(-1).plannedDay, base);
@@ -394,6 +394,7 @@ try {
     (await db()).tasks.find((t) => t.id === "today4").deadline,
     "2026-10-26",
   );
+  await openSection(page,".planner-settings");
   await page.locator("#roles-open").click();
   await page.locator("[data-role=students] [data-archive]").click();
   await expect(page.locator("[data-role=students] [data-archive]")).toHaveText(
@@ -421,8 +422,9 @@ try {
   const fast = page
     .locator("[data-task=done]")
     .getByRole("button", { name: "1週間後に複製：合成 done", exact: true });
+  await rowMenu(page,"done");
   await fast.click();
-  await expect(fast).toBeDisabled();
+  await expect(page.locator("[data-task=done] [data-action=clone]").first()).toBeDisabled();
   await expect.poll(() => postCount).toBe(1);
   assert.equal((await db()).tasks.length, count + 1);
   release();
@@ -436,10 +438,12 @@ try {
     (await db()).tasks.find((t) => t.id === "done"),
     original,
   );
+  await rowMenu(page,"done");
   await fast.click();
   await expect.poll(async () => (await db()).tasks.length).toBe(count + 2);
   await expect(page.locator("#quick-title")).toBeEnabled();
   loss = true;
+  await rowMenu(page,"inbox");
   await page
     .getByRole("button", { name: "3日後に複製：合成 inbox", exact: true })
     .click();
@@ -451,6 +455,8 @@ try {
   await page.locator("[data-retry]").click();
   await expect(page.locator("#recovery")).toBeEmpty();
   assert.equal(postCount, afterLoss);
+  await nav(page,"all");
+  await rowMenu(page,"future");
   await page.locator("[data-task=future] [data-action=custom-clone]").click();
   await page.locator("[name=amount]").fill("2");
   await page.locator("[name=unit]").selectOption("7");
@@ -506,6 +512,7 @@ try {
     "別クライアントの説明",
   );
   // Category indexes cannot be reused after concurrent reorder.
+  await openSection(page,".planner-settings");
   await page.locator("#categories-open").click();
   await page
     .locator('[data-category-index="0"] input')
@@ -532,6 +539,7 @@ try {
   await second.clock.install({ time: new Date("2026-10-26T15:30:00Z") });
   await second.goto(origin + "/todo/");
   await expect(second.locator("#app")).toBeVisible();
+  await rowMenu(page,"inbox");
   failNextList = true;
   await page
     .locator('[data-task=inbox] [data-action=clone][data-days="3"]')
@@ -541,6 +549,8 @@ try {
   const outstanding = await page
     .locator("[data-retry]")
     .getAttribute("data-retry");
+  await nav(second,"all");
+  await rowMenu(second,"future");
   await second
     .locator('[data-task=future] [data-action=clone][data-days="1"]')
     .click();
@@ -569,6 +579,8 @@ try {
     "PASS independent-review regressions: stale detail/CAS, stale category indexes, active-category filter, reload failure recovery, cross-tab isolation, midnight frozen retry",
   );
   await page.clock.setSystemTime(new Date("2026-10-27T15:00:01Z"));
+  await nav(page,"all");
+  await rowMenu(page,"inbox");
   await page
     .locator('[data-task=inbox] [data-action=clone][data-days="1"]')
     .click();
@@ -594,8 +606,68 @@ try {
   console.log(
     "PASS capture, category add/rename preserving task links, reschedule/deadline distinction, role archive/reassignment, pending disabled, repeated independent clones, completion preservation/checklist reset, lost-response reload recovery, custom week/deadline, delayed dismissal",
   );
+  await verifyPlanner(page,db,origin,nav,rowMenu);
 } finally {
   await browser.close();
   await new Promise((r) => server.close(r));
   await mf.dispose();
+}
+
+async function verifyPlanner(page,db,origin,nav,rowMenu) {
+  await page.locator("#quick-title").fill("毎週水曜 12:15 配布資料 #代官山/冬期講習 @準備 @印刷 p1");
+  await page.locator("#quick-title").press("Enter");
+  await expect(page.locator("#view-title")).toHaveText("代官山 / 冬期講習");
+  const first=(await db()).tasks.at(-1);
+  assert.equal(first.plan.labels.length,2);
+  assert.equal(first.plan.priority,1);
+  await page.locator("#edit-view").click();
+  await page.locator('[data-color="green"]').click();
+  await page.locator("#organizer-form button[type=submit]").click();
+  await expect(page.locator("#organizer")).toBeHidden();
+  assert.equal((await db()).planner.projects.find(i=>i.id===first.plan.project).color,"green");
+  await page.locator("#quick-title").fill("板書案");
+  await page.locator("#quick-title").press("Enter");
+  await expect(page.locator("#tasks .planner-row")).toHaveCount(2);
+  const secondTask=(await db()).tasks.at(-1);
+  await rowMenu(page,secondTask.id);
+  await page.locator('[data-task="'+secondTask.id+'"] [data-action=up]').click();
+  await expect(page.locator("#tasks .task-name").first()).toHaveText("板書案");
+  await page.locator("#task-sort").selectOption("priority");
+  await expect(page.locator("#tasks .task-name").first()).toHaveText("配布資料");
+  const labelId=first.plan.labels[0];
+  await page.locator('[data-task="'+first.id+'"] [data-label="'+labelId+'"]').click();
+  await expect(page.locator("#view-title")).toHaveText("準備");
+  await page.locator("#edit-view").click();
+  await page.locator('[data-color="orange"]').click();
+  await page.locator("#organizer-form button[type=submit]").click();
+  await expect(page.locator("#organizer")).toBeHidden();
+  assert.equal((await db()).planner.labels.find(i=>i.id===labelId).color,"orange");
+  await page.locator("#new-filter").click();
+  await page.locator("#organizer-name").fill("準備中の教材");
+  await page.locator("#filter-label").selectOption(labelId);
+  await page.locator("#organizer-form button[type=submit]").click();
+  await expect(page.locator("#organizer")).toBeHidden();
+  await page.locator("#saved-filters button").click();
+  await expect(page.locator("#tasks .task-name")).toHaveText("配布資料");
+  await nav(page,"review");
+  for(const label of ["次の項目へ","次の項目へ","レビューを完了"]){
+    await page.getByRole("button",{name:label,exact:true}).click();
+    await expect(page.locator("#advance-review")).toBeEnabled();
+  }
+  await expect.poll(async()=>(await db()).planner.review.last).toBeTruthy();
+  await page.goto(origin+"/todo/#"+new URLSearchParams({kind:"student",name:"合成生徒",group:"試験用"}));
+  await page.reload();
+  await expect(page.locator("#capture-source")).toContainText("合成生徒");
+  await page.locator("#quick-title").fill("面談資料を用意");
+  await page.locator("#quick-title").press("Enter");
+  await expect(page.locator("#capture-source")).toBeEmpty();
+  assert.equal((await db()).tasks.at(-1).plan.source.name,"合成生徒");
+  const parent=(await db()).tasks.at(-1);
+  await page.locator('[data-task="'+parent.id+'"] [data-action=detail]').click();
+  await page.locator('#add-child').click();
+  await page.locator("#quick-title").fill("合成サブタスク");
+  await page.locator("#quick-title").press("Enter");
+  await expect(page.locator("#tasks .task-name").filter({hasText:"合成サブタスク"})).toBeVisible();
+  assert.equal((await db()).tasks.at(-1).plan.parent,parent.id);
+  console.log("PASS nested projects, project and label colors, multiple labels, manual and priority order, saved filter, weekly review and student-linked capture");
 }

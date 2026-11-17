@@ -1,3 +1,4 @@
+import {bundledWorker} from "./bundled-worker.mjs";
 import test from 'node:test';import assert from 'node:assert/strict';import {readFile} from 'node:fs/promises';import {Miniflare} from 'miniflare';
 import {ensureAttribution,rawRecord} from '../src/lesson-attribution.js';
 import {replaceCalendarRecord,parseCalendarRecord,parsePlainCalendarRecord} from '../../shared/calendar-lesson-record.mjs';
@@ -40,7 +41,7 @@ async function setup(t,{backup=false,historyMode}={}){
  const bindings={SESSION_SECRET:'synthetic-secret',ALLOWED_EMAIL:owner,ALLOWED_ORIGIN:origin,GOOGLE_CLIENT_ID:'synthetic',GOOGLE_CLIENT_SECRET:'synthetic',WORKS_API_KEY:'synthetic-key',CALENDAR_LESSON_RECORDS:'true',CALENDAR_LESSON_MIGRATION_JOURNAL:'true',CALENDAR_LESSON_ATTESTED_CALENDARS:'["synthetic-calendar"]'};
  if(historyMode)bindings.LESSON_HISTORY_MODE=historyMode;
  if(backup){bindings.CALENDAR_LESSON_BACKUP_SHA256='f'.repeat(64);bindings.CALENDAR_LESSON_BACKUP_CAPTURED_AT=new Date().toISOString();}
- const mf=new Miniflare({modules:true,modulesRoot:new URL('../../',import.meta.url).pathname,modulesRules:[{type:'ESModule',include:['**/*.js','**/*.mjs']}],scriptPath:new URL('../src/index.js',import.meta.url).pathname,compatibilityDate:'2026-08-01',d1Databases:{DB:'calendar-runtime'},bindings,outboundService:async request=>{
+ const mf=new Miniflare({modules:true,modulesRoot:new URL('../../',import.meta.url).pathname,modulesRules:[{type:'ESModule',include:['**/*.js','**/*.mjs']}],script: await bundledWorker(),compatibilityDate:'2026-08-01',d1Databases:{DB:'calendar-runtime'},bindings,outboundService:async request=>{
   const url=new URL(request.url);control.reads.push(url.pathname);
   if(url.origin==='https://oauth2.googleapis.com')return Response.json({access_token:'synthetic',expires_in:3600});
   assert.equal(url.origin,'https://www.googleapis.com');

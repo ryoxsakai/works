@@ -155,6 +155,7 @@ test("Calendar read paginates per calendar, retains duplicate names, excludes ex
           ? {
               items: [
                 { summary: "same", start: { date: "2026-10-29" } },
+                { summary: "same", extendedProperties: { private: { worksTodo: "task" } } },
                 { summary: "除外" },
                 { summary: "cancel", status: "cancelled" },
               ],

@@ -596,9 +596,20 @@ try {
   await page.locator("#open-home-settings").click();
   await page.locator("#dashboard-edit").click();
   await page.locator('[data-add="memo"]').click();
-  page.once("dialog", (d) => d.dismiss());
   await page.locator("#home-navigation").evaluate(el => el.open = true);
-  await page.locator('#home-navigation a[href="/todo/"]').click();
+  const navTodo = page.locator('#home-navigation a[href="/todo/"]');
+  for (const modifier of ["ctrlKey","metaKey"]) {
+    const wasBlocked = await navTodo.evaluate((link, key) => {
+      let blocked;
+      link.addEventListener("click", event => { blocked=event.defaultPrevented; event.preventDefault(); }, {once:true});
+      link.dispatchEvent(new MouseEvent("click",{bubbles:true,cancelable:true,[key]:true}));
+      return blocked;
+    }, modifier);
+    assert.equal(wasBlocked,false);
+  }
+  await expect(page.locator("#dashboard-editor")).toBeVisible();
+  page.once("dialog", (d) => d.dismiss());
+  await navTodo.click();
   assert.equal(new URL(page.url()).pathname, "/");
   await page.locator("#dashboard-cancel").click();
   await page.evaluate(() => {

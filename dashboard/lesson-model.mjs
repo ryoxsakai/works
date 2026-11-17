@@ -1,5 +1,5 @@
 import {sameNameLessonCount} from '../shared/lesson-counts.mjs?v=1';
-import {isScheduledLesson,lessonEventRef,lessonEventKey,sameLessonEvent} from '../shared/lesson-plan.js';
+import {isScheduledLesson,isWorksTodoEvent,lessonEventRef,lessonEventKey,sameLessonEvent} from '../shared/lesson-plan.js?v=2';
 import {attributedLessonRecord} from '../shared/lesson-attribution.js';
 import {offsetDay} from './model.mjs';
 
@@ -41,7 +41,7 @@ export async function homeLessonModel(data,day,{api,googleToken,signal,fetcher=f
  if(settings.selected_calendars.some(id=>calendars.filter(c=>c.id===id).length!==1))throw new Error('選択中のカレンダー名を確認できません。授業管理で設定を確認してください。');
 
  const range=[];const ids=[...new Set(settings.selected_calendars)];let cursor=0;
- await Promise.all(Array.from({length:Math.min(3,ids.length)},async()=>{while(cursor<ids.length){const id=ids[cursor++];let page='',seen=new Set();do{const q=new URLSearchParams({timeMin:start+'T00:00:00+09:00',timeMax:end+'T00:00:00+09:00',singleEvents:'true',orderBy:'startTime',maxResults:'250'});if(page)q.set('pageToken',page);const d=await google(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(id)}/events?${q}`);if(d.items!==undefined&&!Array.isArray(d.items))throw new Error('予定の応答を確認できません');range.push(...(d.items||[]).filter(e=>e.status!=='cancelled'&&!(settings.excluded_titles||[]).includes((e.summary||'').trim())).map(e=>({...e,_calendarId:id})));page=d.nextPageToken||'';if(page&&(typeof page!=='string'||seen.has(page)))throw new Error('予定の続きが不正です');seen.add(page);}while(page);}})).catch(e=>{calendarAbort.abort();throw e;});
+ await Promise.all(Array.from({length:Math.min(3,ids.length)},async()=>{while(cursor<ids.length){const id=ids[cursor++];let page='',seen=new Set();do{const q=new URLSearchParams({timeMin:start+'T00:00:00+09:00',timeMax:end+'T00:00:00+09:00',singleEvents:'true',orderBy:'startTime',maxResults:'250'});if(page)q.set('pageToken',page);const d=await google(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(id)}/events?${q}`);if(d.items!==undefined&&!Array.isArray(d.items))throw new Error('予定の応答を確認できません');range.push(...(d.items||[]).filter(e=>e.status!=='cancelled'&&!isWorksTodoEvent(e)&&!(settings.excluded_titles||[]).includes((e.summary||'').trim())).map(e=>({...e,_calendarId:id})));page=d.nextPageToken||'';if(page&&(typeof page!=='string'||seen.has(page)))throw new Error('予定の続きが不正です');seen.add(page);}while(page);}})).catch(e=>{calendarAbort.abort();throw e;});
  function unique(events){const map=new Map();for(const event of events){const ref=lessonEventRef(event),key=lessonEventKey(ref),previous=map.get(key);if(previous&&!sameLessonEvent(lessonEventRef(previous),ref))throw new Error('取得中に予定が変更されました。再取得してください。');if(!previous)map.set(key,event);}return [...map.values()];}
  const dayEvents=unique(data.events),rangeEvents=unique(range);
  const dayStart=Date.parse(day+"T00:00:00+09:00"),dayEnd=Date.parse(offsetDay(day,1)+"T00:00:00+09:00");

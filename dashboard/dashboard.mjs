@@ -1,5 +1,5 @@
 import { cardLoading } from "../shared/card-loading.mjs?v=1";
-import { homeLessonModel, lessonApi } from "./lesson-model.mjs?v=4-name-count";
+import { homeLessonModel, lessonApi } from "./lesson-model.mjs?v=5";
 import {
   MODULES,
   WIDGETS,
@@ -12,7 +12,7 @@ import {
   metadataDateJst,
   esc,
 } from "./model.mjs";
-import { createReader } from "./data.mjs?v=2";
+import { createReader } from "./data.mjs?v=3";
 
 import { icon } from "../shared/ui/icons.mjs";
 
@@ -70,9 +70,9 @@ export function createDashboard({
   }
   function dismiss() {
     if (lessonCards && !lessonCards.canLeave()) return false;
-    if (lessonCards?.hasEdits()) { lessonCards.destroy(); lessonCards = null; cache.delete("lessons"); }
     if (changed() && !confirm("表示設定の変更を破棄して移動しますか？"))
       return false;
+    if (lessonCards?.hasEdits()) { lessonCards.destroy(); lessonCards = null; cache.delete("lessons"); }
     if (draft) {
       draft = null;
       draw();
@@ -550,9 +550,11 @@ export function createDashboard({
   document.addEventListener(
     "click",
     (e) => {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
       const link = e.target.closest("a[href]");
       if (
-        link &&
+        link && !link.hasAttribute("download") &&
+        (!link.target || ["_self","_parent","_top"].includes(link.target.toLowerCase())) &&
         link.origin === location.origin &&
         link.pathname !== "/" &&
         !dismiss()
@@ -569,7 +571,7 @@ export function createDashboard({
   $("dashboard-widgets").addEventListener('home-lesson-discard-reload',()=>{
     lessonCards?.destroy();lessonCards=null;cache.delete('lessons');load('lessons',true);
   });
-  $("dashboard-widgets").addEventListener("home-lesson-navigate",(event)=>{if(!dismiss())return;const {calendarId,eventId,day}=event.detail||{};if(!calendarId||!eventId||!day)return;location.assign("/tutor/?"+new URLSearchParams({record_date:day,student_calendar:calendarId,student_event:eventId}));});
+  $("dashboard-widgets").addEventListener("home-lesson-navigate",(event)=>{const {calendarId,eventId,day}=event.detail||{};if(!calendarId||!eventId||!day||!dismiss())return;location.assign("/tutor/?"+new URLSearchParams({record_date:day,student_calendar:calendarId,student_event:eventId}));});
   window.addEventListener("beforeunload", (e) => {
     if (changed() || lessonCards?.hasEdits()) {
       e.preventDefault();

@@ -1,4 +1,5 @@
 import {validDay} from '../teaching-model.mjs';
+import {isWorksTodoEvent} from '../../shared/lesson-plan.js';
 import {recordDateRange} from '../../tutor/record-date.js';
 export function createProductionContext(auth,{fetcher=fetch,onExpired=()=>{},onLogout=()=>location.replace('/app/'),storage}={}) {
   let active=false,epoch=0,initialization;
@@ -99,7 +100,7 @@ export function createProductionContext(auth,{fetcher=fetch,onExpired=()=>{},onL
             const response=await fetcher('https://www.googleapis.com/calendar/v3/calendars/'+encodeURIComponent(calendarId)+'/events?'+query,{method:'GET',redirect:'error',cache:'no-store',headers:{Authorization:'Bearer '+token},signal:controller.signal});check();
             if(!response.ok)throw new Error('カレンダーの予定を取得できません。更新または従来画面で確認してください。');
             const data=await response.json();check();if(!Array.isArray(data.items))throw new Error('予定の応答を確認できません。');
-            events.push(...data.items.filter(event=>event.status!=='cancelled').map(event=>({...event,calendar_id:calendarId})));
+            events.push(...data.items.filter(event=>event.status!=='cancelled'&&!isWorksTodoEvent(event)).map(event=>({...event,calendar_id:calendarId})));
             pageToken=data.nextPageToken||'';
           }while(pageToken);
         }

@@ -19,5 +19,12 @@ for(const theme of ['light','dark']){await p.evaluate(async t=>(await import('/s
 await p.setViewportSize({width:1440,height:900});await expect(root).not.toHaveClass(/carousel-inner/);await expect(next).toBeHidden();for(const row of await root.locator('tr[data-event-id]').all())await expect(row).toBeVisible();
 await p.setViewportSize({width:390,height:900});await expect(root).toHaveClass(/carousel-inner/);await p.evaluate(()=>dispatchEvent(new Event('beforeprint')));await expect(root).not.toHaveClass(/carousel-inner/);await p.emulateMedia({media:'print'});await p.pdf({path:new URL('all-records.pdf',out).pathname});await p.emulateMedia({media:'screen'});await p.evaluate(()=>dispatchEvent(new Event('afterprint')));await expect(root).toHaveClass(/carousel-inner/);
 await p.locator('[data-day=next]').click();await expect(p.locator('.record-carousel-controls')).toBeHidden();await p.locator('[data-day=next]').click();await expect(root).not.toHaveClass(/carousel-inner/);await expect(root).toContainText('予定はありません');
+await p.goto(f.base+'/tutor/?'+new URLSearchParams({record_date:f.today,todo_calendar:'qa',todo_event:'none'}));
+const target=root.locator('[data-event-id="none"]');
+await expect(target).toHaveClass(/active/);
+await expect(p.locator('.record-carousel-controls span')).toHaveText('4 / 4件');
+await expect.poll(()=>target.evaluate(row=>Math.abs(row.getBoundingClientRect().left-row.parentElement.getBoundingClientRect().left))).toBeLessThan(4);
+await prev.click();
+await expect(p.locator('.record-carousel-controls span')).toHaveText('3 / 4件');
 assert.deepEqual(errors,[]);assert.equal(f.control.writes.length,1,'only explicit synthetic edit saved; navigation/swipe/resize/print do not write');console.log('PASS pinned Bootstrap6 Carousel: 0/1/4 rows, native touch swipe, keyboard/input/IME, retained draft/save, edges/repeated clicks, reduced motion, desktop/rotation, themes, day reload, no clones and print all cards');
 }finally{await ctx.close();await browser.close();await f.close();}
