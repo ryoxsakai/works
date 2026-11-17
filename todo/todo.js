@@ -31,6 +31,7 @@ const offset = (date, days) =>
   new Date(Date.parse(date) + days * 86400000).toISOString().slice(0, 10);
 const pendingKey = "works-todo-clone-requests-v1";
 let state,
+  plannerReady = false,
   busy = false,
   mode = "list",
   editId,
@@ -128,12 +129,14 @@ function setBusy(value) {
 }
 async function reload() {
   const loaded = await api();
-  if (loaded.plannerVersion !== 1) throw new Error("新しいToDoサーバーの反映を待っています");
+  plannerReady = loaded.plannerVersion === 1;
   state = loaded;
   render();
+  if (!plannerReady) message("新しいToDoサーバーの反映後に編集できます。今は一覧を表示しています。");
 }
 async function save(next, success = "保存しました") {
   if (busy) return false;
+  if (!plannerReady) {message("新しいToDoサーバーの反映後に保存できます。"); return false;}
   const focusOrigin = document.activeElement;
   const dialog = document.querySelector("dialog[open]"),
     epoch = dialogEpoch;
@@ -831,17 +834,19 @@ $("sign-out").onclick = async () => {
 const planner=createPlanner({$,esc,state:()=>state,save,api,render,group,openDialog,closeDialog,openDetail,today,message});
 watchAuth({
   onSignedIn: async () => {
+    $("sign-out").hidden = false;
     try {
       await reload();
       $("login-screen").hidden = true;
       $("app").hidden = false;
-      $("sign-out").hidden = false;
       planner.initial();
     } catch (e) {
       $("login-message").textContent = "読み込みに失敗しました：" + e.message;
     }
   },
   onSignedOut: (msg) => {
+    plannerReady = false;
+    $("sign-out").hidden = true;
     $("app").hidden = true;
     $("login-message").textContent =
       msg || "Googleアカウントでサインインしてください";
