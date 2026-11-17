@@ -2854,7 +2854,9 @@ function readBoundedInteger(value, fallback, minimum, maximum, fieldName) {
 }
 
 async function fetchCalendarEventsForSchedule(accessToken, calendarId, timeMin, timeMax) {
+  const {isWorksTodoEvent} = await import("../../shared/lesson-plan.js");
   const events = [];
+  const seenPages = new Set();
   let pageToken = "";
   do {
     const params = new URLSearchParams({
@@ -2875,8 +2877,13 @@ async function fetchCalendarEventsForSchedule(accessToken, calendarId, timeMin, 
       throw httpError(502, `Google Calendar API error (${res.status})`);
     }
     const data = await res.json();
-    events.push(...(data.items || []).map((event) => ({ ...event, calendar_id: calendarId })));
-    pageToken = data.nextPageToken || "";
+    if (data.items !== undefined && !Array.isArray(data.items))
+      throw httpError(502, "カレンダーの予定を確認できませんでした");
+    events.push(...(data.items || []).filter(event => !isWorksTodoEvent(event)).map(event => ({ ...event, calendar_id: calendarId })));
+    pageToken = data.nextPageToken ?? "";
+    if (typeof pageToken !== "string" || (pageToken && seenPages.has(pageToken)))
+      throw httpError(502, "カレンダーの予定の続きを取得できませんでした");
+    if (pageToken) seenPages.add(pageToken);
   } while (pageToken);
   return events;
 }

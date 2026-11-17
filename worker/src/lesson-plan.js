@@ -1,6 +1,6 @@
 import {seriesRules,applicableSeriesRule} from './lesson-series.js';
 import { rawRecord, currentRecord, requireCurrent, prepareRecordWrite, commitRecords, readCommittedRecord, observeRecord } from './lesson-attribution.js';
-import { NEXT_LESSON_DAYS, lessonEventRef, sameLessonEvent, findNextLesson, isScheduledLesson } from "../../shared/lesson-plan.js";
+import { NEXT_LESSON_DAYS, lessonEventRef, sameLessonEvent, findNextLesson, isScheduledLesson, isWorksTodoEvent } from "../../shared/lesson-plan.js";
 import {calendarRecordEligible,overlayCalendarLessonRecord,writeCalendarLessonRecord,calendarRecordsEnabled,loadCalendarStorageState} from './calendar-lesson-records.js';
 import {lessonTitleKey} from '../../shared/lesson-attribution.js';
 import {calendarRecordValues} from '../../shared/calendar-lesson-record.mjs';
@@ -24,6 +24,7 @@ async function lookup(deps, calendarId, eventId) {
   const token = (await deps.token()).access_token;
   const event = await deps.event(token, calendarId, eventId);
   if (!event || event.status === "cancelled") throw failure(409, "予定が削除・キャンセルされています", "LESSON_TARGET_CHANGED");
+  if (isWorksTodoEvent(event)) throw failure(409, "この作業予定は授業記録の対象外です", "LESSON_TARGET_CHANGED");
   return { settings, token, event, ref: lessonEventRef(event, calendarId) };
 }
 async function uniqueRecordId(deps, context, ref) {

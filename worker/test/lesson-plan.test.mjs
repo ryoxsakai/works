@@ -35,6 +35,15 @@ test('exact title and calendar, consecutive same-day lessons and excluded slots'
   assert.equal(findNextLesson({...a,summary:'山田（辞退）'},[{...b,summary:'山田（辞退）'}]).reason,'ineligible');
   assert.equal(findNextLesson(a,[{...b,summary:'山田（辞退）'}]).target,null);
 });
+test('a calendar ToDo with a lesson title is never a source or next lesson',async t=>{
+  const {env,events,deps}=await setup(t);
+  const task={...events[1],id:'work',extendedProperties:{private:{worksTodo:'task-id'}}};
+  events.push(task);
+  assert.equal(isScheduledLesson(lessonEventRef(task)),false);
+  assert.equal(findNextLesson(events[0],[task,events[1]]).target.id,'b');
+  await assert.rejects(readLessonPlan(env,'class-a','work',deps),/授業/);
+  assert.equal((await readNextLessonPlan(env,'class-a','a',deps)).target.id,'b');
+});
 test('equally early duplicate classes are ambiguous and an empty series stays empty',()=>{
   const a=event('a'),b=event('b','2026-10-17',11);
   assert.equal(findNextLesson(a,[b,{...b,id:'duplicate'}]).reason,'ambiguous');

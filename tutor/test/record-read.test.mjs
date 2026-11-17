@@ -13,3 +13,20 @@ test('a late success cannot replace the error display with loading progress',asy
 
 test('four abort-ignoring reads cannot exhaust the pool after timeout',async()=>{const old=Array.from({length:4},()=>boundedRead([0],()=>new Promise(()=>{}),{timeout:10}));const settled=await Promise.allSettled(old);assert(settled.every(r=>r.status==='rejected'&&r.reason.code==='READ_TIMEOUT'));let started=false;assert.deepEqual(await boundedRead([1],async x=>{started=true;return x;},{timeout:20}),[1]);assert(started);});
 test('timed-out late results neither release a newer lease twice nor publish progress',async()=>{let finish,progress=0;await assert.rejects(boundedRead([0],()=>new Promise(r=>finish=r),{timeout:10,onProgress:()=>progress++}),e=>e.code==='READ_TIMEOUT');finish('late');await new Promise(r=>setTimeout(r,0));let active=0,peak=0;await boundedRead([1,2,3,4,5],async x=>{peak=Math.max(peak,++active);await new Promise(r=>setTimeout(r,2));active--;return x;});assert(peak<=4);assert.equal(progress,0);});
+
+test('today and previous lesson reads detect an event ID shared across calendars on different days',async()=>{
+  const today=event('copy','授業','2026-11-03','one');
+  const earlier=event('copy','授業','2026-11-02','two');
+  const collisionScope=[today,earlier];
+  let reads=0;
+  const context=vm.createContext({boundedRead,lessonEventRef,lessonEventKey,isExcludedScheduleEvent:()=>false,
+    apiFetch:async()=>{reads++;return [{calendar_event_id:'copy',lesson_plan:'以前の記録'}];}});
+  const start=source.indexOf('async function readRecordEntries(');
+  vm.runInContext(source.slice(start,source.indexOf('\n}',start)+2),context);
+  for(const lesson of collisionScope){
+    const [row]=await context.readRecordEntries([lesson],null,{collisionScope});
+    assert.equal(row.record_collision,true);
+    assert.equal(row.lesson_plan,undefined);
+  }
+  assert.equal(reads,0);
+});

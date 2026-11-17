@@ -1,3 +1,4 @@
+import { isWorksTodoEvent } from "../shared/lesson-plan.js?v=2";
 import { offsetDay } from "./model.mjs";
 
 // Read-only, scoped to a captured session. No lesson-record/baseline endpoints.
@@ -115,7 +116,7 @@ export function createReader({ session, googleToken, fetcher = fetch }) {
               ...(data.items || [])
                 .filter(
                   (e) =>
-                    e.status !== "cancelled" &&
+                    e.status !== "cancelled" && !isWorksTodoEvent(e) &&
                     !(settings.excluded_titles || []).includes(
                       (e.summary || "").trim(),
                     ),
