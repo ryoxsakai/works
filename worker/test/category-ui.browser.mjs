@@ -14,7 +14,7 @@ try {
   const context=await browser.newContext({viewport:{width,height:900},colorScheme:theme.endsWith('dark')?'dark':'light'});
   await context.addInitScript(t=>{if(!t.startsWith('system'))localStorage.setItem('works_theme',t);},theme);
   const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());
-  let state={roles:[],cloneRequests:{},categories:['仕事','個人','長いカテゴリ名'.repeat(10)],memos:[{id:'m1',title:'テストメモ',category:'仕事',bodies:['本文'],notes:[],tags:[],createdAt:'2026-10-13',updatedAt:'2026-10-13'}],tasks:[{id:'t1',name:'テストタスク',category:'仕事',deadline:null,priority:null,progress:0,memo:''}],revision:0};
+  let state={plannerVersion:1,roles:[],cloneRequests:{},categories:['仕事','個人','長いカテゴリ名'.repeat(10)],memos:[{id:'m1',title:'テストメモ',category:'仕事',bodies:['本文'],notes:[],tags:[],createdAt:'2026-10-13',updatedAt:'2026-10-13'}],tasks:[{id:'t1',name:'テストタスク',category:'仕事',deadline:null,priority:null,progress:0,memo:''}],revision:0};
   await context.route('**/*',async route=>{
    const u=new URL(route.request().url());
    if(u.hostname==='cdn.tailwindcss.com')return route.fulfill({contentType:'text/javascript',body:`const s=document.createElement('style');s.textContent=${JSON.stringify(fs.readFileSync(css,'utf8'))};document.head.append(s);`});
@@ -30,6 +30,12 @@ try {
    await expect(page.locator('#app')).toBeVisible();
    const trigger=page.locator('#categories-open'),modal=page.locator('#categories-dialog');
    const settle=()=>page.waitForFunction(()=>!history.state?.todoDialog);
+   async function openSettings(){
+     const settings=page.locator('.planner-settings');
+     if(!await settings.isVisible()) await page.locator('#mobile-nav').click();
+     await settings.locator('summary').click();
+   }
+   await openSettings();
    await trigger.click();await expect(modal).toBeVisible();assert(await modal.evaluate(e=>e.matches(':modal')));
    assert(await modal.evaluate(e=>e.scrollWidth<=e.clientWidth+1));assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
    await page.screenshot({path:`${artifacts}/${service}-${width}-${theme}-modal.png`});
@@ -45,7 +51,7 @@ try {
    await modal.locator('[data-close]').click();await settle();await expect(trigger).toBeFocused();await trigger.click();await page.goBack();await expect(modal).toBeHidden();await expect(trigger).toBeFocused();
    await trigger.click();await page.mouse.click(2,2);await expect(modal).toBeHidden();await settle();
    // Empty-registry behavior is exercised without orphaning an existing task.
-   state={...state,tasks:[],revision:state.revision+1};await page.reload();await expect(page.locator('#app')).toBeVisible();await trigger.click();
+   state={...state,tasks:[],revision:state.revision+1};await page.reload();await expect(page.locator('#app')).toBeVisible();await openSettings();await trigger.click();
    while(state.categories.length){const count=state.categories.length;await modal.locator('[data-category-action="remove"]').first().click();await expect.poll(()=>state.categories.length).toBe(count-1);}
    await expect(modal).toContainText('カテゴリはまだありません');await expect(modal.locator('#categories-form input')).toBeFocused();await modal.locator('#categories-form input').fill('再開');await modal.locator('#categories-form input').press('Enter');await expect.poll(()=>state.categories).toEqual(['再開']);
    assert.deepEqual(errors,[]);report.push({service,width,theme,result:'pass',layout:'personal-todo'});await context.close();continue;
