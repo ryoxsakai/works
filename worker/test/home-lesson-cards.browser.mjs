@@ -19,6 +19,18 @@ await expect(page.locator('#dashboard-edit')).toBeEnabled();await current('a').e
 let release;f.control.holdSave=new Promise(resolve=>release=resolve);await current('a').fill('遅延中も保持');await current('a').press('Tab');await expect.poll(()=>f.control.writes.length).toBe(3);await page.locator('#open-home-settings').click();await page.locator('#dashboard-refresh').click();await page.locator('#open-home-settings').click();await page.locator('#dashboard-edit').click();await expect(page.locator('#dashboard-editor')).toBeHidden();await page.evaluate(()=>window.qaAuth.onSignedIn({email:'qa@example.invalid',picture:''}));await expect(current('a')).toHaveValue('遅延中も保持');release();f.control.holdSave=null;await expect(row('a').locator('.lesson-plan-status').first()).toHaveText('保存済み');
 // A real guarded profile CAS conflict keeps the draft and never falls back to an unguarded PUT.
 await f.DB.prepare("UPDATE student_prefs SET memo='別画面の更新',updated_at='external' WHERE name='サンプル生徒'").run();await row('a').locator('.home-memo-ack').check();await memo('a').fill('競合した入力');await memo('a').press('Tab');await expect(memo('a')).toHaveJSProperty('readOnly',true);await expect(memo('a')).toHaveValue('競合した入力');await expect(row('a').locator('.student-memo-status')).toContainText('再送を停止');assert.equal((await f.DB.prepare("SELECT memo FROM student_prefs WHERE name='サンプル生徒'").first()).memo,'別画面の更新');assert.equal(f.control.profileWrites.length,2);assert(!requests.some(r=>r.path==='/api/student-prefs'&&r.method==='PUT'));
+// Opening the linked task in a new tab must also work during conflict recovery.
+const prompts=[];
+const dismissPrompt=async d=>{prompts.push(d.message());await d.dismiss();};
+page.on('dialog',dismissPrompt);
+const [taskTab]=await Promise.all([
+  page.waitForEvent('popup',{timeout:4000}),
+  row('a').locator('.record-todo-link').click(),
+]);
+await taskTab.close();
+page.off('dialog',dismissPrompt);
+assert.deepEqual(prompts,[]);
+await expect(memo('a')).toHaveValue('競合した入力');
 page.once('dialog',d=>d.dismiss());await page.locator('.home-lesson-reset').click();await expect(memo('a')).toHaveValue('競合した入力');page.once('dialog',d=>d.accept());await page.locator('.home-lesson-reset').click();await expect(row('a').locator('.home-memo-ack')).not.toBeChecked();await row('a').locator('.home-memo-ack').check();await expect(memo('a')).toHaveValue('別画面の更新');
 // Lost acknowledgement: the actual D1 write commits, but no automatic retry follows.
 let dropProfile=true;await page.route('**/api/student-prefs/guarded',async route=>{if(route.request().method()==='PUT'&&dropProfile){dropProfile=false;await route.fetch();await route.abort('failed');}else await route.fallback();});

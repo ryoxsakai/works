@@ -62,7 +62,16 @@ export function attachRecordCarousel(root) {
   window.addEventListener('beforeprint',beforePrint);window.addEventListener('afterprint',afterPrint);
   window.addEventListener('pagehide',stop);window.addEventListener('pageshow',start);
   start();
-  const enhancement = {destroy(){enhancements.delete(root);root.removeEventListener('focusin',onFocus);root.removeEventListener('pointerdown',interrupt);window.removeEventListener('pointerup',resume);window.removeEventListener('pointercancel',resume);observer.disconnect();stop();controls.remove();mobile.removeEventListener('change',start);reduced.removeEventListener('change',start);window.removeEventListener('beforeprint',beforePrint);window.removeEventListener('afterprint',afterPrint);window.removeEventListener('pagehide',stop);window.removeEventListener('pageshow',start);element.removeEventListener('slid.bs.carousel',update);}};
+  const enhancement = {
+    reveal(row) {
+      if (!rows().includes(row)) return;
+      selected=identity(row);
+      // A freshly rendered table may still have a pending observer delivery.
+      observer.takeRecords();
+      start();
+      row.scrollIntoView({block:'nearest',inline:'nearest',behavior:'instant'});
+    },
+    destroy(){enhancements.delete(root);root.removeEventListener('focusin',onFocus);root.removeEventListener('pointerdown',interrupt);window.removeEventListener('pointerup',resume);window.removeEventListener('pointercancel',resume);observer.disconnect();stop();controls.remove();mobile.removeEventListener('change',start);reduced.removeEventListener('change',start);window.removeEventListener('beforeprint',beforePrint);window.removeEventListener('afterprint',afterPrint);window.removeEventListener('pagehide',stop);window.removeEventListener('pageshow',start);element.removeEventListener('slid.bs.carousel',update);}};
   enhancements.set(root,enhancement);
   return enhancement;
 }

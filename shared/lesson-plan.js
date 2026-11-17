@@ -1,8 +1,13 @@
 // A deliberately exact series identity; classroom and title must both agree.
 export const NEXT_LESSON_DAYS = 366;
 export const lessonEventKey = (event) => JSON.stringify([event.calendar_id, event.id]);
+export function isWorksTodoEvent(event) {
+  const taskId = event.extendedProperties?.private?.worksTodo;
+  return event.worksTodo === true || (typeof taskId === "string" && taskId.length > 0);
+}
 export function lessonEventRef(event, calendarId = event.calendar_id || event._calendarId) {
   return {
+    ...(isWorksTodoEvent(event) ? { worksTodo: true } : {}),
     calendar_id: calendarId, id: event.id, title: event.summary ?? event.title ?? "",
     start: event.start?.dateTime ?? event.start?.date ?? event.start,
     end: event.end?.dateTime ?? event.end?.date ?? event.end,
@@ -18,7 +23,7 @@ const titleKey = (title) => String(title || "").normalize("NFKC").replace(/\s+/g
 export function isScheduledLesson(event, excluded = []) {
   const ref = lessonEventRef(event);
   const title = titleKey(ref.title);
-  return !!ref.id && !!ref.calendar_id && ref.timed && ref.status === "confirmed"
+  return !ref.worksTodo && !!ref.id && !!ref.calendar_id && ref.timed && ref.status === "confirmed"
     && ref.event_type === "default" && ref.transparency !== "transparent" && !ref.declined
     && Number.isFinite(Date.parse(ref.start)) && Date.parse(ref.end) > Date.parse(ref.start)
     && !!title && !excluded.some((value) => titleKey(value) === title)

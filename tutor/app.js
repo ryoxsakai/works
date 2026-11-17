@@ -8,7 +8,7 @@ import {boundedRead,precedingLegacyEvents,precedingOwnerEvents,recordTermScope,s
 import {readNextLessonWithTemplate} from "../shared/next-lesson-read.mjs?v=1";
 import { lessonRecordRows, renderPlanEditors, renderMemoEditors, previousOwnerRecord } from "../shared/lesson-record-view.mjs?v=9-todo";
 import { setUserAvatar } from "../shared/avatar.mjs?v=1";
-import { attachRecordCarousel } from "./record-carousel.mjs?v=3";
+import { attachRecordCarousel } from "./record-carousel.mjs?v=4";
 import { attachRecordToasts } from "./record-toasts.mjs?v=3-name";
 import { startTutorPresentation } from "../shared/ui/tutor-presentation.mjs";
 startTutorPresentation();
@@ -23,7 +23,7 @@ import { getTheme, setTheme } from "../shared/theme.js?v=6";
 import { tokyoDateKey, shiftRecordDate, recordDateRange } from "./record-date.js?v=1";
 import { createStudentMemoStore } from "./student-memo.js?v=1";
 import { createLessonPlanController } from "./lesson-plan.js?v=8";
-import { isScheduledLesson, lessonEventRef, lessonEventKey, sameLessonEvent } from "../shared/lesson-plan.js?v=1";
+import { isScheduledLesson, isWorksTodoEvent, lessonEventRef, lessonEventKey, sameLessonEvent } from "../shared/lesson-plan.js?v=2";
 
 const PASTEL_FALLBACK_COLORS = [
   "#c8e6c9",
@@ -292,7 +292,10 @@ let eventViewMode = localStorage.getItem(EVENT_VIEW_KEY) === "calendar" ? "calen
 let calendarCursor = startOfMonth(new Date());
 let listWeekCursor = startOfWeek(new Date());
 let selectedScheduleDate = formatDateOnly(new Date());
-const requestedRecordDate=new URLSearchParams(location.search).get('record_date');
+const recordLinkParams = new URLSearchParams(location.search);
+const requestedRecordDate = recordLinkParams.get('record_date');
+let linkedRecordId = recordLinkParams.get('todo_event');
+const linkedCalendarId = recordLinkParams.get('todo_calendar');
 let selectedRecordDate = /^\d{4}-\d{2}-\d{2}$/.test(requestedRecordDate||'')&&Number.isFinite(Date.parse(requestedRecordDate))&&new Date(requestedRecordDate).toISOString().slice(0,10)===requestedRecordDate?requestedRecordDate:tokyoDateKey();
 let recordTableRequest = 0;
 let recordRequestedTermScope=null;
@@ -573,9 +576,10 @@ async function loadRecordTable() {
     if (!isCurrent()) return;
 
     const planReadVersion = lessonPlans.version;
-    const dayEntries = await readRecordEntries(dayEvents,null,{isCurrent,onProgress:(done,total)=>{if(isCurrent())els.recordTbody.querySelector(".card-loading p").textContent=`授業記録を読み込んでいます… ${done}/${total}`;}});
+    const collisionScope = [...dayEvents, ...rangeEvents];
+    const dayEntries = await readRecordEntries(dayEvents,null,{isCurrent,collisionScope,onProgress:(done,total)=>{if(isCurrent())els.recordTbody.querySelector(".card-loading p").textContent=`授業記録を読み込んでいます… ${done}/${total}`;}});
     if (!isCurrent()) return;
-    const previousEntries = await readPreviousEntries(dayEvents,rangeEvents,dayEntries,isCurrent);
+    const previousEntries = await readPreviousEntries(dayEvents,rangeEvents,dayEntries,isCurrent,collisionScope);
     const entries = [...dayEntries,...previousEntries];
     if (!isCurrent()) return;
     const entryMap = new Map(entries.map((entry) => [entry.calendar_event_id, entry]));
@@ -644,14 +648,15 @@ async function loadRecordTable() {
 function renderRecordTable(rows) {
   rows.filter((row) => !row.emptySlot && (!lessonRecordNeedsReview(row.record)||row.record.pending_allowed)).forEach((row) => lessonPlans.seed(row.ref, row.lessonPlan, row.planReadVersion, row.record.record_revision,row.record.attribution_status,row.record.owner_id||null,row.record.pending_context||null));
   els.recordTbody.innerHTML = lessonRecordRows(rows, { escapeHtml, formatTimeOrPeriod, lessonRecordNeedsReview, lessonReviewRow, lightenHexColor, calendarName: id => calendarColors.get(id)?.name, lessonAttributionNotice, lessonPlanEditor, lessonPlanFeedback, recordStudentPrefName, lessonEventKey });
-  const linked = new URLSearchParams(location.search);
-  if (linked.has("todo_event")) {
-    const row=[...els.recordTbody.querySelectorAll("[data-record-ref]")].find(el=>{
-      const ref=JSON.parse(el.dataset.recordRef);
-      return ref.id===linked.get("todo_event") && ref.calendar_id===linked.get("todo_calendar");
-    });
-    row?.scrollIntoView({block:"nearest"});
-    row?.querySelector(".record-student-link")?.focus({preventScroll:true});
+  if (linkedRecordId && linkedCalendarId && selectedRecordDate === requestedRecordDate) {
+    const key = lessonEventKey({calendar_id:linkedCalendarId, id:linkedRecordId});
+    const row = [...els.recordTbody.querySelectorAll("[data-card-key]")].find(el => el.dataset.cardKey === key);
+    if (row) {
+      linkedRecordId = null;
+      recordCarousel.reveal(row);
+      row.tabIndex = -1;
+      (row.querySelector(".record-student-link") || row).focus({preventScroll:true});
+    }
   }
   renderStudentMemos();
   ownerMemos.render(els.recordTbody);
@@ -952,6 +957,7 @@ async function fetchCalendarEvents(timeMin, timeMax, { withCalendarId = false, i
         maxResults: "250",
       });
       const items = [];
+      const seenPages = new Set();
       let pageToken = "";
       do {
         if (pageToken) params.set("pageToken", pageToken);
@@ -960,15 +966,20 @@ async function fetchCalendarEvents(timeMin, timeMax, { withCalendarId = false, i
           if(!res.ok){const detail=await extractGoogleErrorDetail(res);throw new Error(`カレンダーの予定を取得できませんでした (${res.status})${detail ? `: ${detail}` : ""}`);}
           return res.json();
         });
+        if (data.items !== undefined && !Array.isArray(data.items))
+          throw new Error("カレンダーの予定を確認できませんでした");
         items.push(...(data.items || []));
-        pageToken = data.nextPageToken || "";
+        pageToken = data.nextPageToken ?? "";
+        if (typeof pageToken !== "string" || (pageToken && seenPages.has(pageToken)))
+          throw new Error("カレンダーの予定の続きを取得できませんでした");
+        if (pageToken) seenPages.add(pageToken);
       } while (pageToken);
       return withCalendarId ? items.map((ev) => ({ ...ev, _calendarId: calendarId })) : items;
     })
   );
   return results
     .flat()
-    .filter((ev) => includeExcluded || !isExcludedScheduleEvent(ev));
+    .filter((ev) => ev.status !== "cancelled" && !isWorksTodoEvent(ev) && (includeExcluded || !isExcludedScheduleEvent(ev)));
 }
 
 function isExcludedScheduleEvent(ev) {
@@ -3680,9 +3691,17 @@ document.addEventListener("click",async event => {
 function lessonAttributionNotice(record) {
   return lessonRecordNeedsReview(record) ? '<small role="status">予定名の対応確認が必要です</small>' : '';
 }
-async function readRecordEntries(events,context=null,{isCurrent=()=>true,onProgress=()=>{}}={}) {
+async function readRecordEntries(events,context=null,{isCurrent=()=>true,onProgress=()=>{},collisionScope=events}={}) {
   const targets=[...new Map(events.filter(event=>!isExcludedScheduleEvent(event)).map(event=>{const ref=lessonEventRef(event);return [lessonEventKey(ref),ref];})).values()];
-  const calendars=new Map();for(const target of targets){const values=calendars.get(target.id)||new Set();values.add(target.calendar_id);calendars.set(target.id,values);}
+  // Legacy records use event ID alone. Check the whole observed period before
+  // reading today's cards or their predecessors in separate requests.
+  const calendars = new Map();
+  for (const event of collisionScope) {
+    const ref = lessonEventRef(event);
+    const ids = calendars.get(ref.id) || new Set();
+    ids.add(ref.calendar_id);
+    calendars.set(ref.id, ids);
+  }
   const collisions=new Set([...calendars].filter(([,values])=>values.size>1).map(([id])=>id));
   const batches=await boundedRead(targets,async(target,signal)=>{
     if(collisions.has(target.id))return [{calendar_event_id:target.id,record_collision:true}];
@@ -3692,7 +3711,7 @@ async function readRecordEntries(events,context=null,{isCurrent=()=>true,onProgr
   },{isCurrent,onProgress});
   return batches.flat();
 }
-async function readPreviousEntries(dayEvents,rangeEvents,dayEntries,isCurrent) {
+async function readPreviousEntries(dayEvents,rangeEvents,dayEntries,isCurrent,collisionScope) {
   const map=new Map(dayEntries.map(r=>[r.calendar_event_id,r]));
   const read=event=>attributedLessonRecord(map.get(event.id),lessonEventRef(event));
   const previous=precedingLegacyEvents(dayEvents,rangeEvents,read);
@@ -3701,7 +3720,7 @@ async function readPreviousEntries(dayEvents,rangeEvents,dayEntries,isCurrent) {
   const byOwner=new Map(owners.map((id,i)=>[id,histories[i]]));
   for(const event of dayEvents){const current=read(event);if(current.record_storage==='d1_owner'&&current.attribution_status==='confirmed')previous.push(...precedingOwnerEvents(event,byOwner.get(current.owner_id)||[],rangeEvents));}
   // Re-read the selected predecessor against its live ref/owner; history names never establish identity.
-  return readRecordEntries(previous,null,{isCurrent});
+  return readRecordEntries(previous,null,{isCurrent,collisionScope});
 }
 
 
@@ -3726,5 +3745,5 @@ document.querySelector("#initialize-lesson-baselines").addEventListener("click",
 
 attachRecordToasts(els.recordTbody);
 
-attachRecordCarousel(els.recordTbody);
+const recordCarousel = attachRecordCarousel(els.recordTbody);
 
