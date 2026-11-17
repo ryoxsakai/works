@@ -389,7 +389,9 @@ function createPlanner({
       task.plan?.project
         ? "project:" + task.plan.project
         : !task.plannedDay
-          ? "inbox"
+          ? task.plan?.parent
+            ? "all"
+            : "inbox"
           : task.plannedDay <= today()
             ? "today"
             : "upcoming",

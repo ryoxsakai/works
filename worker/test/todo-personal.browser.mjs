@@ -662,5 +662,12 @@ async function verifyPlanner(page,db,origin,nav,rowMenu) {
   await page.locator("#quick-title").press("Enter");
   await expect(page.locator("#capture-source")).toBeEmpty();
   assert.equal((await db()).tasks.at(-1).plan.source.name,"合成生徒");
+  const parent=(await db()).tasks.at(-1);
+  await page.locator('[data-task="'+parent.id+'"] [data-action=detail]').click();
+  await page.locator('#add-child').click();
+  await page.locator("#quick-title").fill("合成サブタスク");
+  await page.locator("#quick-title").press("Enter");
+  await expect(page.locator("#tasks .task-name").filter({hasText:"合成サブタスク"})).toBeVisible();
+  assert.equal((await db()).tasks.at(-1).plan.parent,parent.id);
   console.log("PASS nested projects, project and label colors, multiple labels, manual and priority order, saved filter, weekly review and student-linked capture");
 }
