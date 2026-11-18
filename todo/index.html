@@ -6,7 +6,7 @@
     <title>ToDo管理 | Works</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@200;300;400&amp;display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+U:wght@300;400;500&amp;family=Noto+Sans+JP:wght@300;400&amp;display=swap">
     <script src="/shared/theme-init.js?v=1"></script>
     <link rel="stylesheet" href="/shared/styles.css?v=56" />
     <link rel="stylesheet" href="/shared/header.css?v=2" />
@@ -16,7 +16,7 @@
     <link rel="stylesheet" href="/shared/ui/button-states.css?v=1" />
     <link rel="manifest" href="/todo/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/logo.png" />
-    <link rel="stylesheet" href="/todo/planner.css?v=3" />
+    <link rel="stylesheet" href="/todo/planner.css?v=4" />
     <script defer src="/dashboard/vendor/Sortable-1.15.6.min.js"></script>
     <script type="module" src="/shared/header.js?v=4"></script>
   </head>
@@ -113,74 +113,132 @@
           <h2 id="detail-heading">タスクの詳細</h2>
           <button type="button" data-close aria-label="詳細を閉じる">×</button>
         </div>
-        <label>タスク名<input name="name" maxlength="500" required /></label>
+        <label class="detail-name"
+          >タスク名<input name="name" maxlength="500" required
+        /></label>
         <div class="detail-primary">
-          <label>プロジェクト<select id="task-project"></select></label>
-          <label>作業日<input type="date" name="plannedDay"></label>
-          <label>締切<input type="date" name="deadline"></label>
-          <div id="task-labels" class="label-options" aria-label="ラベル"></div>
+          <label
+            ><span class="field-title"
+              ><span data-works-icon="bx-calendar-event"></span>作業日</span
+            ><input type="date" name="plannedDay" /></label
+          ><label
+            ><span class="field-title"
+              ><span data-works-icon="bx-library"></span>プロジェクト</span
+            ><select id="task-project"></select></label
+          ><label
+            ><span class="field-title"
+              ><span data-works-icon="bx-calendar-event"></span>締切</span
+            ><input type="date" name="deadline"
+          /></label>
           <div id="origin-link"></div>
         </div>
-        <div class="form-grid">
-          <label>役割<select name="roleId"></select></label
-          ><label>カテゴリ<select name="category"></select></label
-          ><label
-            >進み具合<select name="status">
-              <option value="pending">未着手</option>
-              <option value="doing">進行中</option>
-              <option value="waiting">待ち</option>
-              <option value="done">完了</option>
-            </select></label
-          ><label
-             hidden>重要度の詳細（任意）<select name="priority">
-              <option value="">指定なし</option>
-              <option value="1">低</option>
-              <option value="2">中</option>
-              <option value="3">高</option>
-            </select></label
-          >
-        </div>
-        <fieldset class="plan-fields"><legend>分類・予定</legend>
-          <div class="form-grid"><label>セクション<input id="task-section" maxlength="100" list="known-sections"></label>
-          <label>親タスク<select id="task-parent"></select></label><label>優先度<select id="task-priority"><option value="1">P1・最優先</option><option value="2">P2・高</option><option value="3">P3・中</option><option value="4">P4・通常</option></select></label>
-          <label>開始時刻（日本時間）<input id="task-time" type="time"></label><label>所要時間（分）<input id="task-duration" type="number" min="1" max="1440" placeholder="30"></label>
-          <label>通知日時（日本時間）<input id="task-reminder" type="datetime-local"></label>
-          <label>繰り返し<select id="task-repeat"><option value="">なし</option><option value="fixed">予定日を基準に繰り返す</option><option value="after">完了日から繰り返す</option></select></label>
-          <label id="interval-field">間隔（日）<input id="task-interval" type="number" min="1" max="3650" value="7"></label></div>
-          <datalist id="known-sections"></datalist>
-          <div id="child-tasks"></div>
-        </fieldset>
-        <label class="check-label"
-          ><input type="checkbox" name="important" /> ★ 大切なタスク</label
-        ><label
-          >このタスクだけのメモ<textarea
-            name="memo"
-            maxlength="10000"
-            rows="3"
-          ></textarea>
-        </label>
-        <label
-          >複製にも引き継ぐ説明（任意）<textarea
-            name="reusableDescription"
-            maxlength="10000"
-            rows="2"
-          ></textarea>
-        </label>
-        <fieldset>
-          <legend>小さなステップ</legend>
-          <div id="checklist-editor"></div>
-          <div class="inline">
-            <input
-              id="step-text"
-              maxlength="500"
-              aria-label="新しいステップ"
-              placeholder="ステップを追加"
-            /><button type="button" id="step-add">追加</button>
+        <details class="detail-section">
+          <summary><span data-works-icon="bx-library"></span>分類・優先度</summary>
+          <div>
+            <div class="form-grid">
+              <label>役割<select name="roleId"></select></label
+              ><label>カテゴリ<select name="category"></select></label
+              ><label
+                >進み具合<select name="status">
+                  <option value="pending">未着手</option>
+                  <option value="doing">進行中</option>
+                  <option value="waiting">待ち</option>
+                  <option value="done">完了</option>
+                </select></label
+              ><label hidden
+                >重要度の詳細（任意）<select name="priority">
+                  <option value="">指定なし</option>
+                  <option value="1">低</option>
+                  <option value="2">中</option>
+                  <option value="3">高</option>
+                </select></label
+              >
+            </div>
+            <label
+              >セクション<input id="task-section" maxlength="100" list="known-sections"
+            /></label>
+            <label>親タスク<select id="task-parent"></select></label
+            ><label
+              >優先度<select id="task-priority">
+                <option value="1">P1・最優先</option>
+                <option value="2">P2・高</option>
+                <option value="3">P3・中</option>
+                <option value="4">P4・通常</option>
+              </select></label
+            >
+            <datalist id="known-sections"></datalist>
+            <div id="task-labels" class="label-options" aria-label="ラベル"></div>
+            <label class="check-label"
+              ><input type="checkbox" name="important" /> ★ 大切なタスク</label
+            >
           </div>
-        </fieldset>
-        <p class="hint">
-          完了履歴は元のタスクに残ります。複製ではステップも未チェックに戻ります。
-        </p>
+        </details>
+        <details class="detail-section">
+          <summary>
+            <span data-works-icon="bx-calendar-event"></span>時間・通知・繰り返し
+          </summary>
+          <div>
+            <label>開始時刻（日本時間）<input id="task-time" type="time" /></label
+            ><label
+              >所要時間（分）<input
+                id="task-duration"
+                type="number"
+                min="1"
+                max="1440"
+                placeholder="30"
+            /></label>
+            <label
+              >通知日時（日本時間）<input id="task-reminder" type="datetime-local"
+            /></label>
+            <label
+              >繰り返し<select id="task-repeat">
+                <option value="">なし</option>
+                <option value="fixed">予定日を基準に繰り返す</option>
+                <option value="after">完了日から繰り返す</option>
+              </select></label
+            >
+            <label id="interval-field"
+              >間隔（日）<input
+                id="task-interval"
+                type="number"
+                min="1"
+                max="3650"
+                value="7"
+            /></label>
+          </div>
+        </details>
+        <details class="detail-section">
+          <summary><span data-works-icon="bx-note"></span>メモ・サブタスク</summary>
+          <div>
+            <label
+              >このタスクだけのメモ<textarea
+                name="memo"
+                maxlength="10000"
+                rows="3"
+              ></textarea>
+            </label>
+            <label
+              >複製にも引き継ぐ説明（任意）<textarea
+                name="reusableDescription"
+                maxlength="10000"
+                rows="2"
+              ></textarea>
+            </label>
+            <fieldset>
+              <legend>小さなステップ</legend>
+              <div id="checklist-editor"></div>
+              <div class="inline">
+                <input
+                  id="step-text"
+                  maxlength="500"
+                  aria-label="新しいステップ"
+                  placeholder="ステップを追加"
+                /><button type="button" id="step-add">追加</button>
+              </div>
+            </fieldset>
+            <div id="child-tasks"></div>
+          </div>
+        </details>
         <div class="dialog-actions">
           <button type="button" id="task-delete" class="danger">削除</button
           ><button type="button" data-close>キャンセル</button
@@ -292,6 +350,6 @@
         ><button class="primary">カテゴリを追加</button>
       </form>
     </dialog>
-    <script type="module" src="/todo/todo.js?v=5"></script>
+    <script type="module" src="/todo/todo.js?v=6"></script>
   </body>
 </html>
