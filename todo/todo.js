@@ -304,6 +304,19 @@ function openDialog(dialog, replace = false) {
   if (replace) history.replaceState({ todoDialog: dialog.id }, "");
   else history.pushState({ todoDialog: dialog.id }, "");
 }
+$("detail").addEventListener("keydown", event => {
+  if (event.key !== "Tab") return;
+  const visible = [...$("detail").querySelectorAll("button, input, select, textarea, summary, a[href]")]
+    .filter(el => !el.disabled && el.getClientRects().length && !el.closest("details:not([open]) > :not(summary)"));
+  const first = visible[0], last = visible.at(-1);
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last?.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first?.focus();
+  }
+});
 function restoreDialogFocus(target) {
   if (target && !target.isConnected) {
     const taskId = target.closest("[data-task]")?.dataset.task;
@@ -433,6 +446,7 @@ function openDetail(id, show = true) {
   $("step-text").value = "";
   $("detail-error").textContent = "";
   if (show) {
+    for (const section of $("detail-form").querySelectorAll(".detail-section")) section.open = false;
     const row = document.querySelector(`[data-task="${CSS.escape(id)}"]`);
     row?.classList.add("inspected");
     openDialog($("detail"));

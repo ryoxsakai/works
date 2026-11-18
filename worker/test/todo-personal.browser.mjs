@@ -231,7 +231,7 @@ try {
           return [css.fontFamily.split(",")[0].replaceAll('"',""),css.fontWeight];
         });
       });
-      assert.deepEqual(type,["200","200","300","400","400","400"].map(weight=>["Noto Sans JP",weight]));
+      assert.deepEqual(type,[...["300","300","400","500","500"].map(weight=>["M PLUS U",weight]),["Noto Sans JP","400"]]);
       const taskBounds = await page.locator("#tasks .task-card").nth(2).boundingBox();
       assert.ok(taskBounds.y + taskBounds.height < 844, "first three tasks fit before scrolling");
       if (width <= 390) {
@@ -444,6 +444,7 @@ try {
   await page
     .getByRole("button", { name: "詳細：合成 today0", exact: true })
     .click();
+  await page.getByText("分類・優先度",{exact:true}).click();
   await page.locator("[name=roleId]").selectOption("lessons");
   await page.locator("#detail-form button[type=submit]").click();
   await expect(page.locator("#detail")).toBeHidden();
@@ -703,7 +704,8 @@ async function verifyPlanner(page,db,origin,nav,rowMenu) {
   assert.equal((await db()).tasks.at(-1).plan.source.name,"合成生徒");
   const parent=(await db()).tasks.at(-1);
   await page.locator('[data-task="'+parent.id+'"] [data-action=detail]').click();
-  await page.locator('#add-child').click();
+  await page.getByText("メモ・サブタスク",{exact:true}).click();
+  await page.locator("#add-child").click();
   await page.locator("#quick-title").fill("合成サブタスク");
   await page.locator("#quick-title").press("Enter");
   await expect(page.locator("#tasks .task-name").filter({hasText:"合成サブタスク"})).toBeVisible();
