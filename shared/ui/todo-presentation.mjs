@@ -30,12 +30,12 @@ export function startTodoPresentation() {
     const workspace=document.querySelector(".todo-page");
     if(!workspace)return;
     active=true;
+    hydrateIcons(workspace);
     decorateTodo(workspace);
     observer.observe(workspace,{childList:true,subtree:true});
   };
   const stop=()=>{active=false;observer.disconnect();observer.takeRecords();};
   controller={start,stop};
-  hydrateIcons();
   window.addEventListener('pagehide',stop);
   window.addEventListener('pageshow',start);
   start();
