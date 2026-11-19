@@ -19,7 +19,7 @@ import {
   getGoogleAccessToken,
   getSessionToken,
 } from "../shared/auth.js?v=13";
-import { getTheme, setTheme } from "../shared/theme.js?v=6";
+import { getTheme, setTheme } from "../shared/theme.js?v=7";
 import { tokyoDateKey, shiftRecordDate, recordDateRange } from "./record-date.js?v=1";
 import { createStudentMemoStore } from "./student-memo.js?v=1";
 import { createLessonPlanController } from "./lesson-plan.js?v=8";

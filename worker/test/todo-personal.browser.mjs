@@ -231,12 +231,12 @@ try {
           return [css.fontFamily.split(",")[0].replaceAll('"',""),css.fontWeight];
         });
       });
-      assert.deepEqual(type,[...["300","300","400","500","500"].map(weight=>["M PLUS U",weight]),["M PLUS 1p","600"]]);
-      await expect(page.locator('.works-header .works-settings-toggle')).toBeVisible();
-      await expect(page.locator('.works-header .btn, .works-settings-dialog [data-dialog-conflict]')).toHaveCount(0);
-      await page.locator('.works-header .works-settings-toggle').click();
-      await expect(page.locator('.works-settings-dialog')).toBeVisible();
-      await page.locator('.works-settings-dialog button[aria-label="閉じる"]').click();
+      // Every service shares the Works typeface (M PLUS 2); weights keep their hierarchy.
+      assert.deepEqual(type.map(([family])=>family),Array(6).fill("M PLUS 2"));
+      assert.deepEqual(type.slice(0,5).map(([,weight])=>weight),["300","300","400","500","500"]);
+      assert.equal(await page.evaluate(()=>document.documentElement.dataset.theme),"light");
+      await expect(page.locator('.works-header .works-quick-add')).toBeVisible();
+      await expect(page.locator('.works-header .btn, .works-settings-dialog')).toHaveCount(0);
       const taskBounds = await page.locator("#tasks .task-card").nth(2).boundingBox();
       assert.ok(taskBounds.y + taskBounds.height < 844, "first three tasks fit before scrolling");
       if (width <= 390) {

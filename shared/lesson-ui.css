@@ -1,0 +1,327 @@
+/*
+ * Lesson UI (Works design): record cards shared by Home and 授業管理, plus the
+ * 授業管理 page frame. Visual layer only; markup, data owners and saves are unchanged.
+ */
+
+/* ---------- Record cards (Home widget and 授業記録) ---------- */
+.record-panel #record-table tbody { gap: 14px; }
+.record-panel #record-table tr[data-event-id],
+.record-panel #record-table tr.lesson-review-row {
+  gap: 8px 12px;
+  padding: 16px 18px 18px;
+  border: 1px solid var(--works-line);
+  border-radius: var(--works-radius-lg);
+  background: var(--works-surface);
+  box-shadow: var(--works-shadow-sm);
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.record-panel #record-table tr[data-event-id]:focus-within {
+  border-color: var(--works-accent-line);
+  box-shadow: 0 0 0 4px rgb(77 91 216 / .08), var(--works-shadow-sm);
+}
+.record-panel .record-card-heading { gap: 8px 12px; }
+.record-panel .record-student-link,
+.record-panel .record-student-name {
+  color: var(--works-ink);
+  font-size: 1.02rem;
+  font-weight: 700;
+  letter-spacing: .01em;
+}
+.record-panel .record-student-name { gap: 10px; }
+.record-panel .record-avatar {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border: 0 !important;
+  border-radius: 11px;
+}
+.record-panel .record-card-meta { color: var(--works-ink-3); font-size: .78rem; font-variant-numeric: tabular-nums; }
+.record-panel .record-recheck,
+.record-panel .record-card-meta button {
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--works-ink-3);
+}
+.record-panel .record-recheck:hover,
+.record-panel .record-card-meta button:hover { background: var(--works-hover); color: var(--works-ink); }
+.record-panel .record-todo-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  justify-self: start;
+  min-height: 32px;
+  margin: 2px 0 0;
+  padding: 2px 12px;
+  border-radius: 999px;
+  background: var(--works-accent-soft);
+  color: var(--works-accent-strong);
+  font-size: .8rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+.record-panel .record-todo-link:hover { background: #e3e7ff; }
+
+/* Field labels: small, quiet and consistent. */
+.record-panel #record-table td:nth-child(n+4)::before,
+.record-panel .record-next-plan label,
+.record-panel .record-student-memo label,
+.record-panel .owner-memo label {
+  margin: 6px 0 6px;
+  color: var(--works-ink-3);
+  font-size: .75rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+}
+.record-panel .record-next-plan,
+.record-panel .record-student-memo { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--works-line); }
+
+/* Inputs: soft wells that light up while editing. */
+.record-panel #record-table textarea,
+.record-panel .owner-memo textarea {
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: var(--works-radius);
+  background: var(--works-surface-sunken);
+  color: var(--works-ink);
+  font-size: 16px;
+  line-height: 1.6;
+  transition: background-color .15s ease, border-color .15s ease, box-shadow .15s ease;
+}
+.record-panel #record-table textarea:hover:not(:disabled) { background: #edf0f7; }
+.record-panel #record-table textarea:focus,
+.record-panel .owner-memo textarea:focus {
+  border-color: var(--works-accent);
+  background: var(--works-surface);
+  box-shadow: var(--works-focus);
+  outline: none;
+}
+.record-panel #record-table textarea::placeholder { color: #9aa0b8; }
+.record-panel #record-table textarea:disabled { background: var(--works-surface-sunken); color: var(--works-ink-3); }
+.record-panel :is(.lesson-plan-status, .student-memo-status, .lesson-plan-target) { color: var(--works-ink-3); font-size: .74rem; }
+
+/* Empty slot rows read as quiet placeholders. */
+.record-panel #record-table .record-empty-slot {
+  padding: 12px 18px;
+  border: 1px dashed var(--works-line-strong);
+  border-radius: var(--works-radius-lg);
+  background: transparent;
+  box-shadow: none;
+  color: var(--works-ink-3);
+}
+
+/* Carousel controls (mobile). */
+.record-carousel-controls { gap: 8px; margin-bottom: 10px; }
+.record-carousel-controls button {
+  border: 1px solid var(--works-line);
+  border-radius: 999px;
+  background: var(--works-surface);
+  color: var(--works-ink-2);
+  box-shadow: var(--works-shadow-sm);
+}
+.record-carousel-controls span { color: var(--works-ink-2); font-size: .85rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* Save toasts: compact gradient pills. */
+.record-save-toasts .record-save-toast {
+  border: 0;
+  border-radius: 999px;
+  background: var(--works-gradient);
+  box-shadow: var(--works-shadow-lg);
+  font-weight: 600;
+}
+
+/* PC: lay cards out in columns instead of stretching inputs edge to edge. */
+@media screen and (min-width: 1024px) {
+  .record-panel #record-table tbody {
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr));
+    align-items: start;
+  }
+}
+
+/* ---------- 授業管理 page frame ---------- */
+body.tutor-bootstrap > main {
+  max-width: none;
+  margin: 0;
+  padding: 24px var(--works-gutter) 48px;
+}
+body.tutor-bootstrap .record-panel,
+body.tutor-bootstrap .curriculum-panel { max-width: none; }
+
+/* Section tabs: segmented control under the header on PC, bottom bar on phones. */
+body.tutor-bootstrap .page-tabs {
+  position: sticky;
+  top: calc(var(--works-header-height, 60px) + 12px);
+  z-index: 15;
+  display: inline-flex;
+  width: auto;
+  max-width: 100%;
+  gap: 4px;
+  margin: 0 0 24px;
+  padding: 4px;
+  border: 1px solid var(--works-line);
+  border-radius: 14px;
+  background: rgb(255 255 255 / .94);
+  box-shadow: var(--works-shadow-sm);
+}
+body.tutor-bootstrap .page-tabs .page-tab-btn,
+body.tutor-bootstrap .page-tabs .nav-link {
+  flex: 0 0 auto;
+  gap: 8px;
+  min-height: 40px;
+  padding: 8px 18px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--works-ink-2);
+  font-size: .92rem;
+  font-weight: 600;
+}
+body.tutor-bootstrap .page-tabs .page-tab-btn:hover { background: var(--works-hover); color: var(--works-ink); }
+body.tutor-bootstrap .page-tabs .page-tab-btn[aria-selected="true"] {
+  background: var(--works-gradient);
+  color: #fff;
+  box-shadow: 0 2px 8px rgb(91 99 240 / .28);
+}
+body.tutor-bootstrap .page-tabs .page-tab-btn i,
+body.tutor-bootstrap .page-tabs .page-tab-btn .works-icon { font-size: 1.15rem; }
+
+/* Panel headings */
+body.tutor-bootstrap .panel-header .eyebrow {
+  margin: 0 0 2px;
+  background: var(--works-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: .14em;
+}
+body.tutor-bootstrap .record-panel .panel-header h2,
+body.tutor-bootstrap .curriculum-panel > .panel-header:first-child h2,
+body.tutor-bootstrap .panel-header h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  color: var(--works-ink);
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: .02em;
+}
+body.tutor-bootstrap .panel-header h2 i { color: var(--works-accent); }
+
+/* Day switcher and date chip */
+body.tutor-bootstrap .record-panel .view-toggle {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--works-line);
+  border-radius: 14px;
+  background: var(--works-surface);
+  box-shadow: var(--works-shadow-sm);
+}
+body.tutor-bootstrap .record-panel .record-day-btn {
+  min-height: 40px;
+  padding: 6px 14px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--works-ink-2);
+  font-weight: 600;
+}
+body.tutor-bootstrap .record-panel .record-day-btn:hover { background: var(--works-hover); color: var(--works-ink); }
+body.tutor-bootstrap .record-panel .hint {
+  min-height: 0;
+  margin: 4px 0 16px;
+  padding: 6px 14px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--works-accent-soft);
+  color: var(--works-accent-strong);
+  font-size: .9rem;
+  font-weight: 700;
+}
+
+/* Shared card surfaces in 授業予定 and 生徒情報 */
+body.tutor-bootstrap :is(.curriculum-panel .collapsible-section, .curriculum-panel .curriculum-search-bar, .schedule-panel .table-scroll, .curriculum-panel .table-scroll) {
+  border: 1px solid var(--works-line);
+  border-radius: var(--works-radius-lg);
+  background: var(--works-surface);
+  box-shadow: var(--works-shadow-sm);
+}
+body.tutor-bootstrap .curriculum-panel :is(.curriculum-print-name-row, .goals-column) {
+  border: 0;
+  border-radius: var(--works-radius);
+  background: var(--works-surface-sunken);
+}
+body.tutor-bootstrap .curriculum-panel .curriculum-table textarea,
+body.tutor-bootstrap .curriculum-panel textarea,
+body.tutor-bootstrap .curriculum-panel input:not([type="checkbox"], [type="radio"]),
+body.tutor-bootstrap .curriculum-panel select {
+  border-radius: 10px;
+}
+
+/* Phones: tabs become a bottom navigation bar within thumb reach. */
+@media screen and (max-width: 640px) {
+  /* Keep the original 1.5rem side gutter: the card carousel snaps against it. */
+  body.tutor-bootstrap > main { padding: 16px 1.5rem calc(96px + env(safe-area-inset-bottom)); }
+  body.tutor-bootstrap .page-tabs {
+    position: fixed;
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 35;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin: 0;
+    padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+    border: 0;
+    border-top: 1px solid var(--works-line);
+    border-radius: 0;
+    background: rgb(255 255 255 / .97);
+    box-shadow: 0 -4px 18px rgb(27 31 51 / .06);
+  }
+  body.tutor-bootstrap .page-tabs .page-tab-btn,
+  body.tutor-bootstrap .page-tabs .nav-link {
+    position: relative;
+    flex-direction: column;
+    gap: 2px;
+    min-height: 54px;
+    padding: 6px 2px;
+    border-radius: 12px;
+    font-size: .72rem;
+  }
+  body.tutor-bootstrap .page-tabs .page-tab-btn[aria-selected="true"] {
+    background: transparent;
+    box-shadow: none;
+    color: var(--works-accent-strong);
+    font-weight: 800;
+  }
+  body.tutor-bootstrap .page-tabs .page-tab-btn[aria-selected="true"] i,
+  body.tutor-bootstrap .page-tabs .page-tab-btn[aria-selected="true"] .works-icon {
+    display: inline-grid;
+    place-items: center;
+    width: 52px;
+    height: 28px;
+    border-radius: 999px;
+    background: var(--works-gradient);
+    color: #fff;
+  }
+  body.tutor-bootstrap .page-tabs .page-tab-btn i { font-size: 1.3rem; line-height: 28px; }
+  body.tutor-bootstrap .panel-header h2 { font-size: 1.3rem; }
+  body.tutor-bootstrap .record-save-toasts { bottom: calc(80px + env(safe-area-inset-bottom)); }
+  .record-panel #record-table tr[data-event-id] { padding: 14px 14px 16px; }
+}
+
+@media print {
+  body.tutor-bootstrap .page-tabs { display: none !important; }
+  body.tutor-bootstrap > main { padding: 0; }
+  .record-panel #record-table tr[data-event-id] { box-shadow: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .record-panel #record-table tr, .record-panel #record-table textarea { transition: none; }
+}

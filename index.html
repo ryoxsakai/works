@@ -5,10 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=M+PLUS+1p:wght@400;500;700&display=swap"
-      rel="stylesheet"
-    />
     <meta
       http-equiv="Cache-Control"
       content="no-store, no-cache, must-revalidate, max-age=0"
@@ -20,7 +16,7 @@
     <link rel="apple-touch-icon" href="/shared/logo.png" />
     <link rel="stylesheet" href="/shared/styles.css?v=56" />
     <link rel="stylesheet" href="/home.css?v=6" />
-    <link rel="stylesheet" href="/shared/header.css?v=2" />
+    <link rel="stylesheet" href="/shared/header.css?v=3" /><link rel="preconnect" href="https://fonts.googleapis.com" /><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin /><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+2:wght@300;400;500;700;800&display=swap" /><link rel="stylesheet" href="/shared/works-design.css?v=1" />
     <link rel="stylesheet" href="/shared/ui/menu-bootstrap.css?v=1" />
     <link rel="stylesheet" href="/shared/ui/menu-tokens.css?v=1" />
     <link rel="stylesheet" href="/shared/ui/button-states.css?v=1" />
@@ -31,6 +27,8 @@
     <link rel="stylesheet" href="/tutor/record-carousel.css?v=1" />
     <link rel="stylesheet" href="/dashboard/lesson-cards.css?v=1" />
     <link rel="stylesheet" href="/home-refined.css?v=1" />
+    <link rel="stylesheet" href="/shared/lesson-ui.css?v=1" />
+    <link rel="stylesheet" href="/home-v2.css?v=1" />
   <link rel="stylesheet" href="/shared/owner-memo.css?v=1"><link rel="stylesheet" href="/shared/card-loading.css?v=1" /></head>
   <body class="dashboard-home">
     <a class="skip-link" href="#dashboard-main">本文へ</a>
@@ -69,6 +67,12 @@
       <main id="dashboard-main" tabindex="-1">
         <p id="home-auth-error" class="error home-auth-error alert" role="alert"></p>
         <p id="dashboard-date" hidden></p>
+        <section class="home-hero" aria-labelledby="home-hero-title">
+          <div>
+            <p class="home-hero-date" id="home-hero-date"></p>
+            <h2 id="home-hero-title">今日の授業と準備</h2>
+          </div>
+        </section>
         <p id="dashboard-message" class="alert" role="status" aria-live="polite"></p>
         <div id="dashboard-editor" class="dashboard-editor" hidden>
           <p>
@@ -112,20 +116,6 @@
         </button>
       </div>
       <div class="modal-tab-panel">
-        <h3>表示テーマ</h3>
-        <div class="theme-options">
-          <label
-            ><input type="radio" name="home-theme" value="system" />
-            OS設定</label
-          >
-          <label
-            ><input type="radio" name="home-theme" value="light" />
-            ライト</label
-          >
-          <label
-            ><input type="radio" name="home-theme" value="dark" /> ダーク</label
-          >
-        </div>
         <div class="home-settings-dashboard">
           <h3>ホーム画面</h3>
           <button id="dashboard-edit" type="button" class="btn btn-outline">ホーム画面の配置を編集</button>
@@ -134,7 +124,7 @@
       </div>
     </dialog>
 
-    <script type="module" src="/home.js?v=22"></script>
+    <script type="module" src="/home.js?v=23"></script>
   </body>
 </html>
 
