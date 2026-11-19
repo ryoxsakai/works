@@ -53,9 +53,9 @@
   place-items: center;
   width: 32px;
   height: 32px;
-  border-radius: 10px;
-  background: var(--works-gradient, #4d5bd8);
-  box-shadow: 0 2px 8px rgb(91 99 240 / .35), inset 0 1px 0 rgb(255 255 255 / .25);
+  border-radius: 8px;
+  background: var(--works-accent, #4d5bd8);
+  box-shadow: none;
   color: #fff;
   font: 800 1rem/1 var(--works-font, system-ui, sans-serif);
   letter-spacing: -.02em;
@@ -88,7 +88,7 @@
   margin: 0;
   padding: 0;
   border: 0 !important;
-  border-radius: 12px !important;
+  border-radius: 8px !important;
   background: transparent !important;
   box-shadow: none !important;
   color: var(--works-ink-2, #4a5068) !important;
@@ -180,8 +180,8 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 16px 12px 24px;
-  border-right: 1px solid var(--works-line, #e4e7f0);
-  background: #fff;
+  border-right: 0;
+  background: var(--works-sidebar, #eceef1);
   box-shadow: var(--works-shadow-lg);
   font-family: var(--works-font, system-ui, sans-serif);
 }
@@ -207,32 +207,22 @@
   gap: 12px;
   min-height: 44px;
   padding: 6px 10px;
-  border-radius: 10px;
+  border-radius: 8px;
   color: var(--works-ink-2, #4a5068);
   font-size: .92rem;
   font-weight: 500;
   text-decoration: none;
   transition: background-color .15s ease, color .15s ease;
 }
-.works-navigation nav a:hover { background: var(--works-hover, #eff1f8); color: var(--works-ink, #1b1f33); }
-.works-navigation nav a[aria-current] { background: var(--works-accent-soft, #eef0ff); color: var(--works-accent-strong, #3f4bc4); font-weight: 700; }
-.works-navigation nav a[aria-current]::before {
-  content: "";
-  position: absolute;
-  top: 10px;
-  bottom: 10px;
-  left: -12px;
-  width: 4px;
-  border-radius: 0 4px 4px 0;
-  background: var(--works-gradient, #4d5bd8);
-}
+.works-navigation nav a:hover { background: rgb(255 255 255 / .6); color: var(--works-ink, #1b1f33); }
+.works-navigation nav a[aria-current] { background: var(--works-surface, #fff); box-shadow: var(--works-shadow-sm); color: var(--works-ink, #1c1d21); font-weight: 700; }
 .works-app-icon {
   display: inline-grid;
   place-items: center;
   flex-shrink: 0;
   width: 30px;
   height: 30px;
-  border-radius: 9px;
+  border-radius: 7px;
   background: var(--app-tint, #eef0ff);
   color: var(--app-ink, #4d5bd8);
 }
@@ -256,7 +246,8 @@
     z-index: 20;
     width: var(--works-sidebar-w, 240px);
     padding: 12px 12px 24px;
-    background: #fff;
+    border-right: 0;
+    background: var(--works-sidebar, #eceef1);
     box-shadow: none;
   }
 }

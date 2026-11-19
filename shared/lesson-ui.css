@@ -1,29 +1,35 @@
 /*
  * Lesson UI (Works design): record cards shared by Home and 授業管理, plus the
  * 授業管理 page frame. Visual layer only; markup, data owners and saves are unchanged.
+ *
+ * Direction: grey page, white cards lifted by two shadows (no borders),
+ * small radii, white inputs with a thin line, gradient only on primary buttons,
+ * "selected" = white face + shadow on a grey track.
  */
 
 /* ---------- Record cards (Home widget and 授業記録) ---------- */
-.record-panel #record-table tbody { gap: 14px; }
+.record-panel #record-table tbody { gap: 16px; }
 .record-panel #record-table tr[data-event-id],
 .record-panel #record-table tr.lesson-review-row {
   gap: 8px 12px;
-  padding: 16px 18px 18px;
-  border: 1px solid var(--works-line);
+  padding: 16px;
+  border: 0;
   border-radius: var(--works-radius-lg);
   background: var(--works-surface);
-  box-shadow: var(--works-shadow-sm);
-  transition: border-color .15s ease, box-shadow .15s ease;
+  box-shadow: var(--works-shadow);
+  transition: box-shadow .15s ease;
 }
-.record-panel #record-table tr[data-event-id]:focus-within {
-  border-color: var(--works-accent-line);
-  box-shadow: 0 0 0 4px rgb(77 91 216 / .08), var(--works-shadow-sm);
+/* Inside the Home widget the cards sit on white, so give them a grey face. */
+.dashboard-home .home-lesson-cards #record-table tr[data-event-id],
+.dashboard-home .home-lesson-cards #record-table tr.lesson-review-row {
+  background: var(--works-surface-sunken);
+  box-shadow: none;
 }
 .record-panel .record-card-heading { gap: 8px 12px; }
 .record-panel .record-student-link,
 .record-panel .record-student-name {
   color: var(--works-ink);
-  font-size: 1.02rem;
+  font-size: 1rem;
   font-weight: 700;
   letter-spacing: .01em;
 }
@@ -32,16 +38,16 @@
   display: inline-grid;
   place-items: center;
   flex-shrink: 0;
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   border: 0 !important;
-  border-radius: 11px;
+  border-radius: var(--works-radius);
 }
 .record-panel .record-card-meta { color: var(--works-ink-3); font-size: .78rem; font-variant-numeric: tabular-nums; }
 .record-panel .record-recheck,
 .record-panel .record-card-meta button {
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--works-radius);
   background: transparent;
   color: var(--works-ink-3);
 }
@@ -52,46 +58,47 @@
   align-items: center;
   gap: 2px;
   justify-self: start;
-  min-height: 32px;
+  min-height: 28px;
   margin: 2px 0 0;
-  padding: 2px 12px;
+  padding: 2px 10px;
   border-radius: 999px;
   background: var(--works-accent-soft);
   color: var(--works-accent-strong);
-  font-size: .8rem;
+  font-size: .78rem;
   font-weight: 700;
   text-decoration: none;
 }
-.record-panel .record-todo-link:hover { background: #e3e7ff; }
+.record-panel .record-todo-link:hover { background: #e3e6fb; }
 
 /* Field labels: small, quiet and consistent. */
 .record-panel #record-table td:nth-child(n+4)::before,
 .record-panel .record-next-plan label,
 .record-panel .record-student-memo label,
 .record-panel .owner-memo label {
-  margin: 6px 0 6px;
+  margin: 6px 0;
   color: var(--works-ink-3);
   font-size: .75rem;
   font-weight: 700;
   letter-spacing: .04em;
 }
 .record-panel .record-next-plan,
-.record-panel .record-student-memo { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--works-line); }
+.record-panel .record-student-memo { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--works-line); }
 
-/* Inputs: soft wells that light up while editing. */
+/* Inputs: white with a thin line, accent ring while editing. */
 .record-panel #record-table textarea,
 .record-panel .owner-memo textarea {
   min-height: 44px;
   padding: 10px 12px;
-  border: 1px solid transparent;
+  border: 1px solid var(--works-input-line);
   border-radius: var(--works-radius);
-  background: var(--works-surface-sunken);
+  background: var(--works-surface);
   color: var(--works-ink);
-  font-size: 16px;
+  font-size: 1rem; /* 14px on PC; phones get 16px from works-design.css */
   line-height: 1.6;
-  transition: background-color .15s ease, border-color .15s ease, box-shadow .15s ease;
+  box-shadow: none;
+  transition: border-color .15s ease, box-shadow .15s ease;
 }
-.record-panel #record-table textarea:hover:not(:disabled) { background: #edf0f7; }
+.record-panel #record-table textarea:hover:not(:disabled) { border-color: var(--works-line-strong); }
 .record-panel #record-table textarea:focus,
 .record-panel .owner-memo textarea:focus {
   border-color: var(--works-accent);
@@ -99,13 +106,13 @@
   box-shadow: var(--works-focus);
   outline: none;
 }
-.record-panel #record-table textarea::placeholder { color: #9aa0b8; }
+.record-panel #record-table textarea::placeholder { color: #9a9ea8; }
 .record-panel #record-table textarea:disabled { background: var(--works-surface-sunken); color: var(--works-ink-3); }
 .record-panel :is(.lesson-plan-status, .student-memo-status, .lesson-plan-target) { color: var(--works-ink-3); font-size: .74rem; }
 
 /* Empty slot rows read as quiet placeholders. */
 .record-panel #record-table .record-empty-slot {
-  padding: 12px 18px;
+  padding: 12px 16px;
   border: 1px dashed var(--works-line-strong);
   border-radius: var(--works-radius-lg);
   background: transparent;
@@ -116,19 +123,19 @@
 /* Carousel controls (mobile). */
 .record-carousel-controls { gap: 8px; margin-bottom: 10px; }
 .record-carousel-controls button {
-  border: 1px solid var(--works-line);
-  border-radius: 999px;
+  border: 0;
+  border-radius: var(--works-radius);
   background: var(--works-surface);
   color: var(--works-ink-2);
   box-shadow: var(--works-shadow-sm);
 }
 .record-carousel-controls span { color: var(--works-ink-2); font-size: .85rem; font-weight: 700; font-variant-numeric: tabular-nums; }
 
-/* Save toasts: compact gradient pills. */
+/* Save toasts: compact ink pills. */
 .record-save-toasts .record-save-toast {
   border: 0;
-  border-radius: 999px;
-  background: var(--works-gradient);
+  border-radius: var(--works-radius);
+  background: var(--works-ink);
   box-shadow: var(--works-shadow-lg);
   font-weight: 600;
 }
@@ -142,15 +149,16 @@
 }
 
 /* ---------- 授業管理 page frame ---------- */
+body.tutor-bootstrap { background: var(--works-page); }
 body.tutor-bootstrap > main {
   max-width: none;
   margin: 0;
   padding: 24px var(--works-gutter) 48px;
 }
-body.tutor-bootstrap .record-panel,
-body.tutor-bootstrap .curriculum-panel { max-width: none; }
+body.tutor-bootstrap [data-page-tab-panel] > .panel { max-width: none; margin: 0; }
 
-/* Section tabs: segmented control under the header on PC, bottom bar on phones. */
+/* Section tabs: grey track with the selected tab as a white face (PC);
+ * a bottom bar on phones. */
 body.tutor-bootstrap .page-tabs {
   position: sticky;
   top: calc(var(--works-header-height, 60px) + 12px);
@@ -158,220 +166,80 @@ body.tutor-bootstrap .page-tabs {
   display: inline-flex;
   width: auto;
   max-width: 100%;
-  gap: 4px;
-  margin: 0 0 24px;
-  padding: 4px;
-  border: 1px solid var(--works-line);
-  border-radius: 14px;
-  background: rgb(255 255 255 / .94);
-  box-shadow: var(--works-shadow-sm);
+  gap: 2px;
+  margin: 0 0 20px;
+  padding: 3px;
+  border: 0;
+  border-radius: var(--works-radius);
+  background: var(--works-track);
+  box-shadow: none;
 }
 body.tutor-bootstrap .page-tabs .page-tab-btn,
 body.tutor-bootstrap .page-tabs .nav-link {
   flex: 0 0 auto;
   gap: 8px;
-  min-height: 40px;
-  padding: 8px 18px;
+  min-height: 36px;
+  padding: 6px 16px;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--works-radius-sm);
   background: transparent;
   color: var(--works-ink-2);
-  font-size: .92rem;
+  font-size: .9rem;
   font-weight: 600;
 }
-body.tutor-bootstrap .page-tabs .page-tab-btn:hover { background: var(--works-hover); color: var(--works-ink); }
+body.tutor-bootstrap .page-tabs .page-tab-btn:hover { color: var(--works-ink); }
 body.tutor-bootstrap .page-tabs .page-tab-btn[aria-selected="true"] {
-  background: var(--works-gradient);
-  color: #fff;
-  box-shadow: 0 2px 8px rgb(91 99 240 / .28);
+  background: var(--works-surface);
+  color: var(--works-ink);
+  box-shadow: var(--works-shadow-sm);
 }
 body.tutor-bootstrap .page-tabs .page-tab-btn i,
-body.tutor-bootstrap .page-tabs .page-tab-btn .works-icon { font-size: 1.15rem; }
+body.tutor-bootstrap .page-tabs .page-tab-btn .works-icon { font-size: 1.1rem; }
 
-/* Panel headings */
-body.tutor-bootstrap .panel-header .eyebrow {
-  margin: 0 0 2px;
-  background: var(--works-gradient);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  font-size: .72rem;
-  font-weight: 800;
-  letter-spacing: .14em;
-}
-body.tutor-bootstrap .record-panel .panel-header h2,
-body.tutor-bootstrap .curriculum-panel > .panel-header:first-child h2,
-body.tutor-bootstrap .panel-header h2 {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 0;
-  color: var(--works-ink);
-  font-size: 1.5rem;
-  font-weight: 800;
-  letter-spacing: .02em;
-}
-body.tutor-bootstrap .panel-header h2 i { color: var(--works-accent); }
-
-/* Day switcher and date chip */
-body.tutor-bootstrap .record-panel .view-toggle {
-  display: inline-flex;
-  gap: 4px;
-  padding: 4px;
-  border: 1px solid var(--works-line);
-  border-radius: 14px;
-  background: var(--works-surface);
-  box-shadow: var(--works-shadow-sm);
-}
-body.tutor-bootstrap .record-panel .record-day-btn {
-  min-height: 40px;
-  padding: 6px 14px;
-  border: 0;
-  border-radius: 10px;
-  background: transparent;
-  color: var(--works-ink-2);
-  font-weight: 600;
-}
-body.tutor-bootstrap .record-panel .record-day-btn:hover { background: var(--works-hover); color: var(--works-ink); }
-body.tutor-bootstrap .record-panel .hint {
-  min-height: 0;
-  margin: 4px 0 16px;
-  padding: 6px 14px;
-  border: 0;
-  border-radius: 999px;
-  background: var(--works-accent-soft);
-  color: var(--works-accent-strong);
-  font-size: .9rem;
-  font-weight: 700;
-}
-
-/* Shared card surfaces in 授業予定 and 生徒情報 */
-body.tutor-bootstrap :is(.curriculum-panel .collapsible-section, .curriculum-panel .curriculum-search-bar, .schedule-panel .table-scroll, .curriculum-panel .table-scroll) {
-  border: 1px solid var(--works-line);
-  border-radius: var(--works-radius-lg);
-  background: var(--works-surface);
-  box-shadow: var(--works-shadow-sm);
-}
-body.tutor-bootstrap .curriculum-panel :is(.curriculum-print-name-row, .goals-column) {
-  border: 0;
-  border-radius: var(--works-radius);
-  background: var(--works-surface-sunken);
-}
-body.tutor-bootstrap .curriculum-panel .curriculum-table textarea,
-body.tutor-bootstrap .curriculum-panel textarea,
-body.tutor-bootstrap .curriculum-panel input:not([type="checkbox"], [type="radio"]),
-body.tutor-bootstrap .curriculum-panel select {
-  border-radius: 10px;
-}
-
-/* Phones: tabs become a bottom navigation bar within thumb reach. */
-@media screen and (max-width: 640px) {
-  /* Keep the original 1.5rem side gutter: the card carousel snaps against it. */
-  body.tutor-bootstrap > main { padding: 16px 1.5rem calc(96px + env(safe-area-inset-bottom)); }
-  body.tutor-bootstrap .page-tabs {
-    position: fixed;
-    top: auto;
-    right: 0;
-    bottom: 0;
-    left: 0;
-    z-index: 35;
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    margin: 0;
-    padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
-    border: 0;
-    border-top: 1px solid var(--works-line);
-    border-radius: 0;
-    background: rgb(255 255 255 / .97);
-    box-shadow: 0 -4px 18px rgb(27 31 51 / .06);
-  }
-  body.tutor-bootstrap .page-tabs .page-tab-btn,
-  body.tutor-bootstrap .page-tabs .nav-link {
-    position: relative;
-    flex-direction: column;
-    gap: 2px;
-    min-height: 54px;
-    padding: 6px 2px;
-    border-radius: 12px;
-    font-size: .72rem;
-  }
-  body.tutor-bootstrap .page-tabs .page-tab-btn[aria-selected="true"] {
-    background: transparent;
-    box-shadow: none;
-    color: var(--works-accent-strong);
-    font-weight: 800;
-  }
-  body.tutor-bootstrap .page-tabs .page-tab-btn[aria-selected="true"] i,
-  body.tutor-bootstrap .page-tabs .page-tab-btn[aria-selected="true"] .works-icon {
-    display: inline-grid;
-    place-items: center;
-    width: 52px;
-    height: 28px;
-    border-radius: 999px;
-    background: var(--works-gradient);
-    color: #fff;
-  }
-  body.tutor-bootstrap .page-tabs .page-tab-btn i { font-size: 1.3rem; line-height: 28px; }
-  body.tutor-bootstrap .panel-header h2 { font-size: 1.3rem; }
-  body.tutor-bootstrap .record-save-toasts { bottom: calc(80px + env(safe-area-inset-bottom)); }
-  .record-panel #record-table tr[data-event-id] { padding: 14px 14px 16px; }
-}
-
-@media print {
-  body.tutor-bootstrap .page-tabs { display: none !important; }
-  body.tutor-bootstrap > main { padding: 0; }
-  .record-panel #record-table tr[data-event-id] { box-shadow: none; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .record-panel #record-table tr, .record-panel #record-table textarea { transition: none; }
-}
-
-/* =====================================================================
- * 授業管理: one visual system for 授業記録 / 授業予定 / 生徒情報
- * Same panel width, header layout, title size, buttons, toggles and cards.
- * ===================================================================== */
-body.tutor-bootstrap [data-page-tab-panel] > .panel {
-  max-width: none;
-  margin: 0;
-}
-
-/* Header row: title on the left, actions on the right, same height everywhere. */
+/* Header row: title on the left, actions on the right, same height on every tab. */
 body.tutor-bootstrap [data-page-tab-panel] > .panel > .panel-header:first-child {
   display: flex;
   flex-wrap: nowrap;
   align-items: flex-end;
   justify-content: space-between;
   gap: 12px 16px;
-  min-height: 56px;
-  margin: 0 0 20px;
+  min-height: 48px;
+  margin: 0 0 16px;
   padding: 0;
 }
 body.tutor-bootstrap [data-page-tab-panel] > .panel > .panel-header:first-child > div:first-child { min-width: 0; }
-body.tutor-bootstrap [data-page-tab-panel] > .panel > .panel-header .eyebrow { margin: 0 0 4px; line-height: 1.2; }
+body.tutor-bootstrap [data-page-tab-panel] > .panel > .panel-header .eyebrow {
+  margin: 0 0 2px;
+  background: none;
+  color: var(--works-ink-3);
+  font-size: .7rem;
+  font-weight: 700;
+  letter-spacing: .12em;
+  line-height: 1.2;
+}
 body.tutor-bootstrap [data-page-tab-panel] > .panel > .panel-header h2 {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   margin: 0;
   color: var(--works-ink);
-  font-size: 1.5rem;
-  font-weight: 800;
-  line-height: 1.3;
-  letter-spacing: .02em;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: .01em;
   white-space: nowrap;
 }
 body.tutor-bootstrap [data-page-tab-panel] > .panel > .panel-header h2 :is(i, svg, .works-icon) {
   flex-shrink: 0;
-  width: 1.3em;
-  height: 1.3em;
-  color: var(--works-accent);
+  width: 1.2em;
+  height: 1.2em;
+  color: var(--works-ink-3);
   font-size: 1em;
-  line-height: 1.3em;
+  line-height: 1.2em;
   text-align: center;
 }
-body.tutor-bootstrap .panel-header-link { text-decoration: none; }
 
-/* Header actions: identical 40px outline buttons (day switch, ToDo, settings, print). */
+/* Header actions: identical white 36px buttons lifted by a light shadow. */
 body.tutor-bootstrap [data-page-tab-panel] > .panel > .panel-header :is(.view-toggle, .schedule-header-actions, .student-heading-actions) {
   display: flex;
   flex-shrink: 0;
@@ -388,110 +256,120 @@ body.tutor-bootstrap [data-page-tab-panel] > .panel > .panel-header :is(.record-
   align-items: center;
   justify-content: center;
   gap: 4px;
-  min-width: 40px;
-  height: 40px;
-  min-height: 40px;
+  min-width: 36px;
+  height: 36px;
+  min-height: 36px;
   padding: 0 12px;
-  border: 1px solid var(--works-line);
-  border-radius: 12px;
+  border: 0;
+  border-radius: var(--works-radius);
   background: var(--works-surface);
   box-shadow: var(--works-shadow-sm);
   color: var(--works-ink-2);
-  font-size: .9rem;
+  font-size: .86rem;
   font-weight: 600;
   line-height: 1;
+  text-decoration: none;
   white-space: nowrap;
 }
 body.tutor-bootstrap [data-page-tab-panel] > .panel > .panel-header .print-btn:has(> :is(i, svg):only-child) { padding: 0; }
-body.tutor-bootstrap [data-page-tab-panel] > .panel > .panel-header :is(.record-day-btn, .print-btn):hover {
-  border-color: var(--works-line-strong);
-  background: var(--works-hover);
-  color: var(--works-ink);
-}
-body.tutor-bootstrap [data-page-tab-panel] > .panel > .panel-header :is(.record-day-btn, .print-btn) i { font-size: 1.2rem; }
+body.tutor-bootstrap [data-page-tab-panel] > .panel > .panel-header :is(.record-day-btn, .print-btn):hover { background: var(--works-surface); box-shadow: var(--works-shadow); color: var(--works-ink); }
+body.tutor-bootstrap [data-page-tab-panel] > .panel > .panel-header :is(.record-day-btn, .print-btn) i { font-size: 1.15rem; }
 
-/* Context chip / view switch directly under the header share one rhythm. */
-body.tutor-bootstrap .record-panel > #record-date-label.hint,
+/* Context chip / switch directly under the header share one rhythm. */
+body.tutor-bootstrap .record-panel > #record-date-label.hint {
+  display: inline-flex;
+  align-items: center;
+  min-height: 0;
+  margin: 0 0 16px;
+  padding: 4px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--works-track);
+  color: var(--works-ink-2);
+  font-size: .85rem;
+  font-weight: 600;
+}
 body.tutor-bootstrap .schedule-panel > .schedule-view-toggle,
 body.tutor-bootstrap .curriculum-panel > #student-groups { margin-top: 0; }
-body.tutor-bootstrap .record-panel > #record-date-label.hint { margin-bottom: 16px; }
 
-/* In-page segmented switch (一覧 / カレンダー): same shape as the header buttons. */
+/* In-page segmented switch (一覧 / カレンダー): same grey track as the tabs. */
 body.tutor-bootstrap .schedule-panel .schedule-view-toggle {
   display: inline-flex;
-  gap: 4px;
+  gap: 2px;
   width: auto;
   margin: 0 0 16px;
-  padding: 4px;
-  border: 1px solid var(--works-line);
-  border-radius: 14px;
-  background: var(--works-surface);
-  box-shadow: var(--works-shadow-sm);
+  padding: 3px;
+  border: 0;
+  border-radius: var(--works-radius);
+  background: var(--works-track);
+  box-shadow: none;
 }
 body.tutor-bootstrap .schedule-panel .schedule-view-toggle .view-toggle-btn {
   flex: 0 0 auto;
   gap: 6px;
   min-width: 0;
-  height: 36px;
-  min-height: 36px;
-  padding: 0 16px;
+  height: 32px;
+  min-height: 32px;
+  padding: 0 14px;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--works-radius-sm);
   background: transparent;
   box-shadow: none;
   color: var(--works-ink-2);
-  font-size: .9rem;
+  font-size: .86rem;
   font-weight: 600;
 }
-body.tutor-bootstrap .schedule-panel .schedule-view-toggle .view-toggle-btn:hover { background: var(--works-hover); color: var(--works-ink); }
+body.tutor-bootstrap .schedule-panel .schedule-view-toggle .view-toggle-btn:hover { color: var(--works-ink); }
 body.tutor-bootstrap .schedule-panel .schedule-view-toggle .view-toggle-btn[aria-pressed="true"] {
-  background: var(--works-accent-soft);
-  color: var(--works-accent-strong);
-  box-shadow: none;
+  background: var(--works-surface);
+  color: var(--works-ink);
+  box-shadow: var(--works-shadow-sm);
 }
 
 /* Week picker and month navigation */
 body.tutor-bootstrap .schedule-panel .schedule-week-nav > button,
 body.tutor-bootstrap .schedule-panel .calendar-nav > button {
-  width: 40px;
-  min-width: 40px;
-  height: 40px;
-  min-height: 40px;
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  min-height: 36px;
   padding: 0;
-  border: 1px solid var(--works-line);
-  border-radius: 12px;
+  border: 0;
+  border-radius: var(--works-radius);
   background: var(--works-surface);
   box-shadow: var(--works-shadow-sm);
   color: var(--works-ink-2);
 }
 body.tutor-bootstrap .schedule-panel .schedule-week-days {
-  border: 1px solid var(--works-line);
-  border-radius: 14px;
+  border: 0;
+  border-radius: var(--works-radius);
   background: var(--works-surface);
   box-shadow: var(--works-shadow-sm);
 }
 body.tutor-bootstrap .schedule-panel .schedule-day-btn {
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--works-radius-sm);
   background: transparent;
   color: var(--works-ink-2);
 }
 body.tutor-bootstrap .schedule-panel .schedule-day-btn:hover { background: var(--works-hover); }
 body.tutor-bootstrap .schedule-panel .schedule-day-btn[aria-pressed="true"] {
-  background: var(--works-gradient);
+  background: var(--works-accent);
   color: #fff;
-  box-shadow: 0 2px 8px rgb(91 99 240 / .28);
+  box-shadow: none;
 }
 
-/* Cards: same surface, radius and title treatment as the 授業記録 cards. */
-body.tutor-bootstrap .schedule-panel .event-item,
-body.tutor-bootstrap .curriculum-panel .collapsible-section {
-  border: 1px solid var(--works-line);
+/* Cards in 授業予定 and 生徒情報: same surface as the 授業記録 cards. */
+body.tutor-bootstrap :is(.schedule-panel .event-item, .curriculum-panel .collapsible-section, .curriculum-panel .curriculum-search-bar, .curriculum-panel .table-scroll) {
+  border: 0;
   border-radius: var(--works-radius-lg);
   background: var(--works-surface);
-  box-shadow: var(--works-shadow-sm);
+  box-shadow: var(--works-shadow);
 }
-body.tutor-bootstrap .schedule-panel .event-item { border-left: 5px solid var(--item-accent, var(--works-accent)); }
+/* Calendar colour stays as a thin inset stripe instead of a border. */
+body.tutor-bootstrap .schedule-panel .event-item {
+  box-shadow: inset 4px 0 0 var(--item-accent, var(--works-accent)), var(--works-shadow);
+}
 body.tutor-bootstrap .schedule-panel .event-student-name {
   min-height: 32px;
   padding: 0;
@@ -499,7 +377,7 @@ body.tutor-bootstrap .schedule-panel .event-student-name {
   background: transparent;
   box-shadow: none;
   color: var(--works-ink);
-  font-size: 1.02rem;
+  font-size: 1rem;
   font-weight: 700;
   text-align: left;
 }
@@ -513,43 +391,121 @@ body.tutor-bootstrap .curriculum-panel .goals-column h4 {
 }
 body.tutor-bootstrap .schedule-panel .event-details dd { color: var(--works-ink); }
 body.tutor-bootstrap .schedule-panel .event-time span { color: var(--works-ink); font-weight: 700; font-variant-numeric: tabular-nums; }
-body.tutor-bootstrap .curriculum-panel .collapsible-section h3 { color: var(--works-ink); font-size: 1.02rem; font-weight: 700; }
-body.tutor-bootstrap :is(.schedule-panel .event-filter-menu, .curriculum-panel .collapsible-section .panel-header button) {
-  border: 1px solid var(--works-line);
-  border-radius: 12px;
-  background: var(--works-surface);
-  color: var(--works-ink-2);
-  box-shadow: none;
-}
-
-@media screen and (max-width: 640px) {
-  body.tutor-bootstrap [data-page-tab-panel] > .panel > .panel-header:first-child { align-items: flex-end; gap: 8px; margin-bottom: 16px; }
-  body.tutor-bootstrap [data-page-tab-panel] > .panel > .panel-header h2 { font-size: 1.3rem; }
-  body.tutor-bootstrap [data-page-tab-panel] > .panel > .panel-header :is(.record-day-btn, .print-btn) { padding: 0 10px; font-size: .85rem; }
-  body.tutor-bootstrap [data-page-tab-panel] > .panel > .panel-header .print-btn:has(> :is(i, svg):only-child) { padding: 0; }
-  /* Phones: the history link shows its icon only (label stays for screen readers). */
-  body.tutor-bootstrap .panel-header-link { width: 40px; padding: 0 !important; }
-  body.tutor-bootstrap .panel-header-link .panel-action-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-}
-@media screen and (max-width: 360px) {
-  body.tutor-bootstrap [data-page-tab-panel] > .panel > .panel-header h2 { font-size: 1.15rem; }
-}
-
-/* 生徒情報の入力欄も授業記録と同じ「やわらかい入力枠」にそろえる */
-body.tutor-bootstrap .curriculum-panel :is(textarea, input[type="text"], input:not([type]), input[type="search"]),
-body.tutor-bootstrap .curriculum-panel .curriculum-table textarea,
-body.tutor-bootstrap .curriculum-panel #student-memo {
-  border: 1px solid transparent;
+body.tutor-bootstrap .curriculum-panel .collapsible-section h3 { color: var(--works-ink); font-size: 1rem; font-weight: 700; }
+body.tutor-bootstrap .curriculum-panel :is(.curriculum-print-name-row, .goals-column) {
+  border: 0;
   border-radius: var(--works-radius);
   background: var(--works-surface-sunken);
+}
+body.tutor-bootstrap :is(.schedule-panel .event-filter-menu, .curriculum-panel .collapsible-section .panel-header button) {
+  border: 0;
+  border-radius: var(--works-radius);
+  background: transparent;
+  color: var(--works-ink-3);
+  box-shadow: none;
+}
+body.tutor-bootstrap :is(.schedule-panel .event-filter-menu, .curriculum-panel .collapsible-section .panel-header button):hover { background: var(--works-hover); color: var(--works-ink); }
+
+/* 生徒情報 inputs: white with a thin line, like the 授業記録 inputs. */
+body.tutor-bootstrap .curriculum-panel :is(textarea, input[type="text"], input:not([type]), input[type="search"], select),
+body.tutor-bootstrap .curriculum-panel .curriculum-table textarea,
+body.tutor-bootstrap .curriculum-panel #student-memo {
+  border: 1px solid var(--works-input-line);
+  border-radius: var(--works-radius);
+  background: var(--works-surface);
   color: var(--works-ink);
   box-shadow: none;
-  transition: background-color .15s ease, border-color .15s ease, box-shadow .15s ease;
+  transition: border-color .15s ease, box-shadow .15s ease;
 }
-body.tutor-bootstrap .curriculum-panel :is(textarea, input[type="text"], input:not([type]), input[type="search"]):focus,
+body.tutor-bootstrap .curriculum-panel :is(textarea, input[type="text"], input:not([type]), input[type="search"], select):focus,
 body.tutor-bootstrap .curriculum-panel #student-memo:focus {
   border-color: var(--works-accent);
-  background: var(--works-surface);
   box-shadow: var(--works-focus);
   outline: none;
+}
+
+/* Phones: tabs become a bottom navigation bar within thumb reach. */
+@media screen and (max-width: 640px) {
+  /* Keep the original 1.5rem side gutter: the card carousel snaps against it. */
+  body.tutor-bootstrap > main { padding: 16px 1.5rem calc(96px + env(safe-area-inset-bottom)); }
+  /* Floating, rounded bar lifted off the screen edge. */
+  body.tutor-bootstrap .page-tabs {
+    position: fixed;
+    top: auto;
+    right: 16px;
+    bottom: calc(12px + env(safe-area-inset-bottom));
+    left: 16px;
+    z-index: 35;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+    width: auto;
+    max-width: 360px;
+    margin: 0 auto;
+    padding: 6px;
+    border: 0;
+    border-radius: 999px;
+    background: rgb(255 255 255 / .96);
+    box-shadow: 0 0 0 1px rgb(16 18 24 / .04), 0 8px 24px rgb(16 18 24 / .14), 0 2px 6px rgb(16 18 24 / .08);
+  }
+  /* Icons only; the label text stays in the button for screen readers. */
+  body.tutor-bootstrap .page-tabs .page-tab-btn,
+  body.tutor-bootstrap .page-tabs .nav-link {
+    position: relative;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    min-height: 48px;
+    padding: 0;
+    border-radius: 999px;
+    background: transparent;
+    box-shadow: none;
+    color: var(--works-ink-3);
+    font-size: 0;
+    line-height: 0;
+  }
+  body.tutor-bootstrap .page-tabs .page-tab-btn :is(i, svg, .works-icon) {
+    width: 24px;
+    height: 24px;
+    font-size: 24px;
+    line-height: 24px;
+  }
+  body.tutor-bootstrap .page-tabs .page-tab-btn:hover { color: var(--works-ink); }
+  /* Selected: a solid ink pill with a white icon. */
+  body.tutor-bootstrap .page-tabs .page-tab-btn[aria-selected="true"] {
+    background: var(--works-ink);
+    box-shadow: 0 2px 6px rgb(16 18 24 / .2);
+    color: #fff;
+  }
+  body.tutor-bootstrap .page-tabs .page-tab-btn[aria-selected="true"] :is(i, svg, .works-icon) {
+    display: inline-block;
+    width: 24px;
+    height: 24px;
+    border-radius: 0;
+    background: transparent;
+    color: #fff;
+  }
+  body.tutor-bootstrap [data-page-tab-panel] > .panel > .panel-header:first-child { gap: 8px; margin-bottom: 14px; }
+  body.tutor-bootstrap [data-page-tab-panel] > .panel > .panel-header h2 { font-size: 18px; }
+  body.tutor-bootstrap [data-page-tab-panel] > .panel > .panel-header :is(.record-day-btn, .print-btn) { padding: 0 10px; font-size: .82rem; }
+  body.tutor-bootstrap [data-page-tab-panel] > .panel > .panel-header .print-btn:has(> :is(i, svg):only-child) { padding: 0; }
+  /* The history link shows its icon only (label stays for screen readers). */
+  body.tutor-bootstrap .panel-header-link { width: 36px; padding: 0 !important; }
+  body.tutor-bootstrap .panel-header-link .panel-action-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  body.tutor-bootstrap .record-save-toasts { bottom: calc(84px + env(safe-area-inset-bottom)); }
+  .record-panel #record-table tr[data-event-id] { padding: 14px; }
+}
+@media screen and (max-width: 360px) {
+  body.tutor-bootstrap [data-page-tab-panel] > .panel > .panel-header h2 { font-size: 16px; }
+}
+
+@media print {
+  body.tutor-bootstrap .page-tabs { display: none !important; }
+  body.tutor-bootstrap > main { padding: 0; }
+  .record-panel #record-table tr[data-event-id] { box-shadow: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .record-panel #record-table tr, .record-panel #record-table textarea { transition: none; }
 }

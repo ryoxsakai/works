@@ -10,7 +10,7 @@ import {
 } from "./shared/auth.js?v=12";
 import { getTheme, setTheme } from "./shared/theme.js?v=7";
 
-import { createDashboard } from "./dashboard/dashboard.mjs?v=15";
+import { createDashboard } from "./dashboard/dashboard.mjs?v=16";
 const homeNavigation = document.querySelector(".works-navigation");
 homeNavigation.id = "home-navigation";
 // Keep the shared popover from covering dashboard edit controls when tabbing out.
@@ -20,15 +20,13 @@ document.addEventListener("focusin", (event) => {
 window.addEventListener("pagehide", () => { homeNavigation.open = false; });
 renderHeroDate();
 
-// Greeting line above the widgets, always in Japan time like the lessons.
+// Date line above the widgets, always in Japan time like the lessons.
 function renderHeroDate() {
   const target = document.querySelector("#home-hero-date");
   if (!target) return;
   const now = new Date();
-  const hour = Number(new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Tokyo", hour: "numeric", hourCycle: "h23" }).format(now));
-  const greeting = hour < 5 ? "おつかれさまです" : hour < 11 ? "おはようございます" : hour < 18 ? "こんにちは" : "こんばんは";
   const date = new Intl.DateTimeFormat("ja-JP", { timeZone: "Asia/Tokyo", month: "long", day: "numeric", weekday: "short" }).format(now);
-  target.textContent = `${date} ・ ${greeting}`;
+  target.textContent = date;
 }
 hydrateIcons();
 const dashboard = createDashboard({
