@@ -926,7 +926,7 @@
 .date-shortcuts { display: flex; gap: 6px; margin-block: 4px; }
 .date-shortcuts .btn { min-height: 44px; padding: 4px 12px; font-size: .85rem; }
 .date-shortcuts [aria-pressed="true"] { background: var(--band); border-color: var(--accent); color: var(--accent); }
-#notice .undo-completion { margin-inline-start: 8px; color: var(--accent); }
+#notice .undo-completion { margin-inline-start: 8px; color: var(--accent); pointer-events: auto; }
 #task-summary { min-width: 0; }
 .summary-toolbar, .summary-day { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .summary-toolbar .btn { min-height: 44px; font-size: .86rem; }
