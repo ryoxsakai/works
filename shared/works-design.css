@@ -7,17 +7,20 @@ html:root[data-theme] {
   --works-font: "M PLUS 2", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", system-ui, sans-serif;
 
   /* Surfaces */
-  --works-page: #f6f7fb;
+  --works-page: #f4f5f7;
   --works-surface: #ffffff;
-  --works-surface-sunken: #f1f3f9;
-  --works-hover: #eff1f8;
-  --works-line: #e4e7f0;
-  --works-line-strong: #d3d8e6;
+  --works-surface-sunken: #f4f5f7;
+  --works-sidebar: #eceef1;
+  --works-track: #e8eaee;
+  --works-hover: #eceef1;
+  --works-line: #e3e5e9;
+  --works-line-strong: #d3d6dc;
+  --works-input-line: #d5d8de;
 
   /* Text */
-  --works-ink: #1b1f33;
-  --works-ink-2: #4a5068;
-  --works-ink-3: #636a84;
+  --works-ink: #1c1d21;
+  --works-ink-2: #4a4e57;
+  --works-ink-3: #656a74;
 
   /* Accent: blue to purple, used sparingly */
   --works-accent: #4d5bd8;
@@ -36,18 +39,19 @@ html:root[data-theme] {
   --works-warning-soft: #fff5e3;
 
   /* Shape */
-  --works-radius-sm: 8px;
-  --works-radius: 12px;
-  --works-radius-lg: 16px;
-  --works-shadow-sm: 0 1px 2px rgb(27 31 51 / .05);
-  --works-shadow: 0 1px 2px rgb(27 31 51 / .04), 0 4px 14px rgb(27 31 51 / .05);
-  --works-shadow-lg: 0 8px 28px rgb(27 31 51 / .12), 0 2px 6px rgb(27 31 51 / .06);
+  --works-radius-sm: 6px;
+  --works-radius: 8px;
+  --works-radius-lg: 8px;
+  /* Two shadows: a tight contact edge plus a soft ambient lift (no borders). */
+  --works-shadow-sm: 0 0 0 1px rgb(16 18 24 / .03), 0 1px 2px rgb(16 18 24 / .07);
+  --works-shadow: 0 1px 2px rgb(16 18 24 / .06), 0 4px 12px rgb(16 18 24 / .05);
+  --works-shadow-lg: 0 2px 6px rgb(16 18 24 / .08), 0 12px 32px rgb(16 18 24 / .12);
   --works-focus: 0 0 0 3px rgb(77 91 216 / .28);
 
   /* Layout */
   --works-header-h: 60px;
   --works-sidebar-w: 240px;
-  --works-gutter: clamp(16px, 2.4vw, 32px);
+  --works-gutter: clamp(16px, 2vw, 28px);
 
   /* Map the legacy tokens every module already reads onto the new palette. */
   --bg: var(--works-page);
