@@ -428,49 +428,65 @@ body.tutor-bootstrap .curriculum-panel #student-memo:focus {
 @media screen and (max-width: 640px) {
   /* Keep the original 1.5rem side gutter: the card carousel snaps against it. */
   body.tutor-bootstrap > main { padding: 16px 1.5rem calc(96px + env(safe-area-inset-bottom)); }
+  /* Floating, rounded bar lifted off the screen edge. */
   body.tutor-bootstrap .page-tabs {
     position: fixed;
     top: auto;
-    right: 0;
-    bottom: 0;
-    left: 0;
+    right: 16px;
+    bottom: calc(12px + env(safe-area-inset-bottom));
+    left: 16px;
     z-index: 35;
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    margin: 0;
-    padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+    gap: 4px;
+    width: auto;
+    max-width: 360px;
+    margin: 0 auto;
+    padding: 6px;
     border: 0;
-    border-radius: 0;
-    background: var(--works-surface);
-    box-shadow: 0 -1px 0 rgb(16 18 24 / .06), 0 -4px 16px rgb(16 18 24 / .05);
+    border-radius: 999px;
+    background: rgb(255 255 255 / .96);
+    box-shadow: 0 0 0 1px rgb(16 18 24 / .04), 0 8px 24px rgb(16 18 24 / .14), 0 2px 6px rgb(16 18 24 / .08);
   }
+  /* Icons only; the label text stays in the button for screen readers. */
   body.tutor-bootstrap .page-tabs .page-tab-btn,
   body.tutor-bootstrap .page-tabs .nav-link {
     position: relative;
-    flex-direction: column;
-    gap: 2px;
-    min-height: 54px;
-    padding: 6px 2px;
-    border-radius: var(--works-radius);
-    font-size: .72rem;
-  }
-  body.tutor-bootstrap .page-tabs .page-tab-btn[aria-selected="true"] {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    min-height: 48px;
+    padding: 0;
+    border-radius: 999px;
     background: transparent;
     box-shadow: none;
-    color: var(--works-ink);
-    font-weight: 700;
+    color: var(--works-ink-3);
+    font-size: 0;
+    line-height: 0;
   }
-  body.tutor-bootstrap .page-tabs .page-tab-btn[aria-selected="true"] i,
-  body.tutor-bootstrap .page-tabs .page-tab-btn[aria-selected="true"] .works-icon {
-    display: inline-grid;
-    place-items: center;
-    width: 52px;
-    height: 28px;
-    border-radius: 999px;
-    background: var(--works-track);
-    color: var(--works-ink);
+  body.tutor-bootstrap .page-tabs .page-tab-btn :is(i, svg, .works-icon) {
+    width: 24px;
+    height: 24px;
+    font-size: 24px;
+    line-height: 24px;
   }
-  body.tutor-bootstrap .page-tabs .page-tab-btn i { font-size: 1.3rem; line-height: 28px; }
+  body.tutor-bootstrap .page-tabs .page-tab-btn:hover { color: var(--works-ink); }
+  /* Selected: a solid ink pill with a white icon. */
+  body.tutor-bootstrap .page-tabs .page-tab-btn[aria-selected="true"] {
+    background: var(--works-ink);
+    box-shadow: 0 2px 6px rgb(16 18 24 / .2);
+    color: #fff;
+  }
+  body.tutor-bootstrap .page-tabs .page-tab-btn[aria-selected="true"] :is(i, svg, .works-icon) {
+    display: inline-block;
+    width: 24px;
+    height: 24px;
+    border-radius: 0;
+    background: transparent;
+    color: #fff;
+  }
   body.tutor-bootstrap [data-page-tab-panel] > .panel > .panel-header:first-child { gap: 8px; margin-bottom: 14px; }
   body.tutor-bootstrap [data-page-tab-panel] > .panel > .panel-header h2 { font-size: 18px; }
   body.tutor-bootstrap [data-page-tab-panel] > .panel > .panel-header :is(.record-day-btn, .print-btn) { padding: 0 10px; font-size: .82rem; }
@@ -478,7 +494,7 @@ body.tutor-bootstrap .curriculum-panel #student-memo:focus {
   /* The history link shows its icon only (label stays for screen readers). */
   body.tutor-bootstrap .panel-header-link { width: 36px; padding: 0 !important; }
   body.tutor-bootstrap .panel-header-link .panel-action-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-  body.tutor-bootstrap .record-save-toasts { bottom: calc(80px + env(safe-area-inset-bottom)); }
+  body.tutor-bootstrap .record-save-toasts { bottom: calc(84px + env(safe-area-inset-bottom)); }
   .record-panel #record-table tr[data-event-id] { padding: 14px; }
 }
 @media screen and (max-width: 360px) {
