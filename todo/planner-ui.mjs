@@ -25,6 +25,7 @@ function createPlanner({
   openDetail,
   today,
   message,
+  syncShortcuts,
 }) {
   const views = {
     today: "今日",
@@ -137,7 +138,7 @@ function createPlanner({
         : [...data.labels, ...data.filters].find(
             (i) => i.id === view.split(":")[1],
           )?.name);
-    $("view-title").textContent = title || "タスク";
+    $("view-title").textContent = view === "today" ? "今日のタスク" : title || "タスク";
     $("edit-view").hidden = !view.includes(":");
     for (const button of document.querySelectorAll(
       ".bottom-tabs [data-view]",
@@ -279,7 +280,7 @@ function createPlanner({
       sorted = sortTasks(items, value("task-sort"));
     }
     $("task-count").textContent =
-      (view === "today" ? "今日のタスク　" : "") +
+      (view === "today" ? "未完了 " : "") +
       sorted.length +
       "件" +
       ($("clear-filters").hidden ? "" : " · 絞り込み中");
@@ -314,7 +315,7 @@ function createPlanner({
         .map((date) => [date, groups.get(date) || []]);
     $("tasks").innerHTML =
       sorted.length || agenda
-        ? `<div class="${mode === "board" ? "board" : "planner-list"}">${blocks.map(([key, items]) => (agenda ? group(fullDate.format(new Date(key)) + (key === day ? " · 今日" : key === addDays(day, 1) ? " · 明日" : ""), items, key) : group(key, items))).join("")}</div>`
+        ? `<div class="${mode === "board" ? "board" : "planner-list"}">${blocks.map(([key, items]) => (agenda ? group(fullDate.format(new Date(key)) + (key === day ? " · 今日" : key === addDays(day, 1) ? " · 明日" : ""), items, key) : group(key, items, null, view === "today" && mode === "list" ? day : null))).join("")}</div>`
         : `<p class="empty">${value("task-search").trim() || value("role-filter") || value("category-filter") ? "条件に合うタスクがありません。" : view === "today" ? "今日の予定と期限超過のタスクはありません。" : view === "review" ? "この項目はすべて整理できています。" : "該当するタスクはありません。"}</p>`;
     if (agenda) {
       const nextDate = list
@@ -338,7 +339,7 @@ function createPlanner({
       if (completed.length)
         $("tasks").insertAdjacentHTML(
           "beforeend",
-          `<details class="completed-today"><summary>完了済み　${completed.length}件</summary>${group("", completed)}</details>`,
+          `<details class="completed-today"><summary>完了済み　${completed.length}件</summary>${group("", completed, null, day)}</details>`,
         );
     }
     if (value("task-sort") === "manual" && window.Sortable) {
@@ -380,10 +381,11 @@ function createPlanner({
   }
   const parse = () =>
     parseQuick(value("quick-title"), today(), value("capture-day") || today());
+  let explicitCaptureDay = false;
   function preview() {
     const q = parse();
     $("quick-preview").textContent = [
-      q.day,
+      explicitCaptureDay ? value("capture-day") : q.day,
       q.time,
       q.repeat && `↻ ${q.repeat.days}日`,
       q.project && "#" + q.project,
@@ -401,6 +403,7 @@ function createPlanner({
   }
   function openCapture(date, parentId = null, replaceDialog = false) {
     captureParent = parentId;
+    explicitCaptureDay = false;
     const projects = p().projects;
     const parent = s().tasks.find((t) => t.id === parentId);
     $("capture-project").innerHTML =
@@ -413,6 +416,7 @@ function createPlanner({
       (view.startsWith("project:") ? view.slice(8) : "");
     $("capture-day").value = date ?? (view === "today" ? today() : "");
     $("capture-error").textContent = "";
+    syncShortcuts($("capture"), $("capture-day"));
     preview();
     openDialog($("capture-sheet"), replaceDialog);
     $("quick-title").focus();
@@ -465,7 +469,7 @@ function createPlanner({
       labels.add(item.id);
     }
     task.name = q.name;
-    task.plannedDay = q.day || task.plannedDay;
+    task.plannedDay = explicitCaptureDay ? task.plannedDay : q.day || task.plannedDay;
     task.deadline = value("capture-deadline") || null;
     task.priority = q.priority && q.priority < 4 ? 4 - q.priority : null;
     task.plan = {
@@ -849,8 +853,14 @@ function createPlanner({
       $("new-task").click();
     }
   });
-  $("quick-title").addEventListener("input", preview);
-  $("capture-day").addEventListener("input", preview);
+  $("quick-title").addEventListener("input", () => {
+    if ($("capture-sheet").dataset.stale !== "true") $("capture-submit").disabled = !value("quick-title").trim();
+    preview();
+  });
+  $("capture-day").addEventListener("input", () => {
+    explicitCaptureDay = true;
+    preview();
+  });
   $("calendar-sync").onchange = async () => {
     const next = structuredClone(s());
     next.planner = { ...p(), calendar: $("calendar-sync").checked };

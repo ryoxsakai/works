@@ -27,9 +27,11 @@ export function startTodoPresentation() {
   });
   const start=()=>{
     if(active)return;
+    const workspace=document.querySelector(".todo-page");
+    if(!workspace)return;
     active=true;
-    decorateTodo(document.body);
-    observer.observe(document.body,{childList:true,subtree:true});
+    decorateTodo(workspace);
+    observer.observe(workspace,{childList:true,subtree:true});
   };
   const stop=()=>{active=false;observer.disconnect();observer.takeRecords();};
   controller={start,stop};

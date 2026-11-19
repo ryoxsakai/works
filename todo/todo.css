@@ -12,22 +12,22 @@
   margin: 0;
   font-size: 15px;
   line-height: 1.6;
-  color-scheme: light;
+  color-scheme: inherit;
 }
 
-* {
+:where(.todo-page) * {
   box-sizing: border-box;
 }
-button,
-input,
-select,
-textarea {
+:where(.todo-page) button,
+:where(.todo-page) input,
+:where(.todo-page) select,
+:where(.todo-page) textarea {
   font: inherit;
 }
-button,
-input,
-select,
-textarea {
+:where(.todo-page) button,
+:where(.todo-page) input,
+:where(.todo-page) select,
+:where(.todo-page) textarea {
   border: 1px solid var(--line);
   border-radius: 10px;
   background: var(--panel);
@@ -35,31 +35,31 @@ textarea {
   padding: 10px 12px;
   max-width: 100%;
 }
-button {
+:where(.todo-page) button {
   cursor: pointer;
   min-height: 44px;
 }
-button:hover {
+:where(.todo-page) button:hover {
   border-color: var(--accent);
 }
-button:disabled {
+:where(.todo-page) button:disabled {
   opacity: 0.55;
   cursor: wait;
 }
-input,
-textarea {
+:where(.todo-page) input,
+:where(.todo-page) textarea {
   width: 100%;
   font-size: 16px;
 }
-input[type="checkbox"] {
+:where(.todo-page) input[type="checkbox"] {
   width: 20px;
   height: 20px;
   accent-color: var(--accent);
 }
-button:focus-visible,
-input:focus-visible,
-select:focus-visible,
-textarea:focus-visible {
+:where(.todo-page) button:focus-visible,
+:where(.todo-page) input:focus-visible,
+:where(.todo-page) select:focus-visible,
+:where(.todo-page) textarea:focus-visible {
   outline: 3px solid var(--accent);
   outline-offset: 3px;
 }
@@ -92,15 +92,15 @@ textarea:focus-visible {
 .heading {
   margin-bottom: 20px;
 }
-h2 {
+:where(.todo-page) h2 {
   font-size: 26px;
   margin: 3px 0;
 }
-h3 {
+:where(.todo-page) h3 {
   font-size: 18px;
   margin: 0 0 8px;
 }
-h4 {
+:where(.todo-page) h4 {
   margin: 0;
 }
 .eyebrow {
@@ -290,7 +290,7 @@ h4 {
   overflow: hidden;
   clip: rect(0, 0, 0, 0);
 }
-dialog {
+:where(.todo-page) dialog {
   width: min(600px, calc(100% - 24px));
   max-height: 90dvh;
   overflow: auto;
@@ -300,16 +300,16 @@ dialog {
   border-radius: 20px;
   padding: 24px;
 }
-dialog::backdrop {
+:where(.todo-page) dialog::backdrop {
   background: #10203999;
 }
-dialog label {
+:where(.todo-page) dialog label {
   display: flex;
   flex-direction: column;
   gap: 5px;
   margin: 12px 0;
 }
-dialog .check-label {
+:where(.todo-page) dialog .check-label {
   flex-direction: row;
   align-items: center;
 }
@@ -332,7 +332,7 @@ dialog .check-label {
   flex-wrap: wrap;
   margin-top: 22px;
 }
-fieldset {
+:where(.todo-page) fieldset {
   border: 1px solid var(--line);
   border-radius: 12px;
   padding: 12px;
@@ -380,7 +380,7 @@ fieldset {
 #clone-error {
   color: #bd3d42;
 }
-body:has(dialog[open]) {
+body:has(.todo-page dialog[open]) {
   overflow: hidden;
 }
 [hidden] {
@@ -429,7 +429,7 @@ body:has(dialog[open]) {
   .form-grid {
     grid-template-columns: 1fr;
   }
-  dialog {
+  :where(.todo-page) dialog {
     padding: 18px;
   }
   .capture {
@@ -452,7 +452,7 @@ body:has(dialog[open]) {
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  * {
+  :where(.todo-page) * {
     scroll-behavior: auto !important;
     transition: none !important;
   }

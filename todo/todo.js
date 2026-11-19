@@ -1,5 +1,5 @@
-import {createPlanner} from "./planner-ui.mjs?v=2";
-import { startTodoPresentation } from "../shared/ui/todo-presentation.mjs";
+import {createPlanner} from "./planner-ui.mjs?v=3";
+import { startTodoPresentation } from "../shared/ui/todo-presentation.mjs?v=2";
 startTodoPresentation();
 import {
   watchAuth,
@@ -16,10 +16,6 @@ const esc = (value) =>
         c
       ],
   );
-const header = document.querySelector(".works-header");
-new ResizeObserver(() => {
-  document.body.style.setProperty("--works-header-height", header.offsetHeight + "px");
-}).observe(header);
 function resizeCaptureSheet() {
   const viewport = window.visualViewport;
   if (!viewport) return;
@@ -137,13 +133,14 @@ function setBusy(value) {
   busy = value;
   document
     .querySelectorAll(
-      "#app button,#app input,#app select,dialog button:not([data-close]),dialog input,dialog select,dialog textarea",
+      "#app button,#app input,#app select,.todo-page dialog button:not([data-close]),.todo-page dialog input,.todo-page dialog select,.todo-page dialog textarea",
     )
     .forEach((el) => {
       const stale = el.closest("dialog")?.dataset.stale === "true";
       el.disabled =
         value ||
         el.hasAttribute("data-fixed-disabled") ||
+        (el.id === "capture-submit" && !$("quick-title").value.trim()) ||
         (stale && !el.hasAttribute("data-dialog-reload"));
     });
   if (!value && pendingFocusRestore) {
@@ -167,7 +164,7 @@ async function save(next, success = "保存しました") {
   if (busy) return false;
   if (!plannerReady) {message("新しいToDoサーバーの反映後に保存できます。"); return false;}
   const focusOrigin = document.activeElement;
-  const dialog = document.querySelector("dialog[open]"),
+  const dialog = document.querySelector(".todo-page dialog[open]"),
     epoch = dialogEpoch;
   // Every form stays bound to the revision it originally displayed.
   if (dialog) next.revision = Number(dialog.dataset.baseRevision);
@@ -218,7 +215,7 @@ function roleBadge(t) {
     ? `<span class="badge role-${esc(r.color)}">${esc(r.icon)} ${esc(r.name)}${r.archived ? "（保管）" : ""}</span>`
     : "";
 }
-function card(t) {
+function card(t, groupDay) {
   const done = statusOf(t) === "done",
     base = today();
   const manual = $("task-sort").value === "manual";
@@ -227,7 +224,7 @@ function card(t) {
     <button class="done-toggle" data-action="complete" aria-pressed="${done}" aria-label="${done ? "未着手に戻す" : "完了にする"}：${esc(t.name)}">${done ? "✓" : "○"}</button>
     <div class="task-body"><button class="task-name" data-action="detail" aria-label="詳細：${esc(t.name)}">${t.important ? "★ " : ""}${esc(t.name)}</button>
     <div class="task-meta">${planner.meta(t)}${roleBadge(t)}
-    ${t.plannedDay ? `<small>予定 ${esc(t.plannedDay)}</small>` : ""}${t.deadline ? `<small class="${t.deadline < base && !done ? "overdue" : ""}">締切 ${esc(t.deadline)}</small>` : ""}
+    ${t.plannedDay && t.plannedDay !== groupDay ? `<small>作業日 ${esc(t.plannedDay)}</small>` : ""}${t.deadline ? `<small class="${t.deadline < base && !done ? "overdue" : ""}">締切 ${esc(t.deadline)}</small>` : ""}
     ${statusOf(t)!=="pending" ? `<small>${statusNames[statusOf(t)]}</small>` : ""}
     ${t.checklist?.length ? `<small>☑ ${t.checklist.filter(c=>c.checked).length}/${t.checklist.length}</small>` : ""}</div></div>
     <details class="row-menu"><summary aria-label="${esc(t.name)}の操作">•••</summary><div>
@@ -236,8 +233,8 @@ function card(t) {
     ${[1,3,7,14].map(n=>`<button data-action="clone" data-days="${n}" aria-label="${n===7?"1週間後":n===14?"2週間後":n+"日後"}に複製：${esc(t.name)}">${n}日後に複製</button>`).join("")}
     <button data-action="custom-clone">日付を選んで複製</button></div></details></article>`;
 }
-function group(title,tasks,date) {
-  return `<section class="group"${date ? ` id="agenda-${esc(date)}"` : ""}>${title ? `<div class="group-heading"><h3>${esc(title)}</h3>${date ? `<button data-add-day="${esc(date)}" aria-label="${esc(title)}にタスクを追加">＋</button>` : `<span>${tasks.length}</span>`}</div>` : ""}<div class="task-rows">${tasks.map(card).join("")}</div>${date && !tasks.length ? '<p class="agenda-empty">予定なし</p>' : ""}</section>`;
+function group(title,tasks,date,groupDay = date) {
+  return `<section class="group"${date ? ` id="agenda-${esc(date)}"` : ""}>${title ? `<div class="group-heading"><h3>${esc(title)}</h3>${date ? `<button data-add-day="${esc(date)}" aria-label="${esc(title)}にタスクを追加">＋</button>` : `<span>${tasks.length}</span>`}</div>` : ""}<div class="task-rows">${tasks.map(t => card(t, groupDay)).join("")}</div>${date && !tasks.length ? '<p class="agenda-empty">予定なし</p>' : ""}</section>`;
 }
 function render() {
   let role = $("role-filter").value,
@@ -346,10 +343,10 @@ function closeDialog(dialog, fromBack = false) {
 }
 window.addEventListener("popstate", () =>
   document
-    .querySelectorAll("dialog[open]")
+    .querySelectorAll(".todo-page dialog[open]")
     .forEach((d) => closeDialog(d, true)),
 );
-for (const dialog of document.querySelectorAll("dialog")) {
+for (const dialog of document.querySelectorAll(".todo-page dialog")) {
   const conflict = document.createElement("div");
   conflict.dataset.dialogConflict = "";
   conflict.hidden = true;
@@ -409,6 +406,57 @@ function renderSteps() {
     )
     .join("");
 }
+function showTaskSummary(visible) {
+  const dialog = $("detail");
+  $("task-summary").hidden = !visible;
+  $("detail-form").hidden = visible;
+  dialog.setAttribute("aria-labelledby", visible ? "summary-name" : "detail-heading");
+}
+function syncShortcuts(form, field) {
+  const base = today();
+  for (const button of form.querySelectorAll("[data-offset]")) {
+    button.setAttribute("aria-pressed", String(field.value === offset(base, Number(button.dataset.offset))));
+  }
+}
+function connectShortcuts(form, field) {
+  form.addEventListener("click", event => {
+    const button = event.target.closest("button[data-offset]");
+    if (!button || busy || form.closest("dialog").dataset.stale === "true") return;
+    field.value = offset(today(), Number(button.dataset.offset));
+    field.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  field.addEventListener("input", () => syncShortcuts(form, field));
+}
+connectShortcuts($("capture"), $("capture-day"));
+connectShortcuts($("detail-form"), $("detail-form").elements.plannedDay);
+const workDate = new Intl.DateTimeFormat("ja-JP", {
+  year: "numeric", month: "short", day: "numeric", weekday: "short", timeZone: "UTC",
+});
+function fillSummary(t) {
+  const done = statusOf(t) === "done";
+  $("summary-name").textContent = t.name;
+  $("summary-day").querySelector("strong").textContent = t.plannedDay ? workDate.format(new Date(t.plannedDay)) : "未設定";
+  $("summary-memo").textContent = t.memo || "未入力";
+  $("summary-deadline").textContent = t.deadline || "未設定";
+  $("summary-project").textContent = $("task-project").selectedOptions[0]?.textContent || "未設定";
+  $("summary-priority").textContent = $("task-priority").selectedOptions[0]?.textContent || "通常";
+  $("summary-reminder").textContent = t.plan?.reminder?.replace("T", " ") || "なし";
+  $("summary-complete").textContent = done ? "未完了に戻す" : "完了する";
+  $("summary-error").textContent = "";
+}
+function editSummary(field) {
+  showTaskSummary(false);
+  field.focus();
+}
+$("summary-edit").onclick = () => editSummary($("detail-form").elements.name);
+$("summary-day").onclick = () => editSummary($("detail-form").elements.plannedDay);
+$("summary-complete").onclick = () => toggleCompletion(editId, $("detail"));
+$("cancel-detail-edit").onclick = () => {
+  if ($("detail").dataset.summaryFirst !== "true") return closeDialog($("detail"));
+  openDetail(editId, false);
+  showTaskSummary(true);
+  $("summary-edit").focus();
+};
 function openDetail(id, show = true) {
   editId = id;
   const t = state.tasks.find((t) => t.id === id),
@@ -441,12 +489,18 @@ function openDetail(id, show = true) {
   f.elements.status.value = statusOf(t);
   f.elements.important.checked = !!t.important;
   planner.fillDetail(t);
+  syncShortcuts(f, f.elements.plannedDay);
+  fillSummary(t);
   checklist = structuredClone(t.checklist || []);
   renderSteps();
   $("step-text").value = "";
   $("detail-error").textContent = "";
   if (show) {
     for (const section of $("detail-form").querySelectorAll(".detail-section")) section.open = false;
+    $("summary-settings").open = false;
+    const summaryFirst = matchMedia("(max-width: 730px)").matches;
+    $("detail").dataset.summaryFirst = String(summaryFirst);
+    showTaskSummary(summaryFirst);
     const row = document.querySelector(`[data-task="${CSS.escape(id)}"]`);
     row?.classList.add("inspected");
     openDialog($("detail"));
@@ -485,6 +539,7 @@ $("checklist-editor").onclick = (e) => {
 };
 $("detail-form").onsubmit = async (e) => {
   e.preventDefault();
+  if (busy || $("detail").dataset.stale === "true" || $("detail-form").hidden) return;
   const epoch = dialogEpoch,
     next = structuredClone(state),
     t = next.tasks.find((t) => t.id === editId),
@@ -506,7 +561,13 @@ $("detail-form").onsubmit = async (e) => {
     t.completedAt = t.status === "done" ? new Date().toISOString() : null;
   }
   const ok = await save(next);
-  if (ok && epoch === dialogEpoch) closeDialog($("detail"));
+  if (epoch !== dialogEpoch) return;
+  if (!ok) { $("detail-error").textContent = $("notice").textContent; return; }
+  if ($("detail").dataset.summaryFirst === "true") {
+    openDetail(editId, false);
+    showTaskSummary(true);
+    $("summary-edit").focus();
+  } else closeDialog($("detail"));
 };
 $("task-delete").onclick = async () => {
   const id = editId,
@@ -537,7 +598,7 @@ $("capture").onsubmit = async (e) => {
     priority: null,
     deadline: null,
     progress: 0,
-    memo: "",
+    memo: $("capture-memo").value.trim(),
     createdAt: captureBase,
     plannedDay,
     status: "pending",
@@ -571,15 +632,40 @@ $("tasks").onclick = async (e) => {
     await save(next, "予定日を変更しました。締切は変更していません");
     document.querySelector(`[data-task="${CSS.escape(id)}"] [data-action="detail"]`)?.focus();
   }
-  if (button.dataset.action === "complete") {
-    const next = structuredClone(state),
-      t = next.tasks.find((t) => t.id === id);
-    t.status = statusOf(t) === "done" ? "pending" : "done";
-    t.progress = t.status === "done" ? 100 : 0;
-    t.completedAt = t.status === "done" ? new Date().toISOString() : null;
-    await save(next);
-  }
+  if (button.dataset.action === "complete") await toggleCompletion(id);
 };
+async function toggleCompletion(id, dialog = null) {
+  if (busy || dialog?.dataset.stale === "true") return;
+  const epoch = dialogEpoch;
+  const next = structuredClone(state);
+  const task = next.tasks.find(item => item.id === id);
+  if (!task) return;
+  const previous = { status: statusOf(task), progress: task.progress, completedAt: task.completedAt };
+  const done = previous.status !== "done";
+  task.status = done ? "done" : "pending";
+  task.progress = done ? 100 : 0;
+  task.completedAt = done ? new Date().toISOString() : null;
+  const result = await save(next, `「${task.name}」を${done ? "完了" : "未完了に変更"}しました`);
+  if (!result) {
+    if (dialog?.open && epoch === dialogEpoch) $("summary-error").textContent = $("notice").textContent;
+    return;
+  }
+  if (dialog?.open && epoch === dialogEpoch) closeDialog(dialog);
+  const revision = state.revision;
+  const undo = document.createElement("button");
+  undo.type = "button";
+  undo.className = "undo-completion";
+  undo.textContent = "元に戻す";
+  undo.onclick = async () => {
+    if (busy) return;
+    if (state.revision !== revision) return message("タスクが更新されました。詳細を確認してください。", true);
+    const restored = structuredClone(state);
+    Object.assign(restored.tasks.find(item => item.id === id), previous);
+    await save(restored, "タスクの状態を元に戻しました");
+  };
+  if (done && task.plan?.repeat && !task.plan.repeatIssued) $("notice").append("（次回分は予定に残ります）");
+  $("notice").append(undo);
+}
 $("deadlines").onclick = (e) => {
   const b = e.target.closest("[data-deadline]");
   if (b && !busy) openDetail(b.dataset.deadline);
@@ -889,7 +975,7 @@ $("sign-out").onclick = async () => {
   await signOutUser();
   location.reload();
 };
-const planner=createPlanner({$,esc,state:()=>state,save,api,render,group,openDialog,closeDialog,openDetail,today,message});
+const planner=createPlanner({$,esc,state:()=>state,save,api,render,group,openDialog,closeDialog,openDetail,today,message,syncShortcuts});
 watchAuth({
   onSignedIn: async () => {
     $("sign-out").hidden = false;

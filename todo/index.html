@@ -6,31 +6,54 @@
     <title>ToDo管理 | Works</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+U:wght@300;400;500&amp;family=Noto+Sans+JP:wght@300;400&amp;display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+U:wght@300;400;500&amp;display=swap">
     <script src="/shared/theme-init.js?v=1"></script>
     <link rel="stylesheet" href="/shared/styles.css?v=56" />
-    <link rel="stylesheet" href="/shared/header.css?v=2" />
-    <link rel="stylesheet" href="/todo/todo.css?v=7" />
+    <link rel="stylesheet" href="/todo/todo.css?v=8" />
     <link rel="stylesheet" href="/shared/ui/todo-bootstrap.css?v=1" />
     <link rel="stylesheet" href="/shared/ui/todo-tokens.css?v=2" />
     <link rel="stylesheet" href="/shared/ui/button-states.css?v=1" />
     <link rel="manifest" href="/todo/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/logo.png" />
-    <link rel="stylesheet" href="/todo/planner.css?v=4" />
+    <link rel="stylesheet" href="/todo/planner.css?v=5" />
+    <link rel="stylesheet" href="/shared/header.css?v=2" />
     <script defer src="/dashboard/vendor/Sortable-1.15.6.min.js"></script>
     <script type="module" src="/shared/header.js?v=4"></script>
   </head>
-  <body class="todo-page todo-bootstrap">
+  <body>
     <header class="page-header works-header">
       <h1>
         <a class="works-home" href="/" aria-label="Works ホーム"
-          ><span class="page-header-icon">W</span><span>Works</span></a
+          ><span class="page-header-icon" aria-hidden="true">W</span
+          ><span>Works</span></a
         ><span class="works-page-title">ToDo管理</span>
       </h1>
       <div class="works-header-actions">
-        <button id="sign-out" hidden>ログアウト</button>
+        <button
+          id="sign-out"
+          type="button"
+          class="user-icon-btn"
+          aria-label="ログアウト"
+          title="ログアウト"
+          hidden
+        >
+          <svg
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="9" />
+            <circle cx="12" cy="9" r="3" />
+            <path d="M5.5 18c1-3 3-4.5 6.5-4.5s5.5 1.5 6.5 4.5" />
+          </svg>
+        </button>
       </div>
     </header>
+    <div class="todo-page todo-bootstrap">
     <main id="app" hidden class="todo-main">
       <div class="planner-layout">
         <aside class="planner-sidebar" aria-label="ToDoメニュー">
@@ -54,7 +77,7 @@
           </div>
         </aside>
         <div class="planner-content">
-          <div class="heading"><div><h2 id="view-title">今日</h2><p id="today-label" class="muted"></p></div>
+          <div class="heading"><div><h2 id="view-title">今日のタスク</h2><p id="today-label" class="muted"></p></div>
           <div class="heading-actions"><button id="edit-view" hidden>編集</button><button id="display-button" aria-expanded="false" aria-controls="display-panel">表示</button><button id="new-task" class="primary">＋ 追加</button></div></div>
           <section class="planner-filters" id="display-panel" aria-label="表示設定" hidden><div class="task-search"><label for="task-search">タスクを探す</label><input id="task-search" type="search" placeholder="タイトル・メモで検索" /><button id="clear-filters" type="button" hidden>絞り込みを解除</button></div>
       <div class="toolbar">
@@ -83,23 +106,28 @@
         <button data-view="upcoming"><span data-works-icon="bx-calendar-event"></span>近日予定</button>
         <button id="mobile-nav" aria-expanded="false" aria-controls="planner-menu"><span data-works-icon="bx-library"></span>閲覧</button>
         <button id="mobile-search"><span class="search-icon" aria-hidden="true"></span>検索</button>
-        <button id="mobile-add" aria-label="タスクを追加"><span aria-hidden="true">＋</span></button>
+        <button id="mobile-add" aria-label="タスクを追加"><span aria-hidden="true">＋</span> 追加</button>
       </nav>
     </main>
     <dialog id="capture-sheet" aria-labelledby="capture-heading">
       <div class="dialog-head"><h2 id="capture-heading">タスクを追加</h2><button data-close aria-label="追加を閉じる">×</button></div>
       <form id="capture">
-        <label for="quick-title" class="sr-only">タスク名</label><input id="quick-title" maxlength="500" required placeholder="タスク名" autocomplete="off">
+        <label for="quick-title" class="capture-title-label">タスク名</label><input id="quick-title" maxlength="500" required placeholder="タスク名" autocomplete="off">
         <div id="capture-source"></div><div id="quick-preview" aria-live="polite"></div>
         <label class="sheet-field">作業日<input type="date" id="capture-day"></label>
-        <label class="sheet-field">プロジェクト<select id="capture-project"></select></label>
-        <details id="capture-details"><summary>詳細</summary>
+        <div class="date-shortcuts" role="group" aria-label="作業日の候補">
+          <button type="button" data-offset="0">今日</button>
+          <button type="button" data-offset="1">明日</button>
+        </div>
+        <label class="capture-memo">メモ（任意）<textarea id="capture-memo" maxlength="10000" rows="2"></textarea></label>
+        <details id="capture-details"><summary>その他の設定</summary>
+          <label class="sheet-field">プロジェクト<select id="capture-project"></select></label>
           <label class="sheet-field">締切<input id="capture-deadline" type="date"></label>
           <label class="sheet-field">通知（日本時間）<input id="capture-reminder" type="datetime-local"></label>
           <label class="sheet-field">ラベル<input id="capture-tags" maxlength="500" placeholder="教材作成 印刷"></label>
         </details>
         <p id="capture-error" role="alert"></p>
-        <button class="primary" type="submit">追加する</button>
+        <button id="capture-submit" class="primary" type="submit" disabled>追加する</button>
       </form>
     </dialog>
     <div id="login-screen" class="login panel">
@@ -108,6 +136,25 @@
       <button id="sign-in" hidden>Googleでサインイン</button>
     </div>
     <dialog id="detail" aria-labelledby="detail-heading">
+      <section id="task-summary" hidden>
+        <div class="summary-toolbar">
+          <button type="button" data-close aria-label="一覧に戻る">‹ 一覧に戻る</button>
+          <button type="button" id="summary-edit"><span data-works-icon="bx-note"></span> 編集</button>
+        </div>
+        <p class="summary-label">タスク詳細</p>
+        <h2 id="summary-name"></h2>
+        <button type="button" id="summary-day" class="summary-day">
+          <span data-works-icon="bx-calendar-event"></span><span>作業日 <strong></strong></span><span>変更</span>
+        </button>
+        <div class="summary-note"><h3>メモ</h3><p id="summary-memo"></p></div>
+        <details class="detail-section" id="summary-settings">
+          <summary><span data-works-icon="bx-library"></span>その他の設定</summary>
+          <dl><dt>プロジェクト</dt><dd id="summary-project"></dd><dt>優先度</dt><dd id="summary-priority"></dd>
+            <dt>締切</dt><dd id="summary-deadline"></dd><dt>通知</dt><dd id="summary-reminder"></dd></dl>
+        </details>
+        <div class="summary-footer"><button type="button" class="primary" id="summary-complete"></button></div>
+        <p role="alert" id="summary-error"></p>
+      </section>
       <form id="detail-form">
         <div class="dialog-head">
           <h2 id="detail-heading">タスクの詳細</h2>
@@ -120,8 +167,19 @@
           <label
             ><span class="field-title"
               ><span data-works-icon="bx-calendar-event"></span>作業日</span
-            ><input type="date" name="plannedDay" /></label
-          ><label
+            ><input type="date" name="plannedDay" /></label>
+          <div class="date-shortcuts" role="group" aria-label="作業日の候補">
+          <button type="button" data-offset="0">今日</button>
+          <button type="button" data-offset="1">明日</button>
+        </div>
+          <div id="origin-link"></div>
+        </div>
+        <label class="edit-memo">メモ<textarea name="memo" maxlength="10000" rows="2"></textarea></label>
+        <details class="detail-section">
+          <summary><span data-works-icon="bx-library"></span>分類・優先度</summary>
+          <div>
+            <div class="form-grid">
+          <label
             ><span class="field-title"
               ><span data-works-icon="bx-library"></span>プロジェクト</span
             ><select id="task-project"></select></label
@@ -130,12 +188,6 @@
               ><span data-works-icon="bx-calendar-event"></span>締切</span
             ><input type="date" name="deadline"
           /></label>
-          <div id="origin-link"></div>
-        </div>
-        <details class="detail-section">
-          <summary><span data-works-icon="bx-library"></span>分類・優先度</summary>
-          <div>
-            <div class="form-grid">
               <label>役割<select name="roleId"></select></label
               ><label>カテゴリ<select name="category"></select></label
               ><label
@@ -208,15 +260,8 @@
           </div>
         </details>
         <details class="detail-section">
-          <summary><span data-works-icon="bx-note"></span>メモ・サブタスク</summary>
+          <summary><span data-works-icon="bx-note"></span>説明・サブタスク</summary>
           <div>
-            <label
-              >このタスクだけのメモ<textarea
-                name="memo"
-                maxlength="10000"
-                rows="3"
-              ></textarea>
-            </label>
             <label
               >複製にも引き継ぐ説明（任意）<textarea
                 name="reusableDescription"
@@ -241,8 +286,8 @@
         </details>
         <div class="dialog-actions">
           <button type="button" id="task-delete" class="danger">削除</button
-          ><button type="button" data-close>キャンセル</button
-          ><button class="primary" type="submit">保存</button>
+          ><button type="button" id="cancel-detail-edit">キャンセル</button
+          ><button class="primary" type="submit">変更を保存</button>
         </div>
         <p id="detail-error" role="alert"></p>
       </form>
@@ -350,6 +395,7 @@
         ><button class="primary">カテゴリを追加</button>
       </form>
     </dialog>
-    <script type="module" src="/todo/todo.js?v=6"></script>
+    </div>
+    <script type="module" src="/todo/todo.js?v=7"></script>
   </body>
 </html>

@@ -860,29 +860,22 @@
 }
 @media(max-width:730px) { .planner-sidebar #sidebar-search { display:none; } }
 
-/* The W is the common Works logo; all UI text follows the planner type scale. */
+/* Apply planner typography inside the ToDo workspace, below the shared header. */
 .todo-page {
-  --todo-font: "Noto Sans JP", "Hiragino Sans", "Yu Gothic", sans-serif;
-  --todo-meta-weight: 200;
-  --todo-body-weight: 300;
-  --todo-heading-weight: 400;
+  --todo-font: "M PLUS U", "Hiragino Sans", "Yu Gothic", sans-serif;
+  --todo-meta-weight: 300;
+  --todo-body-weight: 400;
+  --todo-heading-weight: 500;
   --body-font-family: var(--todo-font);
   --body-font-weight: var(--todo-body-weight);
   --btn-input-font-weight: var(--todo-body-weight);
   font-family: var(--todo-font);
   font-weight: var(--todo-body-weight);
-  font-synthesis: none;
-}
-.todo-page .works-header,
-.todo-page .works-settings-dialog,
-.todo-page :is(.btn, .form-control, dialog) {
-  font-family: var(--todo-font);
 }
 .todo-page :is(button, input, select, textarea, dialog, summary, label, .btn, .form-control) {
   font-weight: var(--todo-body-weight);
 }
 .todo-page :is(h1, h2, h3, h4, b, strong, legend),
-.todo-page .works-header h1,
 .todo-page .task-search label,
 .todo-page .planner-row .task-name,
 .todo-page .btn.primary,
@@ -899,15 +892,6 @@
   color: light-dark(#a82e31,#ffa1a1);
 }
 
-/* Local type scale leaves the existing shared header and its controls intact. */
-.todo-page :is(.todo-main, .login, dialog:not(.works-settings-dialog)) {
-  --todo-font: "M PLUS U", "Hiragino Sans", "Yu Gothic", sans-serif;
-  --todo-meta-weight: 300;
-  --todo-body-weight: 400;
-  --todo-heading-weight: 500;
-  font-family: var(--todo-font);
-  font-weight: var(--todo-body-weight);
-}
 .planner-content #task-count, .completed-today > summary {
   padding-block: 3px;
   line-height: 1.45;
@@ -934,3 +918,40 @@
 #detail .form-control { min-height:38px; padding-block:5px; }
 #detail .dialog-head { border-bottom:2px solid var(--line); border-image:linear-gradient(90deg,var(--accent),#a58adb,transparent) 1; }
 #detail .dialog-actions { margin-top:12px; }
+
+.capture-title-label, .capture-memo, #detail-form .edit-memo {
+  display: grid; gap: 4px; margin-block: 8px; font-size: .82rem;
+}
+#quick-title { font-size: 1.15rem; font-weight: var(--todo-heading-weight); }
+.date-shortcuts { display: flex; gap: 6px; margin-block: 4px; }
+.date-shortcuts .btn { min-height: 44px; padding: 4px 12px; font-size: .85rem; }
+.date-shortcuts [aria-pressed="true"] { background: var(--band); border-color: var(--accent); color: var(--accent); }
+#notice .undo-completion { margin-inline-start: 8px; color: var(--accent); }
+#task-summary { min-width: 0; }
+.summary-toolbar, .summary-day { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.summary-toolbar .btn { min-height: 44px; font-size: .86rem; }
+.summary-toolbar [data-close] { border: 0; color: var(--accent); }
+.summary-label, .summary-note h3 { font-size: .8rem; color: var(--muted); margin: 12px 0 4px; }
+#summary-name { font-size: 1.5rem; line-height: 1.4; margin: 0 0 12px; overflow-wrap: anywhere; }
+#task-summary .summary-day { width: 100%; text-align: start; padding: 10px 12px; background: var(--band); color: var(--accent); }
+.summary-day strong { display: block; color: var(--ink); font-size: 1.1rem; }
+.summary-day span:last-child { margin-inline-start: auto; }
+.summary-note, #summary-settings { padding: 4px 0; border-bottom: 1px solid var(--line); }
+#summary-memo, #summary-settings dd { white-space: pre-wrap; overflow-wrap: anywhere; }
+#summary-memo { margin: 4px 0 12px; }
+#summary-settings dl { display: grid; grid-template-columns: auto minmax(0,1fr); gap: 6px 12px; font-size: .87rem; }
+#summary-settings dd { margin: 0; }
+#task-summary .summary-footer { position: sticky; bottom: 0; padding-block: 10px; background: var(--panel); }
+#summary-complete { width: 100%; }
+#summary-error:empty { display: none; }
+@media (max-width: 730px) {
+  .planner-list .planner-row .done-toggle::before, .completed-today .done-toggle::before { border-radius: 5px; }
+  .planner-list .task-name::after { content: "›"; color: var(--muted); padding-inline-start: .5rem; }
+  .planner-content .heading { padding-block: 10px; background: var(--bg-gradient); }
+  .planner-content #task-count { padding-block: 2px; background: var(--panel); }
+  .completed-today > summary { display: list-item; min-height: 44px; align-content: center; padding-block: 0; background: var(--panel); }
+  .bottom-tabs #mobile-add { flex-direction: row; gap: 2px; align-self: center; justify-self: stretch; margin-inline: 2px; height: 44px; background: var(--accent); color: white; border-radius: 8px; font-size: .85rem; }
+  #mobile-add span { width: auto; font-size: 1rem; background: transparent; line-height: 1; }
+  #detail, #capture-sheet { width: 100%; max-width: none; box-sizing: border-box; }
+  #detail { margin: auto 0 0; border-radius: 14px 14px 0 0; max-height: calc(100dvh - var(--works-header-height,56px)); padding-bottom: max(12px,env(safe-area-inset-bottom)); }
+}

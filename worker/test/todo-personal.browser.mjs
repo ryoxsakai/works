@@ -231,7 +231,12 @@ try {
           return [css.fontFamily.split(",")[0].replaceAll('"',""),css.fontWeight];
         });
       });
-      assert.deepEqual(type,[...["300","300","400","500","500"].map(weight=>["M PLUS U",weight]),["Noto Sans JP","400"]]);
+      assert.deepEqual(type,[...["300","300","400","500","500"].map(weight=>["M PLUS U",weight]),["M PLUS 1p","600"]]);
+      await expect(page.locator('.works-header .works-settings-toggle')).toBeVisible();
+      await expect(page.locator('.works-header .btn, .works-settings-dialog [data-dialog-conflict]')).toHaveCount(0);
+      await page.locator('.works-header .works-settings-toggle').click();
+      await expect(page.locator('.works-settings-dialog')).toBeVisible();
+      await page.locator('.works-settings-dialog button[aria-label="閉じる"]').click();
       const taskBounds = await page.locator("#tasks .task-card").nth(2).boundingBox();
       assert.ok(taskBounds.y + taskBounds.height < 844, "first three tasks fit before scrolling");
       if (width <= 390) {
@@ -239,14 +244,16 @@ try {
         await expect(page.locator("#mobile-add")).toBeVisible();
       }
       await openCapture(page);
-      await expect(page.locator('#capture button')).toHaveClass(/btn-solid/);
-      assert.equal(await page.locator('#capture button').evaluate(el=>getComputedStyle(el).whiteSpace),'nowrap');
-      assert.ok((await page.locator('#capture button').boundingBox()).height<=56,'capture action stays one line');
+      await expect(page.locator('#capture-submit')).toBeDisabled();
+      await expect(page.locator('#capture-details')).not.toHaveAttribute('open');
+      await expect(page.locator('#capture-submit')).toHaveClass(/btn-solid/);
+      assert.equal(await page.locator('#capture-submit').evaluate(el=>getComputedStyle(el).whiteSpace),'nowrap');
+      assert.ok((await page.locator('#capture-submit').boundingBox()).height<=56,'capture action stays one line');
       await page.keyboard.press("Escape");
       await expect(page.locator("#capture-sheet")).toBeHidden();
       const beforePresentation=JSON.stringify(await db()), beforePosts=postCount;
       await page.evaluate(async()=>{
-        const {startTodoPresentation}=await import('/shared/ui/todo-presentation.mjs');
+        const {startTodoPresentation}=await import('/shared/ui/todo-presentation.mjs?v=2');
         const c=startTodoPresentation(); c.start();
         window.dispatchEvent(new Event('pagehide'));
         const b=document.createElement('button'); b.type='button'; b.id='ui-probe'; b.textContent='test';
@@ -265,7 +272,7 @@ try {
         color: getComputedStyle(e).color,
         font: getComputedStyle(e).fontSize,
       }));
-      assert.equal(inputStyle.font, "16px");
+      assert.ok(parseFloat(inputStyle.font) >= 16, "task title stays legible without iOS zoom");
       assert.equal(
         inputStyle.color,
         await page.locator("html").evaluate(el=>getComputedStyle(el).getPropertyValue("--fg").trim()).then(value=>{const c=value.match(/\w\w/g).slice(0,3).map(x=>parseInt(x,16));return `rgb(${c.join(", ")})`;}),
@@ -276,8 +283,8 @@ try {
       await expect(page.locator("#deadlines")).toContainText("today4");
       await page.locator("#clear-filters").click();
       await expect(page.locator("#task-search")).toBeFocused();
-      await expect(page.locator("#task-count")).toHaveText("今日のタスク　5件");
-      await expect(page.locator("#view-title")).toHaveText("今日");
+      await expect(page.locator("#task-count")).toHaveText("未完了 5件");
+      await expect(page.locator("#view-title")).toHaveText("今日のタスク");
       await expect(page.locator(".task-card")).toHaveCount(5);
       await nav(page,"all");
       await rowMenu(page,"today0");
@@ -397,8 +404,10 @@ try {
   }
   assert.equal((await db()).tasks.length, beforeIme);
   await page.locator("#quick-title").fill("タイトルだけ");
-  await page.locator("#capture button").click();
+  await page.locator("#capture-memo").fill("確認用のメモ");
+  await page.locator("#capture-submit").click();
   await expect(page.locator("#notice")).toContainText("インボックス");
+  assert.equal((await db()).tasks.at(-1).memo, "確認用のメモ");
   assert.equal((await db()).tasks.at(-1).plannedDay, null);
   await expect(page.locator("#task-search")).toHaveValue("");
   await nav(page,"upcoming");
@@ -422,8 +431,22 @@ try {
   await page
     .getByRole("button", { name: "詳細：合成 today4", exact: true })
     .click();
+  await expect(page.locator("#summary-name")).toHaveText("合成 today4");
+  await expect(page.locator("#summary-settings")).not.toHaveAttribute("open");
+  await page.locator("#summary-complete").click();
+  await expect(page.locator("#detail")).toBeHidden();
+  assert.equal((await db()).tasks.find(t => t.id === "today4").status, "done");
+  await page.getByRole("button", {name:"元に戻す",exact:true}).click();
+  await expect.poll(async () => (await db()).tasks.find(t => t.id === "today4").status).toBe("pending");
+  await page.getByRole("button", {name:"詳細：合成 today4",exact:true}).click();
+  await page.locator("#summary-day").click();
+  await expect(page.locator("[name=plannedDay]")).toBeFocused();
+  await page.locator('#detail-form [data-offset="1"]').click();
+  await expect(page.locator("[name=plannedDay]")).toHaveValue("2026-10-28");
   await page.locator("[name=plannedDay]").fill("2026-11-15");
   await page.locator("#detail-form button[type=submit]").click();
+  await expect(page.locator("#task-summary")).toBeVisible();
+  await page.locator("#task-summary [data-close]").click();
   await expect(page.locator("#detail")).toBeHidden();
   assert.equal(
     (await db()).tasks.find((t) => t.id === "today4").deadline,
@@ -444,9 +467,12 @@ try {
   await page
     .getByRole("button", { name: "詳細：合成 today0", exact: true })
     .click();
+  await page.locator("#summary-edit").click();
   await page.getByText("分類・優先度",{exact:true}).click();
   await page.locator("[name=roleId]").selectOption("lessons");
   await page.locator("#detail-form button[type=submit]").click();
+  await expect(page.locator("#task-summary")).toBeVisible();
+  await page.locator("#task-summary [data-close]").click();
   await expect(page.locator("#detail")).toBeHidden();
   assert.equal(
     (await db()).tasks.find((t) => t.id === "today0").roleId,
@@ -518,6 +544,7 @@ try {
   await page.keyboard.press("Escape");
   // A failed CAS must never turn a stale form into a fresh overwrite.
   await page.locator("[data-task=inbox] [data-action=detail]").click();
+  await page.locator("#summary-edit").click();
   await page.locator("#detail-form [name=name]").fill("古いフォームの編集");
   await externalEdit((s) => {
     const task = s.tasks.find((t) => t.id === "inbox");
@@ -543,6 +570,8 @@ try {
   );
   await expect(page.locator("#detail-form button[type=submit]")).toBeEnabled();
   await page.locator("#detail-form button[type=submit]").click();
+  await expect(page.locator("#task-summary")).toBeVisible();
+  await page.locator("#task-summary [data-close]").click();
   await expect(page.locator("#detail")).toBeHidden();
   assert.equal(
     (await db()).tasks.find((t) => t.id === "inbox").memo,
@@ -704,7 +733,7 @@ async function verifyPlanner(page,db,origin,nav,rowMenu) {
   assert.equal((await db()).tasks.at(-1).plan.source.name,"合成生徒");
   const parent=(await db()).tasks.at(-1);
   await page.locator('[data-task="'+parent.id+'"] [data-action=detail]').click();
-  await page.getByText("メモ・サブタスク",{exact:true}).click();
+  await page.getByText("説明・サブタスク",{exact:true}).click();
   await page.locator("#add-child").click();
   await page.locator("#quick-title").fill("合成サブタスク");
   await page.locator("#quick-title").press("Enter");
@@ -718,8 +747,8 @@ async function verifyPlanner(page,db,origin,nav,rowMenu) {
   await dayButton.click();
   await expect(page.locator("#capture-day")).toHaveValue(planned);
   await page.locator("#quick-title").fill("16:00 教材を確認");
-  await page.locator("#capture-project").selectOption(first.plan.project);
   await page.locator("#capture-details summary").click();
+  await page.locator("#capture-project").selectOption(first.plan.project);
   await page.locator("#capture-reminder").fill(planned+"T15:30");
   await page.locator("#capture-deadline").fill("2026-12-11");
   await page.locator("#capture-tags").fill("教材作成 印刷");
