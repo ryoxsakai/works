@@ -1,0 +1,290 @@
+    <main>
+      <div class="wiki-heading">
+        <p class="eyebrow">WIKI</p>
+        <h2>知識を整理する</h2>
+        <p>フォルダで探す、ページにまとめる、出典を確かめる。</p>
+      </div>
+      <p id="message" role="status" aria-live="polite"></p>
+      <section id="workspace">
+        <div class="wiki-toolbar wiki-searchbar">
+          <input
+            id="search"
+            type="search"
+            placeholder="本文・タイトル・タグ・別名を検索"
+            aria-label="Wiki検索"
+          /><button id="find">検索</button
+          ><button id="clear-search" hidden>検索を解除</button
+          ><button id="new" class="ui-primary">＋ 新規ページ</button>
+        </div>
+        <p id="page-count" class="wiki-help" role="status"></p>
+        <label><input id="archives" type="checkbox" /> アーカイブも表示</label>
+        <div class="wiki-toolbar">
+          <div class="view-toggle" aria-label="表示方法">
+            <button
+              id="view-folders"
+              class="view-toggle-btn active"
+              type="button"
+              aria-pressed="true"
+            >
+              フォルダ</button
+            ><button
+              id="view-tree"
+              class="view-toggle-btn"
+              type="button"
+              aria-pressed="false"
+            >
+              ツリー
+            </button>
+          </div>
+          <button id="new-folder" type="button" class="btn-primary">
+            ＋ フォルダ
+          </button>
+        </div>
+        <div class="layout wiki-folder-view" id="wiki-layout">
+          <aside id="folder-sidebar" hidden>
+            <h2>Wikiツリー</h2>
+            <p id="hierarchy-warning" class="wiki-help" hidden>
+              親をたどれないフォルダは、この表示では最上位に置いています。保存された階層は変更していません。
+            </p>
+            <div id="folder-tree" class="material-tree"></div>
+            <p id="tree-limit" hidden>
+              ツリーのページ表示は直近2000件です。残りは検索・フォルダ表示から開けます。
+            </p>
+          </aside>
+          <div class="wiki-pane">
+            <section id="folder-browser">
+              <nav
+                id="folder-breadcrumb"
+                class="material-breadcrumb"
+                aria-label="Wikiフォルダ階層"
+              ></nav>
+              <div class="wiki-toolbar">
+                <h2 id="folder-heading">未分類</h2>
+                <button id="rename-folder" type="button" hidden>名称変更</button
+                ><button id="move-folder" type="button" hidden>
+                  フォルダ移動
+                </button>
+              </div>
+              <div id="folder-grid" class="material-folder-grid"></div>
+              <div id="pages" class="wiki-pages"></div>
+              <button id="more" hidden>続きを表示</button>
+            </section>
+            <section id="detail" hidden>
+              <nav
+                id="page-breadcrumb"
+                class="material-breadcrumb"
+                aria-label="現在のページの階層"
+              ></nav>
+              <div class="wiki-toolbar">
+                <button id="back-folders" type="button">← フォルダに戻る</button
+                ><button id="move-page" type="button">ページ移動</button>
+              </div>
+              <div class="wiki-toolbar">
+                <h2 id="title" tabindex="-1"></h2>
+                <button id="focus-reading" type="button" aria-pressed="false">
+                  集中表示</button
+                ><button id="edit" class="ui-primary">編集</button
+                ><details class="wiki-page-tools"><summary>その他の操作</summary><div><button id="archive">アーカイブ</button><button data-export="markdown">Markdownで書き出す</button><button data-export="json">JSONで書き出す</button></div></details>
+              </div>
+              <p id="meta"></p>
+              <p id="current-version" class="wiki-version"></p>
+              <div class="wiki-tabs" role="tablist" aria-label="ページの表示">
+                <button
+                  id="tab-content"
+                  role="tab"
+                  aria-selected="true"
+                  aria-controls="panel-content"
+                  type="button"
+                >
+                  ▤ 本文・出典
+                </button>
+                <button
+                  id="tab-proposals"
+                  role="tab"
+                  aria-selected="false"
+                  aria-controls="panel-proposals"
+                  tabindex="-1"
+                  type="button"
+                >
+                  ✎ 改稿案
+                </button>
+                <button
+                  id="tab-history"
+                  role="tab"
+                  aria-selected="false"
+                  aria-controls="panel-history"
+                  tabindex="-1"
+                  type="button"
+                >
+                  ↶ 履歴
+                </button>
+              </div>
+              <section
+                id="panel-content"
+                role="tabpanel"
+                aria-labelledby="tab-content"
+                tabindex="0"
+              >
+                <details id="page-outline" class="wiki-outline" hidden>
+                  <summary>このページの目次</summary>
+                  <nav id="page-toc" aria-label="ページ内の見出し"></nav>
+                </details>
+                <article id="body"></article>
+                <h3>出典</h3>
+                <div id="sources"></div>
+                <h3>関連ページ</h3>
+                <div id="links"></div>
+              </section>
+              <section
+                id="panel-proposals"
+                role="tabpanel"
+                aria-labelledby="tab-proposals"
+                tabindex="0"
+                hidden
+              >
+                <p class="wiki-help">
+                  改稿案は確認用の候補です。「採用」を実行するまで現在の本文は変わりません。
+                </p>
+                <h3 id="proposal-heading">改稿案</h3>
+                <div id="proposals"></div>
+              </section>
+              <section
+                id="panel-history"
+                role="tabpanel"
+                aria-labelledby="tab-history"
+                tabindex="0"
+                hidden
+              >
+                <h3>履歴・比較・復元</h3>
+                <p class="wiki-help">
+                  過去の版と現在を比較できます。復元すると履歴を残して新しい版を作ります。
+                </p>
+                <div id="history"></div>
+                <button id="more-history" hidden>さらに履歴を表示</button>
+              </section>
+            </section>
+          </div>
+        </div>
+        <dialog
+          id="review-dialog"
+          class="wiki-dialog wiki-review-dialog"
+          aria-labelledby="review-title"
+          aria-describedby="review-help"
+        >
+          <div class="modal-header">
+            <h2 id="review-title">変更を確認</h2>
+            <button
+              id="review-close"
+              type="button"
+              aria-label="差分を閉じる"
+              autofocus
+            >
+              ×
+            </button>
+          </div>
+          <p id="review-help">
+            本文は行ごとに比較します。＋ は変更後、−
+            は変更前。出典や状態の変更も確認してください。
+          </p>
+          <p id="review-message" role="alert"></p>
+          <div id="comparison"></div>
+          <div class="modal-actions">
+            <button id="review-adopt" type="button" hidden>
+              この改稿案を採用</button
+            ><button id="review-done" type="button">閉じる</button>
+          </div>
+        </dialog>
+        <form id="editor" hidden>
+          <h2 id="editor-heading">ページ編集</h2>
+          <label>タイトル<input name="title" required maxlength="300" /></label>
+          <div class="wiki-toolbar">
+            <span>Markdown</span>
+            <div class="view-toggle">
+              <button
+                id="mode-edit"
+                type="button"
+                class="view-toggle-btn active"
+                aria-pressed="true"
+              >
+                編集</button
+              ><button
+                id="mode-preview"
+                type="button"
+                class="view-toggle-btn"
+                aria-pressed="false"
+              >
+                プレビュー
+              </button>
+            </div>
+          </div>
+          <p class="wiki-help">
+            見出し・表・リスト・引用・コード・HTTP(S)リンクに対応。HTMLと外部画像は使用しません。
+          </p>
+          <article
+            id="editor-preview"
+            class="wiki-markdown"
+            hidden
+            aria-label="Markdownプレビュー"
+          ></article>
+          <label id="body-label"
+            >本文（Markdown・HTML不可）<textarea
+              name="body"
+              rows="14"
+              maxlength="100000"
+            ></textarea></label
+          ><label>タグ（カンマ区切り）<input name="tags" /></label
+          ><label>別名（カンマ区切り）<input name="aliases" /></label
+          ><label>関連ページID（カンマ区切り）<input name="links" /></label
+          ><label
+            >状態<select name="status">
+              <option value="draft">下書き</option>
+              <option value="confirmed">確認済み（出典必須）</option>
+            </select></label
+          >
+          <label
+            >改稿案メモ<input id="proposal-notes" maxlength="3000"
+          /></label>
+          <h3>出典</h3>
+          <p>原本を確認し、種別・IDまたはURL・箇所・確認日を入力します。</p>
+          <div id="source-fields"></div>
+          <button id="add-source" type="button">＋ 出典</button>
+          <div class="wiki-toolbar editor-actions" id="editor-actions">
+            <span id="save-state" role="status">保存済み</span
+            ><button type="submit" class="ui-primary">本文として保存</button
+            ><button id="propose" type="button">改稿案として保存</button
+            ><button id="cancel" type="button">キャンセル</button>
+          </div>
+        </form>
+      </section>
+    </main>
+    <dialog
+      id="folder-dialog"
+      class="app-modal wiki-dialog"
+      aria-labelledby="folder-dialog-title"
+    >
+      <div class="modal-header">
+        <h2 id="folder-dialog-title"></h2>
+        <button
+          id="folder-dialog-close"
+          type="button"
+          class="modal-close"
+          aria-label="閉じる"
+        >
+          ×
+        </button>
+      </div>
+      <form id="folder-form" class="modal-tab-panel">
+        <label id="folder-name-label"
+          >フォルダ名<input id="folder-name" maxlength="200" required
+        /></label>
+        <label id="folder-target-label"
+          >移動先<select id="folder-target"></select
+        ></label>
+        <p id="folder-dialog-message" role="status"></p>
+        <div class="modal-actions">
+          <button id="folder-dialog-submit" type="submit" class="btn-primary">
+            保存</button
+          ><button id="folder-dialog-cancel" type="button">キャンセル</button>
+        </div>
+      </form>
+    </dialog>

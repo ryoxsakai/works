@@ -1,0 +1,303 @@
+/* Existing memo utility, task and component styles scoped to the native module. */
+.memo-native .pointer-events-none{pointer-events:none}.memo-native .fixed{position:fixed}.memo-native .absolute{position:absolute}.memo-native .relative{position:relative}.memo-native .inset-0{inset:0}.memo-native .left-1\/2{left:50%}.memo-native .right-3{right:.75rem}.memo-native .top-3{top:.75rem}.memo-native .z-50{z-index:50}.memo-native .mx-4{margin-left:1rem;margin-right:1rem}.memo-native .mx-auto{margin-left:auto;margin-right:auto}.memo-native .mb-1{margin-bottom:.25rem}.memo-native .mb-1\.5{margin-bottom:.375rem}.memo-native .mb-2{margin-bottom:.5rem}.memo-native .mb-3{margin-bottom:.75rem}.memo-native .mb-4{margin-bottom:1rem}.memo-native .mb-8{margin-bottom:2rem}.memo-native .ml-1{margin-left:.25rem}.memo-native .mr-1{margin-right:.25rem}.memo-native .mt-1{margin-top:.25rem}.memo-native .mt-2{margin-top:.5rem}.memo-native .mt-3{margin-top:.75rem}.memo-native .block{display:block}.memo-native .flex{display:flex}.memo-native .inline-flex{display:inline-flex}.memo-native .grid{display:grid}.memo-native .hidden{display:none}.memo-native .h-3{height:.75rem}.memo-native .h-3\.5{height:.875rem}.memo-native .h-4{height:1rem}.memo-native .h-5{height:1.25rem}.memo-native .h-6{height:1.5rem}.memo-native .h-8{height:2rem}.memo-native .min-h-0{min-height:0}.memo-native .min-h-5{min-height:1.25rem}.memo-native .min-h-screen{min-height:100vh}.memo-native .w-10{width:2.5rem}.memo-native .w-3{width:.75rem}.memo-native .w-3\.5{width:.875rem}.memo-native .w-4{width:1rem}.memo-native .w-5{width:1.25rem}.memo-native .w-6{width:1.5rem}.memo-native .w-8{width:2rem}.memo-native .w-96{width:24rem}.memo-native .w-full{width:100%}.memo-native .max-w-28{max-width:7rem}.memo-native .max-w-lg{max-width:32rem}.memo-native .max-w-sm{max-width:24rem}.memo-native .max-w-xs{max-width:20rem}.memo-native .flex-1{flex:1 1 0%}.memo-native .flex-shrink-0{flex-shrink:0}.memo-native .transform{transform:translate(var(--tw-translate-x),var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))}.memo-native .cursor-pointer{cursor:pointer}.memo-native .select-text{-webkit-user-select:text;-moz-user-select:text;user-select:text}.memo-native .resize-none{resize:none}.memo-native .grid-cols-1{grid-template-columns:repeat(1,minmax(0,1fr))}.memo-native .flex-col{flex-direction:column}.memo-native .flex-wrap{flex-wrap:wrap}.memo-native .items-start{align-items:flex-start}.memo-native .items-end{align-items:flex-end}.memo-native .items-center{align-items:center}.memo-native .justify-end{justify-content:flex-end}.memo-native .justify-center{justify-content:center}.memo-native .justify-between{justify-content:space-between}.memo-native .gap-0\.5{gap:.125rem}.memo-native .gap-1{gap:.25rem}.memo-native .gap-1\.5{gap:.375rem}.memo-native .gap-2{gap:.5rem}.memo-native .gap-3{gap:.75rem}.memo-native .gap-4{gap:1rem}.memo-native .space-y-1>:not([hidden])~:not([hidden]){--tw-space-y-reverse:0;margin-top:calc(.25rem*(1 - var(--tw-space-y-reverse)));margin-bottom:calc(.25rem*var(--tw-space-y-reverse))}.memo-native .overflow-hidden{overflow:hidden}.memo-native .overflow-x-auto{overflow-x:auto}.memo-native .overflow-y-auto{overflow-y:auto}.memo-native .truncate{overflow:hidden;text-overflow:ellipsis}.memo-native .truncate,.memo-native .whitespace-nowrap{white-space:nowrap}.memo-native .whitespace-pre-wrap{white-space:pre-wrap}.memo-native .break-all{word-break:break-all}.memo-native .rounded-2xl{border-radius:1rem}.memo-native .rounded-full{border-radius:9999px}.memo-native .rounded-lg{border-radius:.5rem}.memo-native .rounded-xl{border-radius:.75rem}.memo-native .rounded-t-lg{border-top-left-radius:.5rem;border-top-right-radius:.5rem}.memo-native .border{border-width:1px}.memo-native .border-b{border-bottom-width:1px}.memo-native .border-b-2{border-bottom-width:2px}.memo-native .border-t{border-top-width:1px}.memo-native .border-gray-100{--tw-border-opacity:1;border-color:rgb(243 244 246/var(--tw-border-opacity,1))}.memo-native .border-gray-200{--tw-border-opacity:1;border-color:rgb(229 231 235/var(--tw-border-opacity,1))}.memo-native .border-gray-300{--tw-border-opacity:1;border-color:rgb(209 213 219/var(--tw-border-opacity,1))}.memo-native .border-gray-50{--tw-border-opacity:1;border-color:rgb(249 250 251/var(--tw-border-opacity,1))}.memo-native .border-slate-100{--tw-border-opacity:1;border-color:rgb(241 245 249/var(--tw-border-opacity,1))}.memo-native .border-slate-200{--tw-border-opacity:1;border-color:rgb(226 232 240/var(--tw-border-opacity,1))}.memo-native .border-slate-300{--tw-border-opacity:1;border-color:rgb(203 213 225/var(--tw-border-opacity,1))}.memo-native .border-slate-700{--tw-border-opacity:1;border-color:rgb(51 65 85/var(--tw-border-opacity,1))}.memo-native .border-transparent{border-color:transparent}.memo-native .bg-gray-100{--tw-bg-opacity:1;background-color:rgb(243 244 246/var(--tw-bg-opacity,1))}.memo-native .bg-gray-50{--tw-bg-opacity:1;background-color:rgb(249 250 251/var(--tw-bg-opacity,1))}.memo-native .bg-gray-800{--tw-bg-opacity:1;background-color:rgb(31 41 55/var(--tw-bg-opacity,1))}.memo-native .bg-slate-50{--tw-bg-opacity:1;background-color:rgb(248 250 252/var(--tw-bg-opacity,1))}.memo-native .bg-slate-700{--tw-bg-opacity:1;background-color:rgb(51 65 85/var(--tw-bg-opacity,1))}.memo-native .bg-white{--tw-bg-opacity:1;background-color:rgb(255 255 255/var(--tw-bg-opacity,1))}.memo-native .p-4{padding:1rem}.memo-native .px-2{padding-left:.5rem;padding-right:.5rem}.memo-native .px-2\.5{padding-left:.625rem;padding-right:.625rem}.memo-native .px-3{padding-left:.75rem;padding-right:.75rem}.memo-native .px-4{padding-left:1rem;padding-right:1rem}.memo-native .px-5{padding-left:1.25rem;padding-right:1.25rem}.memo-native .px-6{padding-left:1.5rem;padding-right:1.5rem}.memo-native .px-8{padding-left:2rem;padding-right:2rem}.memo-native .py-0\.5{padding-top:.125rem;padding-bottom:.125rem}.memo-native .py-1{padding-top:.25rem;padding-bottom:.25rem}.memo-native .py-1\.5{padding-top:.375rem;padding-bottom:.375rem}.memo-native .py-10{padding-top:2.5rem;padding-bottom:2.5rem}.memo-native .py-16{padding-top:4rem;padding-bottom:4rem}.memo-native .py-2{padding-top:.5rem;padding-bottom:.5rem}.memo-native .py-2\.5{padding-top:.625rem;padding-bottom:.625rem}.memo-native .py-3{padding-top:.75rem;padding-bottom:.75rem}.memo-native .py-4{padding-top:1rem;padding-bottom:1rem}.memo-native .py-5{padding-top:1.25rem;padding-bottom:1.25rem}.memo-native .pb-1{padding-bottom:.25rem}.memo-native .pb-1\.5{padding-bottom:.375rem}.memo-native .pb-2{padding-bottom:.5rem}.memo-native .pb-3{padding-bottom:.75rem}.memo-native .pr-28{padding-right:7rem}.memo-native .pr-4{padding-right:1rem}.memo-native .pt-1{padding-top:.25rem}.memo-native .pt-3{padding-top:.75rem}.memo-native .pt-4{padding-top:1rem}.memo-native .text-center{text-align:center}.memo-native .text-2xl{font-size:1.5rem;line-height:2rem}.memo-native .text-4xl{font-size:2.25rem;line-height:2.5rem}.memo-native .text-5xl{font-size:3rem;line-height:1}.memo-native .text-sm{font-size:.875rem;line-height:1.25rem}.memo-native .text-xs{font-size:.75rem;line-height:1rem}.memo-native .font-bold{font-weight:700}.memo-native .font-medium{font-weight:500}.memo-native .font-semibold{font-weight:600}.memo-native .italic{font-style:italic}.memo-native .leading-relaxed{line-height:1.625}.memo-native .leading-snug{line-height:1.375}.memo-native .text-blue-500{--tw-text-opacity:1;color:rgb(59 130 246/var(--tw-text-opacity,1))}.memo-native .text-gray-300{--tw-text-opacity:1;color:rgb(209 213 219/var(--tw-text-opacity,1))}.memo-native .text-gray-400{--tw-text-opacity:1;color:rgb(156 163 175/var(--tw-text-opacity,1))}.memo-native .text-gray-500{--tw-text-opacity:1;color:rgb(107 114 128/var(--tw-text-opacity,1))}.memo-native .text-gray-600{--tw-text-opacity:1;color:rgb(75 85 99/var(--tw-text-opacity,1))}.memo-native .text-gray-700{--tw-text-opacity:1;color:rgb(55 65 81/var(--tw-text-opacity,1))}.memo-native .text-gray-800{--tw-text-opacity:1;color:rgb(31 41 55/var(--tw-text-opacity,1))}.memo-native .text-slate-400{--tw-text-opacity:1;color:rgb(148 163 184/var(--tw-text-opacity,1))}.memo-native .text-slate-500{--tw-text-opacity:1;color:rgb(100 116 139/var(--tw-text-opacity,1))}.memo-native .text-slate-600{--tw-text-opacity:1;color:rgb(71 85 105/var(--tw-text-opacity,1))}.memo-native .text-slate-700{--tw-text-opacity:1;color:rgb(51 65 85/var(--tw-text-opacity,1))}.memo-native .text-white{--tw-text-opacity:1;color:rgb(255 255 255/var(--tw-text-opacity,1))}.memo-native .underline{text-decoration-line:underline}.memo-native .placeholder-gray-300::-moz-placeholder{--tw-placeholder-opacity:1;color:rgb(209 213 219/var(--tw-placeholder-opacity,1))}.memo-native .placeholder-gray-300::placeholder{--tw-placeholder-opacity:1;color:rgb(209 213 219/var(--tw-placeholder-opacity,1))}.memo-native .opacity-0{opacity:0}.memo-native .opacity-20{opacity:.2}.memo-native .shadow-2xl{--tw-shadow:0 25px 50px -12px rgba(0,0,0,.25);--tw-shadow-colored:0 25px 50px -12px var(--tw-shadow-color)}.memo-native .shadow-2xl,.memo-native .shadow-lg{box-shadow:var(--tw-ring-offset-shadow,0 0 #0000),var(--tw-ring-shadow,0 0 #0000),var(--tw-shadow)}.memo-native .shadow-lg{--tw-shadow:0 10px 15px -3px rgba(0,0,0,.1),0 4px 6px -4px rgba(0,0,0,.1);--tw-shadow-colored:0 10px 15px -3px var(--tw-shadow-color),0 4px 6px -4px var(--tw-shadow-color)}.memo-native .shadow-sm{--tw-shadow:0 1px 2px 0 rgba(0,0,0,.05);--tw-shadow-colored:0 1px 2px 0 var(--tw-shadow-color);box-shadow:var(--tw-ring-offset-shadow,0 0 #0000),var(--tw-ring-shadow,0 0 #0000),var(--tw-shadow)}.memo-native .ring-2{--tw-ring-offset-shadow:var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);--tw-ring-shadow:var(--tw-ring-inset) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color);box-shadow:var(--tw-ring-offset-shadow),var(--tw-ring-shadow),var(--tw-shadow,0 0 #0000)}.memo-native .ring-red-400{--tw-ring-opacity:1;--tw-ring-color:rgb(248 113 113/var(--tw-ring-opacity,1))}.memo-native .filter{filter:var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow)}.memo-native .transition{transition-property:color,background-color,border-color,text-decoration-color,fill,stroke,opacity,box-shadow,transform,filter,-webkit-backdrop-filter;transition-property:color,background-color,border-color,text-decoration-color,fill,stroke,opacity,box-shadow,transform,filter,backdrop-filter;transition-property:color,background-color,border-color,text-decoration-color,fill,stroke,opacity,box-shadow,transform,filter,backdrop-filter,-webkit-backdrop-filter;transition-timing-function:cubic-bezier(.4,0,.2,1);transition-duration:.15s}.memo-native .transition-colors{transition-property:color,background-color,border-color,text-decoration-color,fill,stroke;transition-timing-function:cubic-bezier(.4,0,.2,1);transition-duration:.15s}.memo-native .transition-opacity{transition-property:opacity;transition-timing-function:cubic-bezier(.4,0,.2,1);transition-duration:.15s}.memo-native .hover\:bg-gray-100:hover{--tw-bg-opacity:1;background-color:rgb(243 244 246/var(--tw-bg-opacity,1))}.memo-native .hover\:bg-gray-50:hover{--tw-bg-opacity:1;background-color:rgb(249 250 251/var(--tw-bg-opacity,1))}.memo-native .hover\:bg-red-50:hover{--tw-bg-opacity:1;background-color:rgb(254 242 242/var(--tw-bg-opacity,1))}.memo-native .hover\:bg-slate-100:hover{--tw-bg-opacity:1;background-color:rgb(241 245 249/var(--tw-bg-opacity,1))}.memo-native .hover\:bg-slate-200:hover{--tw-bg-opacity:1;background-color:rgb(226 232 240/var(--tw-bg-opacity,1))}.memo-native .hover\:bg-slate-50:hover{--tw-bg-opacity:1;background-color:rgb(248 250 252/var(--tw-bg-opacity,1))}.memo-native .hover\:bg-slate-800:hover{--tw-bg-opacity:1;background-color:rgb(30 41 59/var(--tw-bg-opacity,1))}.memo-native .hover\:text-blue-700:hover{--tw-text-opacity:1;color:rgb(29 78 216/var(--tw-text-opacity,1))}.memo-native .hover\:text-gray-500:hover{--tw-text-opacity:1;color:rgb(107 114 128/var(--tw-text-opacity,1))}.memo-native .hover\:text-gray-600:hover{--tw-text-opacity:1;color:rgb(75 85 99/var(--tw-text-opacity,1))}.memo-native .hover\:text-gray-700:hover{--tw-text-opacity:1;color:rgb(55 65 81/var(--tw-text-opacity,1))}.memo-native .hover\:text-red-400:hover{--tw-text-opacity:1;color:rgb(248 113 113/var(--tw-text-opacity,1))}.memo-native .hover\:text-slate-500:hover{--tw-text-opacity:1;color:rgb(100 116 139/var(--tw-text-opacity,1))}.memo-native .hover\:text-slate-600:hover{--tw-text-opacity:1;color:rgb(71 85 105/var(--tw-text-opacity,1))}.memo-native .focus\:border-transparent:focus{border-color:transparent}.memo-native .focus\:outline-none:focus{outline:2px solid transparent;outline-offset:2px}.memo-native .focus\:ring-2:focus{--tw-ring-offset-shadow:var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);--tw-ring-shadow:var(--tw-ring-inset) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color);box-shadow:var(--tw-ring-offset-shadow),var(--tw-ring-shadow),var(--tw-shadow,0 0 #0000)}.memo-native .focus\:ring-slate-400:focus{--tw-ring-opacity:1;--tw-ring-color:rgb(148 163 184/var(--tw-ring-opacity,1))}.memo-native .active\:bg-gray-100:active{--tw-bg-opacity:1;background-color:rgb(243 244 246/var(--tw-bg-opacity,1))}.memo-native .active\:bg-slate-900:active{--tw-bg-opacity:1;background-color:rgb(15 23 42/var(--tw-bg-opacity,1))}.memo-native .group:hover .group-hover\:opacity-100{opacity:1}@media (min-width:640px){.memo-native .sm\:grid-cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}}@media (min-width:1024px){.memo-native .lg\:grid-cols-3{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.memo-native {
+  background: var(--bg-gradient) !important;
+  background-attachment: fixed !important;
+  color: var(--fg);
+}
+
+.memo-native .page-header {
+  position: relative;
+  top: auto;
+  z-index: 30;
+  border: 0;
+  background: var(--bg-elevated) !important;
+  color: var(--fg);
+  box-shadow: var(--card-shadow);
+}
+
+.memo-native .todo-main {
+  max-width: 1120px !important;
+  padding-top: 1.5rem;
+}
+
+.memo-native .todo-heading {
+  margin: 0 0 1rem;
+}
+
+.memo-native .todo-heading h2 {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.memo-native .todo-heading h2 i {
+  color: var(--accent);
+  font-size: 1.35rem;
+}
+
+.memo-native .todo-panel {
+  overflow: hidden;
+  border: 1px solid var(--border) !important;
+  border-radius: .65rem !important;
+  background: var(--bg-elevated) !important;
+  box-shadow: var(--card-shadow) !important;
+}
+
+.memo-native .todo-panel #form-toggle {
+  color: var(--fg);
+  border-radius: .65rem;
+}
+
+.memo-native .todo-panel #form-toggle:hover,
+.memo-native .todo-panel .tab-btn:hover,
+.memo-native .todo-category-button:hover {
+  background: var(--bg-hover) !important;
+}
+
+.memo-native input,
+.memo-native select,
+.memo-native textarea {
+  background: var(--bg-elevated) !important;
+  border-color: var(--border) !important;
+  color: var(--fg) !important;
+}
+
+.memo-native input::placeholder,
+.memo-native .text-gray-300,
+.memo-native .text-gray-400 {
+  color: var(--muted) !important;
+}
+
+.memo-native .text-gray-500,
+.memo-native .text-gray-600,
+.memo-native .text-gray-700,
+.memo-native .text-gray-800,
+.memo-native .text-slate-500,
+.memo-native .text-slate-600,
+.memo-native .text-slate-700 {
+  color: var(--fg) !important;
+}
+
+.memo-native .border-gray-100,
+.memo-native .border-gray-200,
+.memo-native .border-gray-50 {
+  border-color: var(--border) !important;
+}
+
+.memo-native .todo-add-button,
+.memo-native .todo-modal button.bg-slate-700 {
+  background: var(--fg) !important;
+  color: var(--bg) !important;
+  border-radius: .5rem !important;
+}
+
+.memo-native .todo-add-button:hover,
+.memo-native .todo-modal button.bg-slate-700:hover {
+  opacity: .85;
+}
+
+.memo-native .todo-category-button {
+  background: var(--bg-elevated) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--muted) !important;
+  border-radius: .5rem !important;
+}
+
+.memo-native #tab-list {
+  gap: .2rem;
+}
+
+.memo-native .tab-btn {
+  min-height: 2.2rem;
+  border-radius: .5rem .5rem 0 0;
+  color: var(--muted) !important;
+  background: transparent !important;
+  border-color: transparent !important;
+}
+
+.memo-native .tab-btn.border-slate-700 {
+  color: var(--accent) !important;
+  background: var(--bg-hover) !important;
+  border-bottom-color: var(--accent) !important;
+}
+
+.memo-native .todo-table-shell {
+  background: var(--bg-elevated);
+}
+
+.memo-native .todo-table th,
+.memo-native .todo-table td {
+  border-bottom: 1px solid var(--border);
+  color: var(--fg);
+}
+
+.memo-native .todo-table th {
+  color: var(--muted) !important;
+  font-weight: 600;
+}
+
+.memo-native .todo-table .task-row:hover {
+  background: var(--bg-hover) !important;
+}
+
+.memo-native .progress-track {
+  background: var(--bg-hover);
+}
+
+.memo-native .icon-btn {
+  color: var(--muted);
+}
+
+.memo-native .icon-btn:hover {
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+
+.memo-native .todo-modal,
+.memo-native #login-form {
+  background: var(--bg-elevated) !important;
+  color: var(--fg);
+  border: 1px solid var(--border);
+}
+
+.memo-native #category-list li:hover,
+.memo-native #category-list li.bg-slate-50 {
+  background: var(--bg-hover) !important;
+}
+
+.memo-native #login-screen {
+  background: var(--bg-gradient) !important;
+}
+
+.memo-native #login-form button {
+  background: var(--bg-elevated) !important;
+  color: var(--fg) !important;
+  border-color: var(--border) !important;
+}
+
+.memo-native #login-form button:hover {
+  background: var(--bg-hover) !important;
+}
+
+@media (max-width: 640px) {
+  .memo-native .todo-main { padding: 1rem !important; }
+  .memo-native .todo-heading { margin-bottom: .75rem; }
+  .memo-native .todo-panel #form-toggle { padding: .8rem 1rem; }
+}
+
+/* Neutral utility surfaces also follow the shared palette inside task modals. */
+.memo-native .bg-white { background: var(--bg-elevated) !important; }
+.memo-native .bg-gray-50,
+.memo-native .bg-gray-100,
+.memo-native .bg-slate-50,
+.memo-native .bg-slate-100 { background: var(--bg-hover) !important; }
+.memo-native .border-gray-300,
+.memo-native .border-slate-300 { border-color: var(--border) !important; }
+
+/* Keep category tabs consistent even when utility styles load first. */
+.memo-native #tab-list .tab-btn { padding: .625rem 1rem; min-height: 44px; }
+.memo-native #tab-list .tab-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
+.memo-native .category-dialog {
+  padding: 0; border: 0; border-radius: 1rem;
+  width: min(36rem, calc(100% - 2rem)); max-width: none;
+  max-height: calc(100dvh - 2rem); color: var(--fg);
+  background: var(--bg-elevated); box-shadow: 0 24px 64px #0003;
+}
+.memo-native .category-dialog::backdrop { background: #0005; backdrop-filter: blur(4px); }
+.memo-native .category-dialog .category-surface {
+  display: flex; flex-direction: column; width: 100%; margin: 0;
+  max-height: calc(100dvh - 2rem); border-radius: 1rem;
+}
+.memo-native .category-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1.25rem 1.5rem; }
+.memo-native .category-header .eyebrow { margin: 0 0 .25rem; }
+.memo-native .category-header h3 { margin: 0; font-size: 1.125rem; font-weight: 700; }
+.memo-native #category-help { padding: 0 1.5rem; margin: 0 0 1rem; color: var(--fg); font-size: .85rem; line-height: 1.6; }
+.memo-native .category-dialog #category-list { list-style: none; padding: 0 1rem 1rem; margin: 0; overflow-y: auto; min-height: 0; }
+.memo-native .category-dialog #category-list li { gap: .5rem; margin-bottom: .5rem; border: 1px solid var(--border); background: var(--bg-elevated); }
+.memo-native .category-dialog .category-name { min-width: 0; overflow-wrap: anywhere; line-height: 1.5; }
+.memo-native .category-dialog input { min-width: 0; min-height: 44px; border: 1px solid var(--border); border-radius: .5rem; padding: .625rem .75rem; }
+.memo-native .category-dialog button { min-height: 44px; padding: .5rem .875rem; border: 1px solid var(--border); border-radius: .5rem; background: var(--bg-elevated); color: var(--fg); cursor: pointer; }
+.memo-native .category-dialog .icon-btn { flex-shrink: 0; width: 44px; height: 44px; min-width: 44px; min-height: 44px; padding: .5rem; opacity: 1; border: 0; }
+.memo-native .category-dialog button:disabled { opacity: .3; cursor: default; }
+.memo-native .category-dialog :is(button, input):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.memo-native .category-add { flex-shrink: 0; border-top: 1px solid var(--border); padding: 1rem 1.5rem; }
+.memo-native .category-add label { display: block; font-size: .85rem; font-weight: 600; margin-bottom: .5rem; }
+.memo-native .category-add-controls { display: flex; gap: .5rem; }
+.memo-native .category-add-controls input { flex: 1; width: 100%; }
+.memo-native .category-footer { padding: 0 1.5rem 1rem; text-align: right; flex-shrink: 0; }
+@media (max-width: 480px) {
+  .memo-native .category-header { padding: 1rem; }
+  .memo-native #category-help { padding: 0 1rem; }
+  .memo-native .category-add { padding: 1rem; }
+  .memo-native .category-dialog #category-list { padding: 0 .75rem .75rem; }
+  .memo-native .category-dialog #category-list li:not(.category-row) { flex-wrap: wrap; }
+
+  .memo-native .category-dialog #category-list li > div { flex-direction: row; }
+  .memo-native .category-dialog #edit-cat-input { flex-basis: 100%; }
+}
+.memo-native .category-dialog .icon-btn { color: var(--fg) !important; }
+
+.memo-native .category-dialog #category-list .category-row { display: grid; grid-template-columns: 88px minmax(0, 1fr) 44px 44px; gap: .5rem; padding: .75rem; }
+.memo-native .category-order { display: flex; flex-direction: row; margin: 0; }
+.memo-native .category-summary { display: flex; align-items: center; gap: .5rem; min-width: 0; }
+.memo-native .category-count { white-space: nowrap; }
+@media (max-width: 480px) {
+  .memo-native .category-dialog #category-list .category-row { grid-template-columns: minmax(88px, 1fr) 44px 44px; }
+  .memo-native .category-summary { grid-column: 1 / -1; grid-row: 1; padding: .25rem 0; }
+  .memo-native .category-order { grid-column: 1; grid-row: 2; }
+  .memo-native .category-row > button { grid-row: 2; }
+}
+
+.memo-native .memo-card { border-color: var(--border) !important; border-radius: .65rem !important; box-shadow: var(--card-shadow); }
+.memo-native .bg-slate-700 { background: var(--fg) !important; color: var(--bg) !important; }
+.memo-native .icon-btn { min-width: 32px; min-height: 32px; }
+.memo-native #save-status { color: var(--muted); font-size: .85rem; overflow-wrap: anywhere; }
+.memo-native #view-body-container > div { border-color: var(--border) !important; }
+.memo-native [id$="modal"] > div { width: min(100% - 2rem, 36rem); }
+@media (max-width: 640px) { .memo-native [id$="modal"] > div { max-height: 85dvh !important; } }
+
+.memo-native .tab-btn { background: transparent; border: 0; border-bottom: 2px solid transparent; }
+.memo-native .icon-btn { background: transparent; border: 0; }
+.memo-native .tab-btn.border-slate-700 { border-bottom-color: var(--accent); }
+
+.memo-native button.icon-btn.bg-slate-700 { background: var(--fg) !important; color: var(--bg) !important; }
+.memo-native button.icon-btn.bg-gray-50 { background: var(--bg-hover) !important; color: var(--fg) !important; }
+.memo-native button.icon-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.memo-native #category-modal > .category-surface { width: 100%; max-height: calc(100dvh - 2rem) !important; }
+
+
+    .memo-native { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
+
+    .memo-native .icon-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      transition: background-color 0.15s;
+    }
+
+    .memo-native .tab-btn { transition: color 0.15s, border-color 0.15s, background-color 0.15s; }
+
+    .memo-native .memo-card { transition: box-shadow 0.15s; }
+    .memo-native .memo-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+
+    .memo-native input, .memo-native select, .memo-native textarea { font-size: 16px !important; }
+
+    .memo-native #tab-list::-webkit-scrollbar { display: none; }
+  
+.memo-native{--fg:var(--ink);--border:var(--line);--bg-elevated:var(--surface);--bg-hover:var(--accent-soft);--bg-gradient:var(--paper);--bg:var(--paper);--card-shadow:0 1px 4px #1231}.memo-native .todo-main{padding:16px 0!important}.memo-native dialog:not([open]){display:none!important}.memo-native dialog{padding:0;margin:auto;width:min(36rem,calc(100% - 24px));max-width:none;max-height:90dvh;overflow:auto;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:16px;overscroll-behavior:contain}.memo-native dialog::backdrop{background:#10203988;backdrop-filter:blur(4px)}.memo-native dialog>.todo-modal{width:100%;margin:0;max-height:90dvh!important}.memo-native dialog>div:first-child:not(.todo-modal){padding:0 16px}.memo-native [data-memo-status]:empty{display:none}.memo-native [data-recovery]{padding:12px;border-bottom:1px solid var(--line)}.memo-native pre{white-space:pre-wrap;overflow-wrap:anywhere}.memo-native button{width:auto;min-height:44px}.memo-native .icon-btn{min-width:44px;min-height:44px;flex-shrink:0}.memo-native input,.memo-native select,.memo-native textarea{min-width:0;font-size:16px}.memo-native [hidden]{display:none!important}.memo-native #memo-grid:empty{padding:0}.memo-native .memo-card{overflow-wrap:anywhere}.memo-native #tab-list{min-width:0}.memo-native svg{flex-shrink:0}.memo-native #view-title{overflow-wrap:anywhere}.memo-native #toast{position:sticky;top:0;max-width:100%;margin:auto;text-align:center;left:0;white-space:normal;transform:none!important}.memo-native .memo-open-title{color:inherit}.memo-native .memo-open-title:focus-visible{outline:3px solid var(--focus)}
+.memo-native dialog.memo-native-dialog{width:min(32rem,calc(100% - 24px))}
+/* Tailwind's display utility must not inherit Framework7's semantic block spacing. */
+.memo-native .block{padding:0;margin:0 0 6px}
+.memo-native :is([data-memo-action^="removeModalBody("],[data-memo-action^="removeModalNote("],[data-memo-action^="removeModalTag("]){border:0;background:transparent}
+.memo-native{overflow-wrap:anywhere}
+.memo-native #modal-tags-list>span{max-width:100%;min-width:0;overflow-wrap:anywhere}

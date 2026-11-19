@@ -1,0 +1,6005 @@
+{
+  "baseline_commit": "d1bf74ee93625f83a00314ab9048a2563e5ef3d8",
+  "evidence": "Static original-source inventory, not runtime parity certification",
+  "modules": {
+    "tutor": [
+      {
+        "file": "tutor/app.js",
+        "interactions": [
+          {
+            "line": 227,
+            "source": "return apiFetch(`/student-prefs?name=${encodeURIComponent(name)}`, {}, null);"
+          },
+          {
+            "line": 234,
+            "source": "readNext: (source) => apiFetch(`/next-lesson-plan?calendar_id=${encodeURIComponent(source.calendar_id)}&event_id=${encodeURIComponent(source.id)}`, {}, null),"
+          },
+          {
+            "line": 236,
+            "source": "const result = await apiFetch(\"/lesson-plan\", { method: \"PUT\", body: JSON.stringify(body) }, null);"
+          },
+          {
+            "line": 328,
+            "source": "toggle.addEventListener(\"click\", () => toggleSection(id));"
+          },
+          {
+            "line": 329,
+            "source": "toggle.addEventListener(\"keydown\", (e) => {"
+          },
+          {
+            "line": 364,
+            "source": "checkbox.addEventListener(\"change\", () => {"
+          },
+          {
+            "line": 377,
+            "source": "els.openSettingsBtn.addEventListener(\"click\", () => {"
+          },
+          {
+            "line": 385,
+            "source": "els.settingsCloseBtn.addEventListener(\"click\", () => els.settingsModal.close());"
+          },
+          {
+            "line": 388,
+            "source": "btn.addEventListener(\"click\", () => {"
+          },
+          {
+            "line": 397,
+            "source": "radio.addEventListener(\"change\", () => {"
+          },
+          {
+            "line": 417,
+            "source": "btn.addEventListener(\"click\", () => setActivePageTab(btn.dataset.pageTab));"
+          },
+          {
+            "line": 654,
+            "source": "document.addEventListener(\"input\", (event) => {"
+          },
+          {
+            "line": 658,
+            "source": "document.addEventListener(\"change\", (event) => {"
+          },
+          {
+            "line": 663,
+            "source": "document.addEventListener(\"click\", async (event) => {"
+          },
+          {
+            "line": 707,
+            "source": "document.addEventListener(\"input\", (event) => {"
+          },
+          {
+            "line": 712,
+            "source": "document.addEventListener(\"change\", (event) => {"
+          },
+          {
+            "line": 717,
+            "source": "document.addEventListener(\"click\", (event) => {"
+          },
+          {
+            "line": 735,
+            "source": "els.recordTbody.addEventListener(\"input\", (event) => {"
+          },
+          {
+            "line": 747,
+            "source": "els.recordTbody.addEventListener(\"click\", (e) => {"
+          },
+          {
+            "line": 755,
+            "source": "els.recordTbody.addEventListener(\"change\", async (e) => {"
+          },
+          {
+            "line": 765,
+            "source": "const savedRecord = await apiFetch(`/curriculum/${encodeURIComponent(eventId)}`, {"
+          },
+          {
+            "line": 784,
+            "source": "btn.addEventListener(\"click\", async () => {"
+          },
+          {
+            "line": 799,
+            "source": "btn.addEventListener(\"click\", () => {"
+          },
+          {
+            "line": 807,
+            "source": "els.calPrevBtn.addEventListener(\"click\", () => {"
+          },
+          {
+            "line": 812,
+            "source": "els.calNextBtn.addEventListener(\"click\", () => {"
+          },
+          {
+            "line": 817,
+            "source": "els.clearNameFilterBtn.addEventListener(\"click\", () => {"
+          },
+          {
+            "line": 824,
+            "source": "els.signOutBtn.addEventListener(\"click\", async () => {"
+          },
+          {
+            "line": 863,
+            "source": "studentDirectory = await apiFetch(\"/students\");"
+          },
+          {
+            "line": 896,
+            "source": "async function apiFetch(path, options = {}, context = (/^\\/(?:goals|schools|student-prefs|student-materials|chapter-progress)(?:[/?]|$)/.test(path) || (path.startsWith(\"/curriculum/\") && options.method)) ? captureStudentContext() : null) {"
+          },
+          {
+            "line": 901,
+            "source": "const res = await fetch(API_BASE + path, {"
+          },
+          {
+            "line": 950,
+            "source": "const res = await fetch("
+          },
+          {
+            "line": 984,
+            "source": "const settings = await apiFetch(\"/settings\");"
+          },
+          {
+            "line": 991,
+            "source": "await apiFetch(\"/settings\", {"
+          },
+          {
+            "line": 998,
+            "source": "await apiFetch(\"/settings\", {"
+          },
+          {
+            "line": 1018,
+            "source": "const res = await fetch(\"https://www.googleapis.com/calendar/v3/users/me/calendarList\", {"
+          },
+          {
+            "line": 1067,
+            "source": "els.calendarChecklist.addEventListener(\"change\", async (e) => {"
+          },
+          {
+            "line": 1106,
+            "source": "await apiFetch(\"/settings\", {"
+          },
+          {
+            "line": 1112,
+            "source": "els.addExcludedTitleForm.addEventListener(\"submit\", async (e) => {"
+          },
+          {
+            "line": 1129,
+            "source": "els.excludedTitleList.addEventListener(\"click\", async (e) => {"
+          },
+          {
+            "line": 1148,
+            "source": "periods = await apiFetch(\"/periods\");"
+          },
+          {
+            "line": 1181,
+            "source": "els.addPeriodForm.addEventListener(\"submit\", async (e) => {"
+          },
+          {
+            "line": 1188,
+            "source": "await apiFetch(\"/periods\", {"
+          },
+          {
+            "line": 1201,
+            "source": "els.periodList.addEventListener(\"click\", async (e) => {"
+          },
+          {
+            "line": 1214,
+            "source": "await apiFetch(`/periods/${id}`, { method: \"DELETE\" });"
+          },
+          {
+            "line": 1240,
+            "source": "apiFetch(`/periods/${a.id}`, { method: \"PUT\", body: JSON.stringify({ sort_order: b.sort_order }) }),"
+          },
+          {
+            "line": 1241,
+            "source": "apiFetch(`/periods/${b.id}`, { method: \"PUT\", body: JSON.stringify({ sort_order: a.sort_order }) }),"
+          },
+          {
+            "line": 1250,
+            "source": "els.periodList.addEventListener(\"submit\", async (e) => {"
+          },
+          {
+            "line": 1260,
+            "source": "await apiFetch(`/periods/${id}`, {"
+          },
+          {
+            "line": 1296,
+            "source": "apiFetch(\"/material-categories\"),"
+          },
+          {
+            "line": 1297,
+            "source": "apiFetch(\"/materials\"),"
+          },
+          {
+            "line": 1379,
+            "source": "els.addMaterialCategoryForm.addEventListener(\"submit\", async (e) => {"
+          },
+          {
+            "line": 1385,
+            "source": "await apiFetch(\"/material-categories\", {"
+          },
+          {
+            "line": 1396,
+            "source": "els.materialCategoryList.addEventListener(\"click\", async (e) => {"
+          },
+          {
+            "line": 1422,
+            "source": "await apiFetch(\"/material-categories/reorder\", {"
+          },
+          {
+            "line": 1432,
+            "source": "els.materialCategoryList.addEventListener(\"submit\", async (e) => {"
+          },
+          {
+            "line": 1441,
+            "source": "await apiFetch(`/material-categories/${id}`, {"
+          },
+          {
+            "line": 1452,
+            "source": "els.addMaterialForm.addEventListener(\"submit\", async (e) => {"
+          },
+          {
+            "line": 1461,
+            "source": "await apiFetch(\"/materials\", {"
+          },
+          {
+            "line": 1472,
+            "source": "els.materialList.addEventListener(\"change\", async (e) => {"
+          },
+          {
+            "line": 1482,
+            "source": "await apiFetch(`/materials/${id}`, {"
+          },
+          {
+            "line": 1493,
+            "source": "els.materialList.addEventListener(\"click\", async (e) => {"
+          },
+          {
+            "line": 1514,
+            "source": "await apiFetch(`/materials/${id}`, { method: \"DELETE\" });"
+          },
+          {
+            "line": 1544,
+            "source": "await apiFetch(\"/materials/reorder\", {"
+          },
+          {
+            "line": 1555,
+            "source": "els.materialList.addEventListener(\"submit\", async (e) => {"
+          },
+          {
+            "line": 1564,
+            "source": "await apiFetch(`/materials/${id}`, { method: \"PUT\", body: JSON.stringify({ name }) });"
+          },
+          {
+            "line": 1587,
+            "source": "materialChapters = await apiFetch(`/materials/${currentMaterialId}/chapters`);"
+          },
+          {
+            "line": 1618,
+            "source": "els.materialChaptersCloseBtn.addEventListener(\"click\", () => els.materialChaptersModal.close());"
+          },
+          {
+            "line": 1620,
+            "source": "els.addChapterForm.addEventListener(\"submit\", async (e) => {"
+          },
+          {
+            "line": 1626,
+            "source": "await apiFetch(`/materials/${currentMaterialId}/chapters`, {"
+          },
+          {
+            "line": 1637,
+            "source": "els.chapterList.addEventListener(\"click\", async (e) => {"
+          },
+          {
+            "line": 1650,
+            "source": "await apiFetch(`/chapters/${id}`, { method: \"DELETE\" });"
+          },
+          {
+            "line": 1675,
+            "source": "apiFetch(`/chapters/${a.id}`, { method: \"PUT\", body: JSON.stringify({ sort_order: b.sort_order }) }),"
+          },
+          {
+            "line": 1676,
+            "source": "apiFetch(`/chapters/${b.id}`, { method: \"PUT\", body: JSON.stringify({ sort_order: a.sort_order }) }),"
+          },
+          {
+            "line": 1685,
+            "source": "els.chapterList.addEventListener(\"submit\", async (e) => {"
+          },
+          {
+            "line": 1694,
+            "source": "await apiFetch(`/chapters/${id}`, { method: \"PUT\", body: JSON.stringify({ name }) });"
+          },
+          {
+            "line": 1713,
+            "source": "const result = await apiFetch(`/student-materials?name=${encodeURIComponent(name)}`, {}, context);"
+          },
+          {
+            "line": 1771,
+            "source": "els.addStudentMaterialBtn.addEventListener(\"click\", async () => {"
+          },
+          {
+            "line": 1777,
+            "source": "await apiFetch(\"/student-materials\", {"
+          },
+          {
+            "line": 1787,
+            "source": "els.studentMaterialsGrid.addEventListener(\"click\", async (e) => {"
+          },
+          {
+            "line": 1793,
+            "source": "await apiFetch(`/student-materials/${id}`, { method: \"DELETE\" });"
+          },
+          {
+            "line": 1807,
+            "source": "els.studentMaterialsGrid.addEventListener(\"change\", async (e) => {"
+          },
+          {
+            "line": 1815,
+            "source": "await apiFetch(`/chapter-progress/${chapterId}`, {"
+          },
+          {
+            "line": 1832,
+            "source": "await apiFetch(\"/student-materials/reorder\", {"
+          },
+          {
+            "line": 1855,
+            "source": "els.studentMaterialsGrid.addEventListener(\"dragstart\", (e) => {"
+          },
+          {
+            "line": 1863,
+            "source": "els.studentMaterialsGrid.addEventListener(\"dragover\", (e) => {"
+          },
+          {
+            "line": 1869,
+            "source": "els.studentMaterialsGrid.addEventListener(\"dragend\", async (e) => {"
+          },
+          {
+            "line": 1878,
+            "source": "els.studentMaterialsGrid.addEventListener("
+          },
+          {
+            "line": 1901,
+            "source": "els.studentMaterialsGrid.addEventListener("
+          },
+          {
+            "line": 1922,
+            "source": "els.studentMaterialsGrid.addEventListener(\"touchend\", async () => {"
+          },
+          {
+            "line": 1976,
+            "source": "years = await apiFetch(\"/years\");"
+          },
+          {
+            "line": 1980,
+            "source": "terms = await apiFetch(\"/terms\");"
+          },
+          {
+            "line": 2054,
+            "source": "els.addYearForm.addEventListener(\"submit\", async (e) => {"
+          },
+          {
+            "line": 2060,
+            "source": "await apiFetch(\"/years\", { method: \"POST\", body: JSON.stringify({ label }) });"
+          },
+          {
+            "line": 2069,
+            "source": "els.yearGroups.addEventListener(\"change\", async (e) => {"
+          },
+          {
+            "line": 2092,
+            "source": "els.yearGroups.addEventListener(\"click\", async (e) => {"
+          },
+          {
+            "line": 2097,
+            "source": "await apiFetch(`/terms/${deleteTermBtn.dataset.id}`, { method: \"DELETE\" });"
+          },
+          {
+            "line": 2114,
+            "source": "await apiFetch(`/years/${deleteYearBtn.dataset.id}`, { method: \"DELETE\" });"
+          },
+          {
+            "line": 2153,
+            "source": "els.yearGroups.addEventListener(\"submit\", async (e) => {"
+          },
+          {
+            "line": 2164,
+            "source": "await apiFetch(\"/terms\", {"
+          },
+          {
+            "line": 2184,
+            "source": "await apiFetch(`/years/${yearId}`, { method: \"PUT\", body: JSON.stringify({ label }) });"
+          },
+          {
+            "line": 2204,
+            "source": "await apiFetch(`/terms/${termId}`, {"
+          },
+          {
+            "line": 2236,
+            "source": "els.curriculumYearSelect.addEventListener(\"change\", () => {"
+          },
+          {
+            "line": 2298,
+            "source": "const save = previous.catch(() => {}).then(() => apiFetch(\"/student-prefs\", {"
+          },
+          {
+            "line": 2310,
+            "source": "els.curriculumPrintNameInput.addEventListener(\"change\", async () => {"
+          },
+          {
+            "line": 2332,
+            "source": "els.openCurriculumSearchModalBtn.addEventListener(\"click\", () => {"
+          },
+          {
+            "line": 2343,
+            "source": "document.querySelector(\"#student-lesson-kind\").addEventListener(\"change\", (event) => {"
+          },
+          {
+            "line": 2353,
+            "source": "els.curriculumSearchModalCloseBtn.addEventListener(\"click\", () => els.curriculumSearchModal.close());"
+          },
+          {
+            "line": 2565,
+            "source": "els.studentGroups.addEventListener(\"click\", (event) => {"
+          },
+          {
+            "line": 2576,
+            "source": "els.studentSelector.addEventListener(\"click\", async (event) => {"
+          },
+          {
+            "line": 2583,
+            "source": "els.curriculumFilterForm.addEventListener(\"submit\", async (e) => {"
+          },
+          {
+            "line": 2651,
+            "source": "els.curriculumTbody.addEventListener(\"change\", async (e) => {"
+          },
+          {
+            "line": 2662,
+            "source": "const savedRecord = await apiFetch(`/curriculum/${encodeURIComponent(eventId)}`, {"
+          },
+          {
+            "line": 2748,
+            "source": "const result = await apiFetch(`/goals?name=${encodeURIComponent(name)}`, {}, context);"
+          },
+          {
+            "line": 2754,
+            "source": "els.openGoalsModalBtn.addEventListener(\"click\", () => {"
+          },
+          {
+            "line": 2768,
+            "source": "els.goalModalCloseBtn.addEventListener(\"click\", () => {"
+          },
+          {
+            "line": 2775,
+            "source": "btn.addEventListener(\"click\", () => {"
+          },
+          {
+            "line": 2784,
+            "source": "list.addEventListener(\"change\", async (e) => {"
+          },
+          {
+            "line": 2790,
+            "source": "await apiFetch(`/goals/${id}`, {"
+          },
+          {
+            "line": 2804,
+            "source": "form.addEventListener(\"submit\", async (e) => {"
+          },
+          {
+            "line": 2813,
+            "source": "await apiFetch(\"/goals\", {"
+          },
+          {
+            "line": 2827,
+            "source": "container.addEventListener(\"click\", async (e) => {"
+          },
+          {
+            "line": 2849,
+            "source": "await apiFetch(`/goals/${id}`, { method: \"DELETE\" });"
+          },
+          {
+            "line": 2868,
+            "source": "apiFetch(`/goals/${g.id}`, { method: \"PUT\", body: JSON.stringify({ sort_order: other.sort_order }) }),"
+          },
+          {
+            "line": 2869,
+            "source": "apiFetch(`/goals/${other.id}`, { method: \"PUT\", body: JSON.stringify({ sort_order: g.sort_order }) }),"
+          },
+          {
+            "line": 2879,
+            "source": "container.addEventListener(\"submit\", async (e) => {"
+          },
+          {
+            "line": 2888,
+            "source": "await apiFetch(`/goals/${id}`, { method: \"PUT\", body: JSON.stringify({ text }) });"
+          },
+          {
+            "line": 2940,
+            "source": "goalTemplates = await apiFetch(\"/goal-templates\");"
+          },
+          {
+            "line": 2945,
+            "source": "form.addEventListener(\"submit\", async (e) => {"
+          },
+          {
+            "line": 2953,
+            "source": "await apiFetch(\"/goal-templates\", {"
+          },
+          {
+            "line": 2966,
+            "source": "container.addEventListener(\"click\", async (e) => {"
+          },
+          {
+            "line": 2976,
+            "source": "await apiFetch(\"/goals\", {"
+          },
+          {
+            "line": 3003,
+            "source": "await apiFetch(`/goal-templates/${id}`, { method: \"DELETE\" });"
+          },
+          {
+            "line": 3021,
+            "source": "apiFetch(`/goal-templates/${t.id}`, {"
+          },
+          {
+            "line": 3025,
+            "source": "apiFetch(`/goal-templates/${other.id}`, {"
+          },
+          {
+            "line": 3037,
+            "source": "container.addEventListener(\"submit\", async (e) => {"
+          },
+          {
+            "line": 3046,
+            "source": "await apiFetch(`/goal-templates/${id}`, { method: \"PUT\", body: JSON.stringify({ text }) });"
+          },
+          {
+            "line": 3084,
+            "source": "const result = await apiFetch(`/schools?name=${encodeURIComponent(name)}`, {}, context);"
+          },
+          {
+            "line": 3136,
+            "source": "els.openSchoolsModalBtn.addEventListener(\"click\", async () => {"
+          },
+          {
+            "line": 3152,
+            "source": "els.schoolsModalCloseBtn.addEventListener(\"click\", () => {"
+          },
+          {
+            "line": 3158,
+            "source": "btn.addEventListener(\"click\", () => {"
+          },
+          {
+            "line": 3167,
+            "source": "els.privateSchoolChecklist.addEventListener(\"change\", async (e) => {"
+          },
+          {
+            "line": 3174,
+            "source": "await apiFetch(\"/schools\", {"
+          },
+          {
+            "line": 3182,
+            "source": "if (existing) await apiFetch(`/schools/${existing.id}`, { method: \"DELETE\" });"
+          },
+          {
+            "line": 3184,
+            "source": "candidateSchools = await apiFetch(`/schools?name=${encodeURIComponent(name)}`);"
+          },
+          {
+            "line": 3191,
+            "source": "els.addNationalSchoolForm.addEventListener(\"submit\", async (e) => {"
+          },
+          {
+            "line": 3198,
+            "source": "await apiFetch(\"/schools\", {"
+          },
+          {
+            "line": 3203,
+            "source": "candidateSchools = await apiFetch(`/schools?name=${encodeURIComponent(name)}`);"
+          },
+          {
+            "line": 3210,
+            "source": "els.nationalSchoolList.addEventListener(\"click\", async (e) => {"
+          },
+          {
+            "line": 3215,
+            "source": "await apiFetch(`/schools/${deleteBtn.dataset.id}`, { method: \"DELETE\" });"
+          },
+          {
+            "line": 3217,
+            "source": "candidateSchools = await apiFetch(`/schools?name=${encodeURIComponent(name)}`);"
+          },
+          {
+            "line": 3225,
+            "source": "select.addEventListener(\"change\", async () => {"
+          },
+          {
+            "line": 3232,
+            "source": "await apiFetch(`/schools/${previousHolder.id}`, { method: \"PUT\", body: JSON.stringify({ rank: null }) });"
+          },
+          {
+            "line": 3235,
+            "source": "await apiFetch(`/schools/${newId}`, { method: \"PUT\", body: JSON.stringify({ rank }) });"
+          },
+          {
+            "line": 3238,
+            "source": "candidateSchools = await apiFetch(`/schools?name=${encodeURIComponent(name)}`);"
+          },
+          {
+            "line": 3271,
+            "source": "els.printScheduleBtn.addEventListener(\"click\", () => triggerPrint());"
+          },
+          {
+            "line": 3273,
+            "source": "els.printCurriculumBtn.addEventListener(\"click\", () => {"
+          },
+          {
+            "line": 3283,
+            "source": "window.addEventListener(\"beforeprint\", () => {"
+          },
+          {
+            "line": 3290,
+            "source": "window.addEventListener(\"afterprint\", () => {"
+          },
+          {
+            "line": 3603,
+            "source": "els.eventList.addEventListener(\"click\", handleTokenClick);"
+          },
+          {
+            "line": 3604,
+            "source": "els.calendarGrid.addEventListener(\"click\", handleTokenClick);"
+          },
+          {
+            "line": 3606,
+            "source": "els.listWeekPrevBtn.addEventListener(\"click\", () => {"
+          },
+          {
+            "line": 3612,
+            "source": "els.listWeekNextBtn.addEventListener(\"click\", () => {"
+          },
+          {
+            "line": 3618,
+            "source": "els.scheduleWeekDays.addEventListener(\"click\", (e) => {"
+          },
+          {
+            "line": 3646,
+            "source": "document.addEventListener(\"click\",async event => {"
+          },
+          {
+            "line": 3652,
+            "source": "const result=await apiFetch(`/lesson-record?calendar_id=${encodeURIComponent(ref.calendar_id)}&event_id=${encodeURIComponent(ref.id)}`,{},null);"
+          },
+          {
+            "line": 3660,
+            "source": "dialog.addEventListener(\"close\",()=>{dialog.remove();button.focus();});"
+          },
+          {
+            "line": 3661,
+            "source": "dialog.querySelector(\"[data-close]\").onclick=()=>dialog.close();"
+          },
+          {
+            "line": 3662,
+            "source": "dialog.querySelectorAll(\"[data-decision]\").forEach(action=>action.onclick=async()=>{"
+          },
+          {
+            "line": 3665,
+            "source": "await apiFetch(\"/lesson-record\",{method:\"PUT\",body:JSON.stringify({target:result.target,record_revision:old.record_revision,decision:action.dataset.decision})},null);"
+          },
+          {
+            "line": 3687,
+            "source": "if(!targets.length) return apiFetch(\"/curriculum?attribution=1\",{},context);"
+          },
+          {
+            "line": 3689,
+            "source": "entries=await apiFetch(\"/lesson-records\",{method:\"POST\",body:JSON.stringify({targets:targets.slice(offset,offset+250)})},context);"
+          },
+          {
+            "line": 3697,
+            "source": "document.querySelector(\"#initialize-lesson-baselines\").addEventListener(\"click\",async event=>{"
+          },
+          {
+            "line": 3703,
+            "source": "const result=await apiFetch(\"/lesson-baseline/initialize\",{method:\"POST\",body:JSON.stringify({cursor})},null);"
+          }
+        ]
+      },
+      {
+        "file": "tutor/index.html",
+        "controls": [
+          {
+            "line": 22,
+            "tag": "a",
+            "attributes": {
+              "class": "works-home",
+              "href": "/",
+              "aria-label": "Works ホーム"
+            }
+          },
+          {
+            "line": 25,
+            "tag": "button",
+            "attributes": {
+              "id": "open-settings",
+              "type": "button",
+              "aria-label": "設定"
+            }
+          },
+          {
+            "line": 26,
+            "tag": "button",
+            "attributes": {
+              "id": "sign-out",
+              "type": "button",
+              "class": "user-icon-btn",
+              "aria-label": "ログアウト"
+            }
+          },
+          {
+            "line": 39,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "class": "page-tab-btn",
+              "data-page-tab": "record",
+              "aria-selected": "true"
+            }
+          },
+          {
+            "line": 40,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "class": "page-tab-btn",
+              "data-page-tab": "schedule",
+              "aria-selected": "false"
+            }
+          },
+          {
+            "line": 41,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "class": "page-tab-btn",
+              "data-page-tab": "curriculum",
+              "aria-selected": "false"
+            }
+          },
+          {
+            "line": 52,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "class": "record-day-btn",
+              "data-day": "prev"
+            }
+          },
+          {
+            "line": 53,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "class": "record-day-btn",
+              "data-day": "next"
+            }
+          },
+          {
+            "line": 84,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "id": "print-schedule",
+              "class": "print-btn",
+              "aria-label": "印刷"
+            }
+          },
+          {
+            "line": 88,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "class": "view-toggle-btn",
+              "data-view": "list",
+              "aria-label": "一覧表示"
+            }
+          },
+          {
+            "line": 89,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "class": "view-toggle-btn",
+              "data-view": "calendar",
+              "aria-label": "カレンダー表示"
+            }
+          },
+          {
+            "line": 93,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "id": "clear-name-filter",
+              "aria-label": "絞り込みを解除"
+            }
+          },
+          {
+            "line": 96,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "id": "list-week-prev",
+              "aria-label": "前週"
+            }
+          },
+          {
+            "line": 98,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "id": "list-week-next",
+              "aria-label": "翌週"
+            }
+          },
+          {
+            "line": 105,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "id": "cal-prev",
+              "aria-label": "前月"
+            }
+          },
+          {
+            "line": 107,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "id": "cal-next",
+              "aria-label": "翌月"
+            }
+          },
+          {
+            "line": 122,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "id": "open-curriculum-search-modal",
+              "class": "print-btn",
+              "aria-label": "生徒情報の表示・印刷設定",
+              "title": "表示・印刷設定"
+            }
+          },
+          {
+            "line": 123,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "id": "print-curriculum",
+              "class": "print-btn",
+              "aria-label": "印刷"
+            }
+          },
+          {
+            "line": 130,
+            "tag": "input",
+            "attributes": {
+              "id": "curriculum-name",
+              "type": "hidden"
+            }
+          },
+          {
+            "line": 136,
+            "tag": "input",
+            "attributes": {
+              "type": "checkbox",
+              "class": "section-print-checkbox",
+              "data-section-print": "memo",
+              "aria-label": "印刷に含める"
+            }
+          },
+          {
+            "line": 144,
+            "tag": "textarea",
+            "attributes": {
+              "id": "student-memo",
+              "class": "student-memo-input",
+              "rows": "1",
+              "aria-label": "生徒メモ",
+              "placeholder": "この生徒についてのメモ(印刷されません)",
+              "disabled": null
+            }
+          },
+          {
+            "line": 145,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "class": "student-memo-retry",
+              "hidden": null
+            }
+          },
+          {
+            "line": 152,
+            "tag": "input",
+            "attributes": {
+              "type": "checkbox",
+              "class": "section-print-checkbox",
+              "data-section-print": "goals",
+              "checked": null,
+              "aria-label": "印刷に含める"
+            }
+          },
+          {
+            "line": 158,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "id": "open-goals-modal",
+              "aria-label": "編集"
+            }
+          },
+          {
+            "line": 181,
+            "tag": "input",
+            "attributes": {
+              "type": "checkbox",
+              "class": "section-print-checkbox",
+              "data-section-print": "schools",
+              "checked": null,
+              "aria-label": "印刷に含める"
+            }
+          },
+          {
+            "line": 187,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "id": "open-schools-modal",
+              "aria-label": "設定"
+            }
+          },
+          {
+            "line": 197,
+            "tag": "input",
+            "attributes": {
+              "type": "checkbox",
+              "class": "section-print-checkbox",
+              "data-section-print": "progress",
+              "checked": null,
+              "aria-label": "印刷に含める"
+            }
+          },
+          {
+            "line": 227,
+            "tag": "input",
+            "attributes": {
+              "type": "checkbox",
+              "class": "section-print-checkbox",
+              "data-section-print": "materials",
+              "checked": null,
+              "aria-label": "印刷に含める"
+            }
+          },
+          {
+            "line": 236,
+            "tag": "select",
+            "attributes": {
+              "id": "add-student-material-select"
+            }
+          },
+          {
+            "line": 237,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "id": "add-student-material-btn",
+              "class": "btn-add",
+              "aria-label": "使用教材を追加"
+            }
+          },
+          {
+            "line": 249,
+            "tag": "dialog",
+            "attributes": {
+              "id": "settings-modal",
+              "class": "app-modal"
+            }
+          },
+          {
+            "line": 252,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "id": "settings-close",
+              "class": "modal-close",
+              "aria-label": "閉じる"
+            }
+          },
+          {
+            "line": 255,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "class": "tab-btn",
+              "data-tab": "materials",
+              "role": "tab",
+              "aria-selected": "false"
+            }
+          },
+          {
+            "line": 256,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "class": "tab-btn",
+              "data-tab": "calendar",
+              "role": "tab",
+              "aria-selected": "true"
+            }
+          },
+          {
+            "line": 257,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "class": "tab-btn",
+              "data-tab": "terms",
+              "role": "tab",
+              "aria-selected": "false"
+            }
+          },
+          {
+            "line": 258,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "class": "tab-btn",
+              "data-tab": "periods",
+              "role": "tab",
+              "aria-selected": "false"
+            }
+          },
+          {
+            "line": 259,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "class": "tab-btn",
+              "data-tab": "excluded",
+              "role": "tab",
+              "aria-selected": "false"
+            }
+          },
+          {
+            "line": 260,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "class": "tab-btn",
+              "data-tab": "appearance",
+              "role": "tab",
+              "aria-selected": "false"
+            }
+          },
+          {
+            "line": 272,
+            "tag": "form",
+            "attributes": {
+              "id": "add-material-category-form",
+              "class": "inline-form material-category-add-form"
+            }
+          },
+          {
+            "line": 273,
+            "tag": "input",
+            "attributes": {
+              "id": "new-material-category-name",
+              "type": "text",
+              "placeholder": "例: 英語",
+              "required": null
+            }
+          },
+          {
+            "line": 274,
+            "tag": "button",
+            "attributes": {
+              "type": "submit",
+              "class": "btn-add",
+              "aria-label": "教材カテゴリを追加"
+            }
+          },
+          {
+            "line": 285,
+            "tag": "form",
+            "attributes": {
+              "id": "add-material-form",
+              "class": "inline-form material-add-form"
+            }
+          },
+          {
+            "line": 286,
+            "tag": "select",
+            "attributes": {
+              "id": "new-material-category",
+              "aria-label": "追加先の教材カテゴリ"
+            }
+          },
+          {
+            "line": 289,
+            "tag": "input",
+            "attributes": {
+              "id": "new-material-name",
+              "type": "text",
+              "placeholder": "例: 青チャート数学I+A",
+              "required": null
+            }
+          },
+          {
+            "line": 290,
+            "tag": "button",
+            "attributes": {
+              "type": "submit",
+              "class": "btn-add",
+              "aria-label": "教材を追加"
+            }
+          },
+          {
+            "line": 300,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "id": "initialize-lesson-baselines",
+              "class": "btn-primary",
+              "style": "min-height:44px"
+            }
+          },
+          {
+            "line": 306,
+            "tag": "form",
+            "attributes": {
+              "id": "add-excluded-title-form",
+              "class": "inline-form"
+            }
+          },
+          {
+            "line": 307,
+            "tag": "input",
+            "attributes": {
+              "id": "new-excluded-title",
+              "type": "text",
+              "placeholder": "例: ○",
+              "required": null
+            }
+          },
+          {
+            "line": 308,
+            "tag": "button",
+            "attributes": {
+              "type": "submit",
+              "class": "btn-add",
+              "aria-label": "追加"
+            }
+          },
+          {
+            "line": 315,
+            "tag": "form",
+            "attributes": {
+              "id": "add-year-form",
+              "class": "term-form"
+            }
+          },
+          {
+            "line": 316,
+            "tag": "input",
+            "attributes": {
+              "id": "new-year-label",
+              "type": "text",
+              "placeholder": "例: 2026年度",
+              "required": null
+            }
+          },
+          {
+            "line": 317,
+            "tag": "button",
+            "attributes": {
+              "type": "submit",
+              "class": "btn-add",
+              "aria-label": "年度を追加"
+            }
+          },
+          {
+            "line": 323,
+            "tag": "form",
+            "attributes": {
+              "id": "add-period-form",
+              "class": "inline-form"
+            }
+          },
+          {
+            "line": 324,
+            "tag": "input",
+            "attributes": {
+              "id": "new-period-label",
+              "type": "text",
+              "placeholder": "例: 1限",
+              "required": null
+            }
+          },
+          {
+            "line": 325,
+            "tag": "input",
+            "attributes": {
+              "type": "time",
+              "id": "new-period-start",
+              "required": null
+            }
+          },
+          {
+            "line": 326,
+            "tag": "button",
+            "attributes": {
+              "type": "submit",
+              "class": "btn-add",
+              "aria-label": "時限を追加"
+            }
+          },
+          {
+            "line": 331,
+            "tag": "input",
+            "attributes": {
+              "type": "radio",
+              "name": "theme",
+              "value": "system"
+            }
+          },
+          {
+            "line": 332,
+            "tag": "input",
+            "attributes": {
+              "type": "radio",
+              "name": "theme",
+              "value": "light"
+            }
+          },
+          {
+            "line": 333,
+            "tag": "input",
+            "attributes": {
+              "type": "radio",
+              "name": "theme",
+              "value": "dark"
+            }
+          },
+          {
+            "line": 338,
+            "tag": "dialog",
+            "attributes": {
+              "id": "material-chapters-modal",
+              "class": "app-modal"
+            }
+          },
+          {
+            "line": 341,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "id": "material-chapters-close",
+              "class": "modal-close",
+              "aria-label": "閉じる"
+            }
+          },
+          {
+            "line": 345,
+            "tag": "form",
+            "attributes": {
+              "id": "add-chapter-form",
+              "class": "inline-form"
+            }
+          },
+          {
+            "line": 346,
+            "tag": "input",
+            "attributes": {
+              "id": "new-chapter-name",
+              "type": "text",
+              "placeholder": "例: 第1章 二次関数",
+              "required": null
+            }
+          },
+          {
+            "line": 347,
+            "tag": "button",
+            "attributes": {
+              "type": "submit",
+              "class": "btn-add",
+              "aria-label": "チャプターを追加"
+            }
+          },
+          {
+            "line": 352,
+            "tag": "dialog",
+            "attributes": {
+              "id": "curriculum-search-modal",
+              "class": "app-modal"
+            }
+          },
+          {
+            "line": 355,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "id": "curriculum-search-modal-close",
+              "class": "modal-close",
+              "aria-label": "閉じる"
+            }
+          },
+          {
+            "line": 357,
+            "tag": "form",
+            "attributes": {
+              "id": "curriculum-filter-form",
+              "class": "modal-tab-panel"
+            }
+          },
+          {
+            "line": 360,
+            "tag": "select",
+            "attributes": {
+              "id": "student-lesson-kind"
+            }
+          },
+          {
+            "line": 363,
+            "tag": "input",
+            "attributes": {
+              "id": "curriculum-print-name",
+              "type": "text",
+              "placeholder": "未設定の場合は選択名を使用"
+            }
+          },
+          {
+            "line": 365,
+            "tag": "select",
+            "attributes": {
+              "id": "curriculum-year-select"
+            }
+          },
+          {
+            "line": 369,
+            "tag": "select",
+            "attributes": {
+              "id": "curriculum-term-select"
+            }
+          },
+          {
+            "line": 373,
+            "tag": "button",
+            "attributes": {
+              "type": "submit",
+              "class": "btn-primary",
+              "aria-label": "表示"
+            }
+          },
+          {
+            "line": 378,
+            "tag": "dialog",
+            "attributes": {
+              "id": "goal-modal",
+              "class": "app-modal"
+            }
+          },
+          {
+            "line": 381,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "id": "goal-modal-close",
+              "class": "modal-close",
+              "aria-label": "閉じる"
+            }
+          },
+          {
+            "line": 384,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "class": "tab-btn",
+              "data-goal-tab": "short",
+              "role": "tab",
+              "aria-selected": "true"
+            }
+          },
+          {
+            "line": 385,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "class": "tab-btn",
+              "data-goal-tab": "mid",
+              "role": "tab",
+              "aria-selected": "false"
+            }
+          },
+          {
+            "line": 386,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "class": "tab-btn",
+              "data-goal-tab": "long",
+              "role": "tab",
+              "aria-selected": "false"
+            }
+          },
+          {
+            "line": 391,
+            "tag": "form",
+            "attributes": {
+              "class": "add-goal-template-form inline-form",
+              "data-category": "short"
+            }
+          },
+          {
+            "line": 392,
+            "tag": "input",
+            "attributes": {
+              "type": "text",
+              "class": "new-goal-template-text",
+              "placeholder": "テンプレートを入力",
+              "required": null
+            }
+          },
+          {
+            "line": 393,
+            "tag": "button",
+            "attributes": {
+              "type": "submit",
+              "class": "btn-add",
+              "aria-label": "テンプレートに追加"
+            }
+          },
+          {
+            "line": 397,
+            "tag": "form",
+            "attributes": {
+              "class": "add-goal-form inline-form",
+              "data-category": "short"
+            }
+          },
+          {
+            "line": 398,
+            "tag": "input",
+            "attributes": {
+              "type": "text",
+              "class": "new-goal-text",
+              "placeholder": "目標を入力",
+              "required": null
+            }
+          },
+          {
+            "line": 399,
+            "tag": "button",
+            "attributes": {
+              "type": "submit",
+              "class": "btn-add",
+              "aria-label": "追加"
+            }
+          },
+          {
+            "line": 405,
+            "tag": "form",
+            "attributes": {
+              "class": "add-goal-template-form inline-form",
+              "data-category": "mid"
+            }
+          },
+          {
+            "line": 406,
+            "tag": "input",
+            "attributes": {
+              "type": "text",
+              "class": "new-goal-template-text",
+              "placeholder": "テンプレートを入力",
+              "required": null
+            }
+          },
+          {
+            "line": 407,
+            "tag": "button",
+            "attributes": {
+              "type": "submit",
+              "class": "btn-add",
+              "aria-label": "テンプレートに追加"
+            }
+          },
+          {
+            "line": 411,
+            "tag": "form",
+            "attributes": {
+              "class": "add-goal-form inline-form",
+              "data-category": "mid"
+            }
+          },
+          {
+            "line": 412,
+            "tag": "input",
+            "attributes": {
+              "type": "text",
+              "class": "new-goal-text",
+              "placeholder": "目標を入力",
+              "required": null
+            }
+          },
+          {
+            "line": 413,
+            "tag": "button",
+            "attributes": {
+              "type": "submit",
+              "class": "btn-add",
+              "aria-label": "追加"
+            }
+          },
+          {
+            "line": 419,
+            "tag": "form",
+            "attributes": {
+              "class": "add-goal-template-form inline-form",
+              "data-category": "long"
+            }
+          },
+          {
+            "line": 420,
+            "tag": "input",
+            "attributes": {
+              "type": "text",
+              "class": "new-goal-template-text",
+              "placeholder": "テンプレートを入力",
+              "required": null
+            }
+          },
+          {
+            "line": 421,
+            "tag": "button",
+            "attributes": {
+              "type": "submit",
+              "class": "btn-add",
+              "aria-label": "テンプレートに追加"
+            }
+          },
+          {
+            "line": 425,
+            "tag": "form",
+            "attributes": {
+              "class": "add-goal-form inline-form",
+              "data-category": "long"
+            }
+          },
+          {
+            "line": 426,
+            "tag": "input",
+            "attributes": {
+              "type": "text",
+              "class": "new-goal-text",
+              "placeholder": "目標を入力",
+              "required": null
+            }
+          },
+          {
+            "line": 427,
+            "tag": "button",
+            "attributes": {
+              "type": "submit",
+              "class": "btn-add",
+              "aria-label": "追加"
+            }
+          },
+          {
+            "line": 432,
+            "tag": "dialog",
+            "attributes": {
+              "id": "schools-modal",
+              "class": "app-modal"
+            }
+          },
+          {
+            "line": 435,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "id": "schools-modal-close",
+              "class": "modal-close",
+              "aria-label": "閉じる"
+            }
+          },
+          {
+            "line": 438,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "class": "tab-btn",
+              "data-schools-tab": "select",
+              "role": "tab",
+              "aria-selected": "true"
+            }
+          },
+          {
+            "line": 439,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "class": "tab-btn",
+              "data-schools-tab": "rank",
+              "role": "tab",
+              "aria-selected": "false"
+            }
+          },
+          {
+            "line": 445,
+            "tag": "form",
+            "attributes": {
+              "id": "add-national-school-form",
+              "class": "inline-form"
+            }
+          },
+          {
+            "line": 446,
+            "tag": "input",
+            "attributes": {
+              "id": "new-national-school",
+              "type": "text",
+              "placeholder": "例: 東京大学",
+              "required": null
+            }
+          },
+          {
+            "line": 447,
+            "tag": "button",
+            "attributes": {
+              "type": "submit",
+              "class": "btn-add",
+              "aria-label": "追加"
+            }
+          },
+          {
+            "line": 454,
+            "tag": "select",
+            "attributes": {
+              "id": "rank1-select",
+              "class": "rank-select",
+              "data-rank": "1"
+            }
+          },
+          {
+            "line": 457,
+            "tag": "select",
+            "attributes": {
+              "id": "rank2-select",
+              "class": "rank-select",
+              "data-rank": "2"
+            }
+          },
+          {
+            "line": 460,
+            "tag": "select",
+            "attributes": {
+              "id": "rank3-select",
+              "class": "rank-select",
+              "data-rank": "3"
+            }
+          }
+        ],
+        "interactions": []
+      },
+      {
+        "file": "tutor/lesson-plan.js",
+        "interactions": []
+      },
+      {
+        "file": "tutor/record-date.js",
+        "interactions": []
+      },
+      {
+        "file": "tutor/student-memo.js",
+        "interactions": []
+      }
+    ],
+    "todo": [
+      {
+        "file": "todo/index.html",
+        "controls": [
+          {
+            "line": 16,
+            "tag": "a",
+            "attributes": {
+              "class": "works-home",
+              "href": "/",
+              "aria-label": "Works ホーム"
+            }
+          },
+          {
+            "line": 21,
+            "tag": "button",
+            "attributes": {
+              "id": "sign-out",
+              "hidden": null
+            }
+          },
+          {
+            "line": 31,
+            "tag": "button",
+            "attributes": {
+              "id": "roles-open"
+            }
+          },
+          {
+            "line": 33,
+            "tag": "form",
+            "attributes": {
+              "id": "capture",
+              "class": "panel capture"
+            }
+          },
+          {
+            "line": 35,
+            "tag": "input",
+            "attributes": {
+              "id": "quick-title",
+              "maxlength": "500",
+              "required": null,
+              "placeholder": "思いついたことを、ひとこと"
+            }
+          },
+          {
+            "line": 40,
+            "tag": "button",
+            "attributes": {
+              "class": "primary",
+              "type": "submit"
+            }
+          },
+          {
+            "line": 42,
+            "tag": "select",
+            "attributes": {
+              "id": "capture-day"
+            }
+          },
+          {
+            "line": 46,
+            "tag": "input",
+            "attributes": {
+              "id": "task-search",
+              "type": "search",
+              "placeholder": "タイトル・メモで検索"
+            }
+          },
+          {
+            "line": 46,
+            "tag": "button",
+            "attributes": {
+              "id": "clear-filters",
+              "type": "button",
+              "hidden": null
+            }
+          },
+          {
+            "line": 50,
+            "tag": "select",
+            "attributes": {
+              "id": "role-filter"
+            }
+          },
+          {
+            "line": 55,
+            "tag": "select",
+            "attributes": {
+              "id": "category-filter"
+            }
+          },
+          {
+            "line": 59,
+            "tag": "button",
+            "attributes": {
+              "id": "categories-open",
+              "type": "button"
+            }
+          },
+          {
+            "line": 61,
+            "tag": "button",
+            "attributes": {
+              "id": "list-view",
+              "aria-pressed": "true"
+            }
+          },
+          {
+            "line": 62,
+            "tag": "button",
+            "attributes": {
+              "id": "board-view",
+              "aria-pressed": "false"
+            }
+          },
+          {
+            "line": 82,
+            "tag": "button",
+            "attributes": {
+              "id": "sign-in",
+              "hidden": null
+            }
+          },
+          {
+            "line": 84,
+            "tag": "dialog",
+            "attributes": {
+              "id": "detail",
+              "aria-labelledby": "detail-heading"
+            }
+          },
+          {
+            "line": 85,
+            "tag": "form",
+            "attributes": {
+              "id": "detail-form"
+            }
+          },
+          {
+            "line": 88,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "data-close": null,
+              "aria-label": "詳細を閉じる"
+            }
+          },
+          {
+            "line": 90,
+            "tag": "input",
+            "attributes": {
+              "name": "name",
+              "maxlength": "500",
+              "required": null
+            }
+          },
+          {
+            "line": 92,
+            "tag": "select",
+            "attributes": {
+              "name": "roleId"
+            }
+          },
+          {
+            "line": 93,
+            "tag": "select",
+            "attributes": {
+              "name": "category"
+            }
+          },
+          {
+            "line": 95,
+            "tag": "input",
+            "attributes": {
+              "type": "date",
+              "name": "plannedDay"
+            }
+          },
+          {
+            "line": 96,
+            "tag": "input",
+            "attributes": {
+              "type": "date",
+              "name": "deadline"
+            }
+          },
+          {
+            "line": 98,
+            "tag": "select",
+            "attributes": {
+              "name": "status"
+            }
+          },
+          {
+            "line": 105,
+            "tag": "select",
+            "attributes": {
+              "name": "priority"
+            }
+          },
+          {
+            "line": 114,
+            "tag": "input",
+            "attributes": {
+              "type": "checkbox",
+              "name": "important"
+            }
+          },
+          {
+            "line": 116,
+            "tag": "textarea",
+            "attributes": {
+              "name": "memo",
+              "maxlength": "10000",
+              "rows": "3"
+            }
+          },
+          {
+            "line": 123,
+            "tag": "textarea",
+            "attributes": {
+              "name": "reusableDescription",
+              "maxlength": "10000",
+              "rows": "2"
+            }
+          },
+          {
+            "line": 133,
+            "tag": "input",
+            "attributes": {
+              "id": "step-text",
+              "maxlength": "500",
+              "aria-label": "新しいステップ",
+              "placeholder": "ステップを追加"
+            }
+          },
+          {
+            "line": 138,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "id": "step-add"
+            }
+          },
+          {
+            "line": 145,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "id": "task-delete",
+              "class": "danger"
+            }
+          },
+          {
+            "line": 146,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "data-close": null
+            }
+          },
+          {
+            "line": 147,
+            "tag": "button",
+            "attributes": {
+              "class": "primary",
+              "type": "submit"
+            }
+          },
+          {
+            "line": 152,
+            "tag": "dialog",
+            "attributes": {
+              "id": "role-dialog",
+              "aria-labelledby": "roles-heading"
+            }
+          },
+          {
+            "line": 155,
+            "tag": "button",
+            "attributes": {
+              "data-close": null,
+              "aria-label": "役割管理を閉じる"
+            }
+          },
+          {
+            "line": 161,
+            "tag": "form",
+            "attributes": {
+              "id": "role-form"
+            }
+          },
+          {
+            "line": 163,
+            "tag": "input",
+            "attributes": {
+              "name": "name",
+              "maxlength": "100",
+              "required": null,
+              "placeholder": "例：生徒管理"
+            }
+          },
+          {
+            "line": 171,
+            "tag": "select",
+            "attributes": {
+              "name": "icon"
+            }
+          },
+          {
+            "line": 180,
+            "tag": "select",
+            "attributes": {
+              "name": "color"
+            }
+          },
+          {
+            "line": 189,
+            "tag": "button",
+            "attributes": {
+              "class": "primary"
+            }
+          },
+          {
+            "line": 193,
+            "tag": "dialog",
+            "attributes": {
+              "id": "clone-dialog",
+              "aria-labelledby": "clone-heading"
+            }
+          },
+          {
+            "line": 194,
+            "tag": "form",
+            "attributes": {
+              "id": "clone-form"
+            }
+          },
+          {
+            "line": 197,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "data-close": null,
+              "aria-label": "複製設定を閉じる"
+            }
+          },
+          {
+            "line": 204,
+            "tag": "input",
+            "attributes": {
+              "name": "amount",
+              "type": "number",
+              "min": "1",
+              "max": "3650",
+              "value": "1",
+              "required": null
+            }
+          },
+          {
+            "line": 212,
+            "tag": "select",
+            "attributes": {
+              "name": "unit"
+            }
+          },
+          {
+            "line": 219,
+            "tag": "input",
+            "attributes": {
+              "type": "date",
+              "name": "deadline"
+            }
+          },
+          {
+            "line": 220,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "id": "copy-deadline"
+            }
+          },
+          {
+            "line": 227,
+            "tag": "button",
+            "attributes": {
+              "class": "primary",
+              "type": "submit"
+            }
+          },
+          {
+            "line": 231,
+            "tag": "dialog",
+            "attributes": {
+              "id": "categories-dialog",
+              "aria-labelledby": "categories-heading"
+            }
+          },
+          {
+            "line": 234,
+            "tag": "button",
+            "attributes": {
+              "data-close": null,
+              "aria-label": "カテゴリ管理を閉じる"
+            }
+          },
+          {
+            "line": 240,
+            "tag": "form",
+            "attributes": {
+              "id": "categories-form"
+            }
+          },
+          {
+            "line": 242,
+            "tag": "input",
+            "attributes": {
+              "name": "name",
+              "maxlength": "100",
+              "required": null
+            }
+          },
+          {
+            "line": 243,
+            "tag": "button",
+            "attributes": {
+              "class": "primary"
+            }
+          }
+        ],
+        "interactions": []
+      },
+      {
+        "file": "todo/todo.js",
+        "interactions": [
+          {
+            "line": 78,
+            "source": "window.addEventListener(\"storage\", (event) => {"
+          },
+          {
+            "line": 84,
+            "source": "async function api(path = \"\", options = {}) {"
+          },
+          {
+            "line": 85,
+            "source": "const response = await fetch(\"/api/todo\" + path, {"
+          },
+          {
+            "line": 127,
+            "source": "state = await api();"
+          },
+          {
+            "line": 139,
+            "source": "state = await api(\"\", { method: \"PUT\", body: JSON.stringify(next) });"
+          },
+          {
+            "line": 344,
+            "source": "window.addEventListener(\"popstate\", () =>"
+          },
+          {
+            "line": 356,
+            "source": "conflict.querySelector(\"button\").onclick = async () => {"
+          },
+          {
+            "line": 382,
+            "source": ".forEach((b) => (b.onclick = () => closeDialog(dialog)));"
+          },
+          {
+            "line": 383,
+            "source": "dialog.addEventListener(\"cancel\", (e) => {"
+          },
+          {
+            "line": 387,
+            "source": "dialog.addEventListener(\"click\", (e) => {"
+          },
+          {
+            "line": 445,
+            "source": "$(\"step-add\").onclick = () => {"
+          },
+          {
+            "line": 465,
+            "source": "$(\"checklist-editor\").onchange = (e) => {"
+          },
+          {
+            "line": 469,
+            "source": "$(\"checklist-editor\").onclick = (e) => {"
+          },
+          {
+            "line": 476,
+            "source": "$(\"detail-form\").onsubmit = async (e) => {"
+          },
+          {
+            "line": 500,
+            "source": "$(\"task-delete\").onclick = async () => {"
+          },
+          {
+            "line": 511,
+            "source": "$(\"capture\").onsubmit = async (e) => {"
+          },
+          {
+            "line": 538,
+            "source": "$(\"tasks\").onclick = async (e) => {"
+          },
+          {
+            "line": 561,
+            "source": "$(\"deadlines\").onclick = (e) => {"
+          },
+          {
+            "line": 566,
+            "source": "$(\"clear-filters\").onclick = () => {"
+          },
+          {
+            "line": 571,
+            "source": "$(\"role-filter\").onchange = render;"
+          },
+          {
+            "line": 572,
+            "source": "$(\"category-filter\").onchange = render;"
+          },
+          {
+            "line": 573,
+            "source": "$(\"list-view\").onclick = () => {"
+          },
+          {
+            "line": 577,
+            "source": "$(\"board-view\").onclick = () => {"
+          },
+          {
+            "line": 614,
+            "source": "$(\"roles-open\").onclick = () => {"
+          },
+          {
+            "line": 619,
+            "source": "$(\"role-form\").onsubmit = async (e) => {"
+          },
+          {
+            "line": 636,
+            "source": "$(\"role-list\").onclick = async (e) => {"
+          },
+          {
+            "line": 681,
+            "source": "$(\"categories-open\").onclick = () => {"
+          },
+          {
+            "line": 685,
+            "source": "$(\"categories-form\").onsubmit = async (event) => {"
+          },
+          {
+            "line": 700,
+            "source": "$(\"categories-list\").onclick = async (event) => {"
+          },
+          {
+            "line": 756,
+            "source": "$(\"recovery\").onclick = (event) => {"
+          },
+          {
+            "line": 766,
+            "source": "let result = await api("
+          },
+          {
+            "line": 770,
+            "source": "result = await api(\"/clone\", {"
+          },
+          {
+            "line": 848,
+            "source": "$(\"copy-deadline\").onclick = () => {"
+          },
+          {
+            "line": 853,
+            "source": "$(\"clone-form\").onsubmit = async (e) => {"
+          },
+          {
+            "line": 865,
+            "source": "$(\"sign-in\").onclick = signIn;"
+          },
+          {
+            "line": 866,
+            "source": "$(\"sign-out\").onclick = async () => {"
+          }
+        ]
+      }
+    ],
+    "memo": [
+      {
+        "file": "memo/app.js",
+        "interactions": [
+          {
+            "line": 22,
+            "source": "async function api(method, data) {"
+          },
+          {
+            "line": 23,
+            "source": "const response = await fetch('/api/memo', { method,"
+          },
+          {
+            "line": 31,
+            "source": "savedState = await api('GET');"
+          },
+          {
+            "line": 44,
+            "source": "savedState = await api('PUT', { ...snapshot, revision });"
+          },
+          {
+            "line": 61,
+            "source": "window.addEventListener('beforeunload', event => {"
+          },
+          {
+            "line": 136,
+            "source": "<button type=\"button\" onclick=\"moveModalBody(${i},-1)\""
+          },
+          {
+            "line": 140,
+            "source": "<button type=\"button\" onclick=\"moveModalBody(${i},1)\""
+          },
+          {
+            "line": 144,
+            "source": "<button type=\"button\" onclick=\"removeModalBody(${i})\""
+          },
+          {
+            "line": 191,
+            "source": "<button type=\"button\" onclick=\"removeModalNote(${i})\""
+          },
+          {
+            "line": 286,
+            "source": "return `<button onclick=\"setTab(${jsArg(t)})\""
+          },
+          {
+            "line": 320,
+            "source": "<button type=\"button\" aria-label=\"変更を保存\" title=\"変更を保存\" onclick=\"saveEditCat(${i})\" class=\"icon-btn text-slate-600 hover:bg-slate-100\">"
+          },
+          {
+            "line": 323,
+            "source": "<button type=\"button\" aria-label=\"変更をキャンセル\" title=\"変更をキャンセル\" onclick=\"cancelEditCat()\" class=\"icon-btn text-gray-400 hover:bg-gray-100\">"
+          },
+          {
+            "line": 330,
+            "source": "<button type=\"button\" aria-label=\"上へ移動\" title=\"上へ移動\" onclick=\"moveCat(${i},-1)\" ${i===0?'disabled':''} class=\"icon-btn w-5 h-4 text-gray-300 hover:text-gray-500 ${i===0?'opacity-20 pointer-events-none':''}\">"
+          },
+          {
+            "line": 333,
+            "source": "<button type=\"button\" aria-label=\"下へ移動\" title=\"下へ移動\" onclick=\"moveCat(${i},1)\" ${i===categories.length-1?'disabled':''} class=\"icon-btn w-5 h-4 text-gray-300 hover:text-gray-500 ${i===categories.length-1?'opacity-20 pointer-events-none':''}\">"
+          },
+          {
+            "line": 339,
+            "source": "<button type=\"button\" aria-label=\"名前を変更\" title=\"名前を変更\" onclick=\"startEditCat(${i})\" class=\"icon-btn text-gray-300 hover:text-slate-500 hover:bg-slate-50\">"
+          },
+          {
+            "line": 342,
+            "source": "<button type=\"button\" aria-label=\"削除\" title=\"削除\" onclick=\"deleteCat(${i})\" class=\"icon-btn text-gray-300 hover:text-red-400 hover:bg-red-50\">"
+          },
+          {
+            "line": 431,
+            "source": "return `<button onclick=\"setTagFilter(${jsArg(tag)})\""
+          },
+          {
+            "line": 451,
+            "source": "<button type=\"button\" onclick=\"removeModalTag(${i})\""
+          },
+          {
+            "line": 499,
+            "source": "return `<div class=\"memo-card relative bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col cursor-pointer\" style=\"min-height:150px\" onclick=\"openMemoView(${jsArg(memo.id)}, event)\">"
+          },
+          {
+            "line": 510,
+            "source": "<button onclick=\"moveMemo(${jsArg(memo.id)},-1)\" ${isFirst ? 'disabled' : ''} title=\"上へ\""
+          },
+          {
+            "line": 514,
+            "source": "<button onclick=\"moveMemo(${jsArg(memo.id)},1)\" ${isLast ? 'disabled' : ''} title=\"下へ\""
+          },
+          {
+            "line": 520,
+            "source": "<button onclick=\"copyMemo(${jsArg(memo.id)}, null)\" title=\"コピー\""
+          },
+          {
+            "line": 524,
+            "source": "<button onclick=\"openMemoModal(${jsArg(memo.id)})\" title=\"編集\""
+          },
+          {
+            "line": 528,
+            "source": "<button onclick=\"deleteMemo(${jsArg(memo.id)})\" title=\"削除\""
+          },
+          {
+            "line": 681,
+            "source": "modal.addEventListener('keydown', event => {"
+          },
+          {
+            "line": 689,
+            "source": "document.querySelector('.works-home').onclick = event => {"
+          }
+        ]
+      },
+      {
+        "file": "memo/index.html",
+        "controls": [
+          {
+            "line": 51,
+            "tag": "a",
+            "attributes": {
+              "class": "works-home",
+              "href": "/",
+              "aria-label": "Works ホーム"
+            }
+          },
+          {
+            "line": 52,
+            "tag": "button",
+            "attributes": {
+              "class": "user-icon-btn",
+              "aria-label": "ログアウト",
+              "onclick": "signOutUser()"
+            }
+          },
+          {
+            "line": 57,
+            "tag": "button",
+            "attributes": {
+              "id": "export-draft",
+              "hidden": null,
+              "onclick": "exportDraft()"
+            }
+          },
+          {
+            "line": 65,
+            "tag": "button",
+            "attributes": {
+              "onclick": "openCategoryModal()",
+              "title": "カテゴリを管理",
+              "class": "icon-btn w-8 h-8 bg-gray-50 hover:bg-gray-100 text-gray-500 border border-gray-200"
+            }
+          },
+          {
+            "line": 72,
+            "tag": "button",
+            "attributes": {
+              "onclick": "openMemoModal(null)",
+              "title": "新規メモ",
+              "class": "icon-btn w-8 h-8 bg-slate-700 hover:bg-slate-800 active:bg-slate-900 text-white"
+            }
+          },
+          {
+            "line": 105,
+            "tag": "button",
+            "attributes": {
+              "onclick": "closeMemoModal()",
+              "class": "icon-btn text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+            }
+          },
+          {
+            "line": 117,
+            "tag": "input",
+            "attributes": {
+              "id": "modal-title",
+              "type": "text",
+              "placeholder": "メモのタイトル",
+              "class": "w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent placeholder-gray-300"
+            }
+          },
+          {
+            "line": 125,
+            "tag": "select",
+            "attributes": {
+              "id": "modal-category",
+              "class": "flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent"
+            }
+          },
+          {
+            "line": 128,
+            "tag": "button",
+            "attributes": {
+              "onclick": "openCategoryModal()",
+              "title": "カテゴリを管理",
+              "class": "px-2.5 py-2 bg-gray-50 hover:bg-gray-100 text-gray-500 rounded-xl border border-gray-200 transition-colors flex items-center justify-center"
+            }
+          },
+          {
+            "line": 142,
+            "tag": "input",
+            "attributes": {
+              "id": "modal-tag-input",
+              "type": "text",
+              "placeholder": "タグを入力してEnterで追加",
+              "class": "w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent placeholder-gray-300",
+              "onkeydown": "handleTagInput(event)"
+            }
+          },
+          {
+            "line": 150,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "onclick": "addModalBody()",
+              "class": "mt-2 flex items-center gap-1 text-xs text-gray-400 hover:text-slate-500 transition-colors"
+            }
+          },
+          {
+            "line": 162,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "onclick": "addModalNote()",
+              "class": "flex items-center gap-1 text-xs text-gray-400 hover:text-slate-500 transition-colors"
+            }
+          },
+          {
+            "line": 179,
+            "tag": "button",
+            "attributes": {
+              "onclick": "closeMemoModal()",
+              "class": "px-4 py-2 text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-colors"
+            }
+          },
+          {
+            "line": 183,
+            "tag": "button",
+            "attributes": {
+              "onclick": "saveMemo()",
+              "class": "px-5 py-2 bg-slate-700 hover:bg-slate-800 active:bg-slate-900 text-white rounded-xl text-sm font-semibold transition-colors"
+            }
+          },
+          {
+            "line": 192,
+            "tag": "dialog",
+            "attributes": {
+              "id": "category-modal",
+              "class": "category-dialog",
+              "aria-labelledby": "category-title",
+              "aria-describedby": "category-help"
+            }
+          },
+          {
+            "line": 196,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "onclick": "closeCategoryModal()",
+              "class": "icon-btn",
+              "aria-label": "カテゴリ管理を閉じる"
+            }
+          },
+          {
+            "line": 203,
+            "tag": "input",
+            "attributes": {
+              "id": "new-category-input",
+              "type": "text",
+              "placeholder": "カテゴリ名を入力",
+              "onkeydown": "if(event.key==='Enter' && !event.isComposing) { event.preventDefault(); addCategory(); }"
+            }
+          },
+          {
+            "line": 205,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "onclick": "addCategory()",
+              "class": "bg-slate-700"
+            }
+          },
+          {
+            "line": 208,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "onclick": "closeCategoryModal()"
+            }
+          },
+          {
+            "line": 222,
+            "tag": "button",
+            "attributes": {
+              "onclick": "signInWithGoogle()",
+              "class": "w-full flex items-center justify-center gap-3 px-6 py-3 bg-white border border-gray-300 rounded-xl text-gray-700 font-medium hover:bg-gray-50 active:bg-gray-100 transition-colors shadow-sm"
+            }
+          },
+          {
+            "line": 246,
+            "tag": "button",
+            "attributes": {
+              "onclick": "closeViewModal()",
+              "class": "icon-btn text-gray-400 hover:text-gray-600 hover:bg-gray-100 flex-shrink-0"
+            }
+          },
+          {
+            "line": 263,
+            "tag": "button",
+            "attributes": {
+              "onclick": "viewCopyMemo()",
+              "title": "コピー",
+              "class": "icon-btn text-gray-300 hover:text-slate-500 hover:bg-slate-50"
+            }
+          },
+          {
+            "line": 267,
+            "tag": "button",
+            "attributes": {
+              "onclick": "viewEditMemo()",
+              "title": "編集",
+              "class": "icon-btn text-gray-300 hover:text-slate-500 hover:bg-slate-50"
+            }
+          },
+          {
+            "line": 271,
+            "tag": "button",
+            "attributes": {
+              "onclick": "viewDeleteMemo()",
+              "title": "削除",
+              "class": "icon-btn text-gray-300 hover:text-red-400 hover:bg-red-50"
+            }
+          }
+        ],
+        "interactions": [
+          {
+            "line": 52,
+            "source": "<div class=\"works-header-actions\"><div id=\"memo-user-bar\" class=\"user-bar\" hidden><button class=\"user-icon-btn\" aria-label=\"ログアウト\" onclick=\"signOutUser()\"><i class=\"bx bx-user-circle\" aria-hidden=\"true\"></i></button></div></div>"
+          },
+          {
+            "line": 57,
+            "source": "<p id=\"save-status\" role=\"status\" aria-live=\"polite\"></p><button id=\"export-draft\" hidden onclick=\"exportDraft()\">未保存JSONを保存</button>"
+          },
+          {
+            "line": 65,
+            "source": "<button onclick=\"openCategoryModal()\" title=\"カテゴリを管理\""
+          },
+          {
+            "line": 72,
+            "source": "<button onclick=\"openMemoModal(null)\" title=\"新規メモ\""
+          },
+          {
+            "line": 105,
+            "source": "<button onclick=\"closeMemoModal()\" class=\"icon-btn text-gray-400 hover:text-gray-600 hover:bg-gray-100\">"
+          },
+          {
+            "line": 128,
+            "source": "<button onclick=\"openCategoryModal()\" title=\"カテゴリを管理\""
+          },
+          {
+            "line": 150,
+            "source": "<button type=\"button\" onclick=\"addModalBody()\""
+          },
+          {
+            "line": 162,
+            "source": "<button type=\"button\" onclick=\"addModalNote()\""
+          },
+          {
+            "line": 179,
+            "source": "<button onclick=\"closeMemoModal()\""
+          },
+          {
+            "line": 183,
+            "source": "<button onclick=\"saveMemo()\""
+          },
+          {
+            "line": 196,
+            "source": "<button type=\"button\" onclick=\"closeCategoryModal()\" class=\"icon-btn\" aria-label=\"カテゴリ管理を閉じる\">×</button>"
+          },
+          {
+            "line": 205,
+            "source": "<button type=\"button\" onclick=\"addCategory()\" class=\"bg-slate-700\">追加</button>"
+          },
+          {
+            "line": 208,
+            "source": "<div class=\"category-footer\"><button type=\"button\" onclick=\"closeCategoryModal()\">完了</button></div>"
+          },
+          {
+            "line": 222,
+            "source": "<button onclick=\"signInWithGoogle()\""
+          },
+          {
+            "line": 246,
+            "source": "<button onclick=\"closeViewModal()\" class=\"icon-btn text-gray-400 hover:text-gray-600 hover:bg-gray-100 flex-shrink-0\">"
+          },
+          {
+            "line": 263,
+            "source": "<button onclick=\"viewCopyMemo()\" title=\"コピー\""
+          },
+          {
+            "line": 267,
+            "source": "<button onclick=\"viewEditMemo()\" title=\"編集\""
+          },
+          {
+            "line": 271,
+            "source": "<button onclick=\"viewDeleteMemo()\" title=\"削除\""
+          }
+        ]
+      }
+    ],
+    "wiki": [
+      {
+        "file": "wiki/app.js",
+        "interactions": [
+          {
+            "line": 29,
+            "source": "async function api(p, body) {"
+          },
+          {
+            "line": 30,
+            "source": "const r = await fetch(\"/api/wiki/\" + p, {"
+          },
+          {
+            "line": 161,
+            "source": "$(\"mode-edit\").onclick = () => previewMode(\"edit\");"
+          },
+          {
+            "line": 162,
+            "source": "$(\"mode-preview\").onclick = () => previewMode(\"preview\");"
+          },
+          {
+            "line": 163,
+            "source": "$(\"back-folders\").onclick = () => {"
+          },
+          {
+            "line": 166,
+            "source": "window.addEventListener(\"popstate\", () => {"
+          },
+          {
+            "line": 183,
+            "source": "const data = await api("
+          },
+          {
+            "line": 245,
+            "source": "link.addEventListener(\"click\", (event) => {"
+          },
+          {
+            "line": 292,
+            "source": "state.data = await api(\"pages/\" + path(id));"
+          },
+          {
+            "line": 331,
+            "source": "div.querySelector(\"button\").onclick = () => {"
+          },
+          {
+            "line": 398,
+            "source": "$(\"editor\").onsubmit = (e) => {"
+          },
+          {
+            "line": 402,
+            "source": "state.data = await api("
+          },
+          {
+            "line": 425,
+            "source": "$(\"propose\").onclick = () =>"
+          },
+          {
+            "line": 428,
+            "source": "await api(\"pages/\" + path(state.editId) + \"/proposals\", {"
+          },
+          {
+            "line": 438,
+            "source": "$(\"add-source\").onclick = () => {"
+          },
+          {
+            "line": 442,
+            "source": "$(\"cancel\").onclick = () => {"
+          },
+          {
+            "line": 451,
+            "source": "$(\"more-history\").onclick = () =>"
+          },
+          {
+            "line": 453,
+            "source": "const h = await api("
+          },
+          {
+            "line": 463,
+            "source": "$(\"clear-search\").onclick = () => {"
+          },
+          {
+            "line": 471,
+            "source": "$(\"find\").onclick = () => run(() => load());"
+          },
+          {
+            "line": 475,
+            "source": "$(\"archives\").onchange = () => run(() => load());"
+          },
+          {
+            "line": 476,
+            "source": "$(\"more\").onclick = () => run(() => load(true));"
+          },
+          {
+            "line": 477,
+            "source": "$(\"new\").onclick = () => {"
+          },
+          {
+            "line": 480,
+            "source": "$(\"edit\").onclick = () => {"
+          },
+          {
+            "line": 483,
+            "source": "$(\"archive\").onclick = () => {"
+          },
+          {
+            "line": 490,
+            "source": "state.data = await api(\"pages/\" + path(state.data.page.id) + \"/archive\", {"
+          },
+          {
+            "line": 497,
+            "source": "$(\"workspace\").onclick = (e) => {"
+          },
+          {
+            "line": 546,
+            "source": "state.data = await api(\"pages/\" + path(p.id) + \"/\" + action, {"
+          },
+          {
+            "line": 561,
+            "source": "const r = await fetch("
+          },
+          {
+            "line": 574,
+            "source": "$(\"sign-in\").onclick = () => {"
+          },
+          {
+            "line": 588,
+            "source": "$(\"sign-out\").onclick = () => {"
+          },
+          {
+            "line": 595,
+            "source": "document.querySelector(\".page-header a\").onclick = (e) => {"
+          },
+          {
+            "line": 598,
+            "source": "window.addEventListener(\"beforeunload\", (e) => {"
+          },
+          {
+            "line": 625,
+            "source": "$(\"focus-reading\").onclick = () => {"
+          }
+        ]
+      },
+      {
+        "file": "wiki/folders.js",
+        "interactions": [
+          {
+            "line": 106,
+            "source": "const data = await hooks.api(\"folders\");"
+          },
+          {
+            "line": 128,
+            "source": "document.querySelector(\"#workspace\").addEventListener(\"click\", (e) => {"
+          },
+          {
+            "line": 135,
+            "source": "$(\"view-folders\").onclick = () => view(\"folders\");"
+          },
+          {
+            "line": 136,
+            "source": "$(\"view-tree\").onclick = () => view(\"tree\");"
+          },
+          {
+            "line": 155,
+            "source": "$(\"folder-dialog-close\").onclick = $(\"folder-dialog-cancel\").onclick = close;"
+          },
+          {
+            "line": 156,
+            "source": "$(\"folder-dialog\").addEventListener(\"cancel\", (e) => {"
+          },
+          {
+            "line": 203,
+            "source": "$(\"new-folder\").onclick = () => show(\"create\");"
+          },
+          {
+            "line": 204,
+            "source": "$(\"rename-folder\").onclick = () => show(\"rename\");"
+          },
+          {
+            "line": 205,
+            "source": "$(\"move-folder\").onclick = () => show(\"move\");"
+          },
+          {
+            "line": 206,
+            "source": "$(\"move-page\").onclick = () => show(\"page\");"
+          },
+          {
+            "line": 207,
+            "source": "$(\"folder-form\").onsubmit = (e) => {"
+          },
+          {
+            "line": 220,
+            "source": "await hooks.api("
+          },
+          {
+            "line": 229,
+            "source": "await hooks.api("
+          }
+        ]
+      },
+      {
+        "file": "wiki/hierarchy.mjs",
+        "interactions": []
+      },
+      {
+        "file": "wiki/index.html",
+        "controls": [
+          {
+            "line": 17,
+            "tag": "a",
+            "attributes": {
+              "class": "works-home",
+              "href": "/",
+              "aria-label": "Works ホーム"
+            }
+          },
+          {
+            "line": 23,
+            "tag": "button",
+            "attributes": {
+              "id": "sign-out",
+              "type": "button",
+              "class": "user-icon-btn",
+              "aria-label": "ログアウト",
+              "title": "ログアウト",
+              "hidden": null
+            }
+          },
+          {
+            "line": 57,
+            "tag": "button",
+            "attributes": {
+              "id": "sign-in"
+            }
+          },
+          {
+            "line": 61,
+            "tag": "input",
+            "attributes": {
+              "id": "search",
+              "type": "search",
+              "placeholder": "本文・タイトル・タグ・別名を検索",
+              "aria-label": "Wiki検索"
+            }
+          },
+          {
+            "line": 66,
+            "tag": "button",
+            "attributes": {
+              "id": "find"
+            }
+          },
+          {
+            "line": 67,
+            "tag": "button",
+            "attributes": {
+              "id": "clear-search",
+              "hidden": null
+            }
+          },
+          {
+            "line": 68,
+            "tag": "button",
+            "attributes": {
+              "id": "new",
+              "class": "ui-primary"
+            }
+          },
+          {
+            "line": 71,
+            "tag": "input",
+            "attributes": {
+              "id": "archives",
+              "type": "checkbox"
+            }
+          },
+          {
+            "line": 74,
+            "tag": "button",
+            "attributes": {
+              "id": "view-folders",
+              "class": "view-toggle-btn active",
+              "type": "button",
+              "aria-pressed": "true"
+            }
+          },
+          {
+            "line": 81,
+            "tag": "button",
+            "attributes": {
+              "id": "view-tree",
+              "class": "view-toggle-btn",
+              "type": "button",
+              "aria-pressed": "false"
+            }
+          },
+          {
+            "line": 90,
+            "tag": "button",
+            "attributes": {
+              "id": "new-folder",
+              "type": "button",
+              "class": "btn-primary"
+            }
+          },
+          {
+            "line": 114,
+            "tag": "button",
+            "attributes": {
+              "id": "rename-folder",
+              "type": "button",
+              "hidden": null
+            }
+          },
+          {
+            "line": 115,
+            "tag": "button",
+            "attributes": {
+              "id": "move-folder",
+              "type": "button",
+              "hidden": null
+            }
+          },
+          {
+            "line": 121,
+            "tag": "button",
+            "attributes": {
+              "id": "more",
+              "hidden": null
+            }
+          },
+          {
+            "line": 130,
+            "tag": "button",
+            "attributes": {
+              "id": "back-folders",
+              "type": "button"
+            }
+          },
+          {
+            "line": 131,
+            "tag": "button",
+            "attributes": {
+              "id": "move-page",
+              "type": "button"
+            }
+          },
+          {
+            "line": 135,
+            "tag": "button",
+            "attributes": {
+              "id": "focus-reading",
+              "type": "button",
+              "aria-pressed": "false"
+            }
+          },
+          {
+            "line": 137,
+            "tag": "button",
+            "attributes": {
+              "id": "edit",
+              "class": "ui-primary"
+            }
+          },
+          {
+            "line": 138,
+            "tag": "details",
+            "attributes": {
+              "class": "wiki-page-tools"
+            }
+          },
+          {
+            "line": 138,
+            "tag": "button",
+            "attributes": {
+              "id": "archive"
+            }
+          },
+          {
+            "line": 138,
+            "tag": "button",
+            "attributes": {
+              "data-export": "markdown"
+            }
+          },
+          {
+            "line": 138,
+            "tag": "button",
+            "attributes": {
+              "data-export": "json"
+            }
+          },
+          {
+            "line": 143,
+            "tag": "button",
+            "attributes": {
+              "id": "tab-content",
+              "role": "tab",
+              "aria-selected": "true",
+              "aria-controls": "panel-content",
+              "type": "button"
+            }
+          },
+          {
+            "line": 152,
+            "tag": "button",
+            "attributes": {
+              "id": "tab-proposals",
+              "role": "tab",
+              "aria-selected": "false",
+              "aria-controls": "panel-proposals",
+              "tabindex": "-1",
+              "type": "button"
+            }
+          },
+          {
+            "line": 162,
+            "tag": "button",
+            "attributes": {
+              "id": "tab-history",
+              "role": "tab",
+              "aria-selected": "false",
+              "aria-controls": "panel-history",
+              "tabindex": "-1",
+              "type": "button"
+            }
+          },
+          {
+            "line": 179,
+            "tag": "details",
+            "attributes": {
+              "id": "page-outline",
+              "class": "wiki-outline",
+              "hidden": null
+            }
+          },
+          {
+            "line": 214,
+            "tag": "button",
+            "attributes": {
+              "id": "more-history",
+              "hidden": null
+            }
+          },
+          {
+            "line": 219,
+            "tag": "dialog",
+            "attributes": {
+              "id": "review-dialog",
+              "class": "wiki-dialog wiki-review-dialog",
+              "aria-labelledby": "review-title",
+              "aria-describedby": "review-help"
+            }
+          },
+          {
+            "line": 227,
+            "tag": "button",
+            "attributes": {
+              "id": "review-close",
+              "type": "button",
+              "aria-label": "差分を閉じる",
+              "autofocus": null
+            }
+          },
+          {
+            "line": 243,
+            "tag": "button",
+            "attributes": {
+              "id": "review-adopt",
+              "type": "button",
+              "hidden": null
+            }
+          },
+          {
+            "line": 245,
+            "tag": "button",
+            "attributes": {
+              "id": "review-done",
+              "type": "button"
+            }
+          },
+          {
+            "line": 248,
+            "tag": "form",
+            "attributes": {
+              "id": "editor",
+              "hidden": null
+            }
+          },
+          {
+            "line": 250,
+            "tag": "input",
+            "attributes": {
+              "name": "title",
+              "required": null,
+              "maxlength": "300"
+            }
+          },
+          {
+            "line": 254,
+            "tag": "button",
+            "attributes": {
+              "id": "mode-edit",
+              "type": "button",
+              "class": "view-toggle-btn active",
+              "aria-pressed": "true"
+            }
+          },
+          {
+            "line": 261,
+            "tag": "button",
+            "attributes": {
+              "id": "mode-preview",
+              "type": "button",
+              "class": "view-toggle-btn",
+              "aria-pressed": "false"
+            }
+          },
+          {
+            "line": 281,
+            "tag": "textarea",
+            "attributes": {
+              "name": "body",
+              "rows": "14",
+              "maxlength": "100000"
+            }
+          },
+          {
+            "line": 286,
+            "tag": "input",
+            "attributes": {
+              "name": "tags"
+            }
+          },
+          {
+            "line": 287,
+            "tag": "input",
+            "attributes": {
+              "name": "aliases"
+            }
+          },
+          {
+            "line": 288,
+            "tag": "input",
+            "attributes": {
+              "name": "links"
+            }
+          },
+          {
+            "line": 290,
+            "tag": "select",
+            "attributes": {
+              "name": "status"
+            }
+          },
+          {
+            "line": 296,
+            "tag": "input",
+            "attributes": {
+              "id": "proposal-notes",
+              "maxlength": "3000"
+            }
+          },
+          {
+            "line": 301,
+            "tag": "button",
+            "attributes": {
+              "id": "add-source",
+              "type": "button"
+            }
+          },
+          {
+            "line": 304,
+            "tag": "button",
+            "attributes": {
+              "type": "submit",
+              "class": "ui-primary"
+            }
+          },
+          {
+            "line": 305,
+            "tag": "button",
+            "attributes": {
+              "id": "propose",
+              "type": "button"
+            }
+          },
+          {
+            "line": 306,
+            "tag": "button",
+            "attributes": {
+              "id": "cancel",
+              "type": "button"
+            }
+          },
+          {
+            "line": 311,
+            "tag": "dialog",
+            "attributes": {
+              "id": "folder-dialog",
+              "class": "app-modal wiki-dialog",
+              "aria-labelledby": "folder-dialog-title"
+            }
+          },
+          {
+            "line": 318,
+            "tag": "button",
+            "attributes": {
+              "id": "folder-dialog-close",
+              "type": "button",
+              "class": "modal-close",
+              "aria-label": "閉じる"
+            }
+          },
+          {
+            "line": 327,
+            "tag": "form",
+            "attributes": {
+              "id": "folder-form",
+              "class": "modal-tab-panel"
+            }
+          },
+          {
+            "line": 329,
+            "tag": "input",
+            "attributes": {
+              "id": "folder-name",
+              "maxlength": "200",
+              "required": null
+            }
+          },
+          {
+            "line": 332,
+            "tag": "select",
+            "attributes": {
+              "id": "folder-target"
+            }
+          },
+          {
+            "line": 336,
+            "tag": "button",
+            "attributes": {
+              "id": "folder-dialog-submit",
+              "type": "submit",
+              "class": "btn-primary"
+            }
+          },
+          {
+            "line": 338,
+            "tag": "button",
+            "attributes": {
+              "id": "folder-dialog-cancel",
+              "type": "button"
+            }
+          }
+        ],
+        "interactions": []
+      },
+      {
+        "file": "wiki/markdown.js",
+        "interactions": []
+      },
+      {
+        "file": "wiki/review.js",
+        "interactions": [
+          {
+            "line": 13,
+            "source": "$(\"tab-\" + name).onclick = () => selectPanel(name);"
+          },
+          {
+            "line": 38,
+            "source": "$(\"review-close\").onclick = $(\"review-done\").onclick = closeReview;"
+          },
+          {
+            "line": 39,
+            "source": "$(\"review-dialog\").addEventListener(\"cancel\", (event) => {"
+          }
+        ]
+      }
+    ],
+    "ss": [
+      {
+        "file": "ss/app.js",
+        "interactions": [
+          {
+            "line": 177,
+            "source": "async function api(path) {"
+          },
+          {
+            "line": 180,
+            "source": "const response = await fetch(`/api${path}`, {"
+          },
+          {
+            "line": 190,
+            "source": "projects = await api(\"/ss-projects\");"
+          },
+          {
+            "line": 194,
+            "source": "els.signOut.addEventListener(\"click\", async () => {"
+          },
+          {
+            "line": 199,
+            "source": "document.addEventListener(\"visibilitychange\", () => {"
+          },
+          {
+            "line": 204,
+            "source": "button.addEventListener(\"click\", () => {"
+          },
+          {
+            "line": 211,
+            "source": "els.showCompleted.addEventListener(\"change\", render);"
+          },
+          {
+            "line": 213,
+            "source": "els.sortKey.addEventListener(\"change\", () => setSort(els.sortKey.value, \"asc\"));"
+          },
+          {
+            "line": 214,
+            "source": "els.sortDirection.addEventListener(\"click\", () => {"
+          }
+        ]
+      },
+      {
+        "file": "ss/index.html",
+        "controls": [
+          {
+            "line": 23,
+            "tag": "a",
+            "attributes": {
+              "class": "works-home",
+              "href": "/",
+              "aria-label": "Works ホーム"
+            }
+          },
+          {
+            "line": 26,
+            "tag": "button",
+            "attributes": {
+              "id": "sign-out",
+              "type": "button",
+              "class": "user-icon-btn",
+              "aria-label": "ログアウト"
+            }
+          },
+          {
+            "line": 47,
+            "tag": "input",
+            "attributes": {
+              "id": "ss-show-completed",
+              "type": "checkbox"
+            }
+          },
+          {
+            "line": 53,
+            "tag": "select",
+            "attributes": {
+              "id": "ss-sort-key"
+            }
+          },
+          {
+            "line": 59,
+            "tag": "button",
+            "attributes": {
+              "id": "ss-sort-direction",
+              "type": "button",
+              "aria-label": "降順に切り替える"
+            }
+          },
+          {
+            "line": 69,
+            "tag": "button",
+            "attributes": {
+              "class": "ss-sort-button",
+              "type": "button",
+              "data-sort-key": "name"
+            }
+          },
+          {
+            "line": 70,
+            "tag": "button",
+            "attributes": {
+              "class": "ss-sort-button",
+              "type": "button",
+              "data-sort-key": "status"
+            }
+          },
+          {
+            "line": 71,
+            "tag": "button",
+            "attributes": {
+              "class": "ss-sort-button",
+              "type": "button",
+              "data-sort-key": "deadline"
+            }
+          },
+          {
+            "line": 72,
+            "tag": "button",
+            "attributes": {
+              "class": "ss-sort-button",
+              "type": "button",
+              "data-sort-key": "remaining"
+            }
+          }
+        ],
+        "interactions": []
+      }
+    ],
+    "workflow": [
+      {
+        "file": "workflow/app.js",
+        "interactions": [
+          {
+            "line": 47,
+            "source": "b.addEventListener(\"click\", () => guard(action, target));"
+          },
+          {
+            "line": 58,
+            "source": "document.addEventListener(\"workflow-roles-changed\", () => guard(load));"
+          },
+          {
+            "line": 74,
+            "source": "async function api(body, query = \"\") {"
+          },
+          {
+            "line": 75,
+            "source": "const r = await fetch(\"/api/workflow\" + query, {"
+          },
+          {
+            "line": 122,
+            "source": "state = await api();"
+          },
+          {
+            "line": 375,
+            "source": "edit.onclick = () =>"
+          },
+          {
+            "line": 418,
+            "source": "await api({"
+          },
+          {
+            "line": 429,
+            "source": "const r = await api({"
+          },
+          {
+            "line": 449,
+            "source": "await api({"
+          },
+          {
+            "line": 460,
+            "source": "await api({"
+          },
+          {
+            "line": 479,
+            "source": "b.onclick = () =>"
+          },
+          {
+            "line": 658,
+            "source": "const detail = await api(null, \"?run_id=\" + encodeURIComponent(id));"
+          },
+          {
+            "line": 669,
+            "source": "const { definition: d } = await api("
+          },
+          {
+            "line": 677,
+            "source": "? await api(null, \"?stage_id=\" + encodeURIComponent(known.id))"
+          },
+          {
+            "line": 747,
+            "source": ": await api(null, \"?run_id=\" + encodeURIComponent(id));"
+          },
+          {
+            "line": 806,
+            "source": "target.onchange = () => {"
+          },
+          {
+            "line": 867,
+            "source": "await api("
+          },
+          {
+            "line": 907,
+            "source": "await api("
+          },
+          {
+            "line": 1005,
+            "source": "await api({"
+          },
+          {
+            "line": 1046,
+            "source": "$(\"#definition-form\").elements.repeat.addEventListener("
+          },
+          {
+            "line": 1050,
+            "source": "$(\"#definition-form\").addEventListener(\"submit\", (event) => {"
+          },
+          {
+            "line": 1098,
+            "source": "await api({"
+          },
+          {
+            "line": 1119,
+            "source": "$(\"#run-action\").addEventListener(\"submit\", (e) => e.preventDefault());"
+          },
+          {
+            "line": 1120,
+            "source": "$(\"#new\").onclick = () => openEditor();"
+          },
+          {
+            "line": 1121,
+            "source": "$(\"#add-task\").onclick = () => $(\"#task-editor\").append(taskEditor());"
+          },
+          {
+            "line": 1123,
+            "source": "b.onclick = () => closeDialog($(\"#\" + b.dataset.close));"
+          },
+          {
+            "line": 1124,
+            "source": "$(\"#prev\").onclick = () => shift(-1);"
+          },
+          {
+            "line": 1125,
+            "source": "$(\"#next\").onclick = () => shift(1);"
+          },
+          {
+            "line": 1126,
+            "source": "$(\"#today\").onclick = () => {"
+          },
+          {
+            "line": 1130,
+            "source": "$(\"#day\").onchange = (e) => {"
+          },
+          {
+            "line": 1136,
+            "source": "$(\"#refresh\").onclick = () => guard(load);"
+          },
+          {
+            "line": 1137,
+            "source": "$(\"#save-interval\").onclick = () =>"
+          },
+          {
+            "line": 1139,
+            "source": "await api({"
+          },
+          {
+            "line": 1147,
+            "source": "$(\"#global-stop\").onclick = () =>"
+          },
+          {
+            "line": 1158,
+            "source": "await api({"
+          },
+          {
+            "line": 1164,
+            "source": "$(\"#auth\").onclick = () =>"
+          },
+          {
+            "line": 1193,
+            "source": "$(\"#run-dialog\").addEventListener(\"close\", () => {"
+          },
+          {
+            "line": 1197,
+            "source": "$(\"#workflow-search\").addEventListener(\"input\", () => {"
+          },
+          {
+            "line": 1200,
+            "source": "$(\"#active-filters\").addEventListener(\"click\", (event) => {"
+          },
+          {
+            "line": 1208,
+            "source": "$(\"#calendar-view\").addEventListener(\"click\", (event) => {"
+          },
+          {
+            "line": 1217,
+            "source": "$(\"#reset-filters\").onclick = () => {"
+          },
+          {
+            "line": 1226,
+            "source": "$(\"#role-filter\").onchange = render;"
+          },
+          {
+            "line": 1296,
+            "source": "const result = await api({ action, targets });"
+          },
+          {
+            "line": 1309,
+            "source": "$(\"#rolling-preview\").onclick = () => guard(() => rolling(\"rolling_preview\"));"
+          },
+          {
+            "line": 1310,
+            "source": "$(\"#rolling-apply\").onclick = () => guard(() => rolling(\"rolling_apply\"));"
+          },
+          {
+            "line": 1312,
+            "source": "$(\"#settings-dialog\").addEventListener(\"close\", () => {"
+          }
+        ]
+      },
+      {
+        "file": "workflow/dialogs.mjs",
+        "interactions": [
+          {
+            "line": 45,
+            "source": "dialog.addEventListener(\"cancel\", (e) => {"
+          },
+          {
+            "line": 49,
+            "source": "dialog.addEventListener(\"close\", () => retire(dialog));"
+          },
+          {
+            "line": 54,
+            "source": "window.addEventListener(\"popstate\", () => {"
+          },
+          {
+            "line": 66,
+            "source": "document.addEventListener("
+          },
+          {
+            "line": 87,
+            "source": "window.addEventListener('beforeunload',event=>{if([...records.keys()].some(dirty)){event.preventDefault();event.returnValue='';}});"
+          }
+        ]
+      },
+      {
+        "file": "workflow/index.html",
+        "controls": [
+          {
+            "line": 17,
+            "tag": "a",
+            "attributes": {
+              "class": "works-home",
+              "href": "/"
+            }
+          },
+          {
+            "line": 22,
+            "tag": "button",
+            "attributes": {
+              "id": "auth"
+            }
+          },
+          {
+            "line": 31,
+            "tag": "button",
+            "attributes": {
+              "id": "refresh"
+            }
+          },
+          {
+            "line": 31,
+            "tag": "button",
+            "attributes": {
+              "id": "resume-setup"
+            }
+          },
+          {
+            "line": 31,
+            "tag": "button",
+            "attributes": {
+              "id": "global-stop"
+            }
+          },
+          {
+            "line": 36,
+            "tag": "button",
+            "attributes": {
+              "data-step": "1"
+            }
+          },
+          {
+            "line": 36,
+            "tag": "button",
+            "attributes": {
+              "data-step": "2"
+            }
+          },
+          {
+            "line": 36,
+            "tag": "button",
+            "attributes": {
+              "data-step": "3"
+            }
+          },
+          {
+            "line": 40,
+            "tag": "button",
+            "attributes": {
+              "id": "setup-back"
+            }
+          },
+          {
+            "line": 40,
+            "tag": "button",
+            "attributes": {
+              "id": "setup-next",
+              "class": "ui-primary"
+            }
+          },
+          {
+            "line": 40,
+            "tag": "button",
+            "attributes": {
+              "id": "setup-cancel"
+            }
+          },
+          {
+            "line": 46,
+            "tag": "button",
+            "attributes": {
+              "id": "new-role"
+            }
+          },
+          {
+            "line": 46,
+            "tag": "button",
+            "attributes": {
+              "data-open": "role-archive-dialog"
+            }
+          },
+          {
+            "line": 49,
+            "tag": "button",
+            "attributes": {
+              "data-open": "definitions-dialog"
+            }
+          },
+          {
+            "line": 49,
+            "tag": "button",
+            "attributes": {
+              "data-open": "planning-dialog"
+            }
+          },
+          {
+            "line": 49,
+            "tag": "button",
+            "attributes": {
+              "data-open": "settings-dialog"
+            }
+          },
+          {
+            "line": 49,
+            "tag": "button",
+            "attributes": {
+              "data-open": "history-dialog"
+            }
+          },
+          {
+            "line": 52,
+            "tag": "button",
+            "attributes": {
+              "id": "new",
+              "class": "ui-primary"
+            }
+          },
+          {
+            "line": 61,
+            "tag": "button",
+            "attributes": {
+              "data-view": "calendar",
+              "aria-pressed": "true"
+            }
+          },
+          {
+            "line": 62,
+            "tag": "button",
+            "attributes": {
+              "data-view": "agenda",
+              "aria-pressed": "false"
+            }
+          },
+          {
+            "line": 67,
+            "tag": "input",
+            "attributes": {
+              "id": "workflow-search",
+              "type": "search",
+              "placeholder": "カンバンの予定を検索"
+            }
+          },
+          {
+            "line": 68,
+            "tag": "button",
+            "attributes": {
+              "id": "reset-filters",
+              "type": "button",
+              "hidden": null
+            }
+          },
+          {
+            "line": 70,
+            "tag": "button",
+            "attributes": {
+              "data-open": "filters-dialog"
+            }
+          },
+          {
+            "line": 72,
+            "tag": "button",
+            "attributes": {
+              "id": "prev",
+              "aria-label": "前日"
+            }
+          },
+          {
+            "line": 73,
+            "tag": "input",
+            "attributes": {
+              "id": "day",
+              "type": "date",
+              "aria-label": "表示日"
+            }
+          },
+          {
+            "line": 73,
+            "tag": "button",
+            "attributes": {
+              "id": "next",
+              "aria-label": "翌日"
+            }
+          },
+          {
+            "line": 78,
+            "tag": "button",
+            "attributes": {
+              "id": "today"
+            }
+          },
+          {
+            "line": 94,
+            "tag": "a",
+            "attributes": {
+              "href": "/wiki/"
+            }
+          },
+          {
+            "line": 102,
+            "tag": "button",
+            "attributes": {
+              "data-active": "all",
+              "aria-pressed": "true"
+            }
+          },
+          {
+            "line": 103,
+            "tag": "button",
+            "attributes": {
+              "data-active": "review",
+              "aria-pressed": "false"
+            }
+          },
+          {
+            "line": 105,
+            "tag": "button",
+            "attributes": {
+              "data-active": "running",
+              "aria-pressed": "false"
+            }
+          },
+          {
+            "line": 120,
+            "tag": "dialog",
+            "attributes": {
+              "id": "role-archive-dialog",
+              "class": "wf-dialog",
+              "aria-labelledby": "role-archive-title"
+            }
+          },
+          {
+            "line": 120,
+            "tag": "button",
+            "attributes": {
+              "data-close": "role-archive-dialog",
+              "aria-label": "閉じる"
+            }
+          },
+          {
+            "line": 121,
+            "tag": "dialog",
+            "attributes": {
+              "id": "filters-dialog",
+              "class": "wf-dialog",
+              "aria-labelledby": "filters-dialog-title"
+            }
+          },
+          {
+            "line": 121,
+            "tag": "button",
+            "attributes": {
+              "data-close": "filters-dialog",
+              "aria-label": "閉じる"
+            }
+          },
+          {
+            "line": 122,
+            "tag": "select",
+            "attributes": {
+              "id": "role-filter",
+              "data-immediate": null
+            }
+          },
+          {
+            "line": 128,
+            "tag": "dialog",
+            "attributes": {
+              "id": "definitions-dialog",
+              "class": "wf-dialog",
+              "aria-labelledby": "definitions-dialog-title"
+            }
+          },
+          {
+            "line": 128,
+            "tag": "button",
+            "attributes": {
+              "data-close": "definitions-dialog",
+              "aria-label": "閉じる"
+            }
+          },
+          {
+            "line": 133,
+            "tag": "dialog",
+            "attributes": {
+              "id": "planning-dialog",
+              "class": "wf-dialog",
+              "aria-labelledby": "planning-dialog-title"
+            }
+          },
+          {
+            "line": 133,
+            "tag": "button",
+            "attributes": {
+              "data-close": "planning-dialog",
+              "aria-label": "閉じる"
+            }
+          },
+          {
+            "line": 138,
+            "tag": "button",
+            "attributes": {
+              "id": "rolling-preview"
+            }
+          },
+          {
+            "line": 139,
+            "tag": "button",
+            "attributes": {
+              "id": "rolling-apply"
+            }
+          },
+          {
+            "line": 144,
+            "tag": "dialog",
+            "attributes": {
+              "id": "settings-dialog",
+              "class": "wf-dialog",
+              "aria-labelledby": "settings-dialog-title"
+            }
+          },
+          {
+            "line": 144,
+            "tag": "button",
+            "attributes": {
+              "data-close": "settings-dialog",
+              "aria-label": "閉じる"
+            }
+          },
+          {
+            "line": 150,
+            "tag": "select",
+            "attributes": {
+              "id": "interval"
+            }
+          },
+          {
+            "line": 154,
+            "tag": "button",
+            "attributes": {
+              "id": "save-interval"
+            }
+          },
+          {
+            "line": 161,
+            "tag": "dialog",
+            "attributes": {
+              "id": "history-dialog",
+              "class": "wf-dialog",
+              "aria-labelledby": "history-dialog-title"
+            }
+          },
+          {
+            "line": 161,
+            "tag": "button",
+            "attributes": {
+              "data-close": "history-dialog",
+              "aria-label": "閉じる"
+            }
+          },
+          {
+            "line": 165,
+            "tag": "button",
+            "attributes": {
+              "id": "show-history"
+            }
+          },
+          {
+            "line": 166,
+            "tag": "dialog",
+            "attributes": {
+              "id": "role-editor",
+              "class": "wf-dialog",
+              "aria-labelledby": "role-title"
+            }
+          },
+          {
+            "line": 167,
+            "tag": "form",
+            "attributes": {
+              "id": "role-form"
+            }
+          },
+          {
+            "line": 170,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "id": "close-role",
+              "aria-label": "閉じる"
+            }
+          },
+          {
+            "line": 172,
+            "tag": "input",
+            "attributes": {
+              "name": "name",
+              "maxlength": "100",
+              "required": null
+            }
+          },
+          {
+            "line": 174,
+            "tag": "textarea",
+            "attributes": {
+              "name": "responsibilities",
+              "maxlength": "2000",
+              "required": null
+            }
+          },
+          {
+            "line": 181,
+            "tag": "textarea",
+            "attributes": {
+              "name": "operations",
+              "maxlength": "2000",
+              "required": null
+            }
+          },
+          {
+            "line": 188,
+            "tag": "textarea",
+            "attributes": {
+              "name": "completion",
+              "maxlength": "2000",
+              "required": null
+            }
+          },
+          {
+            "line": 195,
+            "tag": "select",
+            "attributes": {
+              "name": "icon"
+            }
+          },
+          {
+            "line": 204,
+            "tag": "select",
+            "attributes": {
+              "name": "color"
+            }
+          },
+          {
+            "line": 213,
+            "tag": "button",
+            "attributes": {
+              "type": "submit"
+            }
+          },
+          {
+            "line": 216,
+            "tag": "dialog",
+            "attributes": {
+              "id": "editor",
+              "class": "wf-dialog",
+              "aria-labelledby": "editor-title"
+            }
+          },
+          {
+            "line": 217,
+            "tag": "form",
+            "attributes": {
+              "id": "definition-form"
+            }
+          },
+          {
+            "line": 220,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "data-close": "editor",
+              "aria-label": "閉じる"
+            }
+          },
+          {
+            "line": 224,
+            "tag": "input",
+            "attributes": {
+              "name": "title",
+              "maxlength": "200",
+              "required": null
+            }
+          },
+          {
+            "line": 227,
+            "tag": "select",
+            "attributes": {
+              "name": "kind"
+            }
+          },
+          {
+            "line": 232,
+            "tag": "select",
+            "attributes": {
+              "name": "priority"
+            }
+          },
+          {
+            "line": 240,
+            "tag": "textarea",
+            "attributes": {
+              "name": "purpose",
+              "required": null,
+              "maxlength": "4000"
+            }
+          },
+          {
+            "line": 246,
+            "tag": "textarea",
+            "attributes": {
+              "name": "completion",
+              "required": null,
+              "maxlength": "4000"
+            }
+          },
+          {
+            "line": 252,
+            "tag": "textarea",
+            "attributes": {
+              "name": "permissions",
+              "required": null,
+              "maxlength": "4000",
+              "placeholder": "例：指定したリポジトリの読み取り。公開や送信は確認を求める"
+            }
+          },
+          {
+            "line": 261,
+            "tag": "input",
+            "attributes": {
+              "type": "datetime-local",
+              "name": "start",
+              "required": null
+            }
+          },
+          {
+            "line": 266,
+            "tag": "select",
+            "attributes": {
+              "name": "repeat"
+            }
+          },
+          {
+            "line": 273,
+            "tag": "input",
+            "attributes": {
+              "type": "number",
+              "name": "interval_hours",
+              "min": "1",
+              "max": "8760",
+              "step": "1",
+              "disabled": null
+            }
+          },
+          {
+            "line": 281,
+            "tag": "input",
+            "attributes": {
+              "type": "datetime-local",
+              "name": "deadline"
+            }
+          },
+          {
+            "line": 287,
+            "tag": "input",
+            "attributes": {
+              "type": "checkbox",
+              "name": "planning_enabled"
+            }
+          },
+          {
+            "line": 293,
+            "tag": "select",
+            "attributes": {
+              "name": "planning_roles",
+              "multiple": null,
+              "aria-describedby": "planning-help"
+            }
+          },
+          {
+            "line": 303,
+            "tag": "input",
+            "attributes": {
+              "type": "checkbox",
+              "name": "planning_instructions"
+            }
+          },
+          {
+            "line": 311,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "id": "add-task"
+            }
+          },
+          {
+            "line": 316,
+            "tag": "button",
+            "attributes": {
+              "type": "submit"
+            }
+          },
+          {
+            "line": 319,
+            "tag": "dialog",
+            "attributes": {
+              "id": "run-dialog",
+              "class": "wf-dialog",
+              "aria-label": "今回の実行"
+            }
+          },
+          {
+            "line": 322,
+            "tag": "button",
+            "attributes": {
+              "data-close": "run-dialog",
+              "aria-label": "閉じる"
+            }
+          },
+          {
+            "line": 325,
+            "tag": "form",
+            "attributes": {
+              "id": "run-action"
+            }
+          },
+          {
+            "line": 327,
+            "tag": "textarea",
+            "attributes": {
+              "name": "result",
+              "maxlength": "4000"
+            }
+          },
+          {
+            "line": 332,
+            "tag": "textarea",
+            "attributes": {
+              "name": "evidence"
+            }
+          },
+          {
+            "line": 336,
+            "tag": "input",
+            "attributes": {
+              "type": "checkbox",
+              "name": "criteria_verified"
+            }
+          },
+          {
+            "line": 341,
+            "tag": "input",
+            "attributes": {
+              "type": "checkbox",
+              "name": "workflow_criteria_verified"
+            }
+          },
+          {
+            "line": 349,
+            "tag": "details",
+            "attributes": {}
+          }
+        ],
+        "interactions": []
+      },
+      {
+        "file": "workflow/planning.mjs",
+        "interactions": []
+      },
+      {
+        "file": "workflow/roles.html",
+        "controls": [
+          {
+            "line": 17,
+            "tag": "a",
+            "attributes": {
+              "class": "works-home",
+              "href": "/"
+            }
+          },
+          {
+            "line": 22,
+            "tag": "button",
+            "attributes": {
+              "id": "auth"
+            }
+          },
+          {
+            "line": 26,
+            "tag": "a",
+            "attributes": {
+              "href": "./"
+            }
+          },
+          {
+            "line": 34,
+            "tag": "button",
+            "attributes": {
+              "id": "new-role"
+            }
+          },
+          {
+            "line": 38,
+            "tag": "dialog",
+            "attributes": {
+              "id": "role-editor",
+              "class": "wf-dialog",
+              "aria-labelledby": "role-title"
+            }
+          },
+          {
+            "line": 39,
+            "tag": "form",
+            "attributes": {
+              "id": "role-form"
+            }
+          },
+          {
+            "line": 42,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "id": "close-role",
+              "aria-label": "閉じる"
+            }
+          },
+          {
+            "line": 44,
+            "tag": "input",
+            "attributes": {
+              "name": "name",
+              "maxlength": "100",
+              "required": null
+            }
+          },
+          {
+            "line": 46,
+            "tag": "textarea",
+            "attributes": {
+              "name": "responsibilities",
+              "maxlength": "2000",
+              "required": null
+            }
+          },
+          {
+            "line": 53,
+            "tag": "textarea",
+            "attributes": {
+              "name": "operations",
+              "maxlength": "2000",
+              "required": null
+            }
+          },
+          {
+            "line": 60,
+            "tag": "textarea",
+            "attributes": {
+              "name": "completion",
+              "maxlength": "2000",
+              "required": null
+            }
+          },
+          {
+            "line": 67,
+            "tag": "select",
+            "attributes": {
+              "name": "icon"
+            }
+          },
+          {
+            "line": 76,
+            "tag": "select",
+            "attributes": {
+              "name": "color"
+            }
+          },
+          {
+            "line": 85,
+            "tag": "button",
+            "attributes": {
+              "type": "submit"
+            }
+          }
+        ],
+        "interactions": []
+      },
+      {
+        "file": "workflow/roles.js",
+        "interactions": [
+          {
+            "line": 20,
+            "source": "async function api(body) {"
+          },
+          {
+            "line": 21,
+            "source": "const r = await fetch(\"/api/workflow\", {"
+          },
+          {
+            "line": 56,
+            "source": "const data = await api();"
+          },
+          {
+            "line": 93,
+            "source": "edit.onclick = () => open(role, edit);"
+          },
+          {
+            "line": 95,
+            "source": "archive.onclick = () =>"
+          },
+          {
+            "line": 103,
+            "source": "await api({"
+          },
+          {
+            "line": 115,
+            "source": "$(\"#new-role\").onclick = (e) => open(null, e.target);"
+          },
+          {
+            "line": 116,
+            "source": "$(\"#close-role\").onclick = () => closeDialog(dialog);"
+          },
+          {
+            "line": 117,
+            "source": "dialog.addEventListener(\"close\", () => opener?.focus());"
+          },
+          {
+            "line": 118,
+            "source": "form.onsubmit = (e) => {"
+          },
+          {
+            "line": 122,
+            "source": "await api({"
+          },
+          {
+            "line": 135,
+            "source": "$(\"#auth\").onclick = signOutUser;"
+          },
+          {
+            "line": 144,
+            "source": "$(\"#auth\").onclick = signIn;"
+          }
+        ]
+      },
+      {
+        "file": "workflow/steps.mjs",
+        "interactions": [
+          {
+            "line": 36,
+            "source": "button.onclick = () => select(Number(button.dataset.step));"
+          },
+          {
+            "line": 38,
+            "source": "$('#resume-setup').onclick = () => { guiding = true; select(guideStep); };"
+          },
+          {
+            "line": 39,
+            "source": "$('#setup-back').onclick = () => select(Math.max(1, step - 1));"
+          },
+          {
+            "line": 40,
+            "source": "$('#setup-next').onclick = () => {"
+          },
+          {
+            "line": 44,
+            "source": "$('#setup-cancel').onclick = () => { guiding = false; select(2); };"
+          },
+          {
+            "line": 46,
+            "source": "button.onclick = () => {"
+          },
+          {
+            "line": 52,
+            "source": "$('#show-history').onclick = () => {"
+          }
+        ]
+      }
+    ],
+    "kdp": [
+      {
+        "file": "kdp/app.js",
+        "interactions": [
+          {
+            "line": 32,
+            "source": "async function api(path, { method = \"GET\", body } = {}) {"
+          },
+          {
+            "line": 33,
+            "source": "const res = await fetch(\"/api/kdp/\" + path, {"
+          },
+          {
+            "line": 86,
+            "source": "$(\"modal-content\").onclick = null;"
+          },
+          {
+            "line": 106,
+            "source": "form.onsubmit = (e) => {"
+          },
+          {
+            "line": 133,
+            "source": "const data = await api("
+          },
+          {
+            "line": 153,
+            "source": "const data = await api(\"books/\" + idPath(id));"
+          },
+          {
+            "line": 200,
+            "source": "const data = await api(\"sections/\" + idPath(id));"
+          },
+          {
+            "line": 256,
+            "source": "$(\"new-book\").onclick = () => {"
+          },
+          {
+            "line": 259,
+            "source": "const d = await api(\"books\", { method: \"POST\", body: b });"
+          },
+          {
+            "line": 264,
+            "source": "$(\"books\").onclick = (e) => {"
+          },
+          {
+            "line": 268,
+            "source": "$(\"back-books\").onclick = () => {"
+          },
+          {
+            "line": 275,
+            "source": "$(\"show-archived\").onchange = () => {"
+          },
+          {
+            "line": 281,
+            "source": "$(\"book-settings\").onclick = () => {"
+          },
+          {
+            "line": 288,
+            "source": "await api(\"books/\" + idPath(state.book.id), {"
+          },
+          {
+            "line": 297,
+            "source": "$(\"modal-content\").addEventListener(\"click\", (e) => {"
+          },
+          {
+            "line": 301,
+            "source": "await api(\"books/\" + idPath(state.book.id), {"
+          },
+          {
+            "line": 312,
+            "source": "$(\"new-chapter\").onclick = () => {"
+          },
+          {
+            "line": 315,
+            "source": "await api(\"books/\" + idPath(state.book.id) + \"/chapters\", {"
+          },
+          {
+            "line": 326,
+            "source": "$(\"outline\").onclick = (e) => {"
+          },
+          {
+            "line": 337,
+            "source": "const d = await api("
+          },
+          {
+            "line": 365,
+            "source": "await api(\"chapters/\" + idPath(c.id), {"
+          },
+          {
+            "line": 373,
+            "source": "($(\"archive-chapter\").onclick = () =>"
+          },
+          {
+            "line": 375,
+            "source": "await api(\"chapters/\" + idPath(c.id), {"
+          },
+          {
+            "line": 401,
+            "source": "await api("
+          },
+          {
+            "line": 416,
+            "source": "$(\"image-upload\").onchange = () =>"
+          },
+          {
+            "line": 428,
+            "source": "const res = await fetch("
+          },
+          {
+            "line": 458,
+            "source": "$(id).addEventListener(\"input\", () => dirty(true));"
+          },
+          {
+            "line": 459,
+            "source": "$(\"section-form\").onsubmit = (e) => {"
+          },
+          {
+            "line": 465,
+            "source": "await api(\"sections/\" + idPath(state.section.id), {"
+          },
+          {
+            "line": 481,
+            "source": "$(\"section-archive\").onclick = () => {"
+          },
+          {
+            "line": 484,
+            "source": "await api(\"sections/\" + idPath(state.section.id), {"
+          },
+          {
+            "line": 511,
+            "source": "await api("
+          },
+          {
+            "line": 527,
+            "source": "$(\"archive-source\").onclick = () =>"
+          },
+          {
+            "line": 529,
+            "source": "await api(\"sources/\" + idPath(s.id), {"
+          },
+          {
+            "line": 539,
+            "source": "api("
+          },
+          {
+            "line": 545,
+            "source": "api(\"sections/\" + idPath(state.section.id) + \"/proposals\"),"
+          },
+          {
+            "line": 554,
+            "source": "$(\"new-source\").onclick = () => sourceDialog({});"
+          },
+          {
+            "line": 555,
+            "source": "$(\"sources\").onclick = (e) => {"
+          },
+          {
+            "line": 562,
+            "source": "$(\"new-proposal\").onclick = () => {"
+          },
+          {
+            "line": 573,
+            "source": "await api(\"sections/\" + idPath(state.section.id) + \"/proposals\", {"
+          },
+          {
+            "line": 606,
+            "source": "$(\"proposals\").onclick = (e) => {"
+          },
+          {
+            "line": 619,
+            "source": "button.onclick = () =>"
+          },
+          {
+            "line": 621,
+            "source": "await api(\"proposals/\" + idPath(p.id) + \"/\" + action, {"
+          },
+          {
+            "line": 630,
+            "source": "$(\"section-history\").onclick = () => {"
+          },
+          {
+            "line": 650,
+            "source": "const data = await api("
+          },
+          {
+            "line": 680,
+            "source": "$(\"history-more\").onclick = () => run(() => loadPage(true));"
+          },
+          {
+            "line": 681,
+            "source": "$(\"modal-content\").onclick = (e) => {"
+          },
+          {
+            "line": 697,
+            "source": "await api(\"sections/\" + idPath(sectionId) + \"/restore\", {"
+          },
+          {
+            "line": 705,
+            "source": "$(\"modal-content\").onclick = null;"
+          },
+          {
+            "line": 727,
+            "source": "b.onclick = () => {"
+          },
+          {
+            "line": 730,
+            "source": "const res = await fetch("
+          },
+          {
+            "line": 753,
+            "source": "$(\"modal\").addEventListener(\"cancel\", (e) => {"
+          },
+          {
+            "line": 756,
+            "source": "$(\"modal-close\").onclick = () => {"
+          },
+          {
+            "line": 759,
+            "source": "$(\"modal-content\").onclick = null;"
+          },
+          {
+            "line": 761,
+            "source": "$(\"sign-in\").onclick = () => {"
+          },
+          {
+            "line": 765,
+            "source": "$(\"sign-out\").onclick = () => {"
+          },
+          {
+            "line": 772,
+            "source": "window.addEventListener(\"beforeunload\", (e) => {"
+          },
+          {
+            "line": 778,
+            "source": "document.querySelector(\".page-header a\").onclick = (e) => {"
+          }
+        ]
+      },
+      {
+        "file": "kdp/index.html",
+        "controls": [
+          {
+            "line": 17,
+            "tag": "a",
+            "attributes": {
+              "class": "works-home",
+              "href": "/",
+              "aria-label": "Works ホーム"
+            }
+          },
+          {
+            "line": 19,
+            "tag": "button",
+            "attributes": {
+              "id": "sign-out",
+              "type": "button",
+              "class": "user-icon-btn",
+              "aria-label": "ログアウト",
+              "title": "ログアウト",
+              "hidden": null
+            }
+          },
+          {
+            "line": 27,
+            "tag": "button",
+            "attributes": {
+              "id": "sign-in",
+              "class": "primary"
+            }
+          },
+          {
+            "line": 35,
+            "tag": "button",
+            "attributes": {
+              "id": "new-book",
+              "class": "primary"
+            }
+          },
+          {
+            "line": 38,
+            "tag": "input",
+            "attributes": {
+              "id": "show-archived",
+              "type": "checkbox"
+            }
+          },
+          {
+            "line": 44,
+            "tag": "button",
+            "attributes": {
+              "id": "back-books"
+            }
+          },
+          {
+            "line": 47,
+            "tag": "button",
+            "attributes": {
+              "id": "book-settings"
+            }
+          },
+          {
+            "line": 51,
+            "tag": "button",
+            "attributes": {
+              "data-export": "epub"
+            }
+          },
+          {
+            "line": 52,
+            "tag": "button",
+            "attributes": {
+              "data-export": "json"
+            }
+          },
+          {
+            "line": 53,
+            "tag": "button",
+            "attributes": {
+              "data-export": "markdown"
+            }
+          },
+          {
+            "line": 59,
+            "tag": "button",
+            "attributes": {
+              "id": "new-chapter"
+            }
+          },
+          {
+            "line": 66,
+            "tag": "form",
+            "attributes": {
+              "id": "section-form"
+            }
+          },
+          {
+            "line": 68,
+            "tag": "input",
+            "attributes": {
+              "id": "section-title",
+              "required": null,
+              "maxlength": "300"
+            }
+          },
+          {
+            "line": 73,
+            "tag": "textarea",
+            "attributes": {
+              "id": "section-content",
+              "rows": "20",
+              "spellcheck": "true"
+            }
+          },
+          {
+            "line": 81,
+            "tag": "input",
+            "attributes": {
+              "id": "image-upload",
+              "type": "file",
+              "accept": "image/png,image/jpeg"
+            }
+          },
+          {
+            "line": 92,
+            "tag": "button",
+            "attributes": {
+              "id": "save",
+              "type": "submit",
+              "class": "primary"
+            }
+          },
+          {
+            "line": 96,
+            "tag": "button",
+            "attributes": {
+              "id": "section-archive"
+            }
+          },
+          {
+            "line": 97,
+            "tag": "button",
+            "attributes": {
+              "id": "section-history"
+            }
+          },
+          {
+            "line": 99,
+            "tag": "details",
+            "attributes": {
+              "open": null
+            }
+          },
+          {
+            "line": 103,
+            "tag": "button",
+            "attributes": {
+              "id": "new-source"
+            }
+          },
+          {
+            "line": 105,
+            "tag": "details",
+            "attributes": {
+              "open": null
+            }
+          },
+          {
+            "line": 111,
+            "tag": "button",
+            "attributes": {
+              "id": "new-proposal"
+            }
+          },
+          {
+            "line": 122,
+            "tag": "dialog",
+            "attributes": {
+              "id": "modal"
+            }
+          },
+          {
+            "line": 125,
+            "tag": "button",
+            "attributes": {
+              "id": "modal-close",
+              "aria-label": "閉じる"
+            }
+          }
+        ],
+        "interactions": []
+      }
+    ],
+    "material": [
+      {
+        "file": "material/app.js",
+        "interactions": [
+          {
+            "line": 70,
+            "source": "async function api(path, options = {}) {"
+          },
+          {
+            "line": 77,
+            "source": "const res = await fetch(API_BASE + path, { ...options, headers });"
+          },
+          {
+            "line": 182,
+            "source": "await api(\"/files/\" + encodeURIComponent(fileId), {"
+          },
+          {
+            "line": 191,
+            "source": "await api(\"/folders/\" + encodeURIComponent(folderId), {"
+          },
+          {
+            "line": 200,
+            "source": "folders = await api(\"/folders\");"
+          },
+          {
+            "line": 206,
+            "source": "await api(\"/folder-order\", {"
+          },
+          {
+            "line": 217,
+            "source": "await api(\"/file-order\", {"
+          },
+          {
+            "line": 227,
+            "source": "folders = await api(\"/folders\");"
+          },
+          {
+            "line": 253,
+            "source": "element.addEventListener(\"dragover\", (event) => {"
+          },
+          {
+            "line": 260,
+            "source": "element.addEventListener(\"dragleave\", (event) => {"
+          },
+          {
+            "line": 263,
+            "source": "element.addEventListener(\"drop\", (event) => {"
+          },
+          {
+            "line": 275,
+            "source": "element.addEventListener(\"dragover\", (event) => {"
+          },
+          {
+            "line": 283,
+            "source": "element.addEventListener(\"dragleave\", (event) => {"
+          },
+          {
+            "line": 286,
+            "source": "element.addEventListener(\"drop\", (event) => {"
+          },
+          {
+            "line": 303,
+            "source": "element.addEventListener(\"dragover\", (event) => {"
+          },
+          {
+            "line": 310,
+            "source": "element.addEventListener(\"drop\", (event) => {"
+          },
+          {
+            "line": 339,
+            "source": "root.addEventListener(\"click\", () => openFolder(null));"
+          },
+          {
+            "line": 350,
+            "source": "button.addEventListener(\"click\", () => openFolder(folder.id));"
+          },
+          {
+            "line": 369,
+            "source": "article.addEventListener(\"dragstart\", (event) => startDragging(article, \"folder\", folder.id, event));"
+          },
+          {
+            "line": 370,
+            "source": "article.addEventListener(\"dragend\", () => stopDragging(article));"
+          },
+          {
+            "line": 390,
+            "source": "open.addEventListener(\"click\", () => openFolder(folder.id));"
+          },
+          {
+            "line": 397,
+            "source": "rename.addEventListener(\"click\", () => openRename(\"folder\", folder));"
+          },
+          {
+            "line": 404,
+            "source": "remove.addEventListener(\"click\", async () => {"
+          },
+          {
+            "line": 408,
+            "source": "await api(\"/folders/\" + encodeURIComponent(folder.id), { method: \"DELETE\" });"
+          },
+          {
+            "line": 440,
+            "source": "item.addEventListener(\"dragstart\", (event) => startDragging(item, \"file\", file.id, event));"
+          },
+          {
+            "line": 441,
+            "source": "item.addEventListener(\"dragend\", () => stopDragging(item));"
+          },
+          {
+            "line": 467,
+            "source": "view.addEventListener(\"click\", () => viewFile(file));"
+          },
+          {
+            "line": 474,
+            "source": "rename.addEventListener(\"click\", () => openRename(\"file\", file));"
+          },
+          {
+            "line": 481,
+            "source": "download.addEventListener(\"click\", () => downloadFile(file));"
+          },
+          {
+            "line": 488,
+            "source": "remove.addEventListener(\"click\", () => removeFile(file));"
+          },
+          {
+            "line": 520,
+            "source": "button.addEventListener(\"click\", () => viewFile(file));"
+          },
+          {
+            "line": 538,
+            "source": "summary.querySelector(\"button\").addEventListener(\"click\", (event) => {"
+          },
+          {
+            "line": 630,
+            "source": "treeFiles = await api(\"/files?all=1\");"
+          },
+          {
+            "line": 649,
+            "source": "folders = await api(\"/folders\");"
+          },
+          {
+            "line": 656,
+            "source": "files = await api(\"/files\" + query);"
+          },
+          {
+            "line": 663,
+            "source": "folders = await api(\"/folders\");"
+          },
+          {
+            "line": 710,
+            "source": "const res = await fetch("
+          },
+          {
+            "line": 796,
+            "source": "const res = await fetch("
+          },
+          {
+            "line": 822,
+            "source": "await api(\"/files/\" + encodeURIComponent(file.id), { method: \"DELETE\" });"
+          },
+          {
+            "line": 869,
+            "source": "remove.addEventListener(\"click\", () => {"
+          },
+          {
+            "line": 891,
+            "source": "xhr.upload.addEventListener(\"progress\", (event) => {"
+          },
+          {
+            "line": 896,
+            "source": "xhr.addEventListener(\"load\", () => {"
+          },
+          {
+            "line": 907,
+            "source": "xhr.addEventListener(\"error\", () => reject(new Error(\"アップロード中に通信エラーが発生しました\")));"
+          },
+          {
+            "line": 945,
+            "source": "button.addEventListener(\"click\", () => switchTab(button.dataset.materialTab));"
+          },
+          {
+            "line": 947,
+            "source": "els.search.addEventListener(\"input\", renderLibrary);"
+          },
+          {
+            "line": 948,
+            "source": "els.tagSearch.addEventListener(\"input\", renderTags);"
+          },
+          {
+            "line": 949,
+            "source": "els.treeSearch.addEventListener(\"input\", renderTree);"
+          },
+          {
+            "line": 950,
+            "source": "els.newFolder.addEventListener(\"click\", () => {"
+          },
+          {
+            "line": 955,
+            "source": "els.newFolderClose.addEventListener(\"click\", () => els.newFolderModal.close());"
+          },
+          {
+            "line": 956,
+            "source": "els.renameClose.addEventListener(\"click\", () => els.renameModal.close());"
+          },
+          {
+            "line": 957,
+            "source": "els.renameForm.addEventListener(\"submit\", async (event) => {"
+          },
+          {
+            "line": 966,
+            "source": "await api(path, {"
+          },
+          {
+            "line": 975,
+            "source": "folders = await api(\"/folders\");"
+          },
+          {
+            "line": 981,
+            "source": "els.previewClose.addEventListener(\"click\", () => els.previewModal.close());"
+          },
+          {
+            "line": 982,
+            "source": "els.previewModal.addEventListener(\"close\", cleanupPreview);"
+          },
+          {
+            "line": 983,
+            "source": "els.previewDownload.addEventListener(\"click\", () => {"
+          },
+          {
+            "line": 986,
+            "source": "els.newFolderForm.addEventListener(\"submit\", async (event) => {"
+          },
+          {
+            "line": 990,
+            "source": "await api(\"/folders\", {"
+          },
+          {
+            "line": 1003,
+            "source": "els.fileInput.addEventListener(\"change\", () => {"
+          },
+          {
+            "line": 1008,
+            "source": "els.dropzone.addEventListener(name, (event) => {"
+          },
+          {
+            "line": 1014,
+            "source": "els.dropzone.addEventListener(name, (event) => {"
+          },
+          {
+            "line": 1019,
+            "source": "els.dropzone.addEventListener(\"drop\", (event) => addUploadFiles(event.dataTransfer.files));"
+          },
+          {
+            "line": 1020,
+            "source": "els.uploadStart.addEventListener(\"click\", uploadAll);"
+          },
+          {
+            "line": 1021,
+            "source": "els.signOut.addEventListener(\"click\", async () => {"
+          }
+        ]
+      },
+      {
+        "file": "material/index.html",
+        "controls": [
+          {
+            "line": 22,
+            "tag": "a",
+            "attributes": {
+              "class": "works-home",
+              "href": "/",
+              "aria-label": "Works ホーム"
+            }
+          },
+          {
+            "line": 25,
+            "tag": "button",
+            "attributes": {
+              "id": "sign-out",
+              "type": "button",
+              "class": "user-icon-btn",
+              "aria-label": "ログアウト"
+            }
+          },
+          {
+            "line": 38,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "class": "page-tab-btn",
+              "data-material-tab": "library",
+              "aria-selected": "true"
+            }
+          },
+          {
+            "line": 41,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "class": "page-tab-btn",
+              "data-material-tab": "tree",
+              "aria-selected": "false"
+            }
+          },
+          {
+            "line": 44,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "class": "page-tab-btn",
+              "data-material-tab": "tags",
+              "aria-selected": "false"
+            }
+          },
+          {
+            "line": 56,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "id": "new-folder",
+              "class": "btn-primary material-small-btn"
+            }
+          },
+          {
+            "line": 66,
+            "tag": "input",
+            "attributes": {
+              "id": "material-search-input",
+              "type": "search",
+              "placeholder": "このフォルダ内を検索（名前・教材コード）"
+            }
+          },
+          {
+            "line": 71,
+            "tag": "input",
+            "attributes": {
+              "id": "material-file-input",
+              "type": "file",
+              "multiple": null,
+              "hidden": null
+            }
+          },
+          {
+            "line": 80,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "id": "material-upload-start",
+              "class": "btn-primary material-upload-start material-inline-upload-start",
+              "disabled": null
+            }
+          },
+          {
+            "line": 110,
+            "tag": "input",
+            "attributes": {
+              "id": "material-tree-search-input",
+              "type": "search",
+              "placeholder": "フォルダ名・教材名・教材コードを検索"
+            }
+          },
+          {
+            "line": 131,
+            "tag": "input",
+            "attributes": {
+              "id": "material-tag-search",
+              "type": "search",
+              "placeholder": "タグ・ファイル名を検索"
+            }
+          },
+          {
+            "line": 141,
+            "tag": "dialog",
+            "attributes": {
+              "id": "new-folder-modal",
+              "class": "app-modal"
+            }
+          },
+          {
+            "line": 144,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "id": "new-folder-close",
+              "class": "modal-close",
+              "aria-label": "閉じる"
+            }
+          },
+          {
+            "line": 148,
+            "tag": "form",
+            "attributes": {
+              "id": "new-folder-form",
+              "class": "modal-tab-panel"
+            }
+          },
+          {
+            "line": 151,
+            "tag": "input",
+            "attributes": {
+              "id": "new-folder-name",
+              "type": "text",
+              "maxlength": "120",
+              "required": null
+            }
+          },
+          {
+            "line": 154,
+            "tag": "button",
+            "attributes": {
+              "type": "submit",
+              "class": "btn-primary"
+            }
+          },
+          {
+            "line": 159,
+            "tag": "dialog",
+            "attributes": {
+              "id": "rename-material-modal",
+              "class": "app-modal"
+            }
+          },
+          {
+            "line": 162,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "id": "rename-material-close",
+              "class": "modal-close",
+              "aria-label": "閉じる"
+            }
+          },
+          {
+            "line": 166,
+            "tag": "form",
+            "attributes": {
+              "id": "rename-material-form",
+              "class": "modal-tab-panel"
+            }
+          },
+          {
+            "line": 169,
+            "tag": "input",
+            "attributes": {
+              "id": "rename-material-name",
+              "type": "text",
+              "maxlength": "255",
+              "required": null
+            }
+          },
+          {
+            "line": 173,
+            "tag": "input",
+            "attributes": {
+              "id": "material-code",
+              "type": "text",
+              "maxlength": "64",
+              "placeholder": "例: p1w",
+              "autocomplete": "off"
+            }
+          },
+          {
+            "line": 177,
+            "tag": "button",
+            "attributes": {
+              "type": "submit",
+              "class": "btn-primary"
+            }
+          },
+          {
+            "line": 182,
+            "tag": "dialog",
+            "attributes": {
+              "id": "material-preview-modal",
+              "class": "app-modal material-preview-modal"
+            }
+          },
+          {
+            "line": 186,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "id": "material-preview-download",
+              "aria-label": "ダウンロード"
+            }
+          },
+          {
+            "line": 189,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "id": "material-preview-close",
+              "class": "modal-close",
+              "aria-label": "閉じる"
+            }
+          }
+        ],
+        "interactions": []
+      }
+    ],
+    "admission": [
+      {
+        "file": "admission/admission.js",
+        "interactions": [
+          {
+            "line": 28,
+            "source": "tab.addEventListener(\"click\", function () {"
+          },
+          {
+            "line": 32,
+            "source": "tab.addEventListener(\"keydown\", function (event) {"
+          }
+        ]
+      },
+      {
+        "file": "admission/app.js",
+        "interactions": [
+          {
+            "line": 249,
+            "source": "async function api(path, options = {}) {"
+          },
+          {
+            "line": 252,
+            "source": "const response = await fetch(\"/api\" + path, {"
+          },
+          {
+            "line": 725,
+            "source": "events = await api(\"/admissions\");"
+          },
+          {
+            "line": 732,
+            "source": "els.print.addEventListener(\"click\", printActiveView);"
+          },
+          {
+            "line": 733,
+            "source": "window.addEventListener(\"afterprint\", cleanupPrintView);"
+          },
+          {
+            "line": 734,
+            "source": "els.filterOpen.addEventListener(\"click\", openFilterModal);"
+          },
+          {
+            "line": 735,
+            "source": "els.filterClose.addEventListener(\"click\", () => els.filterModal.close());"
+          },
+          {
+            "line": 736,
+            "source": "els.filterUniversitySearch.addEventListener(\"input\", filterUniversityOptions);"
+          },
+          {
+            "line": 738,
+            "source": "tab.addEventListener(\"click\", () => activateFilterTab(tab.dataset.admissionFilterTab));"
+          },
+          {
+            "line": 739,
+            "source": "tab.addEventListener(\"keydown\", (event) => {"
+          },
+          {
+            "line": 751,
+            "source": "button.addEventListener(\"click\", () => {"
+          },
+          {
+            "line": 757,
+            "source": "button.addEventListener(\"click\", () => {"
+          },
+          {
+            "line": 762,
+            "source": "els.filterClear.addEventListener(\"click\", () => {"
+          },
+          {
+            "line": 765,
+            "source": "els.filterForm.addEventListener(\"submit\", (event) => {"
+          },
+          {
+            "line": 778,
+            "source": "els.filterReset.addEventListener(\"click\", () => {"
+          },
+          {
+            "line": 785,
+            "source": "button.addEventListener(\"click\", () => activateCalendarMode(button.dataset.admissionCalendarMode));"
+          },
+          {
+            "line": 787,
+            "source": "els.calendarPrev.addEventListener(\"click\", () => {"
+          },
+          {
+            "line": 791,
+            "source": "els.calendarNext.addEventListener(\"click\", () => {"
+          },
+          {
+            "line": 796,
+            "source": "tab.addEventListener(\"click\", () => activateView(tab.dataset.admissionViewTab));"
+          },
+          {
+            "line": 797,
+            "source": "tab.addEventListener(\"keydown\", (event) => {"
+          },
+          {
+            "line": 811,
+            "source": "els.signOut.addEventListener(\"click\", async () => {"
+          }
+        ]
+      },
+      {
+        "file": "admission/index.html",
+        "controls": [
+          {
+            "line": 23,
+            "tag": "a",
+            "attributes": {
+              "class": "works-home",
+              "href": "/",
+              "aria-label": "Works ホーム"
+            }
+          },
+          {
+            "line": 26,
+            "tag": "button",
+            "attributes": {
+              "id": "sign-out",
+              "type": "button",
+              "class": "user-icon-btn",
+              "aria-label": "ログアウト"
+            }
+          },
+          {
+            "line": 43,
+            "tag": "button",
+            "attributes": {
+              "id": "admission-print",
+              "type": "button",
+              "class": "admission-print",
+              "aria-label": "現在の表示を印刷",
+              "title": "現在の表示を印刷"
+            }
+          },
+          {
+            "line": 47,
+            "tag": "button",
+            "attributes": {
+              "id": "admission-filter-open",
+              "type": "button",
+              "class": "btn-primary admission-filter-open"
+            }
+          },
+          {
+            "line": 53,
+            "tag": "button",
+            "attributes": {
+              "id": "admission-filter-reset",
+              "type": "button",
+              "class": "admission-filter-reset",
+              "aria-label": "絞り込みを解除",
+              "hidden": null
+            }
+          },
+          {
+            "line": 59,
+            "tag": "button",
+            "attributes": {
+              "class": "admission-view-tab",
+              "type": "button",
+              "role": "tab",
+              "aria-controls": "admission-view-list",
+              "data-admission-view-tab": "list"
+            }
+          },
+          {
+            "line": 62,
+            "tag": "button",
+            "attributes": {
+              "class": "admission-view-tab",
+              "type": "button",
+              "role": "tab",
+              "aria-controls": "admission-view-calendar",
+              "data-admission-view-tab": "calendar"
+            }
+          },
+          {
+            "line": 65,
+            "tag": "button",
+            "attributes": {
+              "class": "admission-view-tab",
+              "type": "button",
+              "role": "tab",
+              "aria-controls": "admission-view-gantt",
+              "data-admission-view-tab": "gantt"
+            }
+          },
+          {
+            "line": 68,
+            "tag": "button",
+            "attributes": {
+              "class": "admission-view-tab",
+              "type": "button",
+              "role": "tab",
+              "aria-controls": "admission-view-table",
+              "data-admission-view-tab": "table"
+            }
+          },
+          {
+            "line": 80,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "data-admission-calendar-mode": "month",
+              "aria-pressed": "true"
+            }
+          },
+          {
+            "line": 81,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "data-admission-calendar-mode": "continuous",
+              "aria-pressed": "false"
+            }
+          },
+          {
+            "line": 84,
+            "tag": "button",
+            "attributes": {
+              "id": "admission-calendar-prev",
+              "type": "button",
+              "aria-label": "前の月"
+            }
+          },
+          {
+            "line": 86,
+            "tag": "button",
+            "attributes": {
+              "id": "admission-calendar-next",
+              "type": "button",
+              "aria-label": "次の月"
+            }
+          },
+          {
+            "line": 116,
+            "tag": "dialog",
+            "attributes": {
+              "id": "admission-filter-modal",
+              "class": "app-modal admission-filter-modal"
+            }
+          },
+          {
+            "line": 119,
+            "tag": "button",
+            "attributes": {
+              "id": "admission-filter-close",
+              "type": "button",
+              "class": "modal-close",
+              "aria-label": "閉じる"
+            }
+          },
+          {
+            "line": 123,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "role": "tab",
+              "data-admission-filter-tab": "universities",
+              "aria-controls": "admission-filter-panel-universities"
+            }
+          },
+          {
+            "line": 126,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "role": "tab",
+              "data-admission-filter-tab": "types",
+              "aria-controls": "admission-filter-panel-types"
+            }
+          },
+          {
+            "line": 129,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "role": "tab",
+              "data-admission-filter-tab": "months",
+              "aria-controls": "admission-filter-panel-months"
+            }
+          },
+          {
+            "line": 134,
+            "tag": "form",
+            "attributes": {
+              "id": "admission-filter-form",
+              "class": "admission-filter-form"
+            }
+          },
+          {
+            "line": 138,
+            "tag": "input",
+            "attributes": {
+              "id": "admission-filter-university-search",
+              "type": "search",
+              "placeholder": "大学名を検索",
+              "autocomplete": "off"
+            }
+          },
+          {
+            "line": 143,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "data-admission-filter-select-all": "filter_university"
+            }
+          },
+          {
+            "line": 144,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "data-admission-filter-clear-group": "filter_university"
+            }
+          },
+          {
+            "line": 154,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "data-admission-filter-select-all": "filter_type"
+            }
+          },
+          {
+            "line": 155,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "data-admission-filter-clear-group": "filter_type"
+            }
+          },
+          {
+            "line": 159,
+            "tag": "input",
+            "attributes": {
+              "type": "checkbox",
+              "name": "filter_type",
+              "value": "general"
+            }
+          },
+          {
+            "line": 160,
+            "tag": "input",
+            "attributes": {
+              "type": "checkbox",
+              "name": "filter_type",
+              "value": "ct"
+            }
+          },
+          {
+            "line": 161,
+            "tag": "input",
+            "attributes": {
+              "type": "checkbox",
+              "name": "filter_type",
+              "value": "recommendation"
+            }
+          },
+          {
+            "line": 162,
+            "tag": "input",
+            "attributes": {
+              "type": "checkbox",
+              "name": "filter_type",
+              "value": "regional"
+            }
+          },
+          {
+            "line": 163,
+            "tag": "input",
+            "attributes": {
+              "type": "checkbox",
+              "name": "filter_type",
+              "value": "comprehensive"
+            }
+          },
+          {
+            "line": 171,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "data-admission-filter-select-all": "filter_month"
+            }
+          },
+          {
+            "line": 172,
+            "tag": "button",
+            "attributes": {
+              "type": "button",
+              "data-admission-filter-clear-group": "filter_month"
+            }
+          },
+          {
+            "line": 176,
+            "tag": "input",
+            "attributes": {
+              "type": "checkbox",
+              "name": "filter_month",
+              "value": "10"
+            }
+          },
+          {
+            "line": 177,
+            "tag": "input",
+            "attributes": {
+              "type": "checkbox",
+              "name": "filter_month",
+              "value": "11"
+            }
+          },
+          {
+            "line": 178,
+            "tag": "input",
+            "attributes": {
+              "type": "checkbox",
+              "name": "filter_month",
+              "value": "12"
+            }
+          },
+          {
+            "line": 179,
+            "tag": "input",
+            "attributes": {
+              "type": "checkbox",
+              "name": "filter_month",
+              "value": "1"
+            }
+          },
+          {
+            "line": 180,
+            "tag": "input",
+            "attributes": {
+              "type": "checkbox",
+              "name": "filter_month",
+              "value": "2"
+            }
+          },
+          {
+            "line": 181,
+            "tag": "input",
+            "attributes": {
+              "type": "checkbox",
+              "name": "filter_month",
+              "value": "3"
+            }
+          },
+          {
+            "line": 186,
+            "tag": "button",
+            "attributes": {
+              "id": "admission-filter-clear",
+              "type": "button"
+            }
+          },
+          {
+            "line": 187,
+            "tag": "button",
+            "attributes": {
+              "type": "submit",
+              "class": "btn-primary"
+            }
+          }
+        ],
+        "interactions": []
+      }
+    ]
+  }
+}

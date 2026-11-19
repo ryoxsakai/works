@@ -1,0 +1,72 @@
+/* Wiki-only styling; review/accepted content and native dialog state are owned by Wiki. */
+.wiki-bootstrap {
+  color-scheme: inherit;
+  --fg-body: var(--fg);
+  --fg-1: var(--fg);
+  --fg-2: var(--wiki-muted);
+  --bg-body: var(--bg-elevated);
+  --bg-1: var(--bg-hover);
+  --bg-2: var(--bg-hover);
+  --border-color: var(--wiki-border);
+  --primary-base: var(--accent);
+  --primary-contrast: #fff;
+  --control-checked-bg: var(--accent);
+  --control-checked-border-color: var(--accent);
+  --focus-ring-color: var(--fg);
+  --focus-ring-width: 2px;
+}
+.wiki-bootstrap .btn {
+  --btn-min-height: 44px;
+  --btn-padding-x: 12px;
+  --btn-padding-y: 9px;
+  --btn-font-size: inherit;
+  --btn-color: var(--fg);
+  --btn-bg: var(--bg-elevated);
+  --btn-border-color: var(--wiki-border);
+  --btn-hover-bg: var(--bg-hover);
+  --btn-hover-color: var(--fg);
+  --btn-hover-border-color: var(--wiki-border);
+  --btn-border-radius: 8px;
+  font-family: inherit;
+  white-space: normal;
+}
+.wiki-bootstrap .btn-solid {
+  --theme-bg: var(--accent);
+  --theme-contrast: #fff;
+  --btn-bg: var(--accent);
+  --btn-color: #fff;
+  --btn-hover-color: #fff;
+}
+.wiki-bootstrap .view-toggle .btn[aria-pressed="true"] {
+  --btn-bg: var(--accent);
+  --btn-color: #fff;
+  --btn-active-bg: var(--accent);
+  --btn-active-color: #fff;
+}
+.wiki-bootstrap .nav {
+  --nav-gap: .4rem;
+  --nav-link-color: var(--fg);
+  --nav-link-hover-color: var(--fg);
+  --nav-link-hover-bg: var(--bg-hover);
+}
+.wiki-bootstrap .nav-link { min-height: 44px; }
+.wiki-bootstrap .form-control {
+  --control-fg: var(--fg);
+  --control-bg: var(--bg-elevated);
+  --control-border-color: var(--wiki-border);
+  --control-border-radius: 8px;
+  --control-placeholder-color: var(--wiki-muted);
+  font-family: inherit;
+  font-size: 16px;
+  min-height: 44px;
+}
+:root[data-theme="dark"] .wiki-bootstrap select.form-control { background-image: var(--control-select-bg-dark); }
+.wiki-bootstrap .check { --check-border-color: var(--wiki-muted); padding: 0; width: 20px; height: 20px; }
+.wiki-bootstrap .card { --card-bg: var(--bg-elevated); --card-color: var(--fg); --card-border-color: var(--wiki-border); --card-border-radius: 12px; }
+.wiki-bootstrap .alert { --alert-bg: var(--bg-hover); --alert-color: var(--fg); --alert-border-color: var(--wiki-border); --alert-padding-x: 12px; --alert-padding-y: 10px; }
+.wiki-bootstrap .alert:empty { display: none; }
+.wiki-bootstrap .works-icon { width: 1.15em; height: 1.15em; flex-shrink: 0; vertical-align: -.125em; }
+.wiki-bootstrap .works-icon, .wiki-bootstrap .works-icon * { pointer-events: none; }
+.wiki-bootstrap [hidden] { display: none !important; }
+@media(prefers-reduced-motion: reduce) { .wiki-bootstrap :is(.btn,.nav-link,.check,.form-control,.alert) { transition: none; } }
+@media print { .wiki-bootstrap :is(.btn,.nav-link,.check,.form-control,.alert) { transition: none; } }

@@ -1,0 +1,203 @@
+  <main class="todo-main w-full mx-auto px-4 py-5">
+
+    <div class="todo-heading"><p class="eyebrow">MEMO</p><h2>メモ一覧</h2></div>
+    <p id="save-status" role="status" aria-live="polite"></p><button id="export-draft" hidden data-memo-action="exportDraft()">未保存JSONを保存</button>
+    <!-- ── メモ一覧 ────────────────────────────────────────── -->
+    <section class="todo-panel flex-1 overflow-hidden flex flex-col min-h-0 bg-white rounded-2xl shadow-sm border border-gray-200">
+
+      <!-- カテゴリタブ + ボタン群 -->
+      <div class="flex-shrink-0 px-4 pt-3 border-b border-gray-200 flex items-end gap-2">
+        <div id="tab-list" class="flex gap-0.5 overflow-x-auto flex-1" style="scrollbar-width:none"></div>
+        <div class="flex items-center gap-2 pb-1 flex-shrink-0">
+          <button data-memo-action="openCategoryModal()" title="カテゴリを管理"
+            class="icon-btn w-8 h-8 bg-gray-50 hover:bg-gray-100 text-gray-500 border border-gray-200">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+            </svg>
+          </button>
+          <button data-memo-action="openMemoModal(null)" title="新規メモ"
+            class="icon-btn w-8 h-8 bg-slate-700 hover:bg-slate-800 active:bg-slate-900 text-white">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- タグフィルター -->
+      <div id="tag-filter" class="hidden flex-shrink-0 px-4 py-2 border-b border-gray-100 flex gap-1.5 overflow-x-auto" style="scrollbar-width:none;-webkit-overflow-scrolling:touch"></div>
+
+      <!-- スクロールエリア（カードのみ） -->
+      <div class="flex-1 overflow-y-auto min-h-0" style="-webkit-overflow-scrolling:touch">
+        <div id="memo-grid" class="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+        <div id="empty-state" class="hidden py-16 text-center">
+          <div class="text-4xl mb-3">🗒️</div>
+          <p class="text-gray-400 font-medium">メモがありません</p>
+          <p class="text-gray-300 text-xs mt-1">「新規メモ」ボタンからメモを追加してください</p>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ── メモ作成・編集モーダル ──────────────────────────────── -->
+  <dialog id="memo-modal"
+    class="memo-native-dialog">
+    <div class="todo-modal bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 flex flex-col" style="max-height:90vh">
+
+      <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <h3 id="memo-modal-title" class="font-semibold text-gray-700">新規メモ</h3>
+        <button data-memo-action="closeMemoModal()" aria-label="メモ編集を閉じる" class="icon-btn text-gray-400 hover:text-gray-600 hover:bg-gray-100">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="px-6 py-4 flex flex-col gap-4 overflow-y-auto flex-1">
+
+        <!-- タイトル -->
+        <div>
+          <label for="modal-title" class="block text-xs font-medium text-gray-500 mb-1.5">タイトル</label>
+          <input id="modal-title" type="text" placeholder="メモのタイトル"
+            class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent placeholder-gray-300"/>
+        </div>
+
+        <!-- カテゴリ -->
+        <div>
+          <label for="modal-category" class="block text-xs font-medium text-gray-500 mb-1.5">カテゴリ</label>
+          <div class="flex gap-2">
+            <select id="modal-category"
+              class="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent">
+            </select>
+            <button data-memo-action="openCategoryModal()" title="カテゴリを管理"
+              class="px-2.5 py-2 bg-gray-50 hover:bg-gray-100 text-gray-500 rounded-xl border border-gray-200 transition-colors flex items-center justify-center">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- タグ -->
+        <div>
+          <label for="modal-tag-input" class="block text-xs font-medium text-gray-500 mb-1.5">タグ</label>
+          <div id="modal-tags-list" class="flex flex-wrap gap-1.5 mb-2"></div>
+          <input id="modal-tag-input" type="text" placeholder="タグを入力してEnterで追加"
+            class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent placeholder-gray-300"/>
+        </div>
+
+        <!-- 本文 -->
+        <div>
+          <div id="bodies-container" class="flex flex-col gap-3"></div>
+          <button type="button" data-memo-action="addModalBody()"
+            class="mt-2 flex items-center gap-1 text-xs text-gray-400 hover:text-slate-500 transition-colors">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
+            </svg>
+            本文を追加
+          </button>
+        </div>
+
+        <!-- 補足 -->
+        <div>
+          <div id="notes-container" class="flex flex-col gap-2 mb-1"></div>
+          <button type="button" data-memo-action="addModalNote()"
+            class="flex items-center gap-1 text-xs text-gray-400 hover:text-slate-500 transition-colors">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
+            </svg>
+            補足を追加
+          </button>
+        </div>
+
+        <!-- 日付情報（目立たない） -->
+        <div id="modal-dates" class="hidden flex gap-4 text-xs text-gray-300">
+          <span>作成日: <span id="modal-created-at"></span></span>
+          <span>更新日: <span id="modal-updated-at"></span></span>
+        </div>
+      </div>
+
+      <div class="px-6 py-4 border-t border-gray-100 flex justify-end gap-2">
+        <button data-memo-action="closeMemoModal()"
+          class="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-colors">
+          キャンセル
+        </button>
+        <button data-memo-action="saveMemo()"
+          class="px-5 py-2 bg-slate-700 hover:bg-slate-800 active:bg-slate-900 text-white rounded-xl text-sm font-semibold transition-colors">
+          保存する
+        </button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- ── カテゴリ管理モーダル ──────────────────────────────────── -->
+  <dialog id="category-modal" class="category-dialog" aria-labelledby="category-title" aria-describedby="category-help">
+    <div class="todo-modal category-surface">
+      <div class="category-header">
+        <div><p class="eyebrow">CATEGORIES</p><h3 id="category-title">カテゴリ管理</h3></div>
+        <button type="button" data-memo-action="closeCategoryModal()" class="icon-btn" aria-label="カテゴリ管理を閉じる">×</button>
+      </div>
+      <p id="category-help">矢印で順序を変更できます。変更はその都度保存されます。</p>
+      <ul id="category-list" aria-label="カテゴリ一覧"></ul>
+      <div class="category-add">
+        <label for="new-category-input">新しいカテゴリ</label>
+        <div class="category-add-controls">
+          <input id="new-category-input" type="text" placeholder="カテゴリ名を入力"/>
+          <button type="button" data-memo-action="addCategory()" class="bg-slate-700">追加</button>
+        </div>
+      </div>
+      <div class="category-footer"><button type="button" data-memo-action="closeCategoryModal()">完了</button></div>
+    </div>
+  </dialog>
+
+  <dialog id="view-modal"
+    class="memo-native-dialog">
+    <div class="todo-modal bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 flex flex-col" style="max-height:85vh">
+
+      <div class="flex items-start justify-between px-6 py-4 border-b border-gray-100">
+        <div class="flex-1 pr-4">
+          <p id="view-category" class="text-xs text-slate-400 mb-1"></p>
+          <h3 id="view-title" class="font-semibold text-gray-800 leading-snug"></h3>
+        </div>
+        <button data-memo-action="closeViewModal()" aria-label="メモ閲覧を閉じる" class="icon-btn text-gray-400 hover:text-gray-600 hover:bg-gray-100 flex-shrink-0">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="px-6 py-4 overflow-y-auto flex-1">
+        <div id="view-body-container"></div>
+        <div id="view-notes-wrap" class="hidden mt-3 pt-3 border-t border-gray-100 flex flex-col gap-1.5"></div>
+      </div>
+
+      <div id="view-tags" class="hidden px-6 pb-3 flex flex-wrap gap-1.5"></div>
+
+      <div class="px-6 py-3 border-t border-gray-100 flex items-center justify-between">
+        <p id="view-dates" class="text-xs text-gray-300"></p>
+        <div class="flex gap-1">
+          <button data-memo-action="viewCopyMemo()" title="コピー"
+            class="icon-btn text-gray-300 hover:text-slate-500 hover:bg-slate-50">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+          </button>
+          <button data-memo-action="viewEditMemo()" title="編集"
+            class="icon-btn text-gray-300 hover:text-slate-500 hover:bg-slate-50">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+          </button>
+          <button data-memo-action="viewDeleteMemo()" title="削除"
+            class="icon-btn text-gray-300 hover:text-red-400 hover:bg-red-50">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- ── トースト通知 ──────────────────────────────────────────── -->
+  <div id="toast"
+    class="fixed left-1/2 z-50 pointer-events-none bg-gray-800 text-white text-sm px-4 py-2.5 rounded-xl shadow-lg whitespace-nowrap max-w-xs truncate"
+    style="top:1rem;transform:translateX(-50%) translateY(-120%);transition:transform 0.3s ease,opacity 0.3s ease;opacity:0"></div>
+

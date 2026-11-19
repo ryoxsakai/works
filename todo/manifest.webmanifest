@@ -1,0 +1,16 @@
+{
+  "id": "/todo/",
+  "name": "Works ToDo",
+  "short_name": "Works ToDo",
+  "lang": "ja",
+  "start_url": "/todo/",
+  "scope": "/todo/",
+  "display": "standalone",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "any",
+      "type": "image/png"
+    }
+  ]
+}

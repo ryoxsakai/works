@@ -1,0 +1,47 @@
+/* Existing Segoe UI stack, compiled utilities and overlay controllers are retained. */
+.memo-bootstrap {
+  color-scheme: inherit;
+  --fg-body: var(--fg);
+  --fg-1: var(--fg);
+  --fg-2: var(--muted);
+  --bg-body: var(--bg-elevated);
+  --bg-1: var(--bg-hover);
+  --bg-2: var(--bg-hover);
+  --border-color: var(--border);
+  --primary-base: var(--fg);
+  --primary-contrast: var(--bg);
+  --focus-ring-color: var(--accent);
+  --focus-ring-width: 2px;
+}
+.memo-bootstrap .btn {
+  --btn-min-height: 44px;
+  --btn-padding-x: 12px;
+  --btn-padding-y: 9px;
+  --btn-font-size: inherit;
+  --btn-color: var(--fg);
+  --btn-bg: var(--bg-elevated);
+  --btn-border-color: var(--border);
+  --btn-hover-color: var(--fg);
+  --btn-hover-bg: var(--bg-hover);
+  --btn-hover-border-color: var(--border);
+  --btn-border-radius: 8px;
+  font-family: inherit;
+}
+.memo-bootstrap .btn-solid { --theme-bg: var(--fg); --theme-contrast: var(--bg); --btn-bg: var(--fg); --btn-color: var(--bg); --btn-hover-color: var(--bg); }
+.memo-bootstrap .icon-btn.btn { width: 44px; height: 44px; min-width: 44px; padding: 0; --btn-padding-x: 0; --btn-padding-y: 0; --btn-border-radius: 50%; }
+.memo-bootstrap button.icon-btn:not(.bg-slate-700) { background: var(--bg-hover); color: var(--fg); }
+.memo-bootstrap #tag-filter .btn { --btn-min-height: 32px; --btn-padding-y: 4px; --btn-padding-x: 10px; white-space: nowrap; }
+.memo-bootstrap #tab-list.nav { flex-wrap: nowrap; --nav-gap: 2px; }
+.memo-bootstrap .nav-link { min-height: 44px; white-space: nowrap; --nav-link-padding-x: 1rem; --nav-link-padding-y: .625rem; --nav-link-color: var(--fg); --nav-link-hover-color: var(--fg); --nav-link-hover-bg: var(--bg-hover); }
+.memo-bootstrap .form-control { --control-fg: var(--fg); --control-bg: var(--bg-elevated); --control-border-color: var(--border); --control-border-radius: 8px; --control-placeholder-color: var(--muted); font-family: inherit; min-height: 44px; }
+:root[data-theme="dark"] .memo-bootstrap select.form-control { background-image: var(--control-select-bg-dark); }
+.memo-bootstrap .card { --card-bg: var(--bg-elevated); --card-color: var(--fg); --card-border-color: var(--border); --card-border-radius: .65rem; }
+.memo-bootstrap .todo-modal.card { display: flex; flex-direction: column; }
+.memo-bootstrap .alert { --alert-bg: var(--bg-hover); --alert-color: var(--fg); --alert-padding-x: 12px; --alert-padding-y: 10px; }
+.memo-bootstrap .alert:empty { display: none; }
+.memo-bootstrap .works-icon { width: 1.15em; height: 1.15em; flex-shrink: 0; vertical-align: -.125em; }
+.memo-bootstrap .works-icon, .memo-bootstrap .works-icon * { pointer-events: none; }
+/* Bootstrap's Card must never expose a utility-hidden overlay or private panel. */
+.memo-bootstrap .hidden, .memo-bootstrap [hidden] { display: none !important; }
+@media(prefers-reduced-motion: reduce) { .memo-bootstrap :is(.btn,.nav-link,.form-control,.alert,.memo-card,.icon-btn,.tab-btn) { transition: none; } }
+@media print { .memo-bootstrap :is(.btn,.nav-link,.form-control,.alert,.memo-card,.icon-btn,.tab-btn) { transition: none; } }

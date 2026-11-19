@@ -1,0 +1,1487 @@
+.material-native{--fg:var(--ink);--bg-elevated:var(--surface);--bg-hover:var(--paper);--border:var(--line);--control:var(--line);--card-shadow:none;min-width:0;color:var(--ink)}.material-native [hidden]{display:none!important}.material-native button,.material-native input,.material-native select{font:inherit;color:inherit;box-sizing:border-box;max-width:100%}.material-native button{min-height:44px;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 12px}.material-native .material-surface{position:static;display:block;transform:none;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:none}.material-native main{padding:0}.material-native :is(p,span,strong,small,h2,h3){overflow-wrap:anywhere}.material-native dialog{color:var(--ink);background:var(--surface);max-width:calc(100vw - 24px);max-height:calc(100dvh - 32px);overflow:auto;overscroll-behavior:contain;border:1px solid var(--line);padding:16px;border-radius:12px}.material-native dialog::backdrop{background:#10182888}.material-native input:not([type=file]),.material-native select{min-height:44px;border:1px solid var(--line);border-radius:8px;background:var(--surface);padding:8px;width:100%}.material-native :is(button,input,select):focus-visible{outline:2px solid var(--accent);outline-offset:2px}.material-native dialog .modal-header{position:static;display:flex;flex-flow:row nowrap;gap:12px;align-items:start}.material-native dialog .modal-header h2{flex:1;min-width:0}.material-native dialog .modal-close{flex:0 0 44px;width:44px;min-width:44px;padding:8px}.material-native [data-material-recovery]{border:2px solid var(--accent);padding:12px;margin:12px 0}.material-native pre{white-space:pre-wrap;overflow-wrap:anywhere}.material-native .material-tree-children{min-width:0}.material-native .material-preview-actions{display:flex;gap:8px}
+
+.material-native .material-surface {
+  margin-bottom: 1.5rem;
+}
+
+.material-native .material-surface h2 {
+  margin-top: 0;
+  font-size: 1rem;
+}
+
+.material-native .home-settings-modal .modal-header {
+  padding: .8rem 1rem;
+  background: color-mix(in srgb, var(--bg-elevated) 92%, var(--accent) 8%);
+}
+
+.material-native .btn-primary {
+  background: var(--bg-elevated);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  font-weight: 600;
+}
+
+.material-native .btn-primary:hover {
+  background: var(--bg-hover);
+}
+
+.material-native .page-tabs {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 1rem;
+  padding: 0.4rem;
+  background: var(--bg-elevated);
+  border-radius: 1.1rem;
+  box-shadow: var(--card-shadow);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.material-native .page-tab-btn {
+  flex: 1 0 auto;
+  flex-shrink: 0;
+  min-width: 0;
+  min-height: 0;
+  border-radius: 0.8rem;
+  color: var(--muted);
+  padding: 0.55rem 0.9rem;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.material-native .page-tab-btn:hover {
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+
+.material-native .page-tab-btn[aria-selected="true"] {
+  color: var(--accent);
+  background: var(--bg-hover);
+  font-weight: 600;
+}
+
+.material-native .panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.material-native .panel-header h2 {
+  margin: 0;
+}
+
+.material-native dialog.app-modal {
+  width: min(480px, 92vw);
+  padding: 0;
+  border: none;
+  border-radius: 1.25rem;
+  background: var(--bg-elevated);
+  color: var(--fg);
+  box-shadow: 0 10px 30px rgba(30, 41, 59, 0.2);
+  overflow: hidden;
+}
+
+.material-native dialog.app-modal::backdrop {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.material-native .modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.material-native .modal-header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.material-native .modal-close {
+  color: var(--muted);
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.material-native .modal-tab-panel {
+  padding: 1rem;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.material-native .edit-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.material-native .edit-actions button {
+  min-height: 2.1rem;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.8rem;
+}
+
+.material-native .edit-actions button[type="submit"] {
+  background: var(--bg-elevated);
+  color: var(--fg);
+  border: 1px solid var(--border);
+}
+
+.material-native .collapsible-section .panel-header {
+  margin-bottom: 0;
+}
+
+.material-native .material-block.dragging {
+  opacity: 0.5;
+}
+
+.material-native .material-block-header {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.4rem;
+  touch-action: none;
+}
+
+.material-native .material-block-header h4 {
+  flex: 1;
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.material-native .material-chevron {
+  font-size: 0.7rem;
+  color: var(--muted);
+  transition: transform 0.15s ease;
+}
+
+.material-native .material-block.collapsed .material-chevron {
+  transform: rotate(-90deg);
+}
+
+.material-native .material-block.collapsed .chapter-progress-list {
+  display: none;
+}
+
+.material-native .material-drag-handle {
+  color: var(--muted);
+  font-size: 0.8rem;
+  cursor: grab;
+}
+
+.material-native .material-block-remove {
+  min-width: 1.9rem;
+  min-height: 1.9rem;
+  padding: 0.3rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+@media print {
+
+  .material-native .page-tabs,
+  .material-native .collapsible-section .panel-header button,
+  .material-native .material-drag-handle,
+  .material-native .material-block-remove {
+    display: none !important;
+  }
+
+  .material-native .material-surface {
+    margin-bottom: 0;
+  }
+}
+
+.material-native .record-panel > .panel-header,
+.material-native .curriculum-panel > .panel-header:first-child {
+  margin-bottom: 1rem;
+  padding: .15rem 0;
+}
+
+.material-native .record-panel .panel-header h2,
+.material-native .curriculum-panel > .panel-header:first-child h2 {
+  font-size: 1.35rem;
+  letter-spacing: .02em;
+}
+
+.material-native .record-panel .panel-header h2 i,
+.material-native .curriculum-panel > .panel-header:first-child h2 i {
+  color: var(--accent);
+}
+
+.material-native .curriculum-panel .collapsible-section .panel-header {
+  margin-bottom: 0;
+}
+
+.material-native .curriculum-panel .material-block {
+  padding: .7rem;
+  border: 1px solid var(--border);
+  border-radius: .85rem;
+  background: color-mix(in srgb, var(--bg-elevated) 94%, var(--accent) 6%);
+}
+
+@media (max-width: 640px) {
+  .material-native .record-panel .panel-header,
+  .material-native .curriculum-panel > .panel-header:first-child {
+    align-items: flex-start;
+  }
+}
+
+.material-native .page-tabs {
+  border-radius: .55rem;
+}
+
+.material-native .page-tab-btn {
+  border-radius: .38rem;
+}
+
+.material-native dialog.app-modal {
+  border-radius: .65rem;
+}
+.material-native .panel-header h2 {
+  font-weight: 700;
+}
+
+.material-native .page-tab-btn[aria-selected="true"] {
+  font-weight: 500;
+}
+
+.material-native #settings-modal .modal-header {
+  padding: .8rem 1rem;
+  background: color-mix(in srgb, var(--bg-elevated) 92%, var(--accent) 8%);
+}
+
+.material-native #settings-modal .modal-tab-panel {
+  min-height: 0;
+  max-height: none;
+  padding: 1rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.material-native #settings-modal .modal-tab-panel > .hint:first-child {
+  margin-bottom: .9rem;
+  line-height: 1.6;
+}
+
+.material-native .material-settings-section {
+  padding: .9rem;
+  border: 1px solid var(--border);
+  border-radius: .65rem;
+  background: color-mix(in srgb, var(--bg-elevated) 96%, var(--accent) 4%);
+}
+
+.material-native .material-settings-section + .material-settings-section {
+  margin-top: 1rem;
+}
+
+.material-native .material-category-item .material-count {
+  min-width: 2.5rem;
+  padding: .16rem .42rem;
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--border));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 7%, var(--bg-elevated));
+  color: var(--accent);
+  font-size: .7rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.material-native .material-category-title {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  font-weight: 700;
+}
+
+.material-native .material-category-title .bx {
+  color: var(--accent);
+  font-size: 1rem;
+}
+
+.material-native .material-category-edit-form,
+.material-native .material-edit-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: .5rem;
+  padding: .55rem;
+  margin-bottom: .5rem;
+  border: 1px solid var(--accent);
+  border-radius: .55rem;
+  background: var(--bg-elevated);
+}
+
+.material-native .material-category-group {
+  padding: .65rem;
+  margin-bottom: .7rem;
+  border: 1px solid var(--border);
+  border-radius: .6rem;
+  background: var(--bg);
+  overflow: hidden;
+}
+
+.material-native .material-category-group:last-child {
+  margin-bottom: 0;
+}
+
+.material-native .material-category-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem;
+  margin: -.65rem -.65rem .65rem;
+  padding: .52rem .65rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 18%, var(--border));
+  border-left: 3px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 7%, var(--bg-elevated));
+}
+
+.material-native .material-category-group-header h4 {
+  display: flex;
+  align-items: center;
+  gap: .42rem;
+  margin: 0;
+  min-width: 0;
+  font-size: .88rem;
+  font-weight: 700;
+}
+
+.material-native .material-category-group-header h4 .bx {
+  display: inline-grid;
+  flex: 0 0 1.65rem;
+  width: 1.65rem;
+  height: 1.65rem;
+  place-items: center;
+  border-radius: .36rem;
+  background: color-mix(in srgb, var(--accent) 13%, var(--bg-elevated));
+  color: var(--accent);
+  font-size: .95rem;
+}
+
+.material-native .material-category-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.material-native .material-category-count {
+  flex: 0 0 auto;
+  padding: .18rem .48rem;
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--border));
+  border-radius: 999px;
+  background: var(--bg-elevated);
+  color: var(--accent);
+  font-size: .68rem;
+  font-weight: 600;
+}
+
+.material-native .material-category-group .term-item {
+  flex-wrap: wrap;
+  padding: .45rem .55rem;
+}
+
+.material-native .material-category-select {
+  width: min(10rem, 32vw);
+  min-height: 2rem;
+  padding: .3rem .45rem;
+  font-size: .76rem;
+}
+
+.material-native .material-item-actions {
+  display: flex;
+  gap: .3rem;
+}
+
+.material-native .material-item-actions button,
+.material-native .material-category-item button {
+  min-width: 1.9rem;
+  min-height: 1.9rem;
+  padding: .3rem;
+  font-size: .75rem;
+}
+
+.material-native .material-delete {
+  color: #dc2626;
+}
+
+.material-native .material-delete:hover {
+  background: rgba(220, 38, 38, .1);
+  color: #dc2626;
+}
+
+.material-native .material-group-empty {
+  margin: 0;
+  padding: .2rem 0;
+  font-size: .76rem;
+}
+
+.material-native .material-category-add-form input {
+  flex: 1 1 14rem;
+}
+
+.material-native .material-add-form select {
+  flex: 0 1 10rem;
+}
+
+.material-native .material-add-form input {
+  flex: 1 1 15rem;
+}
+
+@media (max-width: 560px) {
+  .material-native .material-item .term-item-label {
+    flex-basis: calc(100% - 10.5rem);
+  }
+
+  .material-native .material-category-select {
+    width: 9.5rem;
+  }
+
+  .material-native .material-item-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .material-native .material-category-edit-form,
+  .material-native .material-edit-form {
+    grid-template-columns: 1fr;
+  }
+
+  .material-native .material-add-form select,
+  .material-native .material-add-form input {
+    flex-basis: calc(100% - 3rem);
+  }
+}
+
+.material-native .page-tabs {
+  border-radius: .42rem;
+}
+
+.material-native .page-tab-btn,
+.material-native .curriculum-panel .material-block {
+  border-radius: .3rem;
+}
+
+.material-native dialog.app-modal {
+  border-radius: .45rem;
+}
+
+.material-native .page-tabs {
+  border-radius: .52rem;
+}
+
+.material-native .page-tab-btn,
+.material-native .curriculum-panel .material-block {
+  border-radius: .38rem;
+}
+
+.material-native dialog.app-modal {
+  border-radius: .55rem;
+}
+.material-native .material-page-tabs {
+  position: sticky;
+  top: 3.15rem;
+  z-index: 20;
+}
+
+.material-native .material-panel {
+  padding: 1rem;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: .52rem;
+  box-shadow: var(--card-shadow);
+}
+
+.material-native .material-heading {
+  margin-bottom: .85rem;
+}
+
+.material-native .material-heading h2 {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.material-native .material-heading h2 i {
+  color: var(--accent);
+}
+
+.material-native .material-small-btn {
+  min-height: 2rem;
+  padding: .35rem .55rem;
+  font-size: .78rem;
+  border-radius: .4rem;
+}
+
+.material-native .material-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: .15rem;
+  min-height: 2rem;
+  margin-bottom: .7rem;
+  overflow-x: auto;
+  white-space: nowrap;
+  -webkit-overflow-scrolling: touch;
+}
+
+.material-native .material-breadcrumb-btn {
+  min-width: 0;
+  min-height: 1.8rem;
+  padding: .2rem .35rem;
+  color: var(--muted);
+  font-size: .76rem;
+  border-radius: .32rem;
+}
+
+.material-native .material-breadcrumb-btn:last-child {
+  color: var(--fg);
+  font-weight: 600;
+}
+
+.material-native .material-breadcrumb-separator {
+  color: var(--muted);
+  font-size: .85rem;
+}
+
+.material-native .material-toolbar {
+  margin-bottom: .8rem;
+}
+
+.material-native .material-search {
+  display: flex;
+  align-items: center;
+  gap: .35rem;
+  padding: 0 .55rem;
+  border: 1px solid var(--border);
+  border-radius: .4rem;
+  background: var(--bg-hover);
+  color: var(--muted);
+}
+
+.material-native .material-search input {
+  width: 100%;
+  min-width: 0;
+  padding: .5rem 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font-size: .82rem;
+}
+
+.material-native .material-search input:focus {
+  background: transparent;
+}
+
+.material-native .material-folder-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .55rem;
+  margin-bottom: 1rem;
+}
+
+.material-native .material-folder-card {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: .46rem;
+  background: var(--bg-elevated);
+  box-shadow: var(--card-shadow);
+}
+
+.material-native .material-folder-open {
+  flex: 1;
+  min-width: 0;
+  min-height: 3.5rem;
+  justify-content: flex-start;
+  padding: .55rem .45rem .55rem .65rem;
+  color: var(--fg);
+  text-align: left;
+}
+
+.material-native .material-folder-open > .bx-chevron-right {
+  margin-left: auto;
+  color: var(--muted);
+}
+
+.material-native .material-folder-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  flex-shrink: 0;
+  border-radius: .38rem;
+  background: color-mix(in srgb, var(--accent) 10%, var(--bg-elevated));
+  color: var(--accent);
+  font-size: 1.15rem;
+}
+
+.material-native .material-folder-copy,
+.material-native .material-file-copy,
+.material-native .material-upload-copy {
+  display: grid;
+  min-width: 0;
+  gap: .1rem;
+  flex: 1;
+}
+
+.material-native .material-folder-copy strong,
+.material-native .material-file-copy strong,
+.material-native .material-upload-copy strong {
+  overflow: hidden;
+  color: var(--fg);
+  font-size: .82rem;
+  font-weight: 600;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.material-native .material-folder-copy small,
+.material-native .material-file-copy small,
+.material-native .material-upload-copy small {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: .68rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.material-native .material-icon-btn {
+  min-width: 1.85rem;
+  min-height: 1.85rem;
+  padding: .25rem;
+  border-radius: .34rem;
+  font-size: .9rem;
+}
+
+.material-native .material-folder-card > .material-icon-btn {
+  margin-right: .3rem;
+}
+
+.material-native .material-file-section {
+  padding-top: .75rem;
+  border-top: 1px solid var(--border);
+}
+
+.material-native .material-file-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: .4rem;
+}
+
+.material-native .material-file-heading h3 {
+  margin: 0;
+  font-size: .86rem;
+  font-weight: 700;
+}
+
+.material-native .material-count {
+  color: var(--muted);
+  font-size: .7rem;
+}
+
+.material-native .material-file-list,
+.material-native .material-upload-queue {
+  display: grid;
+  gap: .35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.material-native .material-file-item {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .55rem .45rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.material-native .material-file-item:last-child {
+  border-bottom: 0;
+}
+
+.material-native .material-file-info {
+  display: flex;
+  align-items: center;
+  gap: .55rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.material-native .material-file-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  flex-shrink: 0;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+  border-radius: .36rem;
+  color: var(--accent);
+  font-size: 1rem;
+}
+
+.material-native .material-file-actions {
+  display: flex;
+  gap: .15rem;
+  flex-shrink: 0;
+}
+
+.material-native .material-empty {
+  display: grid;
+  justify-items: center;
+  gap: .35rem;
+  padding: 2.2rem 1rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+.material-native .material-empty[hidden] {
+  display: none !important;
+}
+
+.material-native .material-empty i {
+  font-size: 2rem;
+}
+
+.material-native .material-empty p {
+  margin: 0;
+  font-size: .8rem;
+}
+
+.material-native .material-upload-folder,
+.material-native .material-dialog-field {
+  display: grid;
+  gap: .35rem;
+  margin-bottom: .8rem;
+  color: var(--muted);
+  font-size: .75rem;
+}
+
+.material-native .material-upload-folder select,
+.material-native .material-dialog-field input {
+  width: 100%;
+  background: var(--bg-hover);
+  font-size: .82rem;
+}
+
+.material-native .material-dropzone {
+  display: grid;
+  justify-items: center;
+  gap: .4rem;
+  padding: 2rem 1rem;
+  border: 1px dashed color-mix(in srgb, var(--accent) 45%, var(--border));
+  border-radius: .5rem;
+  background: color-mix(in srgb, var(--accent) 3%, var(--bg-elevated));
+  color: var(--muted);
+  cursor: pointer;
+  text-align: center;
+  transition: background-color .15s ease, border-color .15s ease;
+}
+
+.material-native .material-dropzone:hover,
+.material-native .material-dropzone.is-dragging {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg-elevated));
+}
+
+.material-native .material-dropzone strong {
+  color: var(--fg);
+  font-size: .86rem;
+  font-weight: 600;
+}
+
+.material-native .material-dropzone > span:last-child {
+  font-size: .72rem;
+}
+
+.material-native .material-dropzone-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.8rem;
+  height: 2.8rem;
+  border-radius: .5rem;
+  background: var(--accent);
+  color: #ffffff;
+  font-size: 1.5rem;
+}
+
+.material-native .material-upload-queue {
+  margin-top: .8rem;
+}
+
+.material-native .material-upload-item {
+  padding: .55rem .6rem;
+  border: 1px solid var(--border);
+  border-radius: .42rem;
+  background: var(--bg-elevated);
+}
+
+.material-native .material-upload-item-row {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+}
+
+.material-native .material-upload-item.is-done .material-file-icon {
+  border-color: #22a06b;
+  color: #22a06b;
+}
+
+.material-native .material-upload-item.is-error .material-file-icon,
+.material-native .material-upload-item.is-error small {
+  border-color: #dc2626;
+  color: #dc2626;
+}
+
+.material-native .material-progress {
+  height: .18rem;
+  margin-top: .45rem;
+  overflow: hidden;
+  border-radius: .1rem;
+  background: var(--bg-hover);
+}
+
+.material-native .material-progress span {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: var(--accent);
+  transition: width .15s ease;
+}
+
+.material-native .material-upload-start {
+  width: 100%;
+  margin-top: .8rem;
+  border-radius: .42rem;
+}
+
+@media (max-width: 640px) {
+  .material-native .material-page-tabs {
+    top: 2.95rem;
+  }
+
+  .material-native .material-panel {
+    padding: .8rem;
+  }
+
+  .material-native .material-folder-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .material-native .material-heading h2 {
+    font-size: 1.1rem;
+  }
+}
+
+.material-native :root[data-theme="dark"] .material-search,
+.material-native :root[data-theme="dark"] .material-upload-folder select,
+.material-native :root[data-theme="dark"] .material-dialog-field input {
+  background: color-mix(in srgb, var(--bg-elevated) 94%, #ffffff 6%);
+}
+.material-native .material-file-item {
+  cursor: grab;
+}
+
+.material-native .material-file-item:active {
+  cursor: grabbing;
+}
+
+.material-native .material-file-item.is-dragging {
+  opacity: .42;
+}
+
+.material-native .material-folder-card.is-drop-target,
+.material-native .material-breadcrumb-btn.is-drop-target {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--bg-elevated));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.material-native .material-file-icon.is-pdf {
+  border-color: color-mix(in srgb, #dc2626 45%, var(--border));
+  color: #dc2626;
+}
+
+.material-native .material-file-icon.is-word {
+  border-color: color-mix(in srgb, #2563eb 45%, var(--border));
+  color: #2563eb;
+}
+
+.material-native .material-file-icon.is-sheet {
+  border-color: color-mix(in srgb, #15803d 45%, var(--border));
+  color: #15803d;
+}
+
+.material-native .material-file-icon.is-slide {
+  border-color: color-mix(in srgb, #ea580c 45%, var(--border));
+  color: #ea580c;
+}
+
+.material-native .material-file-icon.is-image {
+  border-color: color-mix(in srgb, #9333ea 45%, var(--border));
+  color: #9333ea;
+}
+
+.material-native .material-file-icon.is-video {
+  border-color: color-mix(in srgb, #db2777 45%, var(--border));
+  color: #db2777;
+}
+
+.material-native .material-file-icon.is-audio {
+  border-color: color-mix(in srgb, #7c3aed 45%, var(--border));
+  color: #7c3aed;
+}
+
+.material-native .material-file-icon.is-archive {
+  border-color: color-mix(in srgb, #a16207 45%, var(--border));
+  color: #a16207;
+}
+
+.material-native .material-file-icon.is-text {
+  border-color: color-mix(in srgb, #475569 45%, var(--border));
+  color: #475569;
+}
+
+.material-native .material-preview-modal {
+  width: min(960px, 96vw) !important;
+  max-width: 96vw;
+}
+
+.material-native .material-preview-actions {
+  display: flex;
+  align-items: center;
+  gap: .15rem;
+}
+
+.material-native .material-preview-actions button {
+  min-width: 1.9rem;
+  min-height: 1.9rem;
+  padding: .25rem;
+  border-radius: .34rem;
+}
+
+.material-native .material-preview-body {
+  display: grid;
+  place-items: center;
+  min-height: min(68vh, 680px);
+  max-height: 78vh;
+  overflow: auto;
+  background: var(--bg-hover);
+}
+
+.material-native .material-pdf-preview {
+  width: 100%;
+  height: min(72vh, 760px);
+  border: 0;
+  background: var(--bg-elevated);
+}
+
+.material-native .material-image-preview {
+  display: block;
+  max-width: 100%;
+  max-height: 72vh;
+  object-fit: contain;
+}
+
+.material-native .material-media-preview {
+  width: 100%;
+  max-height: 72vh;
+  background: #111827;
+}
+
+.material-native .material-audio-preview {
+  width: min(560px, 90%);
+}
+
+.material-native .material-text-preview {
+  width: 100%;
+  min-height: min(68vh, 680px);
+  margin: 0;
+  padding: 1rem;
+  overflow: auto;
+  color: var(--fg);
+  background: var(--bg-elevated);
+  font: 400 .78rem/1.65 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.material-native .material-preview-loading,
+.material-native .material-preview-unsupported {
+  display: grid;
+  justify-items: center;
+  gap: .45rem;
+  padding: 2rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+.material-native .material-preview-loading i,
+.material-native .material-preview-unsupported i {
+  font-size: 2rem;
+}
+
+.material-native .material-preview-unsupported p,
+.material-native .material-preview-unsupported small {
+  margin: 0;
+}
+
+.material-native .material-preview-unsupported p {
+  color: var(--fg);
+  font-size: .86rem;
+  font-weight: 600;
+}
+
+.material-native .material-preview-unsupported small {
+  font-size: .72rem;
+}
+
+@media (max-width: 640px) {
+  .material-native .material-file-item {
+    align-items: flex-start;
+  }
+
+  .material-native .material-file-actions {
+    display: grid;
+    grid-template-columns: repeat(2, 1.75rem);
+  }
+
+  .material-native .material-file-actions .material-icon-btn {
+    min-width: 1.75rem;
+    min-height: 1.75rem;
+  }
+
+  .material-native .material-preview-modal {
+    width: 98vw !important;
+    max-width: 98vw;
+  }
+
+  .material-native .material-preview-body {
+    min-height: 72vh;
+    max-height: 78vh;
+  }
+
+  .material-native .material-pdf-preview {
+    height: 74vh;
+  }
+}
+.material-native .material-dialog-actions {
+  justify-content: flex-end;
+}
+
+.material-native .material-folder-card,
+.material-native .material-file-item {
+  position: relative;
+}
+
+.material-native .material-folder-card[draggable="true"],
+.material-native .material-file-item[draggable="true"] {
+  cursor: grab;
+}
+
+.material-native .material-folder-card.is-dragging,
+.material-native .material-file-item.is-dragging {
+  opacity: .45;
+  cursor: grabbing;
+}
+
+.material-native .material-drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  min-width: 1.35rem;
+  color: var(--muted);
+  font-size: .88rem;
+  cursor: grab;
+  touch-action: none;
+}
+
+.material-native .material-folder-card > .material-drag-handle {
+  margin-left: .28rem;
+}
+
+.material-native .material-file-item > .material-drag-handle {
+  margin-right: -.16rem;
+}
+
+.material-native .material-folder-card.is-drop-inside,
+.material-native .material-breadcrumb-btn.is-drop-target {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg-elevated));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.material-native .material-folder-card.is-drop-before::before,
+.material-native .material-file-item.is-drop-before::before,
+.material-native .material-folder-card.is-drop-after::after,
+.material-native .material-file-item.is-drop-after::after {
+  position: absolute;
+  right: .25rem;
+  left: .25rem;
+  z-index: 3;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+  content: "";
+  pointer-events: none;
+}
+
+.material-native .material-folder-card.is-drop-before::before,
+.material-native .material-file-item.is-drop-before::before {
+  top: -2px;
+}
+
+.material-native .material-folder-card.is-drop-after::after,
+.material-native .material-file-item.is-drop-after::after {
+  bottom: -2px;
+}
+
+.material-native .material-folder-card.is-drop-before::before,
+.material-native .material-folder-card.is-drop-after::after {
+  right: 0;
+  left: 0;
+}
+
+@media (max-width: 640px) {
+  .material-native .material-drag-handle {
+    width: 1.15rem;
+    min-width: 1.15rem;
+  }
+}
+.material-native .material-inline-dropzone {
+  display: flex;
+  min-height: 4.2rem;
+  margin: .7rem 0 1rem;
+  padding: .6rem .7rem;
+  flex-direction: row;
+  align-items: center;
+  gap: .65rem;
+  border-radius: .48rem;
+  text-align: left;
+}
+
+.material-native .material-inline-dropzone .material-dropzone-icon {
+  width: 2rem;
+  height: 2rem;
+  margin: 0;
+  flex-shrink: 0;
+  border-radius: .38rem;
+  font-size: 1.15rem;
+}
+
+.material-native .material-inline-upload-copy {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: .08rem;
+}
+
+.material-native .material-inline-upload-copy strong {
+  font-size: .8rem;
+  font-weight: 600;
+}
+
+.material-native .material-inline-upload-copy small {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: .67rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.material-native .material-inline-upload-action {
+  padding: .35rem .55rem;
+  border: 1px solid var(--border);
+  border-radius: .36rem;
+  background: var(--bg-elevated);
+  color: var(--accent);
+  font-size: .72rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.material-native .material-inline-upload-queue:not(:empty) {
+  margin: -.45rem 0 .65rem;
+  padding: .45rem .55rem;
+  border: 1px solid var(--border);
+  border-radius: .46rem;
+  background: var(--bg-elevated);
+}
+
+.material-native .material-inline-upload-start {
+  display: block;
+  width: fit-content;
+  margin: -.35rem 0 .8rem auto;
+}
+.material-native .material-tree-search {
+  margin: .25rem 0 .65rem;
+}
+
+.material-native .material-tree-help {
+  margin: 0 0 .7rem;
+  color: var(--muted);
+  font-size: .7rem;
+}
+
+.material-native .material-tree {
+  padding: .35rem 0;
+}
+
+.material-native .material-tree-root-heading,
+.material-native .material-tree-folder > summary,
+.material-native .material-tree-file {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 2.65rem;
+  gap: .45rem;
+  padding: .35rem .4rem;
+  color: var(--fg);
+  text-align: left;
+}
+
+.material-native .material-tree-root-heading {
+  border-bottom: 1px solid var(--border);
+  font-size: .82rem;
+}
+
+.material-native .material-tree-root-heading > .bx {
+  color: var(--accent);
+  font-size: 1.05rem;
+}
+
+.material-native .material-tree-folder {
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+}
+
+.material-native .material-tree-folder > summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.material-native .material-tree-folder > summary::-webkit-details-marker {
+  display: none;
+}
+
+.material-native .material-tree-chevron {
+  display: inline-flex;
+  color: var(--muted);
+  transition: transform .15s ease;
+}
+
+.material-native .material-tree-folder[open] > summary > .material-tree-chevron {
+  transform: rotate(90deg);
+}
+
+.material-native .material-tree-folder > summary .material-folder-icon {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: .32rem;
+  font-size: 1rem;
+}
+
+.material-native .material-tree-folder-copy,
+.material-native .material-tree-file-copy {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: .05rem;
+}
+
+.material-native .material-tree-folder-copy strong,
+.material-native .material-tree-file-copy strong {
+  overflow: hidden;
+  font-size: .78rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.material-native .material-tree-folder-copy small,
+.material-native .material-tree-file-copy small {
+  color: var(--muted);
+  font-size: .64rem;
+}
+
+.material-native .material-tree-children {
+  margin-left: .8rem;
+  padding-left: .65rem;
+  border-left: 1px solid color-mix(in srgb, var(--accent) 25%, var(--border));
+}
+
+.material-native .material-tree-file {
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+  background: transparent;
+}
+
+.material-native .material-tree-file:hover {
+  background: var(--bg-hover);
+}
+
+.material-native .material-tree-file .material-file-icon {
+  width: 1.65rem;
+  height: 1.65rem;
+  border-radius: .3rem;
+  font-size: .92rem;
+}
+
+.material-native .material-tree-file > .bx-file-find {
+  color: var(--muted);
+  font-size: .88rem;
+}
+
+.material-native .material-tree-branch-empty {
+  display: block;
+  padding: .5rem .35rem;
+  color: var(--muted);
+  font-size: .68rem;
+}
+
+@media (max-width: 640px) {
+  .material-native .material-inline-upload-action {
+    font-size: 0;
+  }
+
+  .material-native .material-inline-upload-action::after {
+    font-size: .72rem;
+    content: "選択";
+  }
+
+  .material-native .material-tree-children {
+    margin-left: .45rem;
+    padding-left: .45rem;
+  }
+}
+.material-native .material-file-icon {
+  --file-color: #64748b;
+  position: relative;
+  width: 1.65rem;
+  height: 2rem;
+  overflow: hidden;
+  border: 0;
+  border-radius: .2rem;
+  background: var(--file-color);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--file-color) 78%, #000);
+  color: #fff;
+  clip-path: polygon(0 0, 70% 0, 100% 25%, 100% 100%, 0 100%);
+}
+
+.material-native .material-file-icon::after {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 30%;
+  height: 25%;
+  background: color-mix(in srgb, var(--file-color) 72%, #fff);
+  clip-path: polygon(0 0, 0 100%, 100% 100%);
+  content: "";
+}
+
+.material-native .material-file-mark {
+  position: relative;
+  z-index: 1;
+  max-width: 100%;
+  padding-top: .38rem;
+  color: #fff;
+  font-size: .43rem;
+  font-weight: 700;
+  letter-spacing: -.025em;
+  line-height: 1;
+  text-align: center;
+}
+
+.material-native .material-file-icon.is-pdf {
+  --file-color: #dc3f47;
+}
+
+.material-native .material-file-icon.is-word {
+  --file-color: #3178c6;
+}
+
+.material-native .material-file-icon.is-sheet {
+  --file-color: #26966a;
+}
+
+.material-native .material-file-icon.is-slide {
+  --file-color: #e87936;
+}
+
+.material-native .material-file-icon.is-image {
+  --file-color: #8b5cc7;
+}
+
+.material-native .material-file-icon.is-video {
+  --file-color: #d84f8c;
+}
+
+.material-native .material-file-icon.is-audio {
+  --file-color: #6d5bd0;
+}
+
+.material-native .material-file-icon.is-archive {
+  --file-color: #b8842f;
+}
+
+.material-native .material-file-icon.is-text {
+  --file-color: #687487;
+}
+
+.material-native .material-file-icon.is-generic {
+  --file-color: #87909d;
+}
+
+.material-native .material-tree-file .material-file-icon {
+  width: 1.5rem;
+  height: 1.82rem;
+  border-radius: .18rem;
+  font-size: inherit;
+}
+
+.material-native .material-tree-file .material-file-mark {
+  font-size: .39rem;
+}
+
+.material-native .material-upload-item .material-file-icon {
+  width: 1.55rem;
+  height: 1.88rem;
+}
+.material-native .material-search input[type="search"],
+.material-native .material-search input[type="search"]:hover,
+.material-native .material-search input[type="search"]:focus,
+.material-native .material-search input[type="search"]:focus-visible {
+  border: 0 !important;
+  border-radius: 0 !important;
+  outline: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.material-native .material-file-actions{display:flex;flex-wrap:wrap;gap:8px}.material-native .material-folder-card{grid-template-columns:auto minmax(0,1fr) auto auto auto}.material-native [data-placement] form{display:grid;gap:12px}.material-native .material-file-copy,.material-native .material-folder-copy{min-width:0}.material-native .material-file-copy strong,.material-native .material-folder-copy strong{white-space:normal;overflow-wrap:anywhere}.material-native .material-tree-children{padding-left:12px}.material-native .material-icon-btn{min-width:44px;min-height:44px}
+.material-native button{display:inline-flex;align-items:center;justify-content:center;gap:6px;width:auto;}
+.material-native .page-tabs{display:flex;flex-wrap:nowrap;position:static;box-sizing:border-box;width:100%;gap:6px;overflow-x:auto;}
+.material-native .page-tab-btn{flex:1 1 0;width:auto;min-width:0;padding:10px 6px;justify-content:center;}
+.material-native .material-heading{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;}
+.material-native .material-small-btn{flex:0 0 auto;width:auto;}
+.material-native .material-folder-card{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.material-native .material-folder-open{display:flex;align-items:center;flex:1 1 140px;width:auto;gap:8px;}
+.material-native .material-icon-btn{display:inline-flex;flex:0 0 44px;width:44px;min-width:44px;max-width:44px;height:44px;align-items:center;justify-content:center;}
+.material-native .material-drag-handle{flex:0 0 20px;width:20px;}
+.material-native .material-breadcrumb-btn{display:inline-flex;flex:0 0 auto;width:auto;}
+.material-native .material-file-item{flex-wrap:wrap;}
+@media(max-width:640px){.material-native .page-tab-btn{font-size:13px;gap:4px;}.material-native .material-folder-open{flex-basis:calc(100% - 36px);}.material-native .material-folder-card>.material-icon-btn:first-of-type{margin-left:auto;}}
+/* Keep upload copy readable in both Works themes. */
+.material-native .material-dropzone{background:var(--surface);color:var(--ink);}
+.material-native .material-dropzone.is-dragging{background:color-mix(in srgb,var(--accent) 10%,var(--surface));}

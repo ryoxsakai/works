@@ -1,0 +1,19 @@
+/* Shared Tutor components live inside this widget only. */
+.dashboard-home .home-lesson-cards { color-scheme: inherit; width: 100%; min-width: 0; margin: 0; padding: 0; border: 0; background: transparent; box-shadow: none; }
+.dashboard-home .home-lesson-cards .table-scroll { margin: 0; }
+.dashboard-home .home-lesson-cards .home-lesson-day { font-size: .8rem; color: var(--fg); margin: .3rem 0 .65rem; }
+.home-lesson-error:empty { display: none; }
+.home-lesson-error { color: var(--fg); }
+.dashboard-home .home-lesson-cards .home-memo-confirm { display: flex; align-items: flex-start; gap: .4rem; min-height: 44px; touch-action: pan-y; font-size: .72rem; margin-bottom: .5rem; white-space: normal; overflow-wrap: anywhere; }
+.dashboard-home .home-lesson-cards .home-memo-ack { flex: 0 0 auto; width: 20px; height: 20px; min-height: 20px; margin-top: .15rem; }
+.dashboard-home .home-lesson-cards .home-memo-confirm .check { width: 20px; height: 20px; min-height: 20px; }
+.dashboard-home .home-lesson-cards .record-prev-info p { margin: .3rem 0; }
+.dashboard-home .home-lesson-cards .record-card-heading { margin: 0; }
+@media print { .home-memo-confirm, .home-lesson-error { display: none !important; } }
+
+.home-lesson-cards .lesson-record-review { display: inline-flex; min-height: 44px; align-items: center; }
+
+/* Neutralize only the dashboard's generic button chrome on the shared title. */
+.dashboard-home .home-lesson-cards .record-student-link { border: 0; border-radius: 0; background: transparent; padding: 0; font-size: .85rem; font-weight: 600; }
+.dashboard-home .home-lesson-cards .record-card-heading { display: grid; grid-template-columns: minmax(0,1fr) fit-content(60%); }
+.dashboard-home .home-lesson-cards .home-memo-ack { border-color: var(--muted); }

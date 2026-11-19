@@ -1,37 +1,140 @@
 <!doctype html>
 <html lang="ja">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Works</title>
-  <script>
-    (function () {
-      var t = localStorage.getItem("works_theme");
-      if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
-    })();
-  </script>
-  <link rel="apple-touch-icon" href="/shared/logo.png" />
-  <link rel="stylesheet" href="/shared/styles.css?v=41" />
-  <link
-    rel="stylesheet"
-    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
-    referrerpolicy="no-referrer"
-  />
-</head>
-<body>
-  <header class="page-header">
-    <h1><span class="page-header-icon"><i class="fa-solid fa-layer-group"></i></span> Works</h1>
-  </header>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=M+PLUS+1p:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <meta
+      http-equiv="Cache-Control"
+      content="no-store, no-cache, must-revalidate, max-age=0"
+    />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <title>Works</title>
+    <script src="/shared/theme-init.js?v=1"></script>
+    <link rel="apple-touch-icon" href="/shared/logo.png" />
+    <link rel="stylesheet" href="/shared/styles.css?v=56" />
+    <link rel="stylesheet" href="/home.css?v=6" />
+    <link rel="stylesheet" href="/shared/header.css?v=2" />
+    <link rel="stylesheet" href="/shared/ui/menu-bootstrap.css?v=1" />
+    <link rel="stylesheet" href="/shared/ui/menu-tokens.css?v=1" />
+    <link rel="stylesheet" href="/shared/ui/button-states.css?v=1" />
+    <link rel="stylesheet" href="/shared/ui/tutor-bootstrap.css?v=1" />
+    <link rel="stylesheet" href="/shared/ui/tutor-tokens.css?v=1" />
+    <link rel="stylesheet" href="/tutor/record-layout.css?v=4-aligned" />
+    <link rel="stylesheet" href="/shared/ui/carousel-bootstrap.css?v=1" />
+    <link rel="stylesheet" href="/tutor/record-carousel.css?v=1" />
+    <link rel="stylesheet" href="/dashboard/lesson-cards.css?v=1" />
+    <link rel="stylesheet" href="/home-refined.css?v=1" />
+  <link rel="stylesheet" href="/shared/owner-memo.css?v=1"><link rel="stylesheet" href="/shared/card-loading.css?v=1" /></head>
+  <body class="dashboard-home">
+    <a class="skip-link" href="#dashboard-main">本文へ</a>
+    <header class="page-header works-header">
+      <h1>
+        <a class="works-home" href="/" aria-label="Works ホーム"
+          ><span class="page-header-icon" aria-hidden="true">W</span
+          ><span>Works</span></a
+        >
+      </h1>
+      <div class="works-header-actions">
+        <div class="user-bar">
+          <button class="btn btn-outline"
+            id="open-home-settings"
+            type="button"
+            aria-label="設定"
+            title="設定"
+          >
+            <span data-works-icon="bx-cog"></span>
+          </button>
+          <button
+            id="home-auth-action"
+            type="button"
+            class="user-icon-btn btn btn-outline"
+            aria-label="Googleでログイン"
+            title="Googleでログイン"
+          >
+            <img id="user-avatar" alt="" hidden />
+            <span data-works-icon="bx-user-circle" id="user-avatar-fallback"></span>
+          </button>
+        </div>
+      </div>
+    </header>
 
-  <main>
-    <ul class="module-grid">
-      <li>
-        <a class="module-card" href="/tutor/">
-          <h2><i class="fa-solid fa-graduation-cap"></i> 授業管理</h2>
-          <p>生徒ごとの授業予定と進捗を管理します</p>
-        </a>
-      </li>
-    </ul>
-  </main>
-</body>
+    <div class="dashboard-shell">
+      <main id="dashboard-main" tabindex="-1">
+        <p id="home-auth-error" class="error home-auth-error alert" role="alert"></p>
+        <p id="dashboard-date" hidden></p>
+        <p id="dashboard-message" class="alert" role="status" aria-live="polite"></p>
+        <div id="dashboard-editor" class="dashboard-editor" hidden>
+          <p>
+            このユーザー・ブラウザだけの配置です。非表示にしても元のデータは削除されません。
+          </p>
+          <div class="dashboard-actions">
+            <button id="dashboard-save" type="button" class="btn btn-solid theme-primary">
+              配置を保存</button
+            ><button class="btn btn-outline" id="dashboard-cancel" type="button">キャンセル</button
+            ><button class="btn btn-outline" id="dashboard-reset" type="button">初期配置に戻す</button>
+          </div>
+          <h3>ウィジェットを追加</h3>
+          <div id="dashboard-catalog" class="dashboard-catalog"></div>
+          <fieldset id="dashboard-shortcuts">
+            <legend>よく使う機能に表示するリンク</legend>
+          </fieldset>
+        </div>
+        <div id="dashboard-widgets" class="dashboard-widgets"></div>
+        <noscript
+          >ダッシュボードの表示にはJavaScriptが必要です。全メニューから従来の画面に移動できます。</noscript
+        >
+      </main>
+    </div>
+
+    <dialog
+      aria-labelledby="home-settings-title"
+      id="home-settings-modal"
+      class="app-modal home-settings-modal"
+    >
+      <div class="modal-header">
+        <h2 id="home-settings-title">
+          <span data-works-icon="bx-cog"></span> 設定
+        </h2>
+        <button
+          type="button"
+          id="home-settings-close"
+          class="modal-close btn btn-outline"
+          aria-label="閉じる"
+        >
+          <span data-works-icon="bx-x"></span>
+        </button>
+      </div>
+      <div class="modal-tab-panel">
+        <h3>表示テーマ</h3>
+        <div class="theme-options">
+          <label
+            ><input type="radio" name="home-theme" value="system" />
+            OS設定</label
+          >
+          <label
+            ><input type="radio" name="home-theme" value="light" />
+            ライト</label
+          >
+          <label
+            ><input type="radio" name="home-theme" value="dark" /> ダーク</label
+          >
+        </div>
+        <div class="home-settings-dashboard">
+          <h3>ホーム画面</h3>
+          <button id="dashboard-edit" type="button" class="btn btn-outline">ホーム画面の配置を編集</button>
+          <button id="dashboard-refresh" type="button" class="btn btn-outline">表示を更新</button>
+        </div>
+      </div>
+    </dialog>
+
+    <script type="module" src="/home.js?v=22"></script>
+  </body>
 </html>
+

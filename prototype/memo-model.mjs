@@ -1,0 +1,2 @@
+// Decode inert, source-generated action data; never evaluate HTML or JavaScript.
+export function parseMemoAction(value,allowed){const m=/^([A-Za-z]+)\((.*)\)$/.exec(value||'');if(!m||!allowed.has(m[1]))return null;try{const args=JSON.parse('['+m[2].replace(/,\s*event\s*$/,'')+']');if(args.some(v=>v!==null&&!['string','number'].includes(typeof v)))return null;return {name:m[1],args};}catch{return null;}}

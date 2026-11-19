@@ -1,0 +1,481 @@
+main {
+  max-width: 1600px;
+  margin: auto;
+  padding: 24px;
+}
+.wf-heading {
+  font-size: 16px;
+  margin-left: 20px;
+  font-weight: 400;
+}
+.wf-title,
+.wf-row,
+.wf-calendar-bar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+.wf-title p {
+  color: var(--muted);
+  margin: 0;
+}
+.wf-title h2 {
+  margin: 8px 0 20px;
+}
+.wf-patrol {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: var(--bg-elevated);
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  margin-bottom: 20px;
+}
+.wf-patrol small {
+  flex-basis: 100%;
+}
+.wf-filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+.wf-filters button[aria-pressed="true"] {
+  background: var(--accent, #5368d5);
+  color: white;
+}
+.wf-calendar-bar {
+  justify-content: flex-start;
+  margin-bottom: 16px;
+}
+.wf-calendar-bar span,
+.wf-note {
+  font-size: 12px;
+  color: var(--muted);
+}
+.wf-week {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 10px;
+}
+.wf-day {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  min-height: 230px;
+}
+.wf-day h3 {
+  font-size: 14px;
+  margin-top: 0;
+}
+.wf-day.today {
+  border-color: var(--accent, #5368d5);
+}
+.wf-day summary {
+  font-size: 12px;
+  margin: 12px 0;
+  cursor: pointer;
+}
+.wf-run {
+  display: block;
+  text-align: left;
+  width: 100%;
+  padding: 12px;
+  margin: 8px 0;
+  border-radius: 10px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.wf-run small {
+  display: block;
+  margin-top: 8px;
+}
+.wf-definitions {
+  margin: 24px 0;
+}
+.wf-definition {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border);
+}
+button {
+  cursor: pointer;
+}
+button:disabled {
+  cursor: wait;
+  opacity: 0.5;
+}
+.wf-dialog {
+  width: min(760px, 94vw);
+  max-height: 90vh;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--bg-elevated);
+  color: inherit;
+  padding: 24px;
+}
+.wf-dialog::backdrop {
+  background: #0008;
+}
+.wf-dialog label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 12px 0;
+  flex: 1;
+  min-width: 150px;
+}
+.wf-dialog input,
+.wf-dialog textarea,
+.wf-dialog select {
+  width: 100%;
+  box-sizing: border-box;
+}
+.wf-dialog textarea {
+  min-height: 72px;
+}
+.wf-dialog .wf-check {
+  flex-direction: row;
+  align-items: center;
+}
+.wf-check input {
+  width: auto;
+}
+.wf-task {
+  border: 1px solid var(--border);
+  padding: 12px;
+  border-radius: 10px;
+  margin-bottom: 12px;
+}
+.wf-dialog pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.wf-dialog ol {
+  padding-left: 24px;
+}
+.wf-dialog li {
+  margin: 12px 0;
+}
+.wf-dialog a {
+  overflow-wrap: anywhere;
+}
+#error,
+#editor-error,
+#run-error {
+  color: var(--danger, #c54c4c);
+}
+[hidden] {
+  display: none !important;
+}
+@media (max-width: 760px) {
+  main {
+    padding: 16px;
+  }
+  .wf-heading {
+    margin-left: 8px;
+    font-size: 14px;
+  }
+  .wf-week {
+    grid-template-columns: 1fr;
+  }
+  .wf-day {
+    display: none;
+    min-height: 200px;
+  }
+  .wf-day.selected {
+    display: block;
+  }
+  .wf-calendar-bar span {
+    flex-basis: 100%;
+  }
+  .wf-dialog {
+    padding: 16px;
+  }
+  .wf-row {
+    align-items: stretch;
+  }
+  .wf-row label {
+    min-width: 120px;
+  }
+  .wf-patrol {
+    gap: 8px;
+  }
+}
+#workspace button,
+.wf-dialog button {
+  color: var(--fg);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 12px;
+  line-height: 1.4;
+}
+#workspace button:hover,
+.wf-dialog button:hover {
+  background: var(--bg-hover);
+}
+#workspace #new,
+.wf-dialog button[type="submit"] {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+#workspace .wf-filters button[aria-pressed="true"] {
+  background: var(--accent);
+  color: #fff;
+}
+.wf-day {
+  background: var(--bg-elevated);
+}
+.wf-row {
+  justify-content: flex-start;
+}
+.wf-patrol #patrol-status {
+  margin-right: 12px;
+}
+.wf-note {
+  line-height: 1.7;
+}
+.wf-run small {
+  color: var(--muted);
+}
+html {
+  background: var(--bg);
+}
+body {
+  background-attachment: scroll;
+}
+#workspace input,
+#workspace select,
+.wf-dialog input,
+.wf-dialog select,
+.wf-dialog textarea {
+  background: var(--bg-elevated);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px;
+}
+#auth {
+  color: var(--fg);
+}
+.wf-patrol small {
+  color: var(--fg);
+}
+.wf-upcoming {
+  padding: 12px;
+  margin: 8px 0;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  overflow-wrap: anywhere;
+}
+.wf-upcoming small {
+  display: block;
+  margin-top: 8px;
+  font-size: 11px;
+}
+
+/* Overview keeps work visible across calendar dates. */
+.wf-focus {
+  margin: 12px 0 24px;
+}
+.wf-focus h2,
+.wf-section-title {
+  font-size: 18px;
+  margin: 0 0 8px;
+}
+.wf-focus .wf-title {
+  margin-bottom: 16px;
+}
+.wf-focus a {
+  color: var(--fg);
+  text-underline-offset: 4px;
+  font-size: 13px;
+}
+.wf-active-runs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: 12px;
+}
+#workspace .wf-active-card {
+  margin: 0;
+  padding: 18px;
+  border-left: 4px solid var(--accent);
+  line-height: 1.7;
+}
+#workspace .wf-run[data-status="review"] {
+  border-left: 4px solid #b7791f;
+}
+#workspace .wf-run[data-status="paused"],
+#workspace .wf-run[data-status="waiting"] {
+  border-left: 4px solid var(--muted);
+}
+.wf-status {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.wf-active-card progress {
+  display: block;
+  width: 100%;
+  height: 6px;
+  margin: 12px 0;
+  accent-color: var(--accent);
+}
+.wf-empty {
+  padding: 20px;
+  margin: 0;
+  color: var(--muted);
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+}
+.wf-settings {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin: 20px 0 28px;
+  background: var(--bg-elevated);
+}
+.wf-settings > summary,
+.wf-definitions > summary {
+  padding: 14px 16px;
+  cursor: pointer;
+  font-weight: 600;
+}
+.wf-settings .wf-patrol {
+  margin: 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+}
+.wf-definitions {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-elevated);
+}
+#definitions {
+  padding: 0 20px 12px;
+}
+.wf-definition:last-child {
+  border-bottom: 0;
+}
+.wf-definition > p {
+  line-height: 1.8;
+  max-width: 90ch;
+}
+.wf-definition h3 {
+  font-size: 16px;
+}
+#workspace :is(button, input, select, a):focus-visible,
+.wf-dialog :is(button, input, select, textarea, a):focus-visible {
+  outline: 2px solid var(--fg);
+  outline-offset: 3px;
+}
+.wf-dialog {
+  overscroll-behavior: contain;
+}
+@media (min-width: 761px) and (max-width: 1100px) {
+  .wf-week {
+    overflow-x: auto;
+    grid-template-columns: repeat(7, minmax(160px, 1fr));
+    padding-bottom: 12px;
+  }
+}
+@media (max-width: 760px) {
+  #workspace button {
+    min-height: 44px;
+  }
+  .wf-title h2 {
+    font-size: 22px;
+  }
+  .wf-filters {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding: 4px 2px 12px;
+  }
+  .wf-filters button {
+    flex-shrink: 0;
+  }
+  .wf-calendar-bar {
+    gap: 8px;
+  }
+  .wf-calendar-bar input {
+    min-width: 0;
+    flex: 1;
+  }
+  #definitions {
+    padding: 0 14px 12px;
+  }
+}
+body {
+  background: var(--bg);
+}
+/* Four date columns; mobile keeps one selected date and explicit date controls. */
+.wf-week {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  overflow: visible;
+}
+.wf-day,
+.wf-run {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.wf-role {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #20252c;
+  background: #e8e8ed;
+}
+.role-rose {
+  background: #f8dce5;
+}
+.role-sky {
+  background: #d7eafb;
+}
+.role-mint {
+  background: #d7eee2;
+}
+.role-amber {
+  background: #f7e8bf;
+}
+.role-violet {
+  background: #e6ddf7;
+}
+.wf-dialog textarea {
+  width: 100%;
+  box-sizing: border-box;
+}
+@media (max-width: 760px) {
+  .wf-week {
+    display: block;
+  }
+  .wf-day:not(.selected) {
+    display: none;
+  }
+  .wf-role {
+    max-width: 100%;
+  }
+}
+
+/* Three primary steps; auxiliary controls live in named native dialogs. */
+#workflow-steps {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:20px 0;}
+#workflow-steps button {min-height:52px;white-space:normal;text-align:left;}
+#workflow-steps [aria-current="step"] {border:2px solid var(--accent,#5368d5);background:var(--bg-elevated);font-weight:700;}
+#setup-guide {padding:16px;border:1px solid var(--border);border-radius:12px;margin:16px 0;background:var(--bg-elevated);}
+#setup-guide h3 {margin-top:0;}
+#setup-guide .wf-row {justify-content:flex-start;}
+.wf-tools {margin:16px 0;}
+#safety-status:empty {display:none;}
+#safety-status {padding:12px;border:1px solid var(--accent,#5368d5);border-radius:8px;}
+.workflow-workspace [hidden] {display:none!important;}
+.wf-dialog {max-height:90dvh;overflow:auto;}
+.wf-dialog button,#setup-guide button,#workflow-steps button {min-height:44px;}
+.wf-dialog :is(input,select,textarea) {max-width:100%;min-width:0;}
+@media(max-width:600px){#workflow-steps{gap:6px;}#workflow-steps button{padding:10px 6px;font-size:13px;}.wf-tools{display:flex;flex-wrap:wrap;}.wf-tools button{flex:1 1 40%;}#step-1 .wf-definition{overflow-wrap:anywhere;}}

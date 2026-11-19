@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=M+PLUS+1p:wght@400;500;700&display=swap" rel="stylesheet" />
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <title>入試管理 | Works</title>
+  <script src="/shared/theme-init.js?v=1"></script>
+  <link rel="apple-touch-icon" href="/shared/logo.png" />
+  <link rel="stylesheet" href="/shared/styles.css?v=54" />
+  <link rel="stylesheet" href="/shared/ui/admission-bootstrap.css?v=1" />
+  <link rel="stylesheet" href="/shared/ui/admission-tokens.css?v=1" />
+    <link rel="stylesheet" href="/shared/ui/button-states.css?v=1" />
+  <link rel="stylesheet" href="/admission/admission.css?v=16" />
+  <link rel="stylesheet" href="/shared/header.css?v=2" />
+  <script type="module" src="/shared/header.js?v=4"></script>
+</head>
+<body class="admission-bootstrap">
+  <header class="page-header works-header">
+    <h1><a class="works-home" href="/" aria-label="Works ホーム"><span class="page-header-icon" aria-hidden="true">W</span><span>Works</span></a><span class="works-page-title">入試管理</span></h1>
+    <div class="works-header-actions">
+      <div class="user-bar" hidden>
+      <button id="sign-out" type="button" class="user-icon-btn" aria-label="ログアウト">
+        <img id="user-avatar" alt="" hidden />
+        <span data-works-icon="bx-user-circle" id="user-avatar-fallback"></span>
+      </button>
+    </div>
+    </div>
+  </header>
+
+  <main class="admission-main">
+    <section id="signed-in" hidden>
+      <p id="admission-error" class="error" role="alert"></p>
+      <section class="admission-panel" aria-labelledby="admission-title">
+      <div class="admission-heading">
+        <div class="admission-heading-copy">
+          <p class="eyebrow">ADMISSION CALENDAR</p>
+          <h2 id="admission-title"><span data-works-icon="admission-event"></span> 入試日程</h2>
+        </div>
+        <button id="admission-print" type="button" class="admission-print" aria-label="現在の表示を印刷" title="現在の表示を印刷"><span data-works-icon="bx-printer"></span></button>
+      </div>
+
+      <div class="admission-filter-bar" aria-label="入試日程の絞り込み">
+        <button id="admission-filter-open" type="button" class="btn-primary admission-filter-open">
+          <span data-works-icon="admission-filter"></span>
+          絞り込み
+          <span id="admission-filter-count" class="admission-filter-count" hidden>0</span>
+        </button>
+        <p id="admission-filter-summary" class="admission-filter-summary">すべての入試日程</p>
+        <button id="admission-filter-reset" type="button" class="admission-filter-reset" aria-label="絞り込みを解除" hidden>
+          <span data-works-icon="admission-reset"></span>
+        </button>
+      </div>
+
+      <div class="admission-view-tabs" role="tablist" aria-label="入試日程の表示形式">
+        <button class="admission-view-tab" type="button" role="tab" aria-controls="admission-view-list" data-admission-view-tab="list">
+          <span data-works-icon="admission-list"></span> 一覧
+        </button>
+        <button class="admission-view-tab" type="button" role="tab" aria-controls="admission-view-calendar" data-admission-view-tab="calendar">
+          <span data-works-icon="admission-calendar"></span> カレンダー
+        </button>
+        <button class="admission-view-tab" type="button" role="tab" aria-controls="admission-view-gantt" data-admission-view-tab="gantt">
+          <span data-works-icon="admission-gantt"></span> ガント
+        </button>
+        <button class="admission-view-tab" type="button" role="tab" aria-controls="admission-view-table" data-admission-view-tab="table">
+          <span data-works-icon="admission-table"></span> 表
+        </button>
+      </div>
+
+      <section id="admission-view-list" class="admission-view" role="tabpanel" data-admission-view="list">
+        <div id="admission-list"></div>
+      </section>
+
+      <section id="admission-view-calendar" class="admission-view" role="tabpanel" data-admission-view="calendar" hidden>
+        <div class="admission-calendar-controls">
+          <div class="admission-calendar-mode" role="group" aria-label="カレンダーの表示方法">
+            <button type="button" data-admission-calendar-mode="month" aria-pressed="true"><span data-works-icon="admission-calendar"></span> 月表示</button>
+            <button type="button" data-admission-calendar-mode="continuous" aria-pressed="false"><span data-works-icon="admission-week"></span> 連続表示</button>
+          </div>
+          <div id="admission-calendar-nav" class="admission-calendar-nav">
+            <button id="admission-calendar-prev" type="button" aria-label="前の月"><span data-works-icon="bx-chevron-left"></span></button>
+            <strong id="admission-calendar-label"></strong>
+            <button id="admission-calendar-next" type="button" aria-label="次の月"><span data-works-icon="bx-chevron-right"></span></button>
+          </div>
+        </div>
+        <div class="admission-calendar-shell">
+          <div id="admission-calendar-grid" class="admission-calendar-grid"></div>
+          <div id="admission-calendar-continuous" class="admission-calendar-continuous" hidden></div>
+        </div>
+        <p id="admission-calendar-empty" class="admission-view-note" hidden>表示できる入試日程はありません。</p>
+      </section>
+
+      <section id="admission-view-gantt" class="admission-view" role="tabpanel" data-admission-view="gantt" hidden>
+        <div class="admission-gantt-shell">
+          <div id="admission-gantt" class="admission-gantt-inner"></div>
+        </div>
+        <div id="admission-gantt-print" class="admission-gantt-print" aria-hidden="true"></div>
+        <p id="admission-gantt-empty" class="admission-view-note" hidden>表示できる入試日程はありません。</p>
+      </section>
+
+      <section id="admission-view-table" class="admission-view" role="tabpanel" data-admission-view="table" hidden>
+        <div class="admission-table-shell">
+          <table class="admission-table">
+            <thead><tr><th>大学</th><th>方式</th><th>区分</th><th>日付</th><th>補足</th></tr></thead>
+            <tbody id="admission-table-body"></tbody>
+          </table>
+        </div>
+      </section>
+      </section>
+    </section>
+  </main>
+
+  <dialog id="admission-filter-modal" class="app-modal admission-filter-modal">
+    <div class="modal-header">
+      <h2><span data-works-icon="admission-filter"></span> 絞り込み設定</h2>
+      <button id="admission-filter-close" type="button" class="modal-close" aria-label="閉じる"><span data-works-icon="bx-x"></span></button>
+    </div>
+
+    <div class="modal-tabs admission-filter-tabs" role="tablist" aria-label="絞り込み項目">
+      <button type="button" role="tab" data-admission-filter-tab="universities" aria-controls="admission-filter-panel-universities">
+        <span data-works-icon="admission-school"></span> 大学
+      </button>
+      <button type="button" role="tab" data-admission-filter-tab="types" aria-controls="admission-filter-panel-types">
+        <span data-works-icon="admission-category"></span> 方式
+      </button>
+      <button type="button" role="tab" data-admission-filter-tab="months" aria-controls="admission-filter-panel-months">
+        <span data-works-icon="admission-calendar"></span> 一次実施月
+      </button>
+    </div>
+
+    <form id="admission-filter-form" class="admission-filter-form">
+      <section id="admission-filter-panel-universities" class="admission-filter-panel" role="tabpanel" data-admission-filter-panel="universities">
+        <label class="admission-filter-modal-search">
+          <span data-works-icon="admission-search"></span>
+          <input id="admission-filter-university-search" type="search" placeholder="大学名を検索" autocomplete="off" />
+        </label>
+        <div class="admission-filter-panel-tools">
+          <p class="admission-filter-help">対象にしたい大学を複数選択できます。</p>
+          <div>
+            <button type="button" data-admission-filter-select-all="filter_university">すべて選択</button>
+            <button type="button" data-admission-filter-clear-group="filter_university">すべて解除</button>
+          </div>
+        </div>
+        <div id="admission-filter-university-list" class="admission-filter-options admission-filter-university-list"></div>
+      </section>
+
+      <section id="admission-filter-panel-types" class="admission-filter-panel" role="tabpanel" data-admission-filter-panel="types" hidden>
+        <div class="admission-filter-panel-tools">
+          <p class="admission-filter-help">対象にしたい方式を複数選択できます。</p>
+          <div>
+            <button type="button" data-admission-filter-select-all="filter_type">すべて選択</button>
+            <button type="button" data-admission-filter-clear-group="filter_type">すべて解除</button>
+          </div>
+        </div>
+        <div class="admission-filter-options">
+          <label class="admission-filter-option"><input type="checkbox" name="filter_type" value="general" /><span>一般選抜</span></label>
+          <label class="admission-filter-option"><input type="checkbox" name="filter_type" value="ct" /><span>共通テスト利用</span></label>
+          <label class="admission-filter-option"><input type="checkbox" name="filter_type" value="recommendation" /><span>推薦</span></label>
+          <label class="admission-filter-option"><input type="checkbox" name="filter_type" value="regional" /><span>地域枠</span></label>
+          <label class="admission-filter-option"><input type="checkbox" name="filter_type" value="comprehensive" /><span>総合型選抜</span></label>
+        </div>
+      </section>
+
+      <section id="admission-filter-panel-months" class="admission-filter-panel" role="tabpanel" data-admission-filter-panel="months" hidden>
+        <div class="admission-filter-panel-tools">
+          <p class="admission-filter-help">一次試験が実施される月を複数選択できます。</p>
+          <div>
+            <button type="button" data-admission-filter-select-all="filter_month">すべて選択</button>
+            <button type="button" data-admission-filter-clear-group="filter_month">すべて解除</button>
+          </div>
+        </div>
+        <div class="admission-filter-options admission-filter-month-options">
+          <label class="admission-filter-option"><input type="checkbox" name="filter_month" value="10" /><span>10月</span></label>
+          <label class="admission-filter-option"><input type="checkbox" name="filter_month" value="11" /><span>11月</span></label>
+          <label class="admission-filter-option"><input type="checkbox" name="filter_month" value="12" /><span>12月</span></label>
+          <label class="admission-filter-option"><input type="checkbox" name="filter_month" value="1" /><span>1月</span></label>
+          <label class="admission-filter-option"><input type="checkbox" name="filter_month" value="2" /><span>2月</span></label>
+          <label class="admission-filter-option"><input type="checkbox" name="filter_month" value="3" /><span>3月</span></label>
+        </div>
+      </section>
+
+      <div class="admission-filter-actions">
+        <button id="admission-filter-clear" type="button"><span data-works-icon="admission-reset"></span> すべて解除</button>
+        <button type="submit" class="btn-primary"><span data-works-icon="bx-check"></span> 適用</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script type="module" src="/admission/app.js?v=17-avatar"></script>
+</body>
+</html>

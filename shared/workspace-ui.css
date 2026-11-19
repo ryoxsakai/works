@@ -1,0 +1,598 @@
+/* Shared workspace components for Workflow and Wiki. Intentionally scoped. */
+body.works-workspace {
+  --ui-muted: color-mix(in srgb, var(--fg) 72%, var(--bg-elevated));
+  --ui-line: color-mix(in srgb, var(--fg) 18%, var(--bg-elevated));
+  --ui-canvas: color-mix(in srgb, var(--bg) 96%, var(--fg));
+  background: var(--ui-canvas);
+  background-attachment: scroll;
+  color: var(--fg);
+  font-size: 14px;
+  line-height: 1.65;
+}
+.works-workspace main {
+  max-width: 1440px;
+  padding: 28px 24px 48px;
+  margin: 0 auto;
+}
+.works-workspace :is(button, input, select, textarea) {
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 400;
+}
+.works-workspace
+  :is(
+    #workspace,
+    #editor,
+    #definition-form,
+    #run-dialog,
+    #folder-dialog,
+    #login
+  )
+  button {
+  min-height: 40px;
+  min-width: 40px;
+  padding: 9px 14px;
+  border: 1px solid var(--ui-line);
+  border-radius: 8px;
+  background: var(--bg-elevated);
+  color: var(--fg);
+  box-shadow: none;
+  line-height: 20px;
+  cursor: pointer;
+  transition:
+    background-color 0.12s,
+    border-color 0.12s;
+}
+.works-workspace
+  :is(
+    #workspace,
+    #editor,
+    #definition-form,
+    #run-dialog,
+    #folder-dialog,
+    #login
+  )
+  button:hover {
+  background: var(--bg-hover);
+  transform: none;
+  box-shadow: none;
+}
+.works-workspace
+  :is(
+    #workspace,
+    #editor,
+    #definition-form,
+    #run-dialog,
+    #folder-dialog,
+    #login
+  )
+  button:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+.works-workspace
+  :is(
+    #workspace,
+    #editor,
+    #definition-form,
+    #run-dialog,
+    #folder-dialog,
+    #login
+  )
+  button.ui-primary,
+.works-workspace #workspace #new,
+.works-workspace #definition-form button[type="submit"],
+.works-workspace #editor button[type="submit"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+.works-workspace
+  :is(
+    #workspace,
+    #editor,
+    #definition-form,
+    #run-dialog,
+    #folder-dialog,
+    #login
+  )
+  button.ui-primary:hover {
+  filter: brightness(0.94);
+}
+.works-workspace
+  :is(
+    #workspace,
+    #editor,
+    #definition-form,
+    #run-dialog,
+    #folder-dialog,
+    #login
+  )
+  :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+  min-height: 40px;
+  padding: 9px 12px;
+  border: 1px solid var(--ui-line);
+  border-radius: 8px;
+  background: var(--bg-elevated);
+  color: var(--fg);
+  box-shadow: none;
+  line-height: 20px;
+}
+.works-workspace textarea {
+  resize: vertical;
+}
+.works-workspace :is(input, textarea)::placeholder {
+  color: var(--ui-muted);
+  opacity: 1;
+}
+.works-workspace
+  :is(
+    #workspace,
+    #editor,
+    #definition-form,
+    #run-dialog,
+    #folder-dialog,
+    #login
+  )
+  :is(button, input, textarea, select, summary, a):focus-visible {
+  outline: 2px solid var(--fg);
+  outline-offset: 3px;
+}
+.works-workspace :is(h2, h3, p) {
+  overflow-wrap: anywhere;
+}
+.works-workspace main h2 {
+  font-size: 18px;
+  font-weight: 600;
+}
+.works-workspace main h3 {
+  font-size: 15px;
+  font-weight: 600;
+}
+.works-workspace :is(.wf-note, .wf-title p, .ui-caption, .wiki-help, #meta) {
+  color: var(--ui-muted);
+  font-size: 12px;
+}
+.workspace-actions,
+.workspace-section-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.workspace-section-heading {
+  justify-content: space-between;
+  margin: 24px 0 12px;
+}
+.workspace-search {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin: 16px 0;
+}
+.workspace-search label {
+  font-size: 13px;
+  font-weight: 600;
+}
+.workspace-search input {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+.workspace-search .ui-caption {
+  flex-basis: 100%;
+  margin: 0;
+}
+.works-workspace .ui-segmented,
+.works-workspace .view-toggle {
+  display: inline-flex;
+  gap: 3px;
+  border-radius: 9px;
+  padding: 3px;
+  background: var(--bg-hover);
+  border: 1px solid var(--ui-line);
+}
+.works-workspace #workspace :is(.ui-segmented, .view-toggle) button {
+  min-height: 32px;
+  padding: 5px 12px;
+  border-color: transparent;
+  border-radius: 6px;
+  background: transparent;
+  white-space: nowrap;
+}
+.works-workspace
+  #workspace
+  :is(.ui-segmented, .view-toggle)
+  button[aria-pressed="true"] {
+  background: var(--bg-elevated);
+  color: var(--fg);
+  border-color: var(--ui-line);
+  font-weight: 600;
+}
+.works-workspace
+  :is(
+    .wf-focus,
+    .wf-settings,
+    .wf-definitions,
+    #folder-browser,
+    #folder-sidebar,
+    #detail,
+    #editor,
+    #login
+  ) {
+  background: var(--bg-elevated);
+  border: 1px solid var(--ui-line);
+  border-radius: 12px;
+  box-shadow: none;
+}
+.works-workspace .wf-focus {
+  padding: 20px;
+}
+.works-workspace .wf-title > div > h2,
+.works-workspace .wiki-heading h2 {
+  margin: 4px 0 8px;
+  font-size: 24px;
+  letter-spacing: -0.03em;
+}
+.works-workspace .wf-focus .wf-title h2 {
+  font-size: 18px;
+}
+.works-workspace .wf-title p,
+.works-workspace .wiki-heading p {
+  margin: 0;
+  color: var(--ui-muted);
+}
+.works-workspace .wf-title {
+  margin-bottom: 20px;
+}
+.works-workspace .wf-active-card {
+  min-height: 156px;
+  border-color: var(--ui-line);
+  padding: 16px;
+  display: block;
+  text-align: left;
+}
+.works-workspace .wf-status {
+  width: fit-content;
+  border-radius: 5px;
+  padding: 2px 8px;
+  margin-bottom: 10px;
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+.works-workspace .wf-run small {
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--ui-muted);
+}
+.works-workspace .wf-filters {
+  gap: 6px;
+  margin: 16px 0;
+}
+.works-workspace #workspace .wf-filters button {
+  border-radius: 20px;
+  padding-inline: 14px;
+}
+.works-workspace #workspace .wf-filters button[aria-pressed="true"] {
+  background: var(--fg);
+  color: var(--bg);
+  border-color: var(--fg);
+}
+.works-workspace .wf-week {
+  gap: 8px;
+}
+.works-workspace .wf-day {
+  padding: 10px;
+  border-color: var(--ui-line);
+  border-radius: 10px;
+}
+.works-workspace .wf-day.today {
+  border-color: var(--accent);
+}
+.works-workspace .wf-upcoming {
+  background: var(--ui-canvas);
+  border-radius: 8px;
+  border-color: var(--ui-line);
+}
+.works-workspace .wf-week.wf-agenda {
+  display: flex;
+  flex-direction: column;
+  overflow: visible;
+}
+.works-workspace .wf-agenda .wf-day {
+  display: grid;
+  grid-template-columns: 130px 1fr 1fr;
+  gap: 16px;
+  min-height: 0;
+}
+.works-workspace .wf-agenda .wf-day h3 {
+  margin: 12px 0;
+}
+.works-workspace .wf-definition {
+  padding-block: 20px;
+}
+.works-workspace .wf-definition > p {
+  color: var(--ui-muted);
+  font-size: 13px;
+}
+.works-workspace .wf-definition .wf-row {
+  gap: 8px;
+}
+.works-workspace #global-stop,
+.works-workspace #archive {
+  color: var(--fg);
+  border-color: var(--ui-line);
+}
+.works-workspace .wf-dialog,
+.works-workspace .wiki-dialog {
+  border: 1px solid var(--ui-line);
+  border-radius: 12px;
+  padding: 24px;
+}
+.works-workspace .wf-dialog .wf-title {
+  position: sticky;
+  top: -24px;
+  padding-block: 12px;
+  background: var(--bg-elevated);
+  z-index: 1;
+  border-bottom: 1px solid var(--ui-line);
+}
+.works-workspace .wf-dialog .wf-title h2 {
+  margin: 0;
+}
+.works-workspace .wiki-heading {
+  margin-bottom: 24px;
+}
+.works-workspace .wiki-searchbar {
+  border-color: var(--ui-line);
+  padding: 12px;
+}
+.works-workspace #message:empty,
+.works-workspace #error:empty {
+  display: none;
+}
+.works-workspace #message:not(:empty) {
+  padding: 12px 16px;
+  border: 1px solid var(--ui-line);
+  background: var(--bg-elevated);
+  border-radius: 8px;
+}
+.works-workspace #folder-sidebar {
+  align-self: start;
+  position: sticky;
+  top: 80px;
+  max-height: calc(100dvh - 100px);
+  overflow-y: auto;
+}
+.works-workspace #folder-sidebar h2 {
+  font-size: 13px;
+  color: var(--ui-muted);
+}
+.works-workspace .wiki-pages button {
+  padding: 14px;
+  border-color: var(--ui-line);
+  border-radius: 8px;
+}
+.works-workspace #detail {
+  padding: 24px;
+  scroll-margin-top: 80px;
+}
+.works-workspace #body {
+  max-width: 76ch;
+  margin-inline: auto;
+  padding-block: 16px 32px;
+  font-size: 15px;
+  line-height: 1.95;
+}
+.works-workspace #detail .toolbar button:not(#edit) {
+  background: transparent;
+}
+.works-workspace #detail #title {
+  font-size: 24px;
+  letter-spacing: -0.03em;
+  margin: 16px 0 8px;
+}
+.works-workspace #detail :is(#archive, [data-export]) {
+  font-size: 12px;
+  color: var(--ui-muted);
+}
+.works-workspace #meta {
+  line-height: 1.8;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--ui-line);
+}
+.works-workspace #editor {
+  max-width: 960px;
+  padding: 24px;
+}
+.works-workspace #editor textarea[name="body"] {
+  font-family: ui-monospace, monospace;
+  line-height: 1.9;
+  min-height: 360px;
+}
+.works-workspace .editor-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  padding: 14px 0 max(14px, env(safe-area-inset-bottom));
+  background: var(--bg-elevated);
+  border-top: 1px solid var(--ui-line);
+  margin-top: 24px;
+}
+.works-workspace #save-state {
+  flex-basis: 100%;
+  font-size: 12px;
+  color: var(--ui-muted);
+}
+.wiki-editing #wiki-layout {
+  display: none;
+}
+.wiki-focused #folder-browser,
+.wiki-focused #folder-sidebar {
+  display: none;
+}
+.wiki-focused #wiki-layout,
+.wiki-focused .wiki-pane {
+  display: block;
+}
+.wiki-focused #detail {
+  max-width: 980px;
+  margin: 0 auto;
+}
+@media (min-width: 1100px) {
+  .wiki-workspace:not(.wiki-focused) .wiki-pane:has(#detail:not([hidden])) {
+    display: grid;
+    grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+    gap: 20px;
+    align-items: start;
+  }
+  .wiki-workspace .wiki-pane:has(#detail:not([hidden])) #folder-browser {
+    position: sticky;
+    top: 80px;
+    max-height: calc(100dvh - 100px);
+    overflow-y: auto;
+  }
+  .wiki-workspace .wiki-pane:has(#detail:not([hidden])) .wiki-pages {
+    grid-template-columns: 1fr;
+  }
+  .wiki-workspace
+    #wiki-layout:not(.wiki-folder-view):has(#detail:not([hidden])) {
+    grid-template-columns: 200px minmax(0, 1fr);
+    gap: 16px;
+  }
+  .wiki-workspace
+    #wiki-layout:not(.wiki-folder-view)
+    .wiki-pane:has(#detail:not([hidden])) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .wiki-workspace
+    #wiki-layout:not(.wiki-folder-view)
+    .wiki-pane:has(#detail:not([hidden]))
+    #folder-browser {
+    position: static;
+    max-height: 260px;
+  }
+}
+@media (max-width: 760px) {
+  .works-workspace main {
+    padding: 20px 12px 32px;
+  }
+  .works-workspace
+    :is(
+      #workspace,
+      #editor,
+      #definition-form,
+      #run-dialog,
+      #folder-dialog,
+      #login
+    )
+    button,
+  .works-workspace
+    :is(
+      #workspace,
+      #editor,
+      #definition-form,
+      #run-dialog,
+      #folder-dialog,
+      #login
+    )
+    :is(input:not([type="checkbox"]):not([type="radio"]), select) {
+    min-height: 44px;
+  }
+  .works-workspace #workspace :is(.ui-segmented, .view-toggle) button {
+    min-height: 40px;
+  }
+  .works-workspace .wf-focus,
+  .works-workspace #detail,
+  .works-workspace #editor {
+    padding: 16px;
+  }
+  .works-workspace .wf-title {
+    align-items: stretch;
+  }
+  .works-workspace .workspace-actions {
+    width: 100%;
+  }
+  .works-workspace .workspace-actions #new {
+    flex: 1;
+  }
+  .works-workspace .wf-title > div > h2,
+  .works-workspace .wiki-heading h2 {
+    font-size: 22px;
+  }
+  .works-workspace .workspace-search {
+    gap: 8px;
+  }
+  .works-workspace .workspace-search label,
+  .works-workspace .workspace-search .ui-segmented {
+    flex-basis: 100%;
+  }
+  .works-workspace .workspace-search .ui-segmented button {
+    flex: 1;
+  }
+  .works-workspace .wf-agenda .wf-day {
+    display: none;
+  }
+  .works-workspace .wf-agenda .wf-day.selected {
+    display: block;
+  }
+  .works-workspace .editor-actions button {
+    flex: 1 1 auto;
+  }
+  .works-workspace .wf-dialog,
+  .works-workspace .wiki-dialog {
+    padding: 16px;
+  }
+  .works-workspace .wf-dialog .wf-title {
+    top: -16px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .works-workspace button {
+    transition: none;
+  }
+}
+
+.works-workspace #workspace .wf-run {
+  display: block;
+  width: 100%;
+  text-align: left;
+  white-space: normal;
+  border-radius: 8px;
+}
+.works-workspace #workflow-feedback:empty {
+  display: none;
+}
+.works-workspace #workflow-feedback {
+  color: var(--ui-muted);
+  font-size: 12px;
+}
+.works-workspace #workspace[aria-busy="true"] {
+  cursor: progress;
+}
+.works-workspace #folder-dialog #folder-dialog-submit,
+.works-workspace #login #sign-in {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+/* Card controls and toolbars use the same tokens, with content-sized cards. */
+.works-workspace #workspace > .wiki-searchbar {
+  padding: 12px;
+  border: 1px solid var(--ui-line);
+  border-radius: 12px;
+  box-shadow: none;
+}
+.works-workspace #workspace .wiki-pages button {
+  padding: 14px;
+  border-color: var(--ui-line);
+  border-radius: 8px;
+  line-height: 1.65;
+}
+.works-workspace #workspace .wf-active-card {
+  min-height: 156px;
+  padding: 16px;
+  border-color: var(--ui-line);
+}

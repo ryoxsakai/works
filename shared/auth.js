@@ -1,7 +1,7 @@
 import { GOOGLE_CLIENT_ID, ALLOWED_EMAIL } from "./google-config.js?v=5";
 
 // カレンダー読み取りとユーザー確認(email)の両方をこのスコープでまとめて取得する。
-const SCOPES = "openid email profile https://www.googleapis.com/auth/calendar.readonly";
+const SCOPES = "openid email profile https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events";
 
 // works.lrnr.jp 配下の全ページで共有されるキー。
 // ここに保存しておくことで、他のモジュールに移動してもログイン状態を引き継げる(ワンログイン)。
@@ -13,8 +13,8 @@ let sessionToken = null;
 let cachedGoogleToken = null; // { access_token, expires_at }
 let googleTokenPromise = null; // 同時に複数箇所から呼ばれても1回のリクエストにまとめる
 
-function redirectUri() {
-  const u = new URL(window.location.href);
+function redirectUri(pathname = window.location.pathname) {
+  const u = new URL(pathname, window.location.origin);
   u.search = "";
   u.hash = "";
   return u.toString();
@@ -63,18 +63,22 @@ export function getSessionToken() {
 // このWorkerがサーバー側で保存しているリフレッシュトークンを使って都度発行するため、
 // ブラウザ側のタブ状態やサードパーティCookie制限に左右されない。
 // 短時間の間に複数箇所から呼ばれても、キャッシュ・同時リクエストの合流で1回で済ませる。
-export async function getGoogleAccessToken() {
+export async function getGoogleAccessToken({signal=AbortSignal.timeout(15000)}={}) {
+  if(signal.aborted)throw signal.reason||new DOMException('Read aborted','AbortError');
   if (!sessionToken) return null;
   if (cachedGoogleToken && cachedGoogleToken.expires_at > Date.now() + 30_000) {
     return cachedGoogleToken.access_token;
   }
   if (!googleTokenPromise) {
-    googleTokenPromise = fetch(`${API_BASE}/google-token`, {
-      headers: { Authorization: `Bearer ${sessionToken}` },
+    const cancel=()=>{if(googleTokenPromise===request)googleTokenPromise=null;};
+    const request = fetch(`${API_BASE}/google-token`, {
+      headers: { Authorization: `Bearer ${sessionToken}` },signal,
     })
       .then(async (res) => {
         if (!res.ok) throw new Error(`Googleトークンの取得に失敗しました (${res.status})`);
         const data = await res.json();
+        // A late response from an aborted attempt cannot replace a newer token.
+        if(signal.aborted)throw signal.reason||new DOMException('Read aborted','AbortError');
         cachedGoogleToken = {
           access_token: data.access_token,
           expires_at: Date.now() + data.expires_in * 1000,
@@ -82,8 +86,11 @@ export async function getGoogleAccessToken() {
         return cachedGoogleToken.access_token;
       })
       .finally(() => {
-        googleTokenPromise = null;
+        signal.removeEventListener('abort',cancel);
+        if(googleTokenPromise===request)googleTokenPromise = null;
       });
+    googleTokenPromise=request;
+    signal.addEventListener('abort',cancel,{once:true});
   }
   return googleTokenPromise;
 }
@@ -143,10 +150,10 @@ export function isStandaloneHomeScreenApp() {
   return Boolean(window.navigator.standalone);
 }
 
-export function signIn() {
+export function signIn(redirectPath) {
   const params = new URLSearchParams({
     client_id: GOOGLE_CLIENT_ID,
-    redirect_uri: redirectUri(),
+    redirect_uri: redirectUri(redirectPath),
     response_type: "code",
     scope: SCOPES,
     access_type: "offline",

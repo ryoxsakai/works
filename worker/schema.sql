@@ -87,12 +87,26 @@ CREATE TABLE IF NOT EXISTS periods (
   created_at TEXT DEFAULT (datetime('now'))
 );
 
-CREATE TABLE IF NOT EXISTS materials (
+CREATE TABLE IF NOT EXISTS material_categories (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
   sort_order INTEGER DEFAULT 0,
   created_at TEXT DEFAULT (datetime('now'))
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_material_categories_unique_name
+  ON material_categories(lower(trim(name)));
+
+CREATE TABLE IF NOT EXISTS materials (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  category_id INTEGER REFERENCES material_categories(id),
+  sort_order INTEGER DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_materials_category_order
+  ON materials(category_id, sort_order, id);
 
 CREATE TABLE IF NOT EXISTS material_chapters (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -101,6 +115,12 @@ CREATE TABLE IF NOT EXISTS material_chapters (
   sort_order INTEGER DEFAULT 0,
   created_at TEXT DEFAULT (datetime('now'))
 );
+
+-- 同一教材内のチャプター名は、前後の空白と英字の大小を無視して一意にする。
+-- 既存DBへの適用時はWorkerのensureCurriculumIntegrityが重複を安全に統合してから
+-- 同じインデックスを作成する。
+CREATE UNIQUE INDEX IF NOT EXISTS idx_material_chapters_unique_name
+  ON material_chapters(material_id, lower(trim(name)));
 
 CREATE TABLE IF NOT EXISTS student_materials (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -125,4 +145,114 @@ CREATE TABLE IF NOT EXISTS google_auth (
   id INTEGER PRIMARY KEY CHECK (id = 1),
   refresh_token TEXT NOT NULL,
   updated_at TEXT DEFAULT (datetime('now'))
+);
+
+-- ChatGPT Plugin（MCP）のOAuth認可に使う登録済みクライアントと短命の認可コード。
+CREATE TABLE IF NOT EXISTS mcp_oauth_clients (
+  client_id TEXT PRIMARY KEY,
+  redirect_uris TEXT NOT NULL,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS mcp_oauth_codes (
+  code TEXT PRIMARY KEY,
+  client_id TEXT NOT NULL,
+  redirect_uri TEXT NOT NULL,
+  code_challenge TEXT NOT NULL,
+  scope TEXT NOT NULL,
+  expires_at INTEGER NOT NULL,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+-- MCPからの授業記録変更履歴。取り消し時は現在値との競合を確認する。
+CREATE TABLE IF NOT EXISTS mcp_schedule_changes (
+  id TEXT PRIMARY KEY,
+  event_id TEXT NOT NULL,
+  action TEXT NOT NULL,
+  changed_fields TEXT NOT NULL,
+  before_json TEXT NOT NULL,
+  after_json TEXT NOT NULL,
+  undone_by TEXT,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_mcp_schedule_changes_event
+  ON mcp_schedule_changes(event_id, created_at DESC);
+
+-- MCPからの生徒メモ・印刷用氏名の変更履歴。取り消し時は現在値との競合を確認する。
+CREATE TABLE IF NOT EXISTS mcp_student_profile_changes (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  action TEXT NOT NULL,
+  changed_fields TEXT NOT NULL,
+  before_json TEXT NOT NULL,
+  after_json TEXT NOT NULL,
+  undone_by TEXT,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_mcp_student_profile_changes_name
+  ON mcp_student_profile_changes(name, created_at DESC);
+
+-- SS管理: 問題作成案件の進行状況。画面は閲覧専用とし、更新はMCPから行う。
+CREATE TABLE IF NOT EXISTS ss_projects (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('原稿待ち', '素材案作成中', '素材案確認待ち', '問題作成中', '完了')),
+  deadline TEXT NOT NULL,
+  memo TEXT,
+  last_source_email_id TEXT,
+  last_source_email_subject TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_ss_projects_unique_name
+  ON ss_projects(lower(trim(name)));
+CREATE INDEX IF NOT EXISTS idx_ss_projects_deadline
+  ON ss_projects(status, deadline);
+
+-- メールを根拠にMCPから行ったSS案件の登録・更新履歴。
+CREATE TABLE IF NOT EXISTS mcp_ss_project_changes (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  action TEXT NOT NULL,
+  changed_fields TEXT NOT NULL,
+  before_json TEXT NOT NULL,
+  after_json TEXT NOT NULL,
+  source_email_id TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_mcp_ss_project_changes_project
+  ON mcp_ss_project_changes(project_id, created_at DESC);
+
+-- 教材ライブラリのファイルとGoogleカレンダー予定の対応。
+CREATE TABLE IF NOT EXISTS schedule_material_links (
+  calendar_id TEXT NOT NULL,
+  event_id TEXT NOT NULL,
+  material_file_id TEXT NOT NULL,
+  note TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  PRIMARY KEY (calendar_id, event_id, material_file_id)
+);
+
+
+-- 入試管理: 大学・方式・試験段階ごとの日程。複数日程は1日ごとに1行で保存する。
+CREATE TABLE IF NOT EXISTS admission_events (
+  id TEXT PRIMARY KEY,
+  university TEXT NOT NULL,
+  selection_type TEXT NOT NULL DEFAULT 'general',
+  stage TEXT NOT NULL,
+  schedule_date TEXT NOT NULL,
+  end_date TEXT,
+  notes TEXT,
+  source_url TEXT,
+  color TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_admission_events_date ON admission_events(schedule_date);
+CREATE INDEX IF NOT EXISTS idx_admission_events_stage ON admission_events(stage);
+
+CREATE TABLE IF NOT EXISTS todo_state (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  data TEXT NOT NULL,
+  revision INTEGER NOT NULL DEFAULT 1
 );

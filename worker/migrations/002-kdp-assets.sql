@@ -1,0 +1,2 @@
+CREATE TABLE IF NOT EXISTS kdp_assets (id TEXT PRIMARY KEY, book_id TEXT NOT NULL REFERENCES kdp_books(id), content_type TEXT NOT NULL, extension TEXT NOT NULL, size INTEGER NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')));
+CREATE TRIGGER IF NOT EXISTS kdp_assets_quota BEFORE INSERT ON kdp_assets BEGIN SELECT CASE WHEN (SELECT COALESCE(SUM(size),0) FROM kdp_assets WHERE book_id=NEW.book_id)+NEW.size>20971520 OR (SELECT COUNT(*) FROM kdp_assets WHERE book_id=NEW.book_id)>=40 THEN RAISE(ABORT,'KDP image quota exceeded') END; END;

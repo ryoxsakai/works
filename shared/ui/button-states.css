@@ -1,0 +1,14 @@
+/* Match the existing Works theme owner; scoped v6 roots must not reselect OS colors. */
+.dashboard-home,.ss-bootstrap,.todo-bootstrap,.kdp-bootstrap,.wiki-bootstrap,.memo-bootstrap,.admission-bootstrap,.material-bootstrap,.workflow-bootstrap,.tutor-bootstrap { color-scheme: inherit; }
+/* Complete the unthemed v6 outline/text contract, including focus and disabled states. */
+:is(.dashboard-home,.ss-bootstrap,.todo-bootstrap,.kdp-bootstrap,.wiki-bootstrap,.memo-bootstrap,.admission-bootstrap,.material-bootstrap,.workflow-bootstrap,.tutor-bootstrap) :is(.btn-outline,.btn-text) {
+ --theme-bg: var(--bg-1); --theme-contrast: var(--fg-body); --theme-fg: var(--fg-body);
+ --theme-fg-emphasis: var(--fg-body); --theme-bg-subtle: var(--bg-1);
+ --theme-border: var(--border-color); --theme-focus-ring: var(--focus-ring-color);
+}
+/* Keep native disabled behavior and a dimmed appearance, but avoid an undefined color falling to UA gray. */
+:is(.dashboard-home,.ss-bootstrap,.todo-bootstrap,.kdp-bootstrap,.wiki-bootstrap,.memo-bootstrap,.admission-bootstrap,.material-bootstrap,.workflow-bootstrap,.tutor-bootstrap) .btn:disabled,
+:is(.dashboard-home,.ss-bootstrap,.todo-bootstrap,.kdp-bootstrap,.wiki-bootstrap,.memo-bootstrap,.admission-bootstrap,.material-bootstrap,.workflow-bootstrap,.tutor-bootstrap) .btn.disabled {
+ color: var(--fg-body) !important; background: transparent !important; --btn-disabled-opacity: .7; /* Counter the legacy global muted !important without changing disabled behavior. */
+ --btn-disabled-color: var(--fg-body); --btn-disabled-bg: var(--bg-1); --btn-disabled-border-color: var(--border-color);
+}

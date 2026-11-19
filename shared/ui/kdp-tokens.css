@@ -1,0 +1,78 @@
+/* KDP-only component adapter; the native modal/dirty/save controllers stay. */
+.kdp-bootstrap {
+  color-scheme: inherit;
+  --fg-body: var(--fg);
+  --fg-1: var(--fg);
+  --fg-2: var(--muted);
+  --bg-body: var(--bg-elevated);
+  --bg-1: var(--bg-hover);
+  --bg-2: var(--bg-hover);
+  --border-color: var(--border);
+  --primary-base: var(--accent);
+  --primary-contrast: #fff;
+  --control-checked-bg: var(--accent);
+  --control-checked-border-color: var(--accent);
+  --focus-ring-color: var(--accent);
+  --focus-ring-width: 3px;
+}
+.kdp-bootstrap .btn {
+  --btn-min-height: 44px;
+  --btn-padding-x: .85rem;
+  --btn-padding-y: .55rem;
+  --btn-font-size: inherit;
+  --btn-color: var(--fg);
+  --btn-bg: var(--bg-elevated);
+  --btn-border-color: var(--border);
+  --btn-hover-bg: var(--bg-hover);
+  --btn-hover-color: var(--fg);
+  --btn-hover-border-color: var(--border);
+  --btn-border-radius: .45rem;
+  font-family: inherit;
+  white-space: normal;
+}
+.kdp-bootstrap .btn.primary {
+  --theme-bg: var(--accent);
+  --theme-contrast: var(--primary-contrast);
+  --btn-bg: var(--accent);
+  --btn-color: var(--primary-contrast);
+  --btn-hover-color: var(--primary-contrast);
+}
+.kdp-bootstrap .form-control {
+  --control-fg: var(--fg);
+  --control-bg: var(--bg-elevated);
+  --control-border-color: var(--border);
+  --control-border-radius: .45rem;
+  font-family: inherit;
+  font-size: 16px;
+  min-height: 44px;
+}
+:root[data-theme="dark"] .kdp-bootstrap select.form-control { background-image: var(--control-select-bg-dark); }
+.kdp-bootstrap .check { --check-border-color: var(--muted); padding: 0; width: 20px; height: 20px; }
+.kdp-bootstrap .card {
+  --card-bg: var(--bg-elevated);
+  --card-color: var(--fg);
+  --card-border-color: var(--border);
+  --card-border-radius: .65rem;
+}
+.kdp-bootstrap .book-card { align-items: stretch; justify-content: start; white-space: normal; }
+.kdp-bootstrap .alert {
+  --alert-bg: var(--bg-hover);
+  --alert-color: var(--fg);
+  --alert-padding-x: 12px;
+  --alert-padding-y: 10px;
+}
+.kdp-bootstrap .alert:empty { display: none; }
+.kdp-bootstrap .works-icon { width: 1.15em; height: 1.15em; flex-shrink: 0; vertical-align: -.125em; }
+.kdp-bootstrap .works-icon, .kdp-bootstrap .works-icon * { pointer-events: none; }
+.kdp-bootstrap [hidden] { display: none !important; }
+@media(prefers-reduced-motion: reduce) { .kdp-bootstrap :is(.btn,.check,.form-control,.alert) { transition: none; } }
+@media print { .kdp-bootstrap :is(.btn,.check,.form-control,.alert) { transition: none; } }
+/* Legacy global input:not(...) rules outweigh a plain .form-control selector. */
+.kdp-bootstrap input.form-control:not([type="checkbox"]):not([type="radio"]),
+.kdp-bootstrap input.form-control:not([type="checkbox"]):not([type="radio"]):focus {
+  background: var(--control-bg);
+  color: var(--control-fg);
+}
+.kdp-bootstrap input[type="file"],
+.kdp-bootstrap input[type="file"]:focus { background: var(--bg); color: var(--fg); }
+.kdp-bootstrap :is(input,textarea,select) { scroll-margin-block: 80px; }

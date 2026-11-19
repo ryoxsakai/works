@@ -1,0 +1,1189 @@
+import { measure } from "../../worker/test/button-contrast-helpers.mjs";
+import {
+  chromium,
+  expect,
+} from "../../worker/node_modules/@playwright/test/index.mjs";
+import assert from "node:assert/strict";
+import fs from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+const root = fileURLToPath(new URL("../../", import.meta.url));
+const artifacts = path.join(root, "test-artifacts/dashboard");
+await fs.mkdir(artifacts, { recursive: true });
+const base = "https://works-dashboard.test";
+const browser = await chromium.launch({
+  headless: true,
+  ...(process.env.BROWSER_EXECUTABLE
+    ? { executablePath: process.env.BROWSER_EXECUTABLE }
+    : {}),
+});
+const auth = `export const getSessionToken=()=> 'fixture-session';export const getGoogleAccessToken=async()=> window.qaHoldGoogle ? new Promise(resolve=>window.qaReleaseGoogle=()=>resolve('fixture-google')) : 'fixture-google';export const signIn=()=>{window.qaSignIn=(window.qaSignIn||0)+1;};export const signOutUser=async()=>{window.qaSignOut=true;};export const watchAuth=callbacks=>{window.qaAuth=callbacks;if(!localStorage.qaSignedOut)callbacks.onSignedIn({email:localStorage.qaEmail||'dashboard@example.test',picture:''});else callbacks.onSignedOut();};`;
+const mime = {
+  ".html": "text/html",
+  ".js": "text/javascript",
+  ".mjs": "text/javascript",
+  ".css": "text/css",
+  ".png": "image/png",
+  ".woff2": "font/woff2",
+};
+let passed = [];
+const unexpectedRequests = [];
+const fullPageEvidence = [];
+async function fullPageAtTop(page, options) {
+  await page.evaluate(() => scrollTo(0, 0));
+  await page.evaluate(
+    () =>
+      new Promise((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(resolve)),
+      ),
+  );
+  const geometry = await page.evaluate(() => ({
+    scrollY,
+    headerTop: document.querySelector(".page-header").getBoundingClientRect()
+      .top,
+  }));
+  fullPageEvidence.push({ file: path.basename(options.path), ...geometry });
+  assert.equal(geometry.scrollY, 0);
+  assert.ok(Math.abs(geometry.headerTop) < 1);
+  return page.screenshot(options);
+}
+
+let fixtureSequence = 0;
+async function fixture(options = {}) {
+  const fixtureLabel = options.label || `fixture-${++fixtureSequence}`;
+  let closing = false;
+  const ctx = await browser.newContext({
+    viewport: { width: 1440, height: 1000 },
+    timezoneId: "America/Los_Angeles",
+    hasTouch: !!options.touch,
+  });
+  const requests = [],
+    errors = [];
+  let failTodo = !!options.failTodo,
+    holdTodo = !!options.holdTodo,
+    releaseTodo,
+    holdMemo = !!options.holdMemo,
+    releaseMemo;
+  const tasks = [
+    { name: "持ち越しの教材確認", plannedDay: "2026-10-28", status: "doing" },
+    {
+      name: "今日の授業準備",
+      plannedDay: "2026-10-29",
+      deadline: "2026-10-30",
+    },
+    { name: "締切だけのタスク", deadline: "2026-10-28" },
+    { name: "完了した作業", plannedDay: "2026-10-29", progress: 100 },
+    { name: "次週の予定", plannedDay: "2026-11-02" },
+  ];
+  if (options.large)
+    tasks.push(
+      ...Array.from({ length: 4 }, (_, i) => ({
+        name: `本日締切追加 ${i + 1}`,
+        deadline: "2026-10-29",
+      })),
+      ...Array.from({ length: 7 }, (_, i) => ({
+        name: `期限超過追加 ${i + 1}`,
+        deadline: "2026-10-27",
+      })),
+      ...Array.from({ length: 7 }, (_, i) => ({
+        name: `予定追加 ${i + 1}`,
+        plannedDay: "2026-10-29",
+      })),
+    );
+  await ctx.route("**/*", async (r) => {
+    const u = new URL(r.request().url());
+    requests.push({ url: u.pathname + u.search, method: r.request().method() });
+    if (u.origin !== base) {
+      if(u.origin === "https://www.googleapis.com" && u.pathname.endsWith("calendarList")) return r.fulfill({json:{items:[{id:"fixture",summary:"合成教室",backgroundColor:"#2563eb"}]}});
+      if (u.origin === "https://www.googleapis.com" && options.empty)
+        return r.fulfill({ json: { items: [] } });
+      if (u.origin === "https://www.googleapis.com")
+        return r.fulfill({
+          json: {
+            items: [
+              {
+                id: "same",
+                summary: "サンプル生徒 A",
+                start: { dateTime: "2026-10-29T10:00:00+09:00" },
+                end: { dateTime: "2026-10-29T11:00:00+09:00" },
+              },
+              {
+                id: "same2",
+                summary: "サンプル生徒 B",
+                start: { dateTime: "2026-10-29T14:30:00+09:00" },
+                end: { dateTime: "2026-10-29T15:30:00+09:00" },
+              },
+              {
+                summary: "除外",
+                start: { dateTime: "2026-10-29T09:00:00+09:00" },
+              },
+            ],
+          },
+        });
+      return r.abort();
+    }
+    if (u.pathname === "/shared/auth.js")
+      return r.fulfill({ contentType: "text/javascript", body: auth });
+    if (u.pathname === "/api/todo") {
+      if (holdTodo) await new Promise((resolve) => (releaseTodo = resolve));
+      return r
+        .fulfill(
+          failTodo
+            ? { status: 503, json: { error: "fixture" } }
+            : { json: { tasks: options.empty ? [] : tasks } },
+        )
+        .catch(() => {});
+    }
+    if (u.pathname === '/api/terms' || u.pathname === '/api/periods') return r.fulfill({json:[]});
+    if (u.pathname === '/api/lesson-records') { assert.deepEqual(Object.keys(r.request().postDataJSON()),['targets']);return r.fulfill({json:[]}); }
+    const eventRef=()=>({calendar_id:'fixture',id:u.searchParams.get('event_id'),title:u.searchParams.get('event_id')==='same'?'サンプル生徒 A':'サンプル生徒 B',start:u.searchParams.get('event_id')==='same'?'2026-10-29T10:00:00+09:00':'2026-10-29T14:30:00+09:00',end:u.searchParams.get('event_id')==='same'?'2026-10-29T11:00:00+09:00':'2026-10-29T15:30:00+09:00',etag:'',status:'confirmed',timed:true,event_type:'default',transparency:'opaque',declined:false});
+    if (u.pathname === '/api/next-lesson-plan') return r.fulfill({json:{source:eventRef(),target:null,reason:'none'}});
+    if (u.pathname === '/api/student-prefs/guarded') return r.fulfill({json:{target:eventRef(),name:u.searchParams.get('name'),record_revision:0,profile:{exists:false,memo:null,print_name:null,updated_at:null}}});
+    if (u.pathname === "/api/settings")
+      return r.fulfill({
+        json: { selected_calendars: ["fixture"], excluded_titles: ["除外"] },
+      });
+    if (u.pathname === "/api/memo") {
+      if (holdMemo) await new Promise((resolve) => (releaseMemo = resolve));
+      return r
+        .fulfill({
+          json: {
+            memos: [
+              { title: "日付だけのメモ", updatedAt: "2026-10-28" },
+              {
+                title: "授業で使う表現",
+                body: "BODY MUST NEVER APPEAR",
+                notes: "PRIVATE",
+                updatedAt: "2026-10-29T11:00:00Z",
+              },
+            ],
+          },
+        })
+        .catch(() => {});
+    }
+    if (u.pathname === "/api/material-library/files")
+      return r.fulfill({
+        json: [
+          {
+            name: "サンプル教材.pdf",
+            created_at: "2026-10-28 10:00:00",
+            object_key: "PRIVATE-KEY",
+          },
+        ],
+      });
+    if (u.pathname === "/api/ss-projects")
+      return r.fulfill({
+        json: [
+          {
+            name: "サンプル問題制作",
+            status: "問題作成中",
+            deadline: "2026-10-30",
+          },
+          { name: "完了案件", status: "完了", deadline: "2026-10-29" },
+        ],
+      });
+    if (u.pathname.startsWith("/api/")) {
+      const diagnostic = `Unexpected ${r.request().method()} API ${u.pathname} in ${fixtureLabel}, closing=${closing}`;
+      errors.push(diagnostic); unexpectedRequests.push(diagnostic); console.error(diagnostic);
+      return r.fulfill({status:503,json:{error:'Unexpected synthetic fixture request'}});
+    }
+    const file = path.join(
+      root,
+      u.pathname.endsWith("/") ? u.pathname + "index.html" : u.pathname,
+    );
+    try {
+      return r.fulfill({
+        body: await fs.readFile(file),
+        contentType: mime[path.extname(file)] || "application/octet-stream",
+      });
+    } catch {
+      return r.fulfill({ status: 404, body: "fixture missing" });
+    }
+  });
+  const page = await ctx.newPage();
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.clock.install({ time: new Date("2026-10-29T12:00:00Z") });
+  if (options.init) await page.addInitScript(options.init);
+  await page.goto(base + "/");
+  return {
+    ctx,
+    page,
+    requests,
+    errors,
+    release() {
+      holdTodo = false;
+      releaseTodo?.();
+      holdMemo = false;
+      releaseMemo?.();
+    },
+    recover() {
+      failTodo = false;
+    },
+    async close() {
+      closing = true;
+      // A context-close can blur a dirty editor before dispatching pagehide on
+      // some Chromium versions. Exercise the real page's pause/abort lifecycle
+      // first; teardown is not an instruction to autosave a fixture draft.
+      await page.evaluate(() => dispatchEvent(new PageTransitionEvent('pagehide')));
+      this.release();
+      await ctx.close();
+    },
+  };
+}
+async function refreshFromSettings(page) {
+  await page.locator('#open-home-settings').click();
+  await page.evaluate(() => {
+    window.qaSettingsClosed = false;
+    document.querySelector('#home-settings-modal').addEventListener('close', () => {
+      window.qaSettingsClosed = true;
+    }, {once:true});
+  });
+  await page.locator('#dashboard-refresh').click();
+  // Native dialog closure restores the opener's focus. Start editor interaction
+  // only after that lifecycle event, as a real user would, rather than racing it.
+  await page.waitForFunction(() => window.qaSettingsClosed);
+  await expect(page.locator('#home-settings-modal')).not.toBeVisible();
+}
+async function ready(page) {
+  await expect(page.locator('[data-content="todo"]')).toContainText(
+    "持ち越しの教材確認",
+  );
+  await expect(page.locator('[data-content="lessons"]')).toContainText(
+    "サンプル生徒 A",
+  );
+  await expect(page.locator("#dashboard-edit")).toBeEnabled();
+}
+try {
+  const f = await fixture();
+  const { page } = f;
+  await ready(page);
+  assert.equal(
+    await page.locator("#home-navigation a:not([aria-current])").count(),
+    9,
+  );
+  assert.equal(await page.locator(".dashboard-widget").count(), 3);
+  assert.ok(
+    !(await page.locator('[data-content="lessons"]').innerText()).includes(
+      "除外",
+    ),
+  );
+  await expect(page.locator('[data-content="todo"]')).not.toContainText(
+    "完了した作業",
+  );
+  await expect(page.locator('[data-content="todo"]')).not.toContainText(
+    "次週の予定",
+  );
+  assert.ok(f.requests.every((r) => r.method === "GET" || (r.method === "POST" && r.url === "/api/lesson-records")));
+  assert.ok(
+    !f.requests.some((r) =>
+      /lesson-baseline|\/api\/schedule/.test(r.url),
+    ),
+  );
+  assert.ok(
+    !f.requests.some((r) =>
+      /\/api\/memo|material-library|ss-projects/.test(r.url),
+    ),
+  );
+  await fullPageAtTop(page, {
+    path: path.join(artifacts, "desktop-default-1440.png"),
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.locator("#home-navigation")).not.toHaveAttribute("open");
+  await page.evaluate(
+    () =>
+      new Promise((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(resolve)),
+      ),
+  );
+  await expect(page.locator(".dashboard-widget").first()).toHaveAttribute(
+    "data-id",
+    "lessons",
+  );
+  assert.ok(
+    (
+      await page
+        .locator('[data-content="lessons"] .record-student-name')
+        .first()
+        .boundingBox()
+    ).y < 700,
+    "lesson content visible in mobile first screen",
+  );
+  await fullPageAtTop(page, {
+    path: path.join(artifacts, "mobile-default-390.png"),
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  passed.push(
+    "default widgets, all nine original routes, JST planned/deadline distinction, protected read-only observations without saves and lazy optional widgets",
+  );
+  await page.locator("#open-home-settings").click();
+  await page.locator("#dashboard-edit").click();
+  await page.locator('[data-add="memo"]').click();
+  await expect(page.locator('[data-content="memo"]')).toContainText(
+    "授業で使う表現",
+  );
+  await expect(page.locator("body")).not.toContainText(
+    "BODY MUST NEVER APPEAR",
+  );
+  await page.locator('[data-add="materials"]').click();
+  await expect(page.locator('[data-content="materials"]')).toContainText(
+    "サンプル教材.pdf",
+  );
+  await expect(page.locator("body")).not.toContainText("PRIVATE-KEY");
+  await page.locator('[data-add="ss"]').click();
+  await expect(page.locator('[data-content="ss"]')).toContainText(
+    "サンプル問題制作",
+  );
+  await expect(page.locator('[data-content="ss"]')).not.toContainText(
+    "完了案件",
+  );
+  await expect(page.locator('[data-content="memo"]')).toContainText(
+    "更新 2026/10/29 20:00 JST",
+  );
+  await expect(page.locator('[data-content="memo"]')).toContainText(
+    "更新 2026/10/28（日付のみ）",
+  );
+  await expect(page.locator('[data-content="materials"]')).toContainText(
+    "追加 2026/10/28 19:00 JST",
+  );
+  await expect(page.locator('[data-content="todo"]')).toContainText(
+    "締切 2026-10-30",
+  );
+  await expect(page.locator(".dashboard-widget")).toHaveCount(6);
+  const headerEvidence = [];
+  const captureHeader = async (label, ratio) => {
+    await page.evaluate(
+      (r) =>
+        scrollTo(0, (document.documentElement.scrollHeight - innerHeight) * r),
+      ratio,
+    );
+    await page.evaluate(
+      () =>
+        new Promise((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(resolve)),
+        ),
+    );
+    const metrics = await page.evaluate(() => ({
+      scrollY,
+      viewport: { width: innerWidth, height: innerHeight },
+      headerTop: document.querySelector(".page-header").getBoundingClientRect()
+        .top,
+      headerBottom: document
+        .querySelector(".page-header")
+        .getBoundingClientRect().bottom,
+      position: getComputedStyle(document.querySelector(".page-header"))
+        .position,
+    }));
+    headerEvidence.push({ label, ...metrics });
+    assert.ok(
+      Math.abs(metrics.headerTop) < 1,
+      label + " header remains at viewport top",
+    );
+    await page.screenshot({
+      path: path.join(artifacts, "viewport-header-" + label + ".png"),
+      fullPage: false,
+    });
+  };
+  headerEvidence.push({
+    label: "after all-widget edit actions before recapture",
+    scrollY: await page.evaluate(() => scrollY),
+  });
+  for (const [label, ratio] of [
+    ["top", 0],
+    ["middle", 0.5],
+    ["bottom", 1],
+  ])
+    await captureHeader(label, ratio);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await captureHeader("after-resize-edit", 0.5);
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.locator("#home-navigation").evaluate(el => el.open = true);
+  await expect(page.locator('#home-navigation a[href="/todo/"]')).toBeVisible();
+  const coverage = [];
+  const controls = page.locator(
+    "a[href],button:not(:disabled),input:not(:disabled),summary",
+  );
+  for (const width of [390, 1440]) {
+    await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 });
+    await page.evaluate(
+      () =>
+        new Promise((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(resolve)),
+        ),
+    );
+    await page.locator("#home-navigation").evaluate((el) => (el.open = true));
+    for (let i = 0; i < (await controls.count()); i++) {
+      const c = controls.nth(i);
+      if (!(await c.isVisible()) || await c.evaluate(el=>!!el.closest("[inert]"))) continue;
+      await c.focus();
+      const m = await c.evaluate((el) => {
+        const r = el.getBoundingClientRect(),
+          hit = document.elementFromPoint(
+            r.x + r.width / 2,
+            r.y + r.height / 2,
+          );
+        return {
+          control:
+            el.getAttribute("aria-label") || el.textContent.trim() || el.id,
+          top: r.top,
+          bottom: r.bottom,
+          covered: !(hit === el || el.contains(hit)),
+          cover: hit?.tagName,
+        };
+      });
+      coverage.push({ width, ...m });
+    }
+  }
+  await fs.writeFile(
+    path.join(artifacts, "header-viewport-evidence.json"),
+    JSON.stringify({ headerEvidence, coverage }, null, 2),
+  );
+  assert.deepEqual(
+    coverage.filter((c) => c.covered),
+    [],
+    "focused controls must be reachable without an overlay",
+  );
+  passed.push(
+    "actual top/middle/bottom/resized viewport header stays at top; all visible focused controls remain unobscured",
+  );
+  await page.evaluate(() => scrollTo(0, 0));
+  await page.evaluate(
+    () =>
+      new Promise((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(resolve)),
+      ),
+  );
+  await fullPageAtTop(page, {
+    path: path.join(artifacts, "desktop-all-widgets-1440.png"),
+    fullPage: true,
+  });
+  for (const width of [320, 390, 768, 1440]) {
+    await page.setViewportSize({ width, height: 844 });
+    assert.equal(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth > innerWidth,
+      ),
+      false,
+      `full catalog overflow ${width}`,
+    );
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator("#dashboard-editor").scrollIntoViewIfNeeded();
+  await page.screenshot({
+    path: path.join(artifacts, "mobile-edit-390.png"),
+    fullPage: false,
+  });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.locator("#open-home-settings").click();
+  await page.locator('input[name="home-theme"][value="dark"]').check();
+  await page.locator("#home-settings-close").click();
+  await page.evaluate(() => scrollTo(0, 0));
+  await page.evaluate(
+    () =>
+      new Promise((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(resolve)),
+      ),
+  );
+  await fullPageAtTop(page, {
+    path: path.join(artifacts, "desktop-dark-all-widgets-1440.png"),
+    fullPage: true,
+  });
+  await page.locator("#open-home-settings").click();
+  await page.locator('input[name="home-theme"][value="light"]').check();
+  await page.locator("#home-settings-close").click();
+  await page.locator('[data-move="memo"][data-step="-1"]').focus();
+  await page.locator('[data-move="memo"][data-step="-1"]').press("Enter");
+  await expect(page.locator(".dashboard-widget").nth(2)).toHaveAttribute(
+    "data-id",
+    "memo",
+  );
+  await page.locator("#dashboard-cancel").click();
+  assert.equal(await page.locator(".dashboard-widget").count(), 3);
+  assert.equal(
+    await page.evaluate(() =>
+      Object.keys(localStorage).some((k) =>
+        k.startsWith("works-home-dashboard"),
+      ),
+    ),
+    false,
+  );
+  passed.push(
+    "optional catalogs, metadata/title-only rendering, accessible reorder, cancel creates no persistence",
+  );
+  await page.locator("#open-home-settings").click();
+  await page.locator("#dashboard-edit").click();
+  await page.waitForFunction(() =>
+    window.Sortable?.get(document.querySelector("#dashboard-widgets")),
+  );
+  await fullPageAtTop(page, {
+    path: path.join(artifacts, "desktop-edit-1440.png"),
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 1440, height: 1800 });
+  const handle = await page
+      .locator('[data-id="todo"] .drag-handle')
+      .boundingBox(),
+    target = await page
+      .locator('[data-id="lessons"] .drag-handle')
+      .boundingBox();
+  await page.mouse.move(handle.x + 20, handle.y + 20);
+  await page.mouse.down();
+  await page.mouse.move(target.x + target.width - 10, target.y + 20, {
+    steps: 25,
+  });
+  await page.waitForTimeout(250);
+  await page.mouse.up();
+  await expect
+    .poll(() =>
+      page
+        .locator(".dashboard-widget")
+        .evaluateAll((es) => es.map((e) => e.dataset.id).join(",")),
+    )
+    .not.toBe("lessons,todo,shortcuts");
+  await page.locator("#dashboard-cancel").click();
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  passed.push(
+    "real desktop drag handle reorders draft; cancel restores canonical order",
+  );
+
+  await page.locator("#open-home-settings").click();
+  await page.locator("#dashboard-edit").click();
+  await page.locator('[data-hide="lessons"]').click();
+  await page.locator('[data-move="shortcuts"][data-step="-1"]').click();
+  await page.locator("#dashboard-save").click();
+  const stored = await page.evaluate(() =>
+    Object.entries(localStorage).filter(([k]) =>
+      k.startsWith("works-home-dashboard"),
+    ),
+  );
+  assert.equal(stored.length, 1);
+  assert.ok(!stored[0][0].includes("@"));
+  assert.ok(!stored[0][1].includes("教材確認"));
+  const oldCalls = f.requests.filter((r) => r.url === "/api/settings").length;
+  await page.reload();
+  await expect(page.locator(".dashboard-widget").first()).toHaveAttribute(
+    "data-id",
+    "shortcuts",
+  );
+  await expect(page.locator("#dashboard-edit")).toBeEnabled();
+  assert.equal(
+    f.requests.filter((r) => r.url === "/api/settings").length,
+    oldCalls,
+  );
+  passed.push(
+    "user-hashed layout only persistence, reload and disabled-widget no-fetch",
+  );
+  await page.evaluate(() =>
+    window.qaAuth.onSignedIn({ email: "other@example.test", picture: "" }),
+  );
+  await expect(page.locator('[data-id="lessons"]')).toBeVisible();
+  await expect(page.locator("#dashboard-edit")).toBeEnabled();
+  assert.equal(
+    await page.locator(".dashboard-widget").first().getAttribute("data-id"),
+    "lessons",
+  );
+  await page.evaluate(() =>
+    window.qaAuth.onSignedIn({ email: "dashboard@example.test", picture: "" }),
+  );
+  await expect(page.locator(".dashboard-widget").first()).toHaveAttribute(
+    "data-id",
+    "shortcuts",
+  );
+  await expect(page.locator("#dashboard-edit")).toBeEnabled();
+  passed.push("per-user account-switch layout isolation");
+
+  await page.locator("#open-home-settings").click();
+  await page.locator("#dashboard-edit").click();
+  await page.locator('[data-add="memo"]').click();
+  await page.locator("#home-navigation").evaluate(el => el.open = true);
+  const navTodo = page.locator('#home-navigation a[href="/todo/"]');
+  for (const modifier of ["ctrlKey","metaKey"]) {
+    const wasBlocked = await navTodo.evaluate((link, key) => {
+      let blocked;
+      link.addEventListener("click", event => { blocked=event.defaultPrevented; event.preventDefault(); }, {once:true});
+      link.dispatchEvent(new MouseEvent("click",{bubbles:true,cancelable:true,[key]:true}));
+      return blocked;
+    }, modifier);
+    assert.equal(wasBlocked,false);
+  }
+  await expect(page.locator("#dashboard-editor")).toBeVisible();
+  page.once("dialog", (d) => d.dismiss());
+  await navTodo.click();
+  assert.equal(new URL(page.url()).pathname, "/");
+  await page.locator("#dashboard-cancel").click();
+  await page.evaluate(() => {
+    Storage.prototype.setItem = function () {
+      throw new DOMException("quota", "QuotaExceededError");
+    };
+  });
+  await page.locator("#open-home-settings").click();
+  await page.locator("#dashboard-edit").click();
+  await page.locator('[data-hide="todo"]').click();
+  await page.locator("#dashboard-save").click();
+  await expect(page.locator("#dashboard-message")).toContainText(
+    "保存できません",
+  );
+  await expect(page.locator("#dashboard-editor")).toBeVisible();
+  await page.locator("#dashboard-cancel").click();
+  await expect(page.locator('[data-id="todo"]')).toBeVisible();
+  passed.push(
+    "navigation cancel and storage quota failure preserve saved layout/draft recovery",
+  );
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator("#home-navigation").evaluate(el => el.open = false);
+  await page.locator("#home-navigation summary").click();
+  await expect(page.locator('#home-navigation a[href="/kdp/"]')).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#home-navigation summary")).toBeFocused();
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.locator("#home-navigation summary").click();
+  await expect(page.locator('#home-navigation a[href="/wiki/"]')).toBeVisible();
+  await page.locator('#home-navigation a[href="/wiki/"]').focus();
+  await expect(page.locator('#home-navigation a[href="/wiki/"]')).toBeFocused();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#home-navigation summary")).toBeFocused();
+  await fullPageAtTop(page, {
+    path: path.join(artifacts, "mobile-reordered-390.png"),
+    fullPage: true,
+  });
+  for (const width of [320, 375, 390, 768, 900, 1440, 1920]) {
+    await page.setViewportSize({ width, height: 844 });
+    assert.equal(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth > innerWidth,
+      ),
+      false,
+      "overflow " + width,
+    );
+  }
+  passed.push(
+    "320–1920px no overflow, collapsible mobile routes, Escape and resize focus recovery",
+  );
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator("#open-home-settings").click();
+  await page.locator('input[name="home-theme"][value="dark"]').check();
+  await page.locator("#home-settings-close").click();
+  await expect(page.locator("#open-home-settings")).toBeFocused();
+  await fullPageAtTop(page, {
+    path: path.join(artifacts, "mobile-dark-390.png"),
+    fullPage: true,
+  });
+  passed.push("legacy theme settings, dark screenshot and dialog focus return");
+  assert.deepEqual(f.errors, []);
+  await f.close();
+  // Hold the refresh after it starts, then acquire focus / create a draft.
+  // Check the same DOM node, value and focus after success and failure settle.
+  for (const mode of ['focus', 'edit', 'edit-failure']) {
+    const retained = await fixture({label: `retained-${mode}`});
+    await ready(retained.page);
+    const host = retained.page.locator('[data-content="lessons"]');
+    await expect(host).toHaveAttribute('aria-busy', 'false');
+    const input = host.locator('textarea.record-plan').first();
+    await expect(input).toBeEditable();
+    await input.evaluate(el => { window.qaRetainedInput = el; });
+    let releaseRefresh, started;
+    const held = new Promise(resolve => { releaseRefresh = resolve; });
+    const requested = new Promise(resolve => { started = resolve; });
+    await retained.page.route('**/api/settings', async route => {
+      started();
+      await held;
+      await route.fulfill(mode === 'edit-failure'
+        ? {status: 503, json: {error: 'synthetic refresh failure'}}
+        : {json: {selected_calendars: ['fixture'], excluded_titles: ['除外']}});
+    });
+    await refreshFromSettings(retained.page);
+    await requested;
+    await expect(host).toHaveAttribute('aria-busy', 'true');
+    await expect(host.locator('.card-loading')).toHaveCount(0);
+    await input.click();
+    await expect(input, `${mode}: focus established before releasing the read`).toBeFocused();
+    if (mode !== 'focus') await input.fill('応答待ち中に入力した合成下書き');
+    const value = await input.inputValue();
+    releaseRefresh();
+    await expect(host).toHaveAttribute('aria-busy', 'false');
+    await expect(input).toHaveValue(value);
+    assert.equal(await input.evaluate(el => el === window.qaRetainedInput), true, `${mode}: refresh replaced the input`);
+    await expect(input, `${mode}: focus after read completion`).toBeFocused();
+    assert.equal(retained.requests.some(r => r.method !== 'GET' && r.url.startsWith('/api/') && r.url !== '/api/lesson-records'), false);
+    assert.deepEqual(retained.errors, []);
+    // Closing a fixture is not a user save or navigation; discard only in-memory QA state.
+    await retained.close();
+    assert.equal(retained.requests.some(r => r.method !== 'GET' && r.url.startsWith('/api/') && r.url !== '/api/lesson-records'), false, `${mode}: teardown wrote a fixture draft`);
+  }
+  passed.push('refresh responses preserve a newly focused editor and newly typed draft, on success and failure, without replacing the node or writing data');
+
+  // Read snapshot arrives after an edit has already autosaved and lost focus.
+  const savedDuringRead = await fixture({label: "autosaved-stale-read"});
+  await ready(savedDuringRead.page);
+  const savedHost = savedDuringRead.page.locator('[data-content="lessons"]');
+  await expect(savedHost).toHaveAttribute('aria-busy', 'false');
+  const savedInput = savedHost.locator('textarea.record-plan').first();
+  await savedInput.evaluate(el => { window.qaSavedInput = el; });
+  let releaseOldRead, signalRead;
+  const oldReadHeld = new Promise(resolve => { releaseOldRead = resolve; });
+  const oldReadStarted = new Promise(resolve => { signalRead = resolve; });
+  await savedDuringRead.page.route('**/api/lesson-records', async route => {
+    const oldSnapshot = []; // The already observed empty/revision-zero read.
+    signalRead(); await oldReadHeld; await route.fulfill({json: oldSnapshot});
+  });
+  const writes = [];
+  await savedDuringRead.page.route('**/api/lesson-plan', route => {
+    const body = route.request().postDataJSON(); writes.push(body);
+    return route.fulfill({json:{target:body.target,lesson_plan:body.lesson_plan,record_revision:writes.length}});
+  });
+  await refreshFromSettings(savedDuringRead.page);
+  await oldReadStarted;
+  await savedInput.fill('読込待ち中に自動保存した合成予定');
+  await savedDuringRead.page.locator('#home-auth-action').focus();
+  await expect(savedInput.locator('..').locator('.lesson-plan-status')).toContainText('保存済み');
+  assert.equal(writes.length,1);
+  await expect(savedInput).not.toBeFocused();
+  releaseOldRead();
+  await expect(savedHost).toHaveAttribute('aria-busy','false');
+  await expect(savedInput).toHaveValue('読込待ち中に自動保存した合成予定');
+  assert.equal(await savedInput.evaluate(el => el === window.qaSavedInput),true);
+  await savedInput.fill('保存後の次の合成予定');
+  await savedDuringRead.page.locator('#home-auth-action').focus();
+  await expect.poll(() => writes.length).toBe(2);
+  assert.equal(writes[1].record_revision,1);
+  assert.equal(writes[1].expected_lesson_plan,'読込待ち中に自動保存した合成予定');
+  await expect(savedInput.locator('..').locator('.lesson-plan-status')).toContainText('保存済み');
+  assert.deepEqual(savedDuringRead.errors,[]);
+  await savedDuringRead.close();
+  passed.push('stale refresh cannot roll back an autosaved unfocused lesson value or its next-write revision');
+
+  // A late response from ANY widget must not clear newly edited lesson cards
+  // when JST crosses midnight, even before the normal rollover timer runs.
+  for (const boundary of ['lessons','todo']) {
+    const midnightDraft = await fixture({label: `midnight-${boundary}`}); await ready(midnightDraft.page);
+    const lessonHost = midnightDraft.page.locator('[data-content="lessons"]');
+    await expect(lessonHost).toHaveAttribute('aria-busy','false');
+    const input = lessonHost.locator('textarea.record-plan').first();
+    await input.evaluate(el => { window.qaMidnightInput = el; });
+    let release, started;
+    const held = new Promise(resolve => { release = resolve; });
+    const requested = new Promise(resolve => { started = resolve; });
+    await midnightDraft.page.route(boundary === 'lessons' ? '**/api/lesson-records' : '**/api/todo', async route => {
+      started(); await held; await route.fulfill({json: boundary === 'lessons' ? [] : {tasks:[]}});
+    });
+    await midnightDraft.page.clock.setFixedTime(new Date('2026-10-29T14:59:59Z'));
+    await refreshFromSettings(midnightDraft.page); await requested;
+    await input.fill('日付またぎ中の未保存合成下書き');
+    await midnightDraft.page.clock.setFixedTime(new Date('2026-10-29T15:00:01Z'));
+    release();
+    await expect(midnightDraft.page.locator(`[data-content="${boundary}"]`)).toHaveAttribute('aria-busy','false');
+    await expect(input).toHaveValue('日付またぎ中の未保存合成下書き');
+    await expect(input).toBeFocused();
+    assert.equal(await input.evaluate(el => el === window.qaMidnightInput),true);
+    await expect(midnightDraft.page.locator('#dashboard-message')).toContainText('日付が変わりました');
+    assert.deepEqual(midnightDraft.errors,[]); await midnightDraft.close();
+  }
+  passed.push('JST midnight responses from lesson and Todo reads preserve newly edited lesson cards before rollover');
+
+  const fast = await fixture({init: () => {
+    window.qaSkeletonEvents = [];
+    const active = new Map();
+    new MutationObserver(() => {
+      for (const id of ['lessons', 'todo']) {
+        const shown = !!document.querySelector(`[data-content="${id}"] .card-loading`);
+        if (shown !== !!active.get(id)) {
+          window.qaSkeletonEvents.push({id, shown, at: performance.now()});
+          active.set(id, shown);
+        }
+      }
+    }).observe(document, {subtree: true, childList: true});
+  }});
+  await ready(fast.page);
+  for (const id of ['lessons', 'todo']) await expect(fast.page.locator(`[data-content="${id}"]`)).toHaveAttribute('aria-busy', 'false');
+  const initialLoading = await fast.page.evaluate(() => window.qaSkeletonEvents);
+  for (const id of ['lessons', 'todo']) {
+    const events = initialLoading.filter(e => e.id === id);
+    assert.equal(events.at(-1)?.shown || false, false);
+    for (let i = 0; i < events.length - 1; i += 2) {
+      assert.equal(events[i].shown, true);
+      assert.equal(events[i+1].shown, false);
+      assert.ok(events[i+1].at >= events[i].at);
+    }
+  }
+  await fast.page.evaluate(() => { window.qaSkeletonEvents = []; });
+  await fast.page.locator('#open-home-settings').click();
+  await fast.page.locator('#dashboard-refresh').click();
+  await expect(fast.page.locator('[data-content="lessons"] [data-refresh-status]')).toHaveCount(0);
+  await expect(fast.page.locator('[data-content="lessons"]')).toHaveAttribute('aria-busy', 'false');
+  await expect(fast.page.locator('[data-content="todo"]')).toHaveAttribute('aria-busy', 'false');
+  assert.deepEqual(await fast.page.evaluate(() => window.qaSkeletonEvents), []);
+  console.log('Fast initial skeleton DOM transitions: ' + JSON.stringify(initialLoading));
+  await fast.page.route('**/qa-away.html', route => route.fulfill({contentType:'text/html', body:'<!doctype html><title>Local history fixture</title><h1>Local history fixture</h1>'}));
+  await fast.page.goto(base + '/qa-away.html');
+  await fast.page.goBack(); await ready(fast.page);
+  await fast.page.goForward(); await expect(fast.page.locator('h1')).toHaveText('Local history fixture');
+  await fast.page.goBack(); await ready(fast.page);
+  assert.deepEqual(fast.errors, []);
+  await fast.close();
+  passed.push('immediate reads settle without an animation wait; cached fast refresh inserts no skeleton; actual back/forward restores home');
+
+  const delayed = await fixture({ holdTodo: true });
+  await expect(delayed.page.locator('[data-content="lessons"]')).toContainText(
+    "サンプル生徒 A",
+  );
+  const pendingHost = delayed.page.locator('[data-content="todo"]');
+  await expect(pendingHost).toHaveAttribute('aria-busy', 'true');
+  await expect(pendingHost.locator('.card-loading-shapes')).toHaveAttribute('aria-hidden', 'true');
+  for (const width of [390, 1440]) for (const theme of ['light', 'dark']) {
+    await delayed.page.setViewportSize({width, height: 1000});
+    await delayed.page.evaluate(theme => document.documentElement.dataset.theme = theme, theme);
+    await delayed.page.screenshot({path: path.join(artifacts, `loading-${width}-${theme}.png`), fullPage: true});
+  }
+  await delayed.page.emulateMedia({reducedMotion: 'reduce'});
+  assert.equal(await pendingHost.locator('.card-loading-shapes span').first().evaluate(el => getComputedStyle(el).animationName), 'none');
+  await delayed.page.screenshot({path: path.join(artifacts, 'loading-reduced-motion.png'), fullPage: true});
+  await delayed.page.locator("#home-auth-action").click();
+  delayed.release();
+  await expect(delayed.page.locator("#home-auth-action")).toHaveAttribute(
+    "aria-label",
+    "Googleでログイン",
+  );
+  await expect(delayed.page.locator("body")).not.toContainText(
+    "持ち越しの教材確認",
+  );
+  await expect(delayed.page.locator("body")).not.toContainText(
+    "サンプル生徒 A",
+  );
+  assert.deepEqual(delayed.errors, []);
+  await delayed.close();
+  passed.push(
+    "delayed request logout clears private data and rejects late responses",
+  );
+  const failure = await fixture({ failTodo: true });
+  await expect(failure.page.locator('[data-retry="todo"]')).toBeVisible();
+  await expect(failure.page.locator('[data-content="lessons"]')).toContainText(
+    "サンプル生徒 A",
+  );
+  failure.recover();
+  await failure.page.locator('[data-retry="todo"]').click();
+  await ready(failure.page);
+  await failure.page.evaluate(() =>
+    dispatchEvent(
+      new StorageEvent("storage", {
+        key: "works_session_token",
+        newValue: "other",
+      }),
+    ),
+  );
+  await expect(failure.page.locator("#home-auth-action")).toHaveAttribute(
+    "aria-label",
+    "Googleでログイン",
+  );
+  await expect(failure.page.locator("body")).not.toContainText(
+    "サンプル生徒 A",
+  );
+  await failure.close();
+  passed.push(
+    "independent failure/retry and other-tab auth change clears data and shell",
+  );
+  const broken = await fixture({
+    init: () => {
+      Storage.prototype.getItem = function (k) {
+        if (k.startsWith("works-home-dashboard")) return "{broken";
+        return null;
+      };
+    },
+  });
+  await ready(broken.page);
+  await expect(broken.page.locator("#dashboard-message")).toContainText(
+    "初期配置",
+  );
+  await broken.close();
+  passed.push("malformed layout recovers to defaults with visible warning");
+  const midnight = await fixture();
+  await ready(midnight.page);
+  await midnight.page.clock.fastForward(3 * 3600000 + 100);
+  await expect(midnight.page.locator("#dashboard-date")).toContainText(
+    "10月30日",
+  );
+  await expect
+    .poll(() =>
+      midnight.requests.some((r) => r.url.includes("timeMin=2026-10-30")),
+    )
+    .toBe(true);
+  await midnight.close();
+  passed.push(
+    "foreground midnight invalidates and reloads JST calendar window",
+  );
+
+  const interrupt = await fixture({ holdTodo: true });
+  await expect(
+    interrupt.page.locator('[data-content="lessons"]'),
+  ).toContainText("サンプル生徒 A");
+  const initial = interrupt.requests.filter(
+    (r) => r.url === "/api/todo",
+  ).length;
+  await interrupt.page.locator("#open-home-settings").click();
+  await interrupt.page.locator("#dashboard-refresh").click();
+  await interrupt.page.locator("#open-home-settings").click();
+  await interrupt.page.locator("#dashboard-refresh").click();
+  assert.equal(
+    interrupt.requests.filter((r) => r.url === "/api/todo").length,
+    initial,
+  );
+  await interrupt.page.evaluate(() =>
+    dispatchEvent(new PageTransitionEvent("pagehide")),
+  );
+  await expect(interrupt.page.locator("#dashboard-widgets")).toBeEmpty();
+  interrupt.release();
+  await interrupt.page.evaluate(() =>
+    dispatchEvent(new PageTransitionEvent("pageshow", { persisted: true })),
+  );
+  await ready(interrupt.page);
+  await interrupt.close();
+  passed.push(
+    "repeated refresh coalesces; pagehide clears data and pageshow resumes safely",
+  );
+  const slow = await fixture({ holdTodo: true });
+  await expect(slow.page.locator('[data-content="lessons"]')).toContainText(
+    "サンプル生徒 A",
+  );
+  await slow.page.clock.fastForward(20050);
+  await expect(slow.page.locator('[data-retry="todo"]')).toBeVisible();
+  slow.release();
+  await slow.page.locator('[data-retry="todo"]').click();
+  await ready(slow.page);
+  await slow.close();
+  passed.push(
+    "slow request times out independently and recovers via explicit retry",
+  );
+  const tokenWait = await fixture({
+    init: () => {
+      window.qaHoldGoogle = true;
+    },
+  });
+  await expect(tokenWait.page.locator('[data-content="todo"]')).toContainText(
+    "持ち越しの教材確認",
+  );
+  await tokenWait.page.waitForFunction(
+    () => typeof window.qaReleaseGoogle === "function",
+  );
+  await tokenWait.page.clock.fastForward(60050);
+  await expect(tokenWait.page.locator('[data-retry="lessons"]')).toBeVisible();
+  await tokenWait.page.locator("#home-auth-action").click();
+  await tokenWait.page.evaluate(() => window.qaReleaseGoogle());
+  assert.equal(
+    tokenWait.requests.filter((r) => r.url.includes("/calendar/v3/")).length,
+    0,
+  );
+  await expect(tokenWait.page.locator("body")).not.toContainText(
+    "サンプル生徒 A",
+  );
+  await tokenWait.close();
+  passed.push(
+    "unresolved Google-token wait times out; late token after logout causes no Calendar fetch",
+  );
+  const empty = await fixture({ empty: true });
+  await expect(empty.page.locator('[data-content="todo"]')).toContainText(
+    "今日までの未完了予定はありません",
+  );
+  await expect(empty.page.locator('[data-content="lessons"]')).toContainText(
+    "今日の予定はありません",
+  );
+  await empty.page.locator("#open-home-settings").click();
+  await empty.page.locator("#dashboard-edit").click();
+  while (await empty.page.locator("[data-hide]").count())
+    await empty.page.locator("[data-hide]").first().click();
+  await empty.page.locator("#dashboard-save").click();
+  await expect(empty.page.locator("#dashboard-widgets")).toContainText(
+    "ウィジェットは非表示",
+  );
+  await empty.page.reload();
+  await expect(empty.page.locator("#dashboard-widgets")).toContainText(
+    "ウィジェットは非表示",
+  );
+  await empty.page.locator("#open-home-settings").click();
+  await empty.page.locator("#dashboard-edit").click();
+  empty.page.once("dialog", (d) => d.accept());
+  await empty.page.locator("#dashboard-reset").click();
+  await empty.page.locator("#dashboard-save").click();
+  await expect(empty.page.locator(".dashboard-widget")).toHaveCount(3);
+  await empty.close();
+  passed.push(
+    "genuine empty collections, all-hidden layout reload and confirmed initial-layout restore",
+  );
+  const large = await fixture({ large: true });
+  await ready(large.page);
+  await large.page.setViewportSize({ width: 390, height: 844 });
+  const dueSection = large.page.locator('[data-content="todo"]');
+  await expect(dueSection).toContainText("期限超過 8件（すべて表示）");
+  for (let i = 1; i <= 7; i++)
+    await expect(dueSection).toContainText(`期限超過追加 ${i}`);
+  await expect(dueSection).toContainText("全13件");
+  for (let i = 1; i <= 4; i++)
+    await expect(dueSection).toContainText(`本日締切追加 ${i}`);
+  await expect(dueSection).toContainText("3件表示");
+  assert.equal(
+    await large.page
+      .locator(".dashboard-widget")
+      .evaluateAll((es) =>
+        es.some((e) =>
+          ["auto", "scroll"].includes(getComputedStyle(e).overflowY),
+        ),
+      ),
+    false,
+  );
+  await large.close();
+  passed.push(
+    "compact three-row summaries expose total counts and retain every overdue deadline without internal scrolling",
+  );
+  const touch = await fixture({ touch: true });
+  await ready(touch.page);
+  await touch.page.setViewportSize({ width: 390, height: 2400 });
+  await touch.page.locator("#open-home-settings").click();
+  await touch.page.locator("#dashboard-edit").click();
+  await touch.page.waitForFunction(() =>
+    window.Sortable?.get(document.querySelector("#dashboard-widgets")),
+  );
+  const h = await touch.page
+      .locator('[data-id="lessons"] .drag-handle')
+      .boundingBox(),
+    t = await touch.page.locator('[data-id="todo"]').boundingBox();
+  const cdp = await touch.ctx.newCDPSession(touch.page);
+  await cdp.send("Input.dispatchTouchEvent", {
+    type: "touchStart",
+    touchPoints: [{ x: h.x + 20, y: h.y + 20 }],
+  });
+  await touch.page.waitForTimeout(250);
+  for (let i = 1; i <= 20; i++) {
+    await cdp.send("Input.dispatchTouchEvent", {
+      type: "touchMove",
+      touchPoints: [
+        {
+          x: h.x + 20,
+          y: h.y + 20 + ((t.y + t.height - 20 - h.y - 20) * i) / 20,
+        },
+      ],
+    });
+    await touch.page.waitForTimeout(20);
+  }
+  await cdp.send("Input.dispatchTouchEvent", {
+    type: "touchEnd",
+    touchPoints: [],
+  });
+  await expect
+    .poll(() =>
+      touch.page.locator(".dashboard-widget").first().getAttribute("data-id"),
+    )
+    .not.toBe("lessons");
+  await touch.page.locator("#dashboard-cancel").click();
+  await touch.close();
+  passed.push("emulated touch drag on dedicated handle changes draft order");
+  const ui = await fixture();
+  await ready(ui.page);
+  assert.equal(await ui.page.locator('#user-avatar-fallback').evaluate(el => el.tagName.toLowerCase()), 'svg');
+  assert.equal(await ui.page.locator('i.bx').count(), 0);
+  for (const mode of ['light', 'dark']) {
+    await ui.page.emulateMedia({colorScheme: mode === 'light' ? 'dark' : 'light'});
+    await ui.page.evaluate(async mode => { const {setTheme}=await import('/shared/theme.js?v=6'); setTheme(mode); }, mode);
+    assert.equal(await ui.page.locator('body').evaluate(el=>getComputedStyle(el).colorScheme),mode);
+    const contrast=await ui.page.locator('.dashboard-widget .widget-link').first().evaluate(el=>{
+      const style=getComputedStyle(el);
+      const canvas=document.createElement('canvas'); canvas.width=canvas.height=1; const ctx=canvas.getContext('2d');
+      const luminance=color=>{ctx.fillStyle=color;ctx.fillRect(0,0,1,1);const c=Array.from(ctx.getImageData(0,0,1,1).data).slice(0,3).map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4;});return c[0]*.2126+c[1]*.7152+c[2]*.0722;};
+      const a=luminance(style.color),b=luminance(getComputedStyle(el.closest('.dashboard-widget')).backgroundColor);return (Math.max(a,b)+.05)/(Math.min(a,b)+.05);
+    });
+    assert.ok(contrast>=4.5, `${mode} primary text contrast ${contrast}`);
+  }
+  assert.deepEqual(await ui.page.locator('#home-navigation nav > span').allTextContents(), ['授業・教材','自動実行','業務','制作']);
+  assert.deepEqual(await ui.page.locator('#home-navigation a').allTextContents(), ['ホーム','授業管理','教材管理','入試管理','ワークフロー','Wiki','ToDo管理','メモ','KDP管理','SS管理']);
+  assert.equal(await ui.page.locator('#home-navigation [aria-current="page"]').getAttribute('href'), '/');
+  for (const width of [390,1440]) for (const theme of ['light','dark']) {
+    await ui.page.setViewportSize({width,height:900});
+    await ui.page.evaluate(async theme => { const {setTheme}=await import('/shared/theme.js?v=6'); setTheme(theme); },theme);
+    await ui.page.locator('#home-navigation').evaluate(el=>el.open=false);
+    await ui.page.locator('#home-navigation summary').focus();
+    await ui.page.keyboard.press('Enter');
+    await expect(ui.page.locator('#home-navigation nav')).toBeVisible();
+    for (const link of await ui.page.locator('#home-navigation a').all()) {
+      await link.hover();
+      assert.ok((await link.evaluate(measure)).ratio>=4.5);
+    }
+    await ui.page.screenshot({path:path.join(artifacts,`shared-menu-${width}-${theme}.png`)});
+    await ui.page.keyboard.press('Escape');
+    await expect(ui.page.locator('#home-navigation summary')).toBeFocused();
+    await expect(ui.page.locator('#home-navigation')).not.toHaveAttribute('open');
+    await ui.page.locator('#home-navigation summary').click({clickCount:2});
+    await expect(ui.page.locator('#home-navigation')).not.toHaveAttribute('open');
+    await ui.page.locator('#home-navigation summary').click();
+    await ui.page.mouse.click(4,850);
+    await expect(ui.page.locator('#home-navigation')).not.toHaveAttribute('open');
+  }
+  passed.push('shared Tutor menu labels/groups/Home current, keyboard/ESC/outside/repeated click and hover contrast at mobile/desktop in both themes');
+  await ui.page.locator("#open-home-settings").click();
+  await ui.page.locator("#dashboard-edit").click();
+  await expect.poll(()=>ui.page.evaluate(()=>!!window.Sortable?.get(document.querySelector('#dashboard-widgets')))).toBe(true);
+  await ui.page.emulateMedia({reducedMotion:'reduce'});
+  await expect.poll(()=>ui.page.evaluate(()=>window.Sortable.get(document.querySelector('#dashboard-widgets')).option('animation'))).toBe(0);
+  await ui.page.emulateMedia({reducedMotion:'no-preference'});
+  await expect.poll(()=>ui.page.evaluate(()=>window.Sortable.get(document.querySelector('#dashboard-widgets')).option('animation'))).toBe(150);
+  await ui.page.evaluate(()=>window.dispatchEvent(new Event('beforeprint')));
+  assert.equal(await ui.page.evaluate(()=>!!window.Sortable.get(document.querySelector('#dashboard-widgets'))),false);
+  await ui.page.emulateMedia({media:'print'});
+  await ui.page.pdf({path:path.join(artifacts,'menu-print.pdf'),format:'A4'});
+  await ui.page.emulateMedia({media:'screen'});
+  await ui.page.evaluate(()=>window.dispatchEvent(new Event('afterprint')));
+  await expect.poll(()=>ui.page.evaluate(()=>!!window.Sortable.get(document.querySelector('#dashboard-widgets')))).toBe(true);
+  await ui.page.locator('#dashboard-cancel').click();
+  assert.equal(await ui.page.evaluate(()=>!!window.Sortable.get(document.querySelector('#dashboard-widgets'))),false);
+  // The local CSS proof must style real official components, and stay inert on legacy pages.
+  const styles=await ui.page.evaluate(()=>{
+    const btn=document.querySelector('.dashboard-widget');
+    const before=getComputedStyle(btn).display;
+    document.querySelectorAll('link[href*="/shared/ui/"]').forEach(el=>el.disabled=true);
+    const without=getComputedStyle(btn).display;
+    document.querySelectorAll('link[href*="/shared/ui/"]').forEach(el=>el.disabled=false);
+    return {before,without};
+  });
+  assert.equal(styles.before,'flex');
+  assert.notEqual(styles.without,styles.before);
+  assert.deepEqual(ui.errors,[]);
+  await ui.close();
+  passed.push('official scoped Bootstrap components, SVG identity, explicit themes, dynamic reduced motion, print destroy/reinitialize and cancelled editor lifecycle');
+  const font = await fixture();
+  await ready(font.page);
+  const fontSession = await font.ctx.newCDPSession(font.page);
+  await fontSession.send("DOM.enable");
+  await fontSession.send("CSS.enable");
+  const dom = await fontSession.send("DOM.getDocument");
+  const node = await fontSession.send("DOM.querySelector", {
+    nodeId: dom.root.nodeId,
+    selector: ".dashboard-widget h3",
+  });
+  const used = await fontSession.send("CSS.getPlatformFontsForNode", {
+    nodeId: node.nodeId,
+  });
+  const fontEvidence = {
+    declaredStack: await font.page.evaluate(
+      () => getComputedStyle(document.body).fontFamily,
+    ),
+    platformFonts: used.fonts,
+    externalFontRequestsBlockedByFixture: true,
+  };
+  assert.ok(fontEvidence.declaredStack.includes("M PLUS 1p"));
+  await fs.writeFile(
+    path.join(artifacts, "font-evidence.json"),
+    JSON.stringify(fontEvidence, null, 2),
+  );
+  console.log("Font evidence: " + JSON.stringify(fontEvidence));
+  await font.close();
+  await fs.writeFile(
+    path.join(artifacts, "fullpage-capture-evidence.json"),
+    JSON.stringify(fullPageEvidence, null, 2),
+  );
+  await fs.writeFile(
+    path.join(artifacts, "results.json"),
+    JSON.stringify({ passed }, null, 2),
+  );
+  assert.deepEqual(unexpectedRequests, []);
+  console.log(JSON.stringify({ passed }, null, 2));
+} finally {
+  await browser.close();
+}

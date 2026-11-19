@@ -1,0 +1,7 @@
+.owner-memo-editor{display:grid;gap:.5rem;min-width:0}
+.owner-memo-editor label,.owner-memo-editor small,.owner-memo-editor p{display:block;min-width:0;margin:0;overflow-wrap:anywhere}
+.owner-memo-editor button{max-width:100%;white-space:normal}
+.owner-memo-editor pre{white-space:pre-wrap;overflow-wrap:anywhere;margin:0}
+.owner-memo-editor .owner-memo-status{position:static;background:none;padding:0;z-index:auto}
+.owner-memo-editor input[type=checkbox]{width:auto}
+@media print{.owner-memo-editor button,.owner-memo-editor .owner-memo-binding,.owner-memo-editor .owner-memo-status{display:none}}

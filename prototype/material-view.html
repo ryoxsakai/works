@@ -1,0 +1,163 @@
+  <main>
+    <section id="signed-in" hidden>
+      <p id="material-error" class="error" role="alert"></p>
+
+      <div class="page-tabs material-page-tabs" role="tablist">
+        <button type="button" class="page-tab-btn" data-material-tab="library" aria-selected="true">
+          <i class="bx bx-folder-open"></i> 教材一覧
+        </button>
+        <button type="button" class="page-tab-btn" data-material-tab="tree" aria-selected="false">
+          <i class="bx bx-git-branch"></i> ツリー検索
+        </button>
+        <button type="button" class="page-tab-btn" data-material-tab="tags" aria-selected="false">
+          <i class="bx bx-purchase-tag"></i> タグ一覧
+        </button>
+      </div>
+
+      <div data-material-tab-panel="library">
+        <section class="material-surface material-panel" aria-labelledby="material-library-title">
+          <div class="panel-header material-heading">
+            <div>
+              <p class="eyebrow">MATERIAL LIBRARY</p>
+              <h2 id="material-library-title"><i class="bx bx-folder-open"></i> 教材一覧</h2>
+            </div>
+            <button type="button" id="new-folder" class="btn-primary material-small-btn">
+              <i class="bx bx-folder-plus"></i> フォルダ
+            </button>
+          </div>
+
+          <nav id="material-breadcrumb" class="material-breadcrumb" aria-label="フォルダ階層"></nav>
+
+          <div class="material-toolbar">
+            <label class="material-search">
+              <i class="bx bx-search"></i>
+              <input id="material-search-input" type="search" placeholder="このフォルダ内を検索（名前・教材コード）" />
+            </label>
+          </div>
+
+          <label id="material-dropzone" class="material-dropzone material-inline-dropzone" for="material-file-input">
+            <input id="material-file-input" type="file" multiple hidden />
+            <span class="material-dropzone-icon"><i class="bx bx-cloud-upload"></i></span>
+            <span class="material-inline-upload-copy">
+              <strong>このフォルダへアップロード</strong>
+              <small id="material-upload-destination">すべての教材</small>
+            </span>
+            <span class="material-inline-upload-action">ファイルを選択</span>
+          </label>
+          <ul id="material-upload-queue" class="material-upload-queue material-inline-upload-queue"></ul>
+          <button type="button" id="material-upload-start" class="btn-primary material-upload-start material-inline-upload-start" disabled>
+            <i class="bx bx-upload"></i> アップロードする
+          </button>
+
+          <div id="material-folder-grid" class="material-folder-grid"></div>
+
+          <div class="material-file-section">
+            <div class="material-file-heading">
+              <h3>ファイル</h3>
+              <span id="material-file-count" class="material-count">0件</span>
+            </div>
+            <ul id="material-file-list" class="material-file-list"></ul>
+            <div id="material-empty" class="material-empty" hidden>
+              <i class="bx bx-folder-open"></i>
+              <p>このフォルダにはまだ教材がありません。</p>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div data-material-tab-panel="tree" hidden>
+        <section class="material-surface material-panel material-tree-panel" aria-labelledby="material-tree-title">
+          <div class="panel-header material-heading">
+            <div>
+              <p class="eyebrow">TREE SEARCH</p>
+              <h2 id="material-tree-title"><i class="bx bx-git-branch"></i> ツリー検索</h2>
+            </div>
+          </div>
+          <label class="material-search material-tree-search">
+            <i class="bx bx-search"></i>
+            <input id="material-tree-search-input" type="search" placeholder="フォルダ名・教材名・教材コードを検索" />
+          </label>
+          <p class="material-tree-help">フォルダを展開して階層を確認できます。教材名を押すと内容を閲覧します。</p>
+          <div id="material-tree" class="material-tree" role="tree"></div>
+          <div id="material-tree-empty" class="material-empty" hidden>
+            <i class="bx bx-search-alt"></i>
+            <p>一致するフォルダや教材がありません。</p>
+          </div>
+        </section>
+      </div>
+      <div data-material-tab-panel="tags" hidden>
+        <section class="material-surface material-panel" aria-labelledby="material-tags-title">
+          <div class="panel-header material-heading">
+            <div>
+              <p class="eyebrow">TAGS</p>
+              <h2 id="material-tags-title"><i class="bx bx-purchase-tag"></i> タグ一覧</h2>
+            </div>
+            <span id="material-tag-count" class="material-count"></span>
+          </div>
+          <label class="material-search material-tree-search">
+            <i class="bx bx-search"></i>
+            <input id="material-tag-search" type="search" placeholder="タグ・ファイル名を検索" />
+          </label>
+          <p class="material-tree-help">教材コードをタグとしてabc順に表示します。ファイル名を押すと教材を開きます。</p>
+          <div id="material-tags"></div>
+          <p id="material-tags-empty" class="material-empty" hidden>表示するタグがありません。教材の鉛筆ボタンから教材コードを設定してください。</p>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="new-folder-modal" class="app-modal">
+    <div class="modal-header">
+      <h2><i class="bx bx-folder-plus"></i> 新しいフォルダ</h2>
+      <button type="button" id="new-folder-close" class="modal-close" aria-label="閉じる">
+        <i class="bx bx-x"></i>
+      </button>
+    </div>
+    <form id="new-folder-form" class="modal-tab-panel">
+      <label class="material-dialog-field">
+        <span>フォルダ名</span>
+        <input id="new-folder-name" type="text" maxlength="120" required />
+      </label>
+      <div class="edit-actions material-dialog-actions">
+        <button type="submit" class="btn-primary"><i class="bx bx-folder-plus"></i> 作成</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="rename-material-modal" class="app-modal">
+    <div class="modal-header">
+      <h2><i class="bx bx-pencil"></i> <span id="rename-material-title">名前を変更</span></h2>
+      <button type="button" id="rename-material-close" class="modal-close" aria-label="閉じる">
+        <i class="bx bx-x"></i>
+      </button>
+    </div>
+    <form id="rename-material-form" class="modal-tab-panel">
+      <label class="material-dialog-field">
+        <span>新しい名前</span>
+        <input id="rename-material-name" type="text" maxlength="255" required />
+      </label>
+      <label id="material-code-field" class="material-dialog-field" hidden>
+        <span>教材コード</span>
+        <input id="material-code" type="text" maxlength="64" placeholder="例: p1w" autocomplete="off" />
+        <small>検索用の短いコードを設定できます。空欄で保存すると解除します。</small>
+      </label>
+      <div class="edit-actions material-dialog-actions">
+        <button type="submit" class="btn-primary"><i class="bx bx-check"></i> 保存</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="material-preview-modal" class="app-modal material-preview-modal">
+    <div class="modal-header">
+      <h2><i class="bx bx-file-find"></i> <span id="material-preview-title">教材を閲覧</span></h2>
+      <div class="material-preview-actions">
+        <button type="button" id="material-preview-download" aria-label="ダウンロード">
+          <i class="bx bx-download"></i>
+        </button>
+        <button type="button" id="material-preview-close" class="modal-close" aria-label="閉じる">
+          <i class="bx bx-x"></i>
+        </button>
+      </div>
+    </div>
+    <div id="material-preview-body" class="material-preview-body"></div>
+  </dialog>

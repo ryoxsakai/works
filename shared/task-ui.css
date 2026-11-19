@@ -1,0 +1,251 @@
+.todo-page {
+  background: var(--bg-gradient) !important;
+  background-attachment: fixed !important;
+  color: var(--fg);
+}
+
+.todo-page .page-header {
+  position: relative;
+  top: auto;
+  z-index: 30;
+  border: 0;
+  background: var(--bg-elevated) !important;
+  color: var(--fg);
+  box-shadow: var(--card-shadow);
+}
+
+.todo-main {
+  max-width: 1120px !important;
+  padding-top: 1.5rem;
+}
+
+.todo-heading {
+  margin: 0 0 1rem;
+}
+
+.todo-heading h2 {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.todo-heading h2 i {
+  color: var(--accent);
+  font-size: 1.35rem;
+}
+
+.todo-panel {
+  overflow: hidden;
+  border: 1px solid var(--border) !important;
+  border-radius: .65rem !important;
+  background: var(--bg-elevated) !important;
+  box-shadow: var(--card-shadow) !important;
+}
+
+.todo-panel #form-toggle {
+  color: var(--fg);
+  border-radius: .65rem;
+}
+
+.todo-panel #form-toggle:hover,
+.todo-panel .tab-btn:hover,
+.todo-category-button:hover {
+  background: var(--bg-hover) !important;
+}
+
+.todo-page input,
+.todo-page select,
+.todo-page textarea {
+  background: var(--bg-elevated) !important;
+  border-color: var(--border) !important;
+  color: var(--fg) !important;
+}
+
+.todo-page input::placeholder,
+.todo-page .text-gray-300,
+.todo-page .text-gray-400 {
+  color: var(--muted) !important;
+}
+
+.todo-page .text-gray-500,
+.todo-page .text-gray-600,
+.todo-page .text-gray-700,
+.todo-page .text-gray-800,
+.todo-page .text-slate-500,
+.todo-page .text-slate-600,
+.todo-page .text-slate-700 {
+  color: var(--fg) !important;
+}
+
+.todo-page .border-gray-100,
+.todo-page .border-gray-200,
+.todo-page .border-gray-50 {
+  border-color: var(--border) !important;
+}
+
+.todo-add-button,
+.todo-modal button.bg-slate-700 {
+  background: var(--fg) !important;
+  color: var(--bg) !important;
+  border-radius: .5rem !important;
+}
+
+.todo-add-button:hover,
+.todo-modal button.bg-slate-700:hover {
+  opacity: .85;
+}
+
+.todo-category-button {
+  background: var(--bg-elevated) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--muted) !important;
+  border-radius: .5rem !important;
+}
+
+.todo-page #tab-list {
+  gap: .2rem;
+}
+
+.todo-page .tab-btn {
+  min-height: 2.2rem;
+  border-radius: .5rem .5rem 0 0;
+  color: var(--muted) !important;
+  background: transparent !important;
+  border-color: transparent !important;
+}
+
+.todo-page .tab-btn.border-slate-700 {
+  color: var(--accent) !important;
+  background: var(--bg-hover) !important;
+  border-bottom-color: var(--accent) !important;
+}
+
+.todo-table-shell {
+  background: var(--bg-elevated);
+}
+
+.todo-table th,
+.todo-table td {
+  border-bottom: 1px solid var(--border);
+  color: var(--fg);
+}
+
+.todo-table th {
+  color: var(--muted) !important;
+  font-weight: 600;
+}
+
+.todo-table .task-row:hover {
+  background: var(--bg-hover) !important;
+}
+
+.todo-page .progress-track {
+  background: var(--bg-hover);
+}
+
+.todo-page .icon-btn {
+  color: var(--muted);
+}
+
+.todo-page .icon-btn:hover {
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+
+.todo-modal,
+#login-form {
+  background: var(--bg-elevated) !important;
+  color: var(--fg);
+  border: 1px solid var(--border);
+}
+
+#category-list li:hover,
+#category-list li.bg-slate-50 {
+  background: var(--bg-hover) !important;
+}
+
+#login-screen {
+  background: var(--bg-gradient) !important;
+}
+
+#login-form button {
+  background: var(--bg-elevated) !important;
+  color: var(--fg) !important;
+  border-color: var(--border) !important;
+}
+
+#login-form button:hover {
+  background: var(--bg-hover) !important;
+}
+
+@media (max-width: 640px) {
+  .todo-main { padding: 1rem !important; }
+  .todo-heading { margin-bottom: .75rem; }
+  .todo-panel #form-toggle { padding: .8rem 1rem; }
+}
+
+/* Neutral utility surfaces also follow the shared palette inside task modals. */
+.todo-page .bg-white { background: var(--bg-elevated) !important; }
+.todo-page .bg-gray-50,
+.todo-page .bg-gray-100,
+.todo-page .bg-slate-50,
+.todo-page .bg-slate-100 { background: var(--bg-hover) !important; }
+.todo-page .border-gray-300,
+.todo-page .border-slate-300 { border-color: var(--border) !important; }
+
+/* Keep category tabs consistent even when utility styles load first. */
+.todo-page #tab-list .tab-btn { padding: .625rem 1rem; min-height: 44px; }
+.todo-page #tab-list .tab-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
+.category-dialog {
+  padding: 0; border: 0; border-radius: 1rem;
+  width: min(36rem, calc(100% - 2rem)); max-width: none;
+  max-height: calc(100dvh - 2rem); color: var(--fg);
+  background: var(--bg-elevated); box-shadow: 0 24px 64px #0003;
+}
+.category-dialog::backdrop { background: #0005; backdrop-filter: blur(4px); }
+.category-dialog .category-surface {
+  display: flex; flex-direction: column; width: 100%; margin: 0;
+  max-height: calc(100dvh - 2rem); border-radius: 1rem;
+}
+.category-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1.25rem 1.5rem; }
+.category-header .eyebrow { margin: 0 0 .25rem; }
+.category-header h3 { margin: 0; font-size: 1.125rem; font-weight: 700; }
+#category-help { padding: 0 1.5rem; margin: 0 0 1rem; color: var(--fg); font-size: .85rem; line-height: 1.6; }
+.category-dialog #category-list { list-style: none; padding: 0 1rem 1rem; margin: 0; overflow-y: auto; min-height: 0; }
+.category-dialog #category-list li { gap: .5rem; margin-bottom: .5rem; border: 1px solid var(--border); background: var(--bg-elevated); }
+.category-dialog .category-name { min-width: 0; overflow-wrap: anywhere; line-height: 1.5; }
+.category-dialog input { min-width: 0; min-height: 44px; border: 1px solid var(--border); border-radius: .5rem; padding: .625rem .75rem; }
+.category-dialog button { min-height: 44px; padding: .5rem .875rem; border: 1px solid var(--border); border-radius: .5rem; background: var(--bg-elevated); color: var(--fg); cursor: pointer; }
+.category-dialog .icon-btn { flex-shrink: 0; width: 44px; height: 44px; min-width: 44px; min-height: 44px; padding: .5rem; opacity: 1; border: 0; }
+.category-dialog button:disabled { opacity: .3; cursor: default; }
+.category-dialog :is(button, input):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.category-add { flex-shrink: 0; border-top: 1px solid var(--border); padding: 1rem 1.5rem; }
+.category-add label { display: block; font-size: .85rem; font-weight: 600; margin-bottom: .5rem; }
+.category-add-controls { display: flex; gap: .5rem; }
+.category-add-controls input { flex: 1; width: 100%; }
+.category-footer { padding: 0 1.5rem 1rem; text-align: right; flex-shrink: 0; }
+@media (max-width: 480px) {
+  .category-header { padding: 1rem; }
+  #category-help { padding: 0 1rem; }
+  .category-add { padding: 1rem; }
+  .category-dialog #category-list { padding: 0 .75rem .75rem; }
+  .category-dialog #category-list li:not(.category-row) { flex-wrap: wrap; }
+
+  .category-dialog #category-list li > div { flex-direction: row; }
+  .category-dialog #edit-cat-input { flex-basis: 100%; }
+}
+.todo-page .category-dialog .icon-btn { color: var(--fg) !important; }
+
+.category-dialog #category-list .category-row { display: grid; grid-template-columns: 88px minmax(0, 1fr) 44px 44px; gap: .5rem; padding: .75rem; }
+.category-order { display: flex; flex-direction: row; margin: 0; }
+.category-summary { display: flex; align-items: center; gap: .5rem; min-width: 0; }
+.category-count { white-space: nowrap; }
+@media (max-width: 480px) {
+  .category-dialog #category-list .category-row { grid-template-columns: minmax(88px, 1fr) 44px 44px; }
+  .category-summary { grid-column: 1 / -1; grid-row: 1; padding: .25rem 0; }
+  .category-order { grid-column: 1; grid-row: 2; }
+  .category-row > button { grid-row: 2; }
+}

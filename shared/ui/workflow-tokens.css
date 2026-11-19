@@ -1,0 +1,21 @@
+/* Original workspace, roles, native dialogs and execution/confirmation owners remain intact. */
+.workflow-bootstrap { --fg-body: var(--fg); --fg-1: var(--fg); --fg-2: var(--muted); --bg-body: var(--bg-elevated); --bg-1: var(--bg-hover); --bg-2: var(--bg-hover); --border-color: var(--border); --primary-base: #2563eb; --primary-contrast: #fff; --focus-ring-color: var(--accent); --focus-ring-width: 2px; }
+.workflow-bootstrap .btn { --btn-min-height: 44px; --btn-padding-x: 12px; --btn-padding-y: 9px; --btn-font-size: inherit; --btn-color: var(--fg); --btn-bg: var(--bg-elevated); --btn-border-color: var(--border); --btn-hover-color: var(--fg); --btn-hover-bg: var(--bg-hover); --btn-hover-border-color: var(--border); --btn-border-radius: 8px; font-family: inherit; }
+.workflow-bootstrap .btn-solid { --theme-bg: #2563eb; --theme-contrast: #fff; --btn-bg: #2563eb; --btn-color: #fff; --btn-hover-color: #fff; }
+.workflow-bootstrap .nav-link { min-height: 44px; --nav-link-color: var(--fg); --nav-link-hover-color: var(--fg); --nav-link-hover-bg: var(--bg-hover); --nav-link-padding-x: .55rem; --nav-link-padding-y: .4rem; font-family: inherit; }
+.workflow-bootstrap .nav-link[aria-selected="true"] { color: var(--accent); background: var(--bg-hover); font-weight: 600; }
+.workflow-bootstrap .form-control { --control-fg: var(--fg); --control-bg: var(--bg-elevated); --control-border-color: var(--border); --control-placeholder-color: var(--muted); font-family: inherit; min-height: 44px; }
+:root[data-theme="dark"] .workflow-bootstrap select.form-control { background-image: var(--control-select-bg-dark); }
+.workflow-bootstrap .alert { --alert-bg: var(--bg-hover); --alert-color: var(--fg); --alert-padding-x: 12px; --alert-padding-y: 10px; }
+.workflow-bootstrap .alert:empty { display: none; }
+.workflow-bootstrap [hidden] { display: none !important; }
+.workflow-bootstrap .works-icon { width: 1.15em; height: 1.15em; flex-shrink: 0; vertical-align: -.125em; }
+.workflow-bootstrap .works-icon,.workflow-bootstrap .works-icon * { pointer-events: none; }
+@media(prefers-reduced-motion: reduce) { .workflow-bootstrap :is(.btn,.nav-link,.form-control,.alert) { transition: none; } }
+@media print { .workflow-bootstrap :is(.btn,.nav-link,.form-control,.alert) { transition: none; } }
+
+.workflow-bootstrap .btn { gap: 6px; }
+.workflow-bootstrap .nav-link { --nav-link-justify: flex-start; --nav-link-align: center; }
+.workflow-bootstrap .wf-dialog textarea.form-control { min-height: 100px; }
+.workflow-bootstrap .wf-check .check { min-height: 1em; }
+.workflow-bootstrap .wf-run { scroll-margin-block: 80px; }

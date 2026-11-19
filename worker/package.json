@@ -5,9 +5,29 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "db:migrate": "wrangler d1 execute tutor-db --remote --file=./schema.sql"
+    "db:migrate": "wrangler d1 execute tutor-db --remote --file=./schema.sql",
+    "test": "node --test test/*.test.mjs",
+    "test:browser": "node test/oauth-browser-session.browser.mjs",
+    "test:kdp:browser": "node test/kdp-ui.browser.mjs",
+    "test:ss:browser": "node test/ss-ui.browser.mjs",
+    "wiki:migrate": "node scripts-wiki-migrate.mjs",
+    "test:wiki:browser": "node test/wiki-ui.browser.mjs",
+    "test:next-lesson:browser": "node test/next-lesson-plan.browser.mjs",
+    "test:header:browser": "node test/header-theme.browser.mjs",
+    "test:category:browser": "node test/category-ui.browser.mjs && npm run test:todo:browser",
+    "test:todo:browser": "node test/todo-personal.browser.mjs",
+    "test:workflow:browser": "node test/workflow-ui.browser.mjs",
+    "test:lesson-attribution:browser": "node test/lesson-attribution.browser.mjs",
+    "test:lesson-baseline:browser": "node test/lesson-baseline.browser.mjs"
   },
   "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "dompurify": "3.4.17",
+    "esbuild": "0.17.19",
+    "marked": "18.1.1",
     "wrangler": "^3.90.0"
+  },
+  "dependencies": {
+    "@block65/webcrypto-web-push": "2.0.0"
   }
 }

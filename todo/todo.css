@@ -1,0 +1,531 @@
+.todo-page {
+  --panel: var(--bg-elevated);
+  --ink: var(--fg);
+  --muted: color-mix(in srgb, var(--fg) 75%, var(--bg-elevated));
+  --line: var(--border);
+  background: var(--bg-gradient);
+  color: var(--ink);
+  font-family:
+    system-ui,
+    -apple-system,
+    sans-serif;
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.6;
+  color-scheme: inherit;
+}
+
+:where(.todo-page) * {
+  box-sizing: border-box;
+}
+:where(.todo-page) button,
+:where(.todo-page) input,
+:where(.todo-page) select,
+:where(.todo-page) textarea {
+  font: inherit;
+}
+:where(.todo-page) button,
+:where(.todo-page) input,
+:where(.todo-page) select,
+:where(.todo-page) textarea {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--ink);
+  padding: 10px 12px;
+  max-width: 100%;
+}
+:where(.todo-page) button {
+  cursor: pointer;
+  min-height: 44px;
+}
+:where(.todo-page) button:hover {
+  border-color: var(--accent);
+}
+:where(.todo-page) button:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+:where(.todo-page) input,
+:where(.todo-page) textarea {
+  width: 100%;
+  font-size: 16px;
+}
+:where(.todo-page) input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--accent);
+}
+:where(.todo-page) button:focus-visible,
+:where(.todo-page) input:focus-visible,
+:where(.todo-page) select:focus-visible,
+:where(.todo-page) textarea:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
+.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+.danger {
+  color: #c43f46;
+}
+.todo-main {
+  max-width: 1050px;
+  margin: auto;
+  padding: 28px 20px 64px;
+}
+.heading,
+.toolbar,
+.dialog-head,
+.dialog-actions,
+.inline,
+.task-top,
+.task-meta,
+.role-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+.heading {
+  margin-bottom: 20px;
+}
+:where(.todo-page) h2 {
+  font-size: 26px;
+  margin: 3px 0;
+}
+:where(.todo-page) h3 {
+  font-size: 18px;
+  margin: 0 0 8px;
+}
+:where(.todo-page) h4 {
+  margin: 0;
+}
+.eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.17em;
+  color: var(--muted);
+  margin: 0;
+}
+.muted,
+.hint {
+  color: var(--muted);
+}
+.hint {
+  font-size: 13px;
+  margin: 8px 0 16px;
+}
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 20px;
+}
+.capture {
+  display: flex;
+  gap: 10px;
+}
+.capture input {
+  border: none;
+  background: transparent;
+}
+.capture button {
+  white-space: nowrap;
+}
+.toolbar {
+  flex-wrap: wrap;
+  margin: 24px 0 18px;
+}
+.toolbar label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.view-switch {
+  display: flex;
+  gap: 4px;
+}
+.view-switch [aria-pressed="true"] {
+  background: var(--accent);
+  color: white;
+}
+.deadline-panel {
+  border-left: 4px solid #ca8645;
+  margin: 18px 0 28px;
+}
+.deadline-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  border-top: 1px solid var(--line);
+  padding: 8px 0;
+}
+.deadline-row button {
+  border: 0;
+  text-align: left;
+}
+.overdue {
+  color: #bd3d42;
+  font-weight: 600;
+}
+.group {
+  margin: 24px 0;
+}
+.group-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.count {
+  font-size: 13px;
+  color: var(--muted);
+}
+.task-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 10px;
+  min-width: 0;
+}
+.task-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+  margin: 0;
+}
+.task-top {
+  align-items: flex-start;
+  justify-content: flex-start;
+}
+.task-top > div {
+  flex: 1;
+  min-width: 0;
+}
+.task-top > .done-toggle {
+  flex: none;
+  padding: 8px;
+  min-width: 44px;
+}
+.task-meta {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 9px 0;
+}
+.badge {
+  font-size: 12px;
+  border-radius: 7px;
+  padding: 3px 8px;
+  border: 1px solid var(--line);
+}
+.role-blue {
+  background: #dce9ff;
+  color: #243f70;
+}
+.role-green {
+  background: #dcefe1;
+  color: #234e33;
+}
+.role-pink {
+  background: #f8e0e8;
+  color: #733247;
+}
+.role-purple {
+  background: #e9dff8;
+  color: #513876;
+}
+.role-yellow {
+  background: #f7edcc;
+  color: #604d1a;
+}
+.task-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+.clone-fast {
+  font-size: 12px;
+  padding: 8px;
+}
+.clone-fast span {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+}
+.task-actions > button {
+  flex-grow: 1;
+}
+.board {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+.board .task-actions {
+  display: flex;
+}
+.board .detail-button {
+  display: block;
+}
+.board-column {
+  min-width: 0;
+}
+.board .task-top {
+  flex-wrap: wrap;
+}
+.empty {
+  padding: 18px;
+  color: var(--muted);
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+}
+:where(.todo-page) dialog {
+  width: min(600px, calc(100% - 24px));
+  max-height: 90dvh;
+  overflow: auto;
+  background: var(--panel);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 24px;
+}
+:where(.todo-page) dialog::backdrop {
+  background: #10203999;
+}
+:where(.todo-page) dialog label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 12px 0;
+}
+:where(.todo-page) dialog .check-label {
+  flex-direction: row;
+  align-items: center;
+}
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 14px;
+}
+.dialog-head {
+  margin-bottom: 16px;
+}
+.dialog-head h2 {
+  font-size: 22px;
+}
+.dialog-head button {
+  font-size: 23px;
+}
+.dialog-actions {
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  margin-top: 22px;
+}
+:where(.todo-page) fieldset {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+}
+.step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.step span {
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+.role-row {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+.role-row .role-name {
+  flex: 1;
+  min-width: 120px;
+}
+.role-row input {
+  min-width: 80px;
+}
+.login {
+  max-width: 420px;
+  margin: 60px auto;
+  text-align: center;
+}
+#notice:not(:empty),
+#recovery:not(:empty) {
+  padding: 14px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  margin: 14px 0;
+}
+#recovery button {
+  margin: 8px;
+}
+#detail-error,
+#role-error,
+#clone-error {
+  color: #bd3d42;
+}
+body:has(.todo-page dialog[open]) {
+  overflow: hidden;
+}
+[hidden] {
+  display: none !important;
+}
+@media (max-width: 700px) {
+  .todo-main {
+    padding: 20px 12px 44px;
+  }
+  .heading {
+    align-items: flex-start;
+  }
+  .heading h2 {
+    font-size: 22px;
+  }
+  .heading button {
+    font-size: 13px;
+    white-space: nowrap;
+  }
+  .panel {
+    padding: 16px;
+  }
+  .toolbar {
+    gap: 10px;
+  }
+  .toolbar label {
+    flex: 1;
+    min-width: 130px;
+  }
+  .toolbar select {
+    min-width: 0;
+    flex: 1;
+  }
+  .view-switch {
+    width: 100%;
+  }
+  .view-switch button {
+    flex: 1;
+  }
+  .board {
+    grid-template-columns: 1fr;
+  }
+  .board .task-actions {
+    display: flex;
+  }
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+  :where(.todo-page) dialog {
+    padding: 18px;
+  }
+  .capture {
+    padding: 10px;
+    gap: 4px;
+  }
+  .capture input {
+    min-width: 0;
+    padding: 8px;
+  }
+  .capture button {
+    padding: 8px 10px;
+  }
+  .deadline-row {
+    align-items: flex-start;
+  }
+  .deadline-row span {
+    white-space: nowrap;
+    font-size: 13px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  :where(.todo-page) * {
+    scroll-behavior: auto !important;
+    transition: none !important;
+  }
+}
+/* Keep input surfaces and 16px mobile text consistent over the shared stylesheet. */
+.todo-page input:not([type="checkbox"]):not([type="radio"]),
+.todo-page select,
+.todo-page textarea,
+.todo-page input:not([type="checkbox"]):not([type="radio"]):focus,
+.todo-page select:focus,
+.todo-page textarea:focus {
+  background: var(--panel);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 16px;
+  box-shadow: none;
+}
+.todo-page .capture input:not([type="checkbox"]):not([type="radio"]) {
+  background: transparent;
+  border: none;
+}
+html[data-theme="dark"] .todo-page .overdue,
+html[data-theme="dark"] .todo-page .danger,
+html[data-theme="dark"] .todo-page #detail-error,
+html[data-theme="dark"] .todo-page #clone-error,
+html[data-theme="dark"] .todo-page #role-error {
+  color: #ff9298;
+}
+.category-row {
+  border-bottom: 1px solid var(--line);
+  padding: 12px 0;
+  margin-bottom: 12px;
+}
+.category-row .inline {
+  justify-content: flex-start;
+}
+
+/* Keep compact category ordering controls usable on touch screens. */
+.category-row [data-category-action="up"],
+.category-row [data-category-action="down"] {
+  min-width: 44px;
+}
+.todo-page dialog button {
+  min-width: 44px;
+  min-height: 44px;
+  flex-shrink: 0;
+}
+
+/* Keep direct clone actions compact, with dates in their accessible descriptions. */
+.task-search { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:20px 0 12px; }
+.task-search label { font-weight:600; }
+.task-search input { flex:1; min-width:160px; }
+.task-actions { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); }
+.task-actions .clone-fast { min-width:0; padding:6px 2px; }
+.task-actions > button:not(.clone-fast) { grid-column:span 2; font-size:12px; padding:6px; }
+.task-actions .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+.task-card { padding:12px; }
+.task-meta { margin:6px 0; }
+.task-card .hint { margin:4px 0; font-size:12px; }
+@media(max-width:600px) { .task-search label { width:100%; } .task-top { gap:8px; } }
+
+.capture-destination { display:flex; align-items:center; gap:10px; font-size:13px; margin:10px 0; color:var(--muted); }
+.capture-destination select { min-height:44px; color:var(--ink); }
+
+.board .task-actions { display:grid; }
+
+.clone-caption { margin:10px 0 0; color:var(--muted); font-size:12px; }
+.clone-caption + .task-actions { margin-top:4px; }
+/* Reserve useful reading width for long task names on narrow screens. */
+.deadline-row button { min-width:0; overflow-wrap:anywhere; }
+@media(max-width:600px) {
+  .deadline-row { flex-direction:column; align-items:stretch; gap:2px; }
+  .deadline-row button { width:100%; padding:8px 0; }
+  .deadline-row > span { align-self:flex-end; }
+}

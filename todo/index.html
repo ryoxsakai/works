@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content" />
+    <title>ToDo管理 | Works</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+U:wght@300;400;500&amp;display=swap">
+    <script src="/shared/theme-init.js?v=1"></script>
+    <link rel="stylesheet" href="/shared/styles.css?v=56" />
+    <link rel="stylesheet" href="/todo/todo.css?v=8" />
+    <link rel="stylesheet" href="/shared/ui/todo-bootstrap.css?v=1" />
+    <link rel="stylesheet" href="/shared/ui/todo-tokens.css?v=2" />
+    <link rel="stylesheet" href="/shared/ui/button-states.css?v=1" />
+    <link rel="manifest" href="/todo/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/logo.png" />
+    <link rel="stylesheet" href="/todo/planner.css?v=5" />
+    <link rel="stylesheet" href="/shared/header.css?v=2" />
+    <script defer src="/dashboard/vendor/Sortable-1.15.6.min.js"></script>
+    <script type="module" src="/shared/header.js?v=4"></script>
+  </head>
+  <body>
+    <header class="page-header works-header">
+      <h1>
+        <a class="works-home" href="/" aria-label="Works ホーム"
+          ><span class="page-header-icon" aria-hidden="true">W</span
+          ><span>Works</span></a
+        ><span class="works-page-title">ToDo管理</span>
+      </h1>
+      <div class="works-header-actions">
+        <button
+          id="sign-out"
+          type="button"
+          class="user-icon-btn"
+          aria-label="ログアウト"
+          title="ログアウト"
+          hidden
+        >
+          <svg
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="9" />
+            <circle cx="12" cy="9" r="3" />
+            <path d="M5.5 18c1-3 3-4.5 6.5-4.5s5.5 1.5 6.5 4.5" />
+          </svg>
+        </button>
+      </div>
+    </header>
+    <div class="todo-page todo-bootstrap">
+    <main id="app" hidden class="todo-main">
+      <div class="planner-layout">
+        <aside class="planner-sidebar" aria-label="ToDoメニュー">
+
+          <div id="planner-menu">
+            <button id="sidebar-search"><span class="search-icon" aria-hidden="true"></span>タスクを検索</button>
+            <nav id="views" aria-label="タスク一覧"></nav>
+            <div class="side-heading"><h3>プロジェクト</h3><button id="new-project" aria-label="プロジェクトを管理">＋</button></div>
+            <nav id="projects" aria-label="プロジェクト"></nav>
+            <div class="side-heading"><h3>ラベル</h3><button id="new-label" aria-label="ラベルを管理">＋</button></div>
+            <nav id="labels" aria-label="ラベル"></nav>
+            <div class="side-heading"><h3>保存フィルター</h3><button id="new-filter" aria-label="フィルターを管理">＋</button></div>
+            <nav id="saved-filters" aria-label="保存フィルター"></nav>
+            <details class="planner-settings"><summary>設定・連携</summary><div>
+              <button id="roles-open">役割を管理</button><button id="categories-open">カテゴリを管理</button>
+              <button id="push-settings">この端末の通知を有効にする</button><button id="push-disable">この端末の通知を解除</button>
+              <label><input type="checkbox" id="calendar-sync"> Googleカレンダーに反映</label>
+              <small>予定日がある未完了タスクをメインカレンダーに反映します。オフにすると連携した予定を取り除きます。</small>
+              <button id="sync-status">連携状態を確認</button><output id="delivery-state" aria-live="polite"></output>
+            </div></details>
+          </div>
+        </aside>
+        <div class="planner-content">
+          <div class="heading"><div><h2 id="view-title">今日のタスク</h2><p id="today-label" class="muted"></p></div>
+          <div class="heading-actions"><button id="edit-view" hidden>編集</button><button id="display-button" aria-expanded="false" aria-controls="display-panel">表示</button><button id="new-task" class="primary">＋ 追加</button></div></div>
+          <section class="planner-filters" id="display-panel" aria-label="表示設定" hidden><div class="task-search"><label for="task-search">タスクを探す</label><input id="task-search" type="search" placeholder="タイトル・メモで検索" /><button id="clear-filters" type="button" hidden>絞り込みを解除</button></div>
+      <div class="toolbar">
+        <label
+          >役割
+          <select id="role-filter">
+            <option value="">すべて</option>
+          </select></label
+        ><label
+          >カテゴリ
+          <select id="category-filter">
+            <option value="">すべて</option>
+          </select></label
+        >
+      </div>
+      <div class="display-options"><div class="view-switch btn-group" role="group" aria-label="表示切替"><button id="list-view" aria-pressed="true">リスト</button><button id="board-view" aria-pressed="false">ボード</button></div>
+        <label>並べ替え <select id="task-sort"><option value="manual">手動</option><option value="plannedDay">予定日</option><option value="deadline">締切</option><option value="priority">優先度</option><option value="name">名前</option></select></label></div></section>
+      <div id="week-picker" hidden></div>
+      <div id="notice" role="status" aria-live="polite"></div>
+      <div id="recovery"></div>
+      <p id="task-count" class="hint" role="status"></p><div id="review-controls"></div><div id="tasks" aria-label="タスク一覧"></div>
+      <details class="panel deadline-panel"><summary>締切の確認 <span id="due-count"></span></summary><div id="deadlines"></div></details>
+      </div></div>
+      <nav class="bottom-tabs" aria-label="ToDo ナビゲーション">
+        <button data-view="today"><span data-works-icon="bx-list-check"></span>今日</button>
+        <button data-view="upcoming"><span data-works-icon="bx-calendar-event"></span>近日予定</button>
+        <button id="mobile-nav" aria-expanded="false" aria-controls="planner-menu"><span data-works-icon="bx-library"></span>閲覧</button>
+        <button id="mobile-search"><span class="search-icon" aria-hidden="true"></span>検索</button>
+        <button id="mobile-add" aria-label="タスクを追加"><span aria-hidden="true">＋</span> 追加</button>
+      </nav>
+    </main>
+    <dialog id="capture-sheet" aria-labelledby="capture-heading">
+      <div class="dialog-head"><h2 id="capture-heading">タスクを追加</h2><button data-close aria-label="追加を閉じる">×</button></div>
+      <form id="capture">
+        <label for="quick-title" class="capture-title-label">タスク名</label><input id="quick-title" maxlength="500" required placeholder="タスク名" autocomplete="off">
+        <div id="capture-source"></div><div id="quick-preview" aria-live="polite"></div>
+        <label class="sheet-field">作業日<input type="date" id="capture-day"></label>
+        <div class="date-shortcuts" role="group" aria-label="作業日の候補">
+          <button type="button" data-offset="0">今日</button>
+          <button type="button" data-offset="1">明日</button>
+        </div>
+        <label class="capture-memo">メモ（任意）<textarea id="capture-memo" maxlength="10000" rows="2"></textarea></label>
+        <details id="capture-details"><summary>その他の設定</summary>
+          <label class="sheet-field">プロジェクト<select id="capture-project"></select></label>
+          <label class="sheet-field">締切<input id="capture-deadline" type="date"></label>
+          <label class="sheet-field">通知（日本時間）<input id="capture-reminder" type="datetime-local"></label>
+          <label class="sheet-field">ラベル<input id="capture-tags" maxlength="500" placeholder="教材作成 印刷"></label>
+        </details>
+        <p id="capture-error" role="alert"></p>
+        <button id="capture-submit" class="primary" type="submit" disabled>追加する</button>
+      </form>
+    </dialog>
+    <div id="login-screen" class="login panel">
+      <h2>Works ToDo管理</h2>
+      <p id="login-message">読み込み中…</p>
+      <button id="sign-in" hidden>Googleでサインイン</button>
+    </div>
+    <dialog id="detail" aria-labelledby="detail-heading">
+      <section id="task-summary" hidden>
+        <div class="summary-toolbar">
+          <button type="button" data-close aria-label="一覧に戻る">‹ 一覧に戻る</button>
+          <button type="button" id="summary-edit"><span data-works-icon="bx-note"></span> 編集</button>
+        </div>
+        <p class="summary-label">タスク詳細</p>
+        <h2 id="summary-name"></h2>
+        <button type="button" id="summary-day" class="summary-day">
+          <span data-works-icon="bx-calendar-event"></span><span>作業日 <strong></strong></span><span>変更</span>
+        </button>
+        <div class="summary-note"><h3>メモ</h3><p id="summary-memo"></p></div>
+        <details class="detail-section" id="summary-settings">
+          <summary><span data-works-icon="bx-library"></span>その他の設定</summary>
+          <dl><dt>プロジェクト</dt><dd id="summary-project"></dd><dt>優先度</dt><dd id="summary-priority"></dd>
+            <dt>締切</dt><dd id="summary-deadline"></dd><dt>通知</dt><dd id="summary-reminder"></dd></dl>
+        </details>
+        <div class="summary-footer"><button type="button" class="primary" id="summary-complete"></button></div>
+        <p role="alert" id="summary-error"></p>
+      </section>
+      <form id="detail-form">
+        <div class="dialog-head">
+          <h2 id="detail-heading">タスクの詳細</h2>
+          <button type="button" data-close aria-label="詳細を閉じる">×</button>
+        </div>
+        <label class="detail-name"
+          >タスク名<input name="name" maxlength="500" required
+        /></label>
+        <div class="detail-primary">
+          <label
+            ><span class="field-title"
+              ><span data-works-icon="bx-calendar-event"></span>作業日</span
+            ><input type="date" name="plannedDay" /></label>
+          <div class="date-shortcuts" role="group" aria-label="作業日の候補">
+          <button type="button" data-offset="0">今日</button>
+          <button type="button" data-offset="1">明日</button>
+        </div>
+          <div id="origin-link"></div>
+        </div>
+        <label class="edit-memo">メモ<textarea
+            name="memo"
+            maxlength="10000"
+            rows="3"
+          ></textarea>
+        </label>
+        <details class="detail-section">
+          <summary><span data-works-icon="bx-library"></span>分類・優先度</summary>
+          <div>
+            <div class="form-grid">
+          <label
+            ><span class="field-title"
+              ><span data-works-icon="bx-library"></span>プロジェクト</span
+            ><select id="task-project"></select></label
+          ><label
+            ><span class="field-title"
+              ><span data-works-icon="bx-calendar-event"></span>締切</span
+            ><input type="date" name="deadline"
+          /></label>
+              <label>役割<select name="roleId"></select></label
+              ><label>カテゴリ<select name="category"></select></label
+              ><label
+                >進み具合<select name="status">
+                  <option value="pending">未着手</option>
+                  <option value="doing">進行中</option>
+                  <option value="waiting">待ち</option>
+                  <option value="done">完了</option>
+                </select></label
+              ><label hidden
+                >重要度の詳細（任意）<select name="priority">
+                  <option value="">指定なし</option>
+                  <option value="1">低</option>
+                  <option value="2">中</option>
+                  <option value="3">高</option>
+                </select></label
+              >
+            </div>
+            <label
+              >セクション<input id="task-section" maxlength="100" list="known-sections"
+            /></label>
+            <label>親タスク<select id="task-parent"></select></label
+            ><label
+              >優先度<select id="task-priority">
+                <option value="1">P1・最優先</option>
+                <option value="2">P2・高</option>
+                <option value="3">P3・中</option>
+                <option value="4">P4・通常</option>
+              </select></label
+            >
+            <datalist id="known-sections"></datalist>
+            <div id="task-labels" class="label-options" aria-label="ラベル"></div>
+            <label class="check-label"
+              ><input type="checkbox" name="important" /> ★ 大切なタスク</label
+            >
+          </div>
+        </details>
+        <details class="detail-section">
+          <summary>
+            <span data-works-icon="bx-calendar-event"></span>時間・通知・繰り返し
+          </summary>
+          <div>
+            <label>開始時刻（日本時間）<input id="task-time" type="time" /></label
+            ><label
+              >所要時間（分）<input
+                id="task-duration"
+                type="number"
+                min="1"
+                max="1440"
+                placeholder="30"
+            /></label>
+            <label
+              >通知日時（日本時間）<input id="task-reminder" type="datetime-local"
+            /></label>
+            <label
+              >繰り返し<select id="task-repeat">
+                <option value="">なし</option>
+                <option value="fixed">予定日を基準に繰り返す</option>
+                <option value="after">完了日から繰り返す</option>
+              </select></label
+            >
+            <label id="interval-field"
+              >間隔（日）<input
+                id="task-interval"
+                type="number"
+                min="1"
+                max="3650"
+                value="7"
+            /></label>
+          </div>
+        </details>
+        <details class="detail-section">
+          <summary><span data-works-icon="bx-note"></span>説明・サブタスク</summary>
+          <div>
+            <label
+              >複製にも引き継ぐ説明（任意）<textarea
+                name="reusableDescription"
+                maxlength="10000"
+                rows="2"
+              ></textarea>
+            </label>
+            <fieldset>
+              <legend>小さなステップ</legend>
+              <div id="checklist-editor"></div>
+              <div class="inline">
+                <input
+                  id="step-text"
+                  maxlength="500"
+                  aria-label="新しいステップ"
+                  placeholder="ステップを追加"
+                /><button type="button" id="step-add">追加</button>
+              </div>
+            </fieldset>
+            <div id="child-tasks"></div>
+          </div>
+        </details>
+        <div class="dialog-actions">
+          <button type="button" id="task-delete" class="danger">削除</button
+          ><button type="button" id="cancel-detail-edit">キャンセル</button
+          ><button class="primary" type="submit">変更を保存</button>
+        </div>
+        <p id="detail-error" role="alert"></p>
+      </form>
+    </dialog>
+    <dialog id="organizer" aria-labelledby="organizer-title"><div class="dialog-head"><h2 id="organizer-title"></h2><button data-close aria-label="閉じる">×</button></div>
+      <label>編集対象<select id="organizer-item"></select></label><form id="organizer-form"><label>名前<input id="organizer-name" required maxlength="100"></label>
+      <label id="org-parent-field">親プロジェクト<select id="organizer-parent"></select></label>
+      <fieldset id="org-colors"><legend>表示色</legend><div id="color-options"></div></fieldset>
+      <div id="filter-fields"><label>検索語<input id="filter-query" maxlength="500"></label><div class="form-grid"><label>プロジェクト<select id="filter-project"></select></label><label>ラベル<select id="filter-label"></select></label>
+      <label>状態<select id="filter-status"><option value="">すべて</option><option value="pending">未着手</option><option value="doing">進行中</option><option value="waiting">連絡待ち</option><option value="done">完了</option></select></label>
+      <label>優先度<select id="filter-priority"><option value="">すべて</option><option>1</option><option>2</option><option>3</option><option>4</option></select></label></div>
+      <label><input type="checkbox" id="filter-due"> 期限超過・7日以内の締切</label></div>
+      <div id="organizer-order"><button type="button" id="org-up">↑ 上へ</button> <button type="button" id="org-down">↓ 下へ</button></div><p id="organizer-error" role="alert"></p><div class="dialog-actions"><button id="organizer-delete" type="button">削除</button><button type="submit" class="primary">保存</button></div></form></dialog>
+    <dialog id="role-dialog" aria-labelledby="roles-heading">
+      <div class="dialog-head">
+        <h2 id="roles-heading">自分の役割</h2>
+        <button data-close aria-label="役割管理を閉じる">×</button>
+      </div>
+      <p class="hint">
+        例：生徒管理・授業管理・模試作成。カテゴリとは別に管理します。使った役割はアーカイブして履歴を残せます。
+      </p>
+      <div id="role-list"></div>
+      <form id="role-form">
+        <label
+          >役割名<input
+            name="name"
+            maxlength="100"
+            required
+            placeholder="例：生徒管理"
+        /></label>
+        <div class="form-grid">
+          <label
+            >アイコン<select name="icon">
+              <option>📚</option>
+              <option>👥</option>
+              <option>📝</option>
+              <option>🏠</option>
+              <option>💼</option>
+              <option>⭐</option>
+            </select></label
+          ><label
+            >色<select name="color">
+              <option value="blue">ブルー</option>
+              <option value="green">グリーン</option>
+              <option value="pink">ピンク</option>
+              <option value="purple">パープル</option>
+              <option value="yellow">イエロー</option>
+            </select></label
+          >
+        </div>
+        <button class="primary">役割を追加</button>
+      </form>
+      <p id="role-error" role="alert"></p>
+    </dialog>
+    <dialog id="clone-dialog" aria-labelledby="clone-heading">
+      <form id="clone-form">
+        <div class="dialog-head">
+          <h2 id="clone-heading">未来に複製</h2>
+          <button type="button" data-close aria-label="複製設定を閉じる">
+            ×
+          </button>
+        </div>
+        <p id="clone-source"></p>
+        <div class="form-grid">
+          <label
+            >いくつ後？<input
+              name="amount"
+              type="number"
+              min="1"
+              max="3650"
+              value="1"
+              required /></label
+          ><label
+            >単位<select name="unit">
+              <option value="1">日後</option>
+              <option value="7">週間後</option>
+            </select></label
+          >
+        </div>
+        <p id="clone-target"></p>
+        <label>新しい締切（任意）<input type="date" name="deadline" /></label
+        ><button type="button" id="copy-deadline">
+          元の締切を明示的にコピー
+        </button>
+        <p id="deadline-preview" class="hint"></p>
+        <p class="hint">
+          締切の初期値は「なし」。元の完了記録は変わりません。自動繰り返しではありません。
+        </p>
+        <button class="primary" type="submit">この日へ複製</button>
+        <p id="clone-error" role="alert"></p>
+      </form>
+    </dialog>
+    <dialog id="categories-dialog" aria-labelledby="categories-heading">
+      <div class="dialog-head">
+        <h2 id="categories-heading">カテゴリを管理</h2>
+        <button data-close aria-label="カテゴリ管理を閉じる">×</button>
+      </div>
+      <p class="hint">
+        従来のカテゴリです。役割とは別に保持します。使用中のカテゴリを削除する場合は、移動先を選んでください。
+      </p>
+      <div id="categories-list"></div>
+      <form id="categories-form">
+        <label
+          >新しいカテゴリ<input name="name" maxlength="100" required /></label
+        ><button class="primary">カテゴリを追加</button>
+      </form>
+    </dialog>
+    </div>
+    <script type="module" src="/todo/todo.js?v=7"></script>
+  </body>
+</html>

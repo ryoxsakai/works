@@ -1,0 +1,141 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import test from "node:test";
+import { Miniflare } from "miniflare";
+
+let moduleSequence = 0;
+
+async function loadAdmissionFunctions() {
+  const sourceUrl = new URL("../src/index.js", import.meta.url);
+  const source = (await readFile(sourceUrl, "utf8")).replace("./workflow.js", new URL("../src/workflow.js", import.meta.url).href).replace("./wiki.js", new URL("../src/wiki.js", import.meta.url).href).replace("./kdp-services.js", new URL("../src/kdp-services.js", import.meta.url).href).replace("./oauth-refresh.js", new URL("../src/oauth-refresh.js", import.meta.url).href).replace("./mcp-scopes.js", new URL("../src/mcp-scopes.js", import.meta.url).href).replace("./calendar-lesson-records.js", new URL("../src/calendar-lesson-records.js", import.meta.url).href).replace("./calendar-lesson-google.js", new URL("../src/calendar-lesson-google.js", import.meta.url).href).replace("./calendar-lesson-journal.js", new URL("../src/calendar-lesson-journal.js", import.meta.url).href).replace("./calendar-lesson-migration.js", new URL("../src/calendar-lesson-migration.js", import.meta.url).href).replace("./lesson-owner-history.js", new URL("../src/lesson-owner-history.js", import.meta.url).href);
+  const exposedSource = `${source}\nexport { createMcpAccessToken, handleMcp, ensureAdmissionSchema, ensureAdmissionSupplement2027, listMcpAdmissionEvents };`;
+  moduleSequence += 1;
+  return import(`data:text/javascript;base64,${Buffer.from(exposedSource).toString("base64")}#${moduleSequence}`);
+}
+
+test("admission schedules are available through a read-only MCP tool", async (context) => {
+  const functions = await loadAdmissionFunctions();
+  const miniflare = new Miniflare({
+    modules: true,
+    script: "export default { fetch() { return new Response('ok'); } };",
+    compatibilityDate: "2026-08-01",
+    d1Databases: { DB: "admissions-test" },
+  });
+  context.after(async () => {
+    await miniflare.dispose();
+  });
+
+  const db = await miniflare.getD1Database("DB");
+  const env = {
+    DB: db,
+    ALLOWED_EMAIL: "owner@example.com",
+    SESSION_SECRET: "admission-test-secret",
+  };
+
+  await db.prepare("CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT)").run();
+  await functions.ensureAdmissionSchema(env);
+  await db.batch([
+    db.prepare("INSERT INTO settings (key, value) VALUES ('admission_seed_2027', '{}')"),
+    db.prepare("INSERT INTO settings (key, value) VALUES ('admission_supplement_2027_missing_private_medical_v1', '{}')"),
+  ]);
+  await db.batch([
+    db.prepare("INSERT INTO admission_events (id, university, selection_type, stage, schedule_date) VALUES (?, ?, ?, ?, ?)")
+      .bind("a-primary", "A大学医学部", "general", "primary", "2027-02-01"),
+    db.prepare("INSERT INTO admission_events (id, university, selection_type, stage, schedule_date) VALUES (?, ?, ?, ?, ?)")
+      .bind("a-result", "A大学医学部", "general", "final_result", "2027-02-10"),
+    db.prepare("INSERT INTO admission_events (id, university, selection_type, stage, schedule_date) VALUES (?, ?, ?, ?, ?)")
+      .bind("b-primary", "B大学医学部", "recommendation", "primary", "2026-11-01"),
+  ]);
+
+  const toolsResponse = await functions.handleMcp(
+    new Request("https://works.lrnr.jp/mcp", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
+    }),
+    env,
+    new URL("https://works.lrnr.jp/mcp")
+  );
+  const tool = (await toolsResponse.json()).result.tools.find((item) => item.name === "list_admission_events");
+  assert.ok(tool);
+  assert.equal(tool.annotations.readOnlyHint, true);
+
+  const listed = await functions.listMcpAdmissionEvents(env, {
+    year: 2027,
+    selection_type: "general",
+  });
+  assert.equal(listed.total, 2);
+  assert.equal(listed.university_count, 1);
+  assert.deepEqual(listed.universities, ["A大学医学部"]);
+  assert.deepEqual(listed.events.map((event) => event.id), ["a-primary", "a-result"]);
+
+  const mcpToken = await functions.createMcpAccessToken(env, "schedule:read");
+  const callResponse = await functions.handleMcp(
+    new Request("https://works.lrnr.jp/mcp", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${mcpToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 2,
+        method: "tools/call",
+        params: {
+          name: "list_admission_events",
+          arguments: { year: 2027, stage: "primary", limit: 10 },
+        },
+      }),
+    }),
+    env,
+    new URL("https://works.lrnr.jp/mcp")
+  );
+  const payload = await callResponse.json();
+  assert.equal(payload.result.structuredContent.total, 1);
+  assert.equal(payload.result.structuredContent.events[0].university, "A大学医学部");
+
+  await assert.rejects(
+    functions.listMcpAdmissionEvents(env, { date_from: "2027/02/01" }),
+    /date_from must be a valid date/
+  );
+  await assert.rejects(
+    functions.listMcpAdmissionEvents(env, { date_to: "2027-02-30" }),
+    /date_to must be a valid date/
+  );
+});
+
+
+test("missing 2027 private medical admissions are seeded once", async (context) => {
+  const functions = await loadAdmissionFunctions();
+  const miniflare = new Miniflare({
+    modules: true,
+    script: "export default { fetch() { return new Response('ok'); } };",
+    compatibilityDate: "2026-08-01",
+    d1Databases: { DB: "admissions-supplement-test" },
+  });
+  context.after(async () => {
+    await miniflare.dispose();
+  });
+
+  const db = await miniflare.getD1Database("DB");
+  const env = { DB: db };
+  await db.prepare("CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT)").run();
+  await functions.ensureAdmissionSchema(env);
+  await db.prepare("INSERT INTO settings (key, value) VALUES ('admission_seed_2027', '{}')").run();
+
+  const first = await functions.ensureAdmissionSupplement2027(env);
+  const second = await functions.ensureAdmissionSupplement2027(env);
+  assert.deepEqual(first, { expected: 64, registered: 64 });
+  assert.deepEqual(second, first);
+
+  const { results } = await db.prepare(
+    "SELECT university, stage, schedule_date, source_url FROM admission_events ORDER BY university, schedule_date, stage"
+  ).all();
+  assert.equal(results.length, 64);
+  assert.ok(results.every((event) => event.source_url?.startsWith("https://")));
+  assert.ok(results.some((event) =>
+    event.university === "日本大学医学部（N方式第2期）" &&
+    event.stage === "secondary" &&
+    event.schedule_date === "2027-03-17"
+  ));
+});

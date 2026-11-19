@@ -1,0 +1,9 @@
+.card-loading { padding: .75rem; min-height: 8rem; color: var(--fg, #1f2328); background: var(--bg-elevated, #fff); border-radius: .5rem; }
+.card-loading p { margin: 0 0 1rem; color: inherit; font-size: .875rem; }
+.card-loading-shapes { display: grid; gap: .8rem; }
+.card-loading-shapes span { display: block; height: .85rem; border-radius: .35rem; background: currentColor; opacity: .09; animation: card-loading-pulse 1.6s ease-in-out infinite; }
+.card-loading-shapes span:first-child { width: 55%; }
+.card-loading-shapes span:last-child { width: 75%; }
+@keyframes card-loading-pulse { 50% { opacity: .18; } }
+@media (prefers-reduced-motion: reduce) { .card-loading-shapes span { animation: none; } }
+@media print { .card-loading { display: none; } }
