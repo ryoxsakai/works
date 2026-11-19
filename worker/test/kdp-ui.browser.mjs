@@ -415,15 +415,16 @@ try {
       fullPage: true,
     });
     await expect(page.locator('#section-title')).toBeEnabled();
-    await page.evaluate(async()=>{const {setTheme}=await import('/shared/theme.js?v=6');setTheme('dark');});
-    await expect.poll(()=>page.locator('#section-title').evaluate(el=>getComputedStyle(el).backgroundColor)).toBe('rgb(30, 33, 38)');
+    // Works is light only: a stale dark request still renders the light editor.
+    await page.evaluate(async()=>{const {setTheme}=await import('/shared/theme.js?v=7');setTheme('dark');});
+    await expect.poll(()=>page.locator('#section-title').evaluate(el=>getComputedStyle(el).backgroundColor)).toBe('rgb(255, 255, 255)');
     for(const id of ['section-title','image-upload']){
       const contrast=await page.locator('#'+id).evaluate(el=>{
         const c=document.createElement('canvas');c.width=c.height=1;const ctx=c.getContext('2d');
         const lum=color=>{ctx.fillStyle=color;ctx.fillRect(0,0,1,1);const a=Array.from(ctx.getImageData(0,0,1,1).data).slice(0,3).map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4;});return a[0]*.2126+a[1]*.7152+a[2]*.0722;};
         const s=getComputedStyle(el),a=lum(s.color),b=lum(s.backgroundColor);return (Math.max(a,b)+.05)/(Math.min(a,b)+.05);
       });
-      assert.ok(contrast>=4.5, `${id} dark text contrast ${contrast}`);
+      assert.ok(contrast>=4.5, `${id} text contrast ${contrast}`);
     }
     for(const id of ['section-title','image-upload']) {
       await page.locator('#'+id).focus();

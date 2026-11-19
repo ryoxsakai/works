@@ -1,5 +1,3 @@
-// Apply before styles load to avoid flashing the wrong theme on direct visits.
-try {
-  const theme = localStorage.getItem("works_theme");
-  if (theme === "light" || theme === "dark") document.documentElement.dataset.theme = theme;
-} catch {}
+// Works is light-only; set it before styles load so no page flashes dark.
+document.documentElement.dataset.theme = "light";
+document.documentElement.style.colorScheme = "light";

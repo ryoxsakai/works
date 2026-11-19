@@ -29,7 +29,7 @@ try {
  assert.equal(await page.locator('#login-screen').isVisible(),false);
  assert.equal(await page.locator('#memo-modal').isVisible(),false);
  assert.equal(await page.locator('#view-modal').isVisible(),false);
- assert.match(await page.locator('body').evaluate(el=>getComputedStyle(el).fontFamily),/Segoe UI/);
+ assert.match(await page.locator('body').evaluate(el=>getComputedStyle(el).fontFamily),/M PLUS 2/); // shared Works typeface
  const revisionBefore=state.revision;
  await page.evaluate(async()=>{const {startMemoPresentation}=await import('/shared/ui/memo-presentation.mjs');startMemoPresentation().stop();startMemoPresentation();startMemoPresentation();});
  assert.equal(state.revision,revisionBefore,'presentation lifecycle never saves');
@@ -61,10 +61,10 @@ try {
  fs.mkdirSync('test-artifacts/memo',{recursive:true});
  for(const width of [320,375,390,768,1440]) {
   await page.setViewportSize({width,height:900});
-  for(const theme of ['light','dark','system']) {
-   await page.locator('.works-header .works-settings-toggle').click();
-   await page.locator(`.works-settings-dialog input[value="${theme}"]`).check();
-   await page.locator('.works-settings-dialog button[aria-label="閉じる"]').click();
+  for(const theme of ['light']) {
+   // Works is light only; the shared header offers quick add instead of a theme dialog.
+   await page.locator('.works-header .works-quick-add').waitFor({state:'visible'});
+   assert.equal(await page.evaluate(()=>document.documentElement.dataset.theme),'light');
    assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
    await page.screenshot({path:`test-artifacts/memo/${width}-${theme}.png`,fullPage:true});
    await page.evaluate(()=>openMemoModal(null));
@@ -79,7 +79,7 @@ try {
    await page.screenshot({path:`test-artifacts/memo/${width}-${theme}-edit.png`,fullPage:true});
    await page.evaluate(()=>closeMemoModal());
    assert.equal(await page.locator('#memo-modal').isVisible(),false);
-   if(width===390&&theme==='dark') {await page.emulateMedia({media:'print',reducedMotion:'reduce'});await page.pdf({path:'test-artifacts/memo/print.pdf'});await page.emulateMedia({media:'screen'});}
+   if(width===390&&theme==='light') {await page.emulateMedia({media:'print',reducedMotion:'reduce'});await page.pdf({path:'test-artifacts/memo/print.pdf'});await page.emulateMedia({media:'screen'});}
   }
  }
  conflict=true; await page.evaluate(()=>openMemoModal(null)); await page.waitForFunction(()=>document.activeElement?.id==='modal-title'); await page.locator('#modal-title').fill('未保存'); await page.evaluate(()=>saveMemo());

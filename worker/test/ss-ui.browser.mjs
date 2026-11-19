@@ -104,13 +104,10 @@ try {
     assert.equal(await page.locator('#user-avatar-fallback').evaluate(el=>el.tagName.toLowerCase()),'svg');
     await page.emulateMedia({reducedMotion:'reduce'});
     assert.equal(await page.locator('#ss-show-completed').evaluate(el=>getComputedStyle(el).transitionDuration),'0s');
-    await page.getByRole('button',{name:'設定',exact:true}).click();
-    await page.locator('input[name="works-theme"][value="light"]').check();
+    // Works is light only: no theme settings, and the select caret stays dark-on-light.
+    assert.equal(await page.locator('input[name="works-theme"]').count(),0);
+    assert.equal(await page.evaluate(()=>document.documentElement.dataset.theme),'light');
     assert.ok((await page.locator('#ss-sort-key').evaluate(el=>getComputedStyle(el).backgroundImage)).includes('%2300000080'));
-    await page.locator('input[name="works-theme"][value="dark"]').check();
-    assert.ok((await page.locator('#ss-sort-key').evaluate(el=>getComputedStyle(el).backgroundImage)).includes('%23ffffff80'));
-    await page.keyboard.press('Escape');
-    await page.screenshot({path:`test-artifacts/ss-${width}-dark.png`,fullPage:true});
     await page.emulateMedia({media:'print'});
     assert.equal(await page.locator('tbody tr').count(),2);
     await page.pdf({path:`test-artifacts/ss-${width}-print.pdf`,format:'A4'});

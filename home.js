@@ -1,5 +1,5 @@
 import { setUserAvatar } from "./shared/avatar.mjs?v=1";
-import "./shared/header.js?v=4";
+import "./shared/header.js?v=5";
 import { hydrateIcons } from "./shared/ui/icons.mjs";
 import {
   signIn,
@@ -8,7 +8,7 @@ import {
   getSessionToken,
   getGoogleAccessToken,
 } from "./shared/auth.js?v=12";
-import { getTheme, setTheme } from "./shared/theme.js?v=6";
+import { getTheme, setTheme } from "./shared/theme.js?v=7";
 
 import { createDashboard } from "./dashboard/dashboard.mjs?v=15";
 const homeNavigation = document.querySelector(".works-navigation");
@@ -18,6 +18,18 @@ document.addEventListener("focusin", (event) => {
   if (!homeNavigation.contains(event.target)) homeNavigation.open = false;
 });
 window.addEventListener("pagehide", () => { homeNavigation.open = false; });
+renderHeroDate();
+
+// Greeting line above the widgets, always in Japan time like the lessons.
+function renderHeroDate() {
+  const target = document.querySelector("#home-hero-date");
+  if (!target) return;
+  const now = new Date();
+  const hour = Number(new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Tokyo", hour: "numeric", hourCycle: "h23" }).format(now));
+  const greeting = hour < 5 ? "おつかれさまです" : hour < 11 ? "おはようございます" : hour < 18 ? "こんにちは" : "こんばんは";
+  const date = new Intl.DateTimeFormat("ja-JP", { timeZone: "Asia/Tokyo", month: "long", day: "numeric", weekday: "short" }).format(now);
+  target.textContent = `${date} ・ ${greeting}`;
+}
 hydrateIcons();
 const dashboard = createDashboard({
   getSessionToken,

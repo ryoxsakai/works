@@ -169,7 +169,7 @@ async function checkTheme(page, theme) {
 }
 async function setTheme(page, value) {
   await page.evaluate(async (theme) => {
-    const { setTheme } = await import("/shared/theme.js?v=6");
+    const { setTheme } = await import("/shared/theme.js?v=7");
     setTheme(theme);
   }, value);
 }
@@ -243,13 +243,14 @@ try {
       }),
       page = await context.newPage(),
       errors = [];
-    const selectedTheme = name.endsWith("dark") ? "dark" : "light";
+    const storedTheme = name.endsWith("dark") ? "dark" : "light";
+    const selectedTheme = "light"; // Works is light only, whatever was stored before.
     await context.addInitScript((theme) => {
       if (!sessionStorage.themeSeeded) {
         localStorage.setItem("works_theme", theme);
         sessionStorage.themeSeeded = "1";
       }
-    }, selectedTheme);
+    }, storedTheme);
     let mutationCount=0;
     page.on("pageerror", (e) => errors.push(e.message));
     await context.route("**/*", async (route) => {
@@ -437,34 +438,19 @@ try {
       path: "test-artifacts/wiki-theme-" + name + ".png",
       fullPage: true,
     });
-    const opposite = selectedTheme === "dark" ? "light" : "dark";
-    await setTheme(page, opposite);
-    await checkTheme(page, opposite);
+    // Works is light only: a stored or OS dark preference never switches themes.
+    await setTheme(page, "dark");
+    await checkTheme(page, "light");
     await page.locator("#cancel").click();
     await page.reload();
     await expect(page.locator("#find")).toBeEnabled();
-    assert.equal(
-      await page.evaluate(() => localStorage.getItem("works_theme")),
-      opposite,
-    );
-    assert.equal(
-      await page.evaluate(() => document.documentElement.dataset.theme),
-      opposite,
-    );
+    assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), "light");
     await page.locator('#pages [data-page="' + themePageId + '"]').click();
     await page.locator("#tab-proposals").click();
     await page.locator("[data-compare-proposal]").click();
-    await checkTheme(page, opposite);
-    await setTheme(page, "system");
-    assert.equal(
-      await page.evaluate(() => localStorage.getItem("works_theme")),
-      null,
-    );
     await page.emulateMedia({ colorScheme: "dark" });
-    await checkTheme(page, "dark");
-    await page.emulateMedia({ colorScheme: "light" });
     await checkTheme(page, "light");
-    await setTheme(page, selectedTheme);
+    await page.emulateMedia({ colorScheme: "light" });
     let acceptDialogs = true;
     page.on("dialog", (d) => (acceptDialogs ? d.accept() : d.dismiss()));
     await expect(page.locator("#body")).toContainText("Safe knowledge");

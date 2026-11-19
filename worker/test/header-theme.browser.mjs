@@ -18,22 +18,10 @@ export const watchAuth = ({onSignedIn,onSignedOut}) => {
   if (localStorage.getItem('qa_signed_in') === 'yes') onSignedIn?.({email:'qa@example.test',picture:''});
   else onSignedOut?.();
 };`;
-async function openThemeSettings(page) {
-  await page.locator('.works-header button[aria-label="設定"]').click();
-  const appearance = page.locator('dialog[open] [role="tab"][data-tab="appearance"]');
-  if (await appearance.count()) await appearance.click();
-  await page.locator('dialog[open] input[type="radio"][value="light"]').waitFor({state:'visible'});
-}
-async function selectTheme(page, value) {
-  await openThemeSettings(page);
-  await page.locator(`dialog[open] input[type="radio"][value="${value}"]`).check();
-  await page.locator('dialog[open] button[aria-label="閉じる"]').click();
-}
-async function selectedTheme(page) {
-  await openThemeSettings(page);
-  const value=await page.locator('dialog[open] input[type="radio"]:checked').inputValue();
-  await page.locator('dialog[open] button[aria-label="閉じる"]').click();
-  return value;
+// Works is light only: no page offers a theme choice any more.
+async function assertLightOnly(page) {
+  assert.equal(await page.evaluate(()=>document.documentElement.dataset.theme),'light');
+  assert.equal(await page.locator('input[type="radio"][value="dark"]').count(),0,'no dark theme option');
 }
 (async () => {
   const browser = await chromium.launch({headless:true,...(process.env.BROWSER_EXECUTABLE ? {executablePath:process.env.BROWSER_EXECUTABLE} : {})});
@@ -113,8 +101,8 @@ async function selectedTheme(page) {
         await page.goto(base + path);
         if (!signedIn && ["/tutor/", "/material/", "/admission/", "/ss/", "/material-print/"].includes(path)) await page.waitForURL(base + "/");
         await page.waitForFunction(() => !!window.qaAuth);
-        await page.locator('.works-header button[aria-label="設定"]').waitFor();
-        assert.equal(await page.locator('.works-header select').count(),0,'theme selector lives inside settings');
+        await page.locator('.works-header .works-quick-add').waitFor();
+        assert.equal(await page.locator('.works-header select').count(),0,'no selector in the header');
         if (new URL(page.url()).pathname === '/') {
           await page.waitForFunction(expected => document.querySelector('#home-auth-action').getAttribute('aria-label') === expected, signedIn ? 'ログアウト' : 'Googleでログイン');
         } else {
@@ -123,17 +111,17 @@ async function selectedTheme(page) {
         }
         // This harness isolates header geometry from memo's full-screen sign-in view.
         if (path === '/memo/') await page.locator('#login-screen').evaluate(el => el.style.display = 'none');
-        for (const theme of ['light','dark']) {
-          await selectTheme(page, theme);
-          await page.waitForTimeout(180); // Let existing card/button color transitions settle.
+        for (const theme of ['light']) {
+          await assertLightOnly(page);
           const geometry = await page.evaluate(() => {
             const h = document.querySelector('.works-header');
             const rect = h.getBoundingClientRect();
             const children = [...h.querySelectorAll('h1, .works-header-actions, select, summary, button:not([hidden])')].filter(e=>e.getBoundingClientRect().width);
             const menu = h.querySelector('.works-navigation');
             const style = menu ? getComputedStyle(menu) : {marginTop:'0px',paddingTop:'0px',borderTopWidth:'0px'};
-            const summary = (menu?.querySelector('summary') || h.querySelector('button[aria-label="設定"]')).getBoundingClientRect();
-            const themeControl = h.querySelector('button[aria-label="設定"]').getBoundingClientRect();
+            const toggle = menu?.querySelector('summary');
+            const summary = (toggle && toggle.getClientRects().length ? toggle : h.querySelector('.works-quick-add')).getBoundingClientRect();
+            const themeControl = h.querySelector('.works-quick-add').getBoundingClientRect();
             return {menuTop:style.marginTop,menuPadding:style.paddingTop,menuBorder:style.borderTopWidth,
               menuCenter:summary.y+summary.height/2,themeCenter:themeControl.y+themeControl.height/2,
               left:rect.left,right:rect.right,width:innerWidth,theme:document.documentElement.dataset.theme,bg:getComputedStyle(h).backgroundColor,
@@ -145,10 +133,13 @@ async function selectedTheme(page) {
           assert.equal(geometry.menuTop, '0px', `${path} menu top margin`);
           assert.equal(geometry.menuPadding, '0px', `${path} menu top padding`);
           assert.equal(geometry.menuBorder, '0px', `${path} menu top border`);
-          assert.ok(Math.abs(geometry.menuCenter - geometry.themeCenter) < 2, `${path} menu alignment`);
+          assert.ok(Math.abs(geometry.menuCenter - geometry.themeCenter) < 2, `${path} menu and quick add alignment`);
           assert.deepEqual(geometry.clipped,[],`${path} ${width} clipped controls`);
-          if (new URL(page.url()).pathname !== '/') await page.locator('.works-navigation summary').click();
-          else await page.locator('#home-navigation').evaluate(el=>el.open=true);
+          // PC shows a permanent sidebar; phones and tablets open the drawer.
+          if (width < 1024) {
+            if (new URL(page.url()).pathname !== '/') await page.locator('.works-navigation summary').click();
+            else await page.locator('#home-navigation').evaluate(el=>el.open=true);
+          }
           const nav = await page.locator(new URL(page.url()).pathname === '/' ? '#home-navigation nav' : '.works-navigation nav').boundingBox();
           assert(nav.x>=0 && nav.x+nav.width<=width+1,`${path} ${width} clipped menu`);
           await page.keyboard.press('Escape');
@@ -165,30 +156,27 @@ async function selectedTheme(page) {
   }
   await page.goto(base + '/');
   assert.equal(await page.locator('.module-card[href="/material-print/"]').count(),0);
-  await page.locator('#home-navigation summary').click();
+  await page.locator('#home-navigation').evaluate(el=>el.open=true);
   assert.equal(await page.locator('#home-navigation a[href="/wiki/"]').innerText(),'Wiki');
   assert.equal(await page.locator('#home-navigation a:not([aria-current])').count(),9);
-  await selectTheme(page,'dark');
+  // A previously stored dark choice and a dark OS both resolve to light.
+  await page.evaluate(()=>localStorage.setItem('works_theme','dark'));
+  await page.emulateMedia({colorScheme:'dark'});
   await page.reload();
-  assert.equal(await selectedTheme(page),'dark');
+  await assertLightOnly(page);
   await page.goto(base+'/kdp/');
-  assert.equal(await selectedTheme(page),'dark');
-  const second = await context.newPage();
-  await second.goto(base+'/ss/');
-  await second.locator('.works-header button[aria-label="設定"]').waitFor();
-  await selectTheme(page,'light');
-  await second.waitForFunction(()=>document.documentElement.dataset.theme==='light');
-  await selectTheme(second,'system');
-  await second.emulateMedia({colorScheme:'dark'});
-  await second.waitForFunction(()=>document.documentElement.dataset.theme==='dark');
-  await second.emulateMedia({colorScheme:'light'});
-  await second.waitForFunction(()=>document.documentElement.dataset.theme==='light');
+  await assertLightOnly(page);
+  await page.emulateMedia({colorScheme:'light'});
+  // Quick add offers ToDo and Memo from every page.
+  await page.locator('.works-quick-add').click();
+  assert.deepEqual(await page.locator('.works-quick-menu a').evaluateAll(as=>as.map(a=>a.getAttribute('href'))),['/todo/#works-quick=todo','/memo/#works-quick=memo']);
+  await page.keyboard.press('Escape');
+  assert.equal(await page.locator('.works-quick-menu').isHidden(),true);
   // Shared navigation must invoke the existing dirty/busy guard before navigating.
   await page.goto(base+'/wiki/');
-  await page.locator('.works-header button[aria-label="設定"]').waitFor();
-        assert.equal(await page.locator('.works-header select').count(),0,'theme selector lives inside settings');
+  await page.locator('.works-header .works-quick-add').waitFor();
   await page.evaluate(()=>{document.querySelector('.works-home').onclick=e=>{window.qaGuard=true;e.preventDefault();};});
-  await page.locator('.works-navigation summary').click();
+  if (await page.locator('.works-navigation summary').isVisible()) await page.locator('.works-navigation summary').click();
   await page.locator('.works-navigation a[href="/kdp/"]').click();
   assert.equal(await page.evaluate(()=>window.qaGuard),true);
   assert.equal(new URL(page.url()).pathname,'/wiki/');
@@ -201,7 +189,7 @@ async function selectedTheme(page) {
   await field.waitFor();
   for(const width of [320,390,1280]){
     await page.setViewportSize({width,height:900});
-    await selectTheme(page,'light');
+    await assertLightOnly(page);
     const geometry=await page.locator('#record-table').evaluate(el=>({display:getComputedStyle(el).display,width:el.getBoundingClientRect().width,body:document.body.scrollWidth,viewport:innerWidth}));
     assert.equal(geometry.display,'block');assert.ok(geometry.body<=width);assert.ok(geometry.width<=width);
     const fields=await page.locator('#record-tbody tr').first().locator('.record-plan, .record-next-plan textarea, .student-memo-input').evaluateAll(es=>es.filter(el=>el.getClientRects().length).map(el=>{const r=el.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,bottom:r.bottom};}));
@@ -226,9 +214,8 @@ async function selectedTheme(page) {
     await page.reload();await field.waitFor();
     assert.equal(await field.inputValue(),savedValue);
     assert.ok(await field.evaluate(el=>el.offsetHeight)>empty);
-    await selectTheme(page,'dark');
     assert.equal(await page.locator('.works-header select').count(),0);
-    if(width===390)await page.screenshot({path:path.join(artifacts,'records-390-dark.png'),fullPage:true});
+    if(width===390)await page.screenshot({path:path.join(artifacts,'records-390-light.png'),fullPage:true});
   }
   const initialDate=await page.locator('#record-date-label').innerText();
   await page.locator('.record-day-btn[data-day="prev"]').click();
@@ -285,6 +272,6 @@ async function selectedTheme(page) {
   await page.screenshot({path:path.join(artifacts,'shared-student-memo-390.png'),fullPage:true});
   console.log('Shared student memo: existing data, both views, day changes, reload, autosize, read/save failures and stale save isolation passed.');
   fs.writeFileSync(path.join(artifacts,'report.json'),JSON.stringify({matrix:report,themePersistence:'pass',navigation:'pass',crossTab:'pass',osFollow:'pass',print:'pass'},null,2));
-  console.log(`Passed ${report.length} page/width/auth combinations, each light/dark + print; theme persistence, cross-tab, OS follow, navigation guard, home categories.`);
+  console.log(`Passed ${report.length} page/width/auth combinations, light only + print; stored/OS dark ignored, quick add, navigation guard, home categories.`);
   await browser.close();
 })().catch(e=>{console.error(e);process.exit(1);});

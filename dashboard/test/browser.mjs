@@ -475,8 +475,9 @@ try {
     fullPage: false,
   });
   await page.setViewportSize({ width: 1440, height: 1000 });
+  // Works is light only: the settings dialog no longer offers a theme choice.
   await page.locator("#open-home-settings").click();
-  await page.locator('input[name="home-theme"][value="dark"]').check();
+  assert.equal(await page.locator('#home-settings-modal input[type="radio"]').count(), 0);
   await page.locator("#home-settings-close").click();
   await page.evaluate(() => scrollTo(0, 0));
   await page.evaluate(
@@ -486,12 +487,9 @@ try {
       ),
   );
   await fullPageAtTop(page, {
-    path: path.join(artifacts, "desktop-dark-all-widgets-1440.png"),
+    path: path.join(artifacts, "desktop-all-widgets-1440.png"),
     fullPage: true,
   });
-  await page.locator("#open-home-settings").click();
-  await page.locator('input[name="home-theme"][value="light"]').check();
-  await page.locator("#home-settings-close").click();
   await page.locator('[data-move="memo"][data-step="-1"]').focus();
   await page.locator('[data-move="memo"][data-step="-1"]').press("Enter");
   await expect(page.locator(".dashboard-widget").nth(2)).toHaveAttribute(
@@ -637,7 +635,8 @@ try {
   await page.keyboard.press("Escape");
   await expect(page.locator("#home-navigation summary")).toBeFocused();
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.locator("#home-navigation summary").click();
+  // PC keeps the navigation open as a sidebar without a toggle.
+  await expect(page.locator("#home-navigation summary")).toBeHidden();
   await expect(page.locator('#home-navigation a[href="/wiki/"]')).toBeVisible();
   await page.locator('#home-navigation a[href="/wiki/"]').focus();
   await expect(page.locator('#home-navigation a[href="/wiki/"]')).toBeFocused();
@@ -663,14 +662,13 @@ try {
   );
   await page.setViewportSize({ width: 390, height: 844 });
   await page.locator("#open-home-settings").click();
-  await page.locator('input[name="home-theme"][value="dark"]').check();
   await page.locator("#home-settings-close").click();
   await expect(page.locator("#open-home-settings")).toBeFocused();
   await fullPageAtTop(page, {
-    path: path.join(artifacts, "mobile-dark-390.png"),
+    path: path.join(artifacts, "mobile-light-390.png"),
     fullPage: true,
   });
-  passed.push("legacy theme settings, dark screenshot and dialog focus return");
+  passed.push("light-only settings, screenshot and dialog focus return");
   assert.deepEqual(f.errors, []);
   await f.close();
   // Hold the refresh after it starts, then acquire focus / create a draft.
@@ -831,7 +829,7 @@ try {
   const pendingHost = delayed.page.locator('[data-content="todo"]');
   await expect(pendingHost).toHaveAttribute('aria-busy', 'true');
   await expect(pendingHost.locator('.card-loading-shapes')).toHaveAttribute('aria-hidden', 'true');
-  for (const width of [390, 1440]) for (const theme of ['light', 'dark']) {
+  for (const width of [390, 1440]) for (const theme of ['light']) {
     await delayed.page.setViewportSize({width, height: 1000});
     await delayed.page.evaluate(theme => document.documentElement.dataset.theme = theme, theme);
     await delayed.page.screenshot({path: path.join(artifacts, `loading-${width}-${theme}.png`), fullPage: true});
@@ -1082,8 +1080,10 @@ try {
   assert.equal(await ui.page.locator('i.bx').count(), 0);
   for (const mode of ['light', 'dark']) {
     await ui.page.emulateMedia({colorScheme: mode === 'light' ? 'dark' : 'light'});
-    await ui.page.evaluate(async mode => { const {setTheme}=await import('/shared/theme.js?v=6'); setTheme(mode); }, mode);
-    assert.equal(await ui.page.locator('body').evaluate(el=>getComputedStyle(el).colorScheme),mode);
+    await ui.page.evaluate(async mode => { const {setTheme}=await import('/shared/theme.js?v=7'); setTheme(mode); }, mode);
+    // Light only: neither the OS preference nor a stale setTheme call can switch to dark.
+    assert.equal(await ui.page.evaluate(()=>document.documentElement.dataset.theme),'light');
+    assert.equal(await ui.page.locator('body').evaluate(el=>getComputedStyle(el).colorScheme),'light');
     const contrast=await ui.page.locator('.dashboard-widget .widget-link').first().evaluate(el=>{
       const style=getComputedStyle(el);
       const canvas=document.createElement('canvas'); canvas.width=canvas.height=1; const ctx=canvas.getContext('2d');
@@ -1095,10 +1095,20 @@ try {
   assert.deepEqual(await ui.page.locator('#home-navigation nav > span').allTextContents(), ['授業・教材','自動実行','業務','制作']);
   assert.deepEqual(await ui.page.locator('#home-navigation a').allTextContents(), ['ホーム','授業管理','教材管理','入試管理','ワークフロー','Wiki','ToDo管理','メモ','KDP管理','SS管理']);
   assert.equal(await ui.page.locator('#home-navigation [aria-current="page"]').getAttribute('href'), '/');
-  for (const width of [390,1440]) for (const theme of ['light','dark']) {
+  for (const width of [390,1440]) for (const theme of ['light']) {
     await ui.page.setViewportSize({width,height:900});
-    await ui.page.evaluate(async theme => { const {setTheme}=await import('/shared/theme.js?v=6'); setTheme(theme); },theme);
     await ui.page.locator('#home-navigation').evaluate(el=>el.open=false);
+    if (width >= 1024) {
+      // PC: permanent sidebar, so the links are reachable without a toggle.
+      await expect(ui.page.locator('#home-navigation summary')).toBeHidden();
+      await expect(ui.page.locator('#home-navigation nav')).toBeVisible();
+      for (const link of await ui.page.locator('#home-navigation a').all()) {
+        await link.hover();
+        assert.ok((await link.evaluate(measure)).ratio>=4.5);
+      }
+      await ui.page.screenshot({path:path.join(artifacts,`shared-menu-${width}-${theme}.png`)});
+      continue;
+    }
     await ui.page.locator('#home-navigation summary').focus();
     await ui.page.keyboard.press('Enter');
     await expect(ui.page.locator('#home-navigation nav')).toBeVisible();
@@ -1113,10 +1123,10 @@ try {
     await ui.page.locator('#home-navigation summary').click({clickCount:2});
     await expect(ui.page.locator('#home-navigation')).not.toHaveAttribute('open');
     await ui.page.locator('#home-navigation summary').click();
-    await ui.page.mouse.click(4,850);
+    await ui.page.mouse.click(width-4,850);
     await expect(ui.page.locator('#home-navigation')).not.toHaveAttribute('open');
   }
-  passed.push('shared Tutor menu labels/groups/Home current, keyboard/ESC/outside/repeated click and hover contrast at mobile/desktop in both themes');
+  passed.push('shared Tutor menu labels/groups/Home current, keyboard/ESC/outside/repeated click and hover contrast at mobile drawer and desktop sidebar (light only)');
   await ui.page.locator("#open-home-settings").click();
   await ui.page.locator("#dashboard-edit").click();
   await expect.poll(()=>ui.page.evaluate(()=>!!window.Sortable?.get(document.querySelector('#dashboard-widgets')))).toBe(true);
@@ -1167,7 +1177,7 @@ try {
     platformFonts: used.fonts,
     externalFontRequestsBlockedByFixture: true,
   };
-  assert.ok(fontEvidence.declaredStack.includes("M PLUS 1p"));
+  assert.ok(fontEvidence.declaredStack.includes("M PLUS 2"));
   await fs.writeFile(
     path.join(artifacts, "font-evidence.json"),
     JSON.stringify(fontEvidence, null, 2),
