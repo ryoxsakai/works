@@ -68,7 +68,12 @@ html:root[data-theme] {
 /* Light only: also stop components that opt into the OS dark palette. */
 *, *::before, *::after { color-scheme: light !important; }
 
-html { -webkit-text-size-adjust: 100%; }
+/* Compact type scale: 14px base (body copy ~13-14px, captions ~12px). */
+html { -webkit-text-size-adjust: 100%; font-size: 14px; }
+/* Phones: keep form fields at 16px so iOS does not zoom while typing. */
+@media (max-width: 640px) {
+  html body :is(input:not([type="checkbox"], [type="radio"]), textarea, select) { font-size: 16px; }
+}
 /* One typeface across every service, including Bootstrap-scoped modules. */
 html body,
 html body :is(.todo-page, .dashboard-home, [class$="-bootstrap"], [class*="-bootstrap "]) {

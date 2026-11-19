@@ -135,6 +135,19 @@ export function createDashboard({
         "",
       )}</div>${current().shortcuts.length ? "" : '<p class="dashboard-muted">設定からリンクを追加できます。</p>'}`;
   }
+  // Small coloured chips for urgency (overdue / today / tomorrow / later).
+  function dayAfter(day) {
+    const d = new Date(day + "T00:00:00Z");
+    d.setUTCDate(d.getUTCDate() + 1);
+    return d.toISOString().slice(0, 10);
+  }
+  function chip(text, tone = "") {
+    return `<span class="status-chip${tone ? " status-chip-" + tone : ""}">${text}</span>`;
+  }
+  function deadlineChip(deadline) {
+    const tone = deadline < date ? "danger" : deadline === date ? "info" : deadline === dayAfter(date) ? "success" : "";
+    return (deadline < date ? chip("期限超過", "danger") : "") + chip("締切 " + esc(deadline), tone);
+  }
   function body(id, data) {
     if (id === "lessons") return data.unconfigured ? '<p class="dashboard-muted">授業管理の設定でカレンダーを選択してください。</p>' : !data.rows.length ? '<p class="dashboard-muted">今日の予定はありません。</p>' : cardLoading('授業カードを準備中…');
     if (id === "todo") {
@@ -144,14 +157,14 @@ export function createDashboard({
         list(
           planned,
           (t) =>
-            `<strong>${esc(t.name)}</strong><small>${t.plannedDay < date ? "持ち越し · " : ""}予定 ${esc(t.plannedDay)}${t.deadline ? " · 締切 " + esc(t.deadline) : ""}</small>`,
+            `<strong>${esc(t.name)}</strong><small class="status-chips">${t.plannedDay < date ? chip("持ち越し", "warning") : ""}${chip("予定 " + esc(t.plannedDay), t.plannedDay === date ? "info" : "")}${t.deadline ? deadlineChip(t.deadline) : ""}</small>`,
           "今日までの未完了予定はありません。",
         ) +
         `<h4>締切の確認（7日以内・期限超過）</h4>${due.some((t) => t.deadline < date) ? `<p class="overdue deadline-alert" role="note">期限超過 ${due.filter((t) => t.deadline < date).length}件（すべて表示）</p>` : ""}` +
         list(
           due,
           (t) =>
-            `<strong>${esc(t.name)}</strong><small class="${t.deadline < date ? "overdue" : ""}">${t.deadline < date ? "期限超過 · " : ""}締切 ${esc(t.deadline)}</small>`,
+            `<strong>${esc(t.name)}</strong><small class="status-chips${t.deadline < date ? " overdue" : ""}">${deadlineChip(t.deadline)}</small>`,
           "対象の締切はありません。",
           (t) => t.deadline <= date,
         )
@@ -174,7 +187,7 @@ export function createDashboard({
     return list(
       data,
       (p) =>
-        `<strong>${esc(p.name)}</strong><small class="${p.deadline < date ? "overdue" : ""}">${p.deadline < date ? "期限超過 · " : ""}締切 ${esc(p.deadline)} · ${esc(p.status)}</small>`,
+        `<strong>${esc(p.name)}</strong><small class="status-chips${p.deadline < date ? " overdue" : ""}">${deadlineChip(p.deadline)}${chip(esc(p.status))}</small>`,
       "未完了の案件はありません。",
       (p) => p.deadline <= date,
     );

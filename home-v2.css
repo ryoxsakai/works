@@ -22,7 +22,7 @@
 .home-hero h2 {
   margin: 0;
   color: var(--works-ink);
-  font-size: 1.25rem;
+  font-size: 20px;
   font-weight: 700;
   letter-spacing: .01em;
   line-height: 1.4;
@@ -90,6 +90,26 @@
 .dashboard-home .dashboard-widget .overdue { color: var(--works-danger); }
 .dashboard-home .dashboard-widget .widget-updated { color: var(--works-ink-3); }
 
+/* Status chips: small tinted pills that show urgency at a glance. */
+.dashboard-home .status-chips { display: flex !important; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.dashboard-home .status-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--works-track);
+  color: var(--works-ink-2);
+  font-size: .82rem;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.dashboard-home .status-chip-danger { background: #fdecee; color: #b4232f; }
+.dashboard-home .status-chip-info { background: #e8efff; color: #2f5bd0; }
+.dashboard-home .status-chip-success { background: #e4f5ec; color: #17784f; }
+.dashboard-home .status-chip-warning { background: #fff2dc; color: #94580a; }
+
 /* Today's lessons: cards inside the widget sit on the grey surface. */
 .dashboard-home .dashboard-widget[data-id="lessons"] { background: var(--works-surface); }
 .dashboard-home .home-lesson-cards .home-lesson-day {
@@ -138,7 +158,7 @@
 @media (max-width: 899px) {
   .dashboard-home main { padding: 16px 12px 40px; }
   .home-hero { margin-bottom: 14px; padding: 0 4px; }
-  .home-hero h2 { font-size: 1.15rem; }
+  .home-hero h2 { font-size: 18px; }
   .dashboard-home .dashboard-widget { padding: 16px; }
 }
 @media print {
