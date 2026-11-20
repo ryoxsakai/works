@@ -499,3 +499,103 @@ body .todo-page .todo-main { background: var(--works-page); color: var(--works-i
   #capture-sheet .dialog-head h2 { font-size: 16px; color: var(--works-ink-3); }
   #capture > #capture-submit { min-width: 44px; padding: 0 14px; }
 }
+
+/* ---------- 近日予定: month header, one-card week strip, compact empty days ---------- */
+.todo-page #week-picker:not([hidden]) { margin: 0 0 12px; }
+.todo-page #week-picker .week-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.todo-page #week-picker .week-month { color: var(--works-ink); font-size: 1rem; font-weight: 700; }
+.todo-page #week-picker .week-nav { display: inline-flex; align-items: center; gap: 2px; }
+.todo-page #week-picker .week-tools button {
+  min-width: 36px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--works-radius);
+  background: transparent;
+  box-shadow: none;
+  color: var(--works-ink-2);
+  font-size: 1.1rem;
+}
+.todo-page #week-picker .week-tools button:hover { background: var(--works-hover); color: var(--works-ink); }
+.todo-page #week-picker .week-tools .week-today {
+  background: var(--works-surface);
+  box-shadow: var(--works-shadow-sm);
+  font-size: .85rem;
+  font-weight: 600;
+}
+.todo-page #week-picker .week-days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 2px;
+  margin: 0;
+  padding: 6px;
+  border: 0;
+  border-radius: var(--works-radius-lg);
+  background: var(--works-surface);
+  box-shadow: var(--works-shadow);
+}
+.todo-page #week-picker .week-days button {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  min-width: 0;
+  min-height: 56px;
+  padding: 6px 0 10px;
+  border: 0;
+  border-radius: var(--works-radius);
+  background: transparent;
+  box-shadow: none;
+  color: var(--works-ink);
+}
+.todo-page #week-picker .week-days button:hover { background: var(--works-hover); }
+.todo-page #week-picker .week-days small { color: var(--works-ink-3); font-size: .72rem; font-weight: 600; }
+.todo-page #week-picker .week-days b {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  font-size: .98rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.todo-page #week-picker .week-days [data-weekend] b { color: var(--works-ink-3); }
+.todo-page #week-picker .week-days [data-today] b { color: var(--works-accent); font-weight: 800; }
+.todo-page #week-picker .week-days [aria-pressed="true"] { background: transparent; }
+.todo-page #week-picker .week-days [aria-pressed="true"] b { background: var(--works-accent); color: #fff; }
+.todo-page #week-picker .week-dot {
+  position: absolute;
+  bottom: 5px;
+  left: 50%;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--works-accent);
+  transform: translateX(-50%);
+}
+.todo-page #week-picker .week-dot[hidden] { display: none; }
+
+/* Empty days collapse into one line: date, "予定なし", add. */
+.todo-page .planner-list .group.is-empty { display: flex; align-items: center; min-height: 40px; padding: 0 16px; border-bottom: 1px solid var(--works-line); }
+.todo-page .planner-list .group.is-empty .group-heading { display: contents; }
+.todo-page .planner-list .group.is-empty .group-heading h3 { order: 1; color: var(--works-ink-3); }
+.todo-page .planner-list .group.is-empty .agenda-empty { order: 2; flex: 1 1 auto; margin: 0; padding: 0 0 0 10px; color: var(--works-ink-3); font-size: .8rem; }
+.todo-page .planner-list .group.is-empty .group-heading button { order: 3; }
+.todo-page .planner-list .group.is-empty .task-rows { display: none; }
+.todo-page .planner-list .group:last-child.is-empty { border-bottom: 0; }
+
+@media (max-width: 730px) {
+  .todo-page #week-picker:not([hidden]) { padding: 0 12px; }
+  .todo-page #week-picker .week-days { padding: 4px; }
+}

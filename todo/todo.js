@@ -1,4 +1,4 @@
-import {createPlanner} from "./planner-ui.mjs?v=5";
+import {createPlanner} from "./planner-ui.mjs?v=6";
 import { startTodoPresentation } from "../shared/ui/todo-presentation.mjs?v=2";
 startTodoPresentation();
 import {
@@ -244,7 +244,7 @@ function card(t, groupDay) {
     <button data-action="custom-clone">日付を選んで複製</button></div></details></article>`;
 }
 function group(title,tasks,date,groupDay = date) {
-  return `<section class="group"${date ? ` id="agenda-${esc(date)}"` : ""}>${title ? `<div class="group-heading"><h3>${esc(title)}</h3>${date ? `<button data-add-day="${esc(date)}" aria-label="${esc(title)}にタスクを追加">＋</button>` : `<span>${tasks.length}</span>`}</div>` : ""}<div class="task-rows">${tasks.map(t => card(t, groupDay)).join("")}</div>${date && !tasks.length ? '<p class="agenda-empty">予定なし</p>' : ""}</section>`;
+  return `<section class="group${date && !tasks.length ? " is-empty" : ""}"${date ? ` id="agenda-${esc(date)}"` : ""}>${title ? `<div class="group-heading"><h3>${esc(title)}</h3>${date ? `<button data-add-day="${esc(date)}" aria-label="${esc(title)}にタスクを追加">＋</button>` : `<span>${tasks.length}</span>`}</div>` : ""}<div class="task-rows">${tasks.map(t => card(t, groupDay)).join("")}</div>${date && !tasks.length ? '<p class="agenda-empty">予定なし</p>' : ""}</section>`;
 }
 function render() {
   let role = $("role-filter").value,
