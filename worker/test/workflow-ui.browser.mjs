@@ -460,9 +460,9 @@ try {
     .click();
   await expect(page.locator("#patrol-status")).not.toContainText("全体停止中");
   await page.goto(origin + "/");
-  await expect(page.locator("#home-navigation")).toContainText("ワークフロー");
-  await expect(page.locator('#home-navigation a[href="/wiki/"]')).toHaveCount(1);
-  await expect(page.locator('#home-navigation a[href="/workflow/"]')).toHaveCount(1);
+  await expect(page.locator('#home-navigation a[href="/todo/"]')).toHaveCount(1);
+  await expect(page.locator('#home-navigation a[href="/wiki/"]')).toHaveCount(0);
+  await expect(page.locator('#home-navigation a[href="/workflow/"]')).toHaveCount(0);
   // Regression: repeated explicit closes consume the history entry; no phantom Back stops.
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto(origin + "/workflow/roles.html");

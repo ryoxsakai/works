@@ -259,7 +259,7 @@ try {
   await ready(page);
   assert.equal(
     await page.locator("#home-navigation a:not([aria-current])").count(),
-    9,
+    5,
   );
   assert.equal(await page.locator(".dashboard-widget").count(), 3);
   assert.ok(
@@ -631,15 +631,15 @@ try {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.locator("#home-navigation").evaluate(el => el.open = false);
   await page.locator("#home-navigation summary").click();
-  await expect(page.locator('#home-navigation a[href="/kdp/"]')).toBeVisible();
+  await expect(page.locator('#home-navigation a[href="/memo/"]')).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.locator("#home-navigation summary")).toBeFocused();
   await page.setViewportSize({ width: 1440, height: 1000 });
   // PC keeps the navigation open as a sidebar without a toggle.
   await expect(page.locator("#home-navigation summary")).toBeHidden();
-  await expect(page.locator('#home-navigation a[href="/wiki/"]')).toBeVisible();
-  await page.locator('#home-navigation a[href="/wiki/"]').focus();
-  await expect(page.locator('#home-navigation a[href="/wiki/"]')).toBeFocused();
+  await expect(page.locator('#home-navigation a[href="/memo/"]')).toBeVisible();
+  await page.locator('#home-navigation a[href="/memo/"]').focus();
+  await expect(page.locator('#home-navigation a[href="/memo/"]')).toBeFocused();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.keyboard.press("Escape");
   await expect(page.locator("#home-navigation summary")).toBeFocused();
@@ -1092,8 +1092,8 @@ try {
     });
     assert.ok(contrast>=4.5, `${mode} primary text contrast ${contrast}`);
   }
-  assert.deepEqual(await ui.page.locator('#home-navigation nav > span').allTextContents(), ['授業・教材','自動実行','業務','制作']);
-  assert.deepEqual(await ui.page.locator('#home-navigation a').allTextContents(), ['ホーム','授業管理','教材管理','入試管理','ワークフロー','Wiki','ToDo管理','メモ','KDP管理','SS管理']);
+  assert.deepEqual(await ui.page.locator('#home-navigation nav > span').allTextContents(), ['授業・教材','業務']);
+  assert.deepEqual(await ui.page.locator('#home-navigation a').allTextContents(), ['ホーム','授業管理','教材管理','入試管理','ToDo管理','メモ']);
   assert.equal(await ui.page.locator('#home-navigation [aria-current="page"]').getAttribute('href'), '/');
   for (const width of [390,1440]) for (const theme of ['light']) {
     await ui.page.setViewportSize({width,height:900});
