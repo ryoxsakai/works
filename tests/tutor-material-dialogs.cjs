@@ -46,7 +46,7 @@ const folders = [{id:'synthetic-folder',name:'合成フォルダ',parent_id:null
           const r=el.getBoundingClientRect(),h=el.querySelector('.modal-header').getBoundingClientRect();
           const fields=[...el.querySelectorAll('input:not([type="checkbox"],[type="radio"]),select,textarea')].filter(n=>n.getClientRects().length);
           const close=el.querySelector('.modal-close').getBoundingClientRect();
-          return {rect:{x:r.x,y:r.y,width:r.width,height:r.height},header:{top:h.top,bottom:h.bottom},title:document.getElementById(el.getAttribute('aria-labelledby'))?.textContent.trim(),close:{width:close.width,height:close.height},fields:fields.map(n=>({font:parseFloat(getComputedStyle(n).fontSize),right:n.getBoundingClientRect().right,left:n.getBoundingClientRect().left}))};
+          return {rect:{x:r.x,y:r.y,width:r.width,height:r.height},header:{top:h.top,bottom:h.bottom},title:document.getElementById(el.getAttribute('aria-labelledby'))?.textContent.trim(),close:{width:close.width,height:close.height},fields:fields.map(n=>({id:n.id||n.className||n.name,font:parseFloat(getComputedStyle(n).fontSize),right:n.getBoundingClientRect().right,left:n.getBoundingClientRect().left}))};
         });
         assert(result.title,selector+' accessible name');
         assert(result.rect.x>=0&&result.rect.y>=0,selector+' top/left in viewport');
@@ -55,7 +55,7 @@ const folders = [{id:'synthetic-folder',name:'合成フォルダ',parent_id:null
         assert(result.close.width>=44&&result.close.height>=44,selector+' close touch target');
         for(const f of result.fields){
           if(viewport.width<1000)assert(f.font>=16,selector+' touch input font');
-          assert(f.left>=result.rect.x&&f.right<=result.rect.x+result.rect.width+1,selector+' input fits');
+          assert(f.left>=result.rect.x&&f.right<=result.rect.x+result.rect.width+1,selector+' input '+f.id+' fits at '+viewport.width+': '+JSON.stringify({field:f,dialog:result.rect}));
         }
         return result;
       };

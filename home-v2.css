@@ -185,7 +185,7 @@
   width: min(420px, calc(100% - 32px));
   max-height: calc(100dvh - 32px);
   border: 0;
-  border-radius: var(--works-radius);
+  border-radius: var(--works-radius-lg);
   background: var(--works-surface);
   color: var(--works-ink);
   box-shadow: var(--works-shadow-lg);
