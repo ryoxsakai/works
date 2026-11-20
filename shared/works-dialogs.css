@@ -16,14 +16,15 @@ html body dialog:modal {
   overscroll-behavior: contain;
 }
 
+/* Legacy page-ID rules style this same surface; the shared token wins. */
 html body dialog:modal::backdrop {
-  background: var(--works-dialog-backdrop);
-  backdrop-filter: none;
+  background: var(--works-dialog-backdrop) !important;
+  backdrop-filter: none !important;
 }
 
 /* The desktop ToDo detail is a side panel, not a dimmed full-width sheet. */
 @media (min-width: 1000px) {
   html body .todo-page dialog#detail:modal::backdrop {
-    background: transparent;
+    background: transparent !important;
   }
 }

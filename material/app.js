@@ -70,6 +70,15 @@ function setError(message = "") {
   els.error.textContent = message;
 }
 
+// Form feedback must remain visible above the native dialog's backdrop. This
+// changes only the presentation of existing errors, not requests or save state.
+function setDialogError(dialog, message = "") {
+  const alert = dialog.querySelector(".material-dialog-error");
+  alert.textContent = message;
+  alert.hidden = !message;
+  if (message && !dialog.open) setError(message);
+}
+
 async function api(path, options = {}) {
   const token = getSessionToken();
   const headers = new Headers(options.headers || {});
@@ -677,6 +686,7 @@ async function openFolder(id) {
 }
 
 function openRename(type, item) {
+  setDialogError(els.renameModal);
   renameTarget = { type, id: item.id };
   els.renameTitle.textContent = type === "folder" ? "フォルダ名を変更" : "教材情報を編集";
   els.renameName.maxLength = type === "folder" ? 120 : 255;
@@ -951,6 +961,7 @@ els.search.addEventListener("input", renderLibrary);
 els.tagSearch.addEventListener("input", renderTags);
 els.treeSearch.addEventListener("input", renderTree);
 els.newFolder.addEventListener("click", () => {
+  setDialogError(els.newFolderModal);
   els.newFolderName.value = "";
   els.newFolderModal.showModal();
   requestAnimationFrame(() => els.newFolderName.focus());
@@ -962,6 +973,7 @@ els.renameForm.addEventListener("submit", async (event) => {
   if (!renameTarget) return;
   try {
     setError();
+    setDialogError(els.renameModal);
     const path =
       renameTarget.type === "folder"
         ? "/folders/" + encodeURIComponent(renameTarget.id)
@@ -978,7 +990,7 @@ els.renameForm.addEventListener("submit", async (event) => {
     folders = await api("/folders");
     await loadFiles();
   } catch (err) {
-    setError(err.message);
+    setDialogError(els.renameModal, err.message);
   }
 });
 els.previewClose.addEventListener("click", () => els.previewModal.close());
@@ -990,6 +1002,7 @@ els.newFolderForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   try {
     setError();
+    setDialogError(els.newFolderModal);
     await api("/folders", {
       method: "POST",
       body: JSON.stringify({
@@ -1000,7 +1013,7 @@ els.newFolderForm.addEventListener("submit", async (event) => {
     els.newFolderModal.close();
     await loadFolders();
   } catch (err) {
-    setError(err.message);
+    setDialogError(els.newFolderModal, err.message);
   }
 });
 els.fileInput.addEventListener("change", () => {

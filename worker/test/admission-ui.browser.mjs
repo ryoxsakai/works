@@ -9,7 +9,7 @@ const artifacts='test-artifacts/admission';fs.mkdirSync(artifacts,{recursive:tru
 const rows=[{id:'a',university:'北里大学医学部',selection_type:'general',stage:'primary',schedule_date:'2027-01-31',end_date:null,notes:'Synthetic\nsecond line',source_url:'https://example.test/source'},{id:'b',university:'北里大学医学部',selection_type:'general',stage:'final_result',schedule_date:'2027-02-10',notes:'result'},{id:'c',university:'愛知医科大学',selection_type:'ct',stage:'primary',schedule_date:'2027-02-01',notes:'other'}];
 try {
  for(const width of [320,390,768,1440])for(const theme of ['light','dark']) {
-  const context=await browser.newContext({viewport:{width,height:900},colorScheme:theme==='dark'?'light':'dark',hasTouch:width<500,reducedMotion:'reduce'});
+  const context=await browser.newContext({viewport:{width,height:width===320?480:900},colorScheme:theme==='dark'?'light':'dark',hasTouch:width<500,reducedMotion:'reduce'});
   await context.addInitScript(t=>localStorage.setItem('works_theme',t),theme);
   const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));let gets=0,failed=false,empty=false;
   await page.route('**/*',async route=>{
@@ -35,13 +35,27 @@ try {
    await page.screenshot({path:`${artifacts}/${width}-${theme}-${view}.png`,fullPage:true});
   }
   await page.reload();await expect(page.locator('[data-admission-view-tab="table"]')).toHaveAttribute('aria-selected','true');
-  await page.locator('#admission-filter-open').click();const dialog=page.locator('#admission-filter-modal');await expect(dialog).toBeVisible();assert(await dialog.evaluate(el=>el.matches(':modal')));
+  await page.locator('#admission-filter-open').click();const dialog=page.getByRole('dialog',{name:'絞り込み設定'});await expect(dialog).toBeVisible();assert(await dialog.evaluate(el=>el.matches(':modal')));
+  const layout=await dialog.evaluate(el=>{
+   const panel=el.querySelector('[data-admission-filter-panel="universities"]');
+   const box=el.getBoundingClientRect(),apply=el.querySelector('button[type="submit"]').getBoundingClientRect();
+   const tabs=[...el.querySelectorAll('[role="tab"]')];
+   return {withinViewport:box.top>=0&&box.bottom<=innerHeight+1&&box.left>=0&&box.right<=innerWidth+1,
+    applyVisible:apply.height>=44&&apply.bottom<=box.bottom+1,
+    scrollablePanel:getComputedStyle(panel).overflowY==='auto',
+    tabsFit:tabs.every(tab=>tab.scrollWidth<=tab.clientWidth+1),
+    lightCard:getComputedStyle(el).backgroundColor==='rgb(255, 255, 255)',
+    radius:getComputedStyle(el).borderRadius};
+  });
+  assert.deepEqual(layout,{withinViewport:true,applyVisible:true,scrollablePanel:true,tabsFit:true,lightCard:true,radius:'8px'});
+  await expect(page.locator('#admission-filter-university-search')).toHaveAccessibleName('大学名を検索');
   await page.locator('#admission-filter-university-search').fill('北里');
   await page.locator('input[name="filter_university"]').filter({visible:true}).first().check();
   await page.locator('[data-admission-filter-tab="types"]').click();await page.locator('input[name="filter_type"][value="general"]').check();
   await page.locator('[data-admission-filter-tab="months"]').click();await page.locator('input[name="filter_month"][value="1"]').check();
   await page.screenshot({path:`${artifacts}/${width}-${theme}-filter.png`});
   await dialog.locator('button[type="submit"]').click();await expect(dialog).not.toBeVisible();await expect(page.locator('#admission-filter-summary')).toContainText('大学 1件');
+  await expect(page.locator('#admission-filter-open')).toBeFocused();
   await page.locator('#admission-filter-reset').click();await page.locator('#admission-filter-open').click();await page.keyboard.press('Escape');await expect(dialog).not.toBeVisible();
   await expect(page.locator('#admission-filter-open')).toBeFocused();
   await page.locator('[data-admission-view-tab="calendar"]').click();await page.locator('[data-admission-calendar-mode="continuous"]').click();await expect(page.locator('[data-admission-calendar-mode="continuous"]')).toHaveAttribute('aria-pressed','true');

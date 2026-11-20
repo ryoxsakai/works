@@ -29,8 +29,20 @@ jobs:
           node-version: 24
       - run: node scripts/prepare-synthetic-test-fixture.mjs
       - run: npm ci --prefix worker --ignore-scripts
-      - run: node worker/node_modules/playwright/cli.js install --with-deps chromium
+      - name: Install Chromium
+        id: chromium
+        run: node worker/node_modules/playwright/cli.js install --with-deps chromium
       - name: Check dialog foundation across six services
         run: node worker/test/works-dialogs.browser.mjs
       - name: Check ToDo and Memo long dialog layout
+        if: ${{ !cancelled() && steps.chromium.outcome == 'success' }}
         run: node scripts/test/todo-memo-dialog-layout.mjs
+      - name: Check Home settings and layout
+        if: ${{ !cancelled() && steps.chromium.outcome == 'success' }}
+        run: node worker/test/home-layout.browser.mjs
+      - name: Check Admissions filters and layout
+        if: ${{ !cancelled() && steps.chromium.outcome == 'success' }}
+        run: node worker/test/admission-ui.browser.mjs
+      - name: Check Teaching and Materials dialog workflows
+        if: ${{ !cancelled() && steps.chromium.outcome == 'success' }}
+        run: node tests/tutor-material-dialogs.cjs
