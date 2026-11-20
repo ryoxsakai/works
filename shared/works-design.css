@@ -71,8 +71,10 @@ html:root[data-theme] {
 /* Compact type scale: 14px base (body copy ~13-14px, captions ~12px). */
 html { -webkit-text-size-adjust: 100%; font-size: 14px; }
 /* Phones: keep form fields at 16px so iOS does not zoom while typing. */
-@media (max-width: 640px) {
-  html body :is(input:not([type="checkbox"], [type="radio"]), textarea, select) { font-size: 16px; }
+/* Phones and other touch screens: never under 16px in a form field, or iOS zooms
+ * the page on focus. !important so page rules (e.g. 授業記録 at 14px) cannot win. */
+@media (max-width: 640px), (pointer: coarse) {
+  html body :is(input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"]), textarea, select) { font-size: max(16px, 1em) !important; }
 }
 /* One typeface across every service, including Bootstrap-scoped modules. */
 html body,
