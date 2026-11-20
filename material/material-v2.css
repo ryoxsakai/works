@@ -335,8 +335,44 @@ body.material-bootstrap .material-dialog-actions .btn-primary {
 /* ---------- Phones ---------- */
 @media (max-width: 640px) {
   body.material-bootstrap > main { padding: 16px 12px 40px; }
-  body.material-bootstrap .material-page-tabs { display: flex; width: 100%; }
-  body.material-bootstrap .material-page-tabs .page-tab-btn { flex: 1 1 0; padding: 6px 4px; font-size: .82rem; }
+  /* Same floating, icon-only bar as 授業管理 (labels stay for screen readers). */
+  body.material-bootstrap > main { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+  body.material-bootstrap .material-page-tabs {
+    position: fixed;
+    top: auto;
+    right: 16px;
+    bottom: calc(12px + env(safe-area-inset-bottom));
+    left: 16px;
+    z-index: 35;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+    width: auto;
+    max-width: 360px;
+    margin: 0 auto;
+    padding: 6px;
+    border-radius: 999px;
+    background: rgb(255 255 255 / .96);
+    box-shadow: 0 0 0 1px rgb(16 18 24 / .04), 0 8px 24px rgb(16 18 24 / .14), 0 2px 6px rgb(16 18 24 / .08);
+  }
+  body.material-bootstrap .material-page-tabs .page-tab-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    min-height: 48px;
+    padding: 0;
+    border-radius: 999px;
+    color: var(--works-ink-3);
+    font-size: 0;
+    line-height: 0;
+  }
+  body.material-bootstrap .material-page-tabs .page-tab-btn :is(i, svg, .works-icon) { width: 24px; height: 24px; font-size: 24px; line-height: 24px; }
+  body.material-bootstrap .material-page-tabs .page-tab-btn[aria-selected="true"] {
+    background: var(--works-ink);
+    box-shadow: 0 2px 6px rgb(16 18 24 / .2);
+    color: #fff;
+  }
   body.material-bootstrap .material-heading h2 { font-size: 18px; }
   body.material-bootstrap .material-file-item { flex-wrap: nowrap; }
   body.material-bootstrap .material-file-actions .material-icon-btn { min-width: 32px; width: 32px; }
