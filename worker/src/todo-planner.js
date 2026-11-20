@@ -4,6 +4,7 @@ import {
   defaults,
   nextDay,
   palette,
+  isHexColor,
   statusOf,
   validDay,
   validTime,
@@ -52,7 +53,9 @@ function validate(state) {
     labels = registry(p.labels, "ラベル");
   registry(p.filters, "フィルター");
   if (
-    [...p.projects, ...p.labels].some((i) => !Object.hasOwn(palette, i.color))
+    [...p.projects, ...p.labels].some(({ color }) =>
+      typeof color !== "string" || (!isHexColor(color) && !Object.hasOwn(palette, color))
+    )
   )
     reject("色を選び直してください");
   tree(p.projects, (i) => i.parent, "プロジェクト");

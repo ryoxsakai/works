@@ -5526,6 +5526,7 @@ async function readTodo(env) {
     ? { roles: [], ...JSON.parse(row.data), revision: row.revision }
     : { ...emptyTodo(), revision: 0 };
 }
+const todoRoleColor = /^(blue|green|pink|purple|yellow|#[0-9a-fA-F]{6})$/;
 function validateTodo(state) {
   const roles = state?.roles ?? [];
   const validRoles =
@@ -5539,7 +5540,7 @@ function validateTodo(state) {
         typeof r.name === "string" &&
         r.name.trim() &&
         r.name.length <= 100 &&
-        ["blue", "green", "pink", "purple", "yellow"].includes(r.color) &&
+        typeof r.color === "string" && todoRoleColor.test(r.color) &&
         ["📚", "👥", "📝", "🏠", "💼", "⭐"].includes(r.icon) &&
         typeof r.archived === "boolean",
     ) &&
@@ -5870,7 +5871,7 @@ const todoTools = [
               id: { type: "string" },
               name: { type: "string" },
               icon: { enum: ["📚", "👥", "📝", "🏠", "💼", "⭐"] },
-              color: { enum: ["blue", "green", "pink", "purple", "yellow"] },
+              color: { type: "string", pattern: todoRoleColor.source },
               archived: { type: "boolean" },
             },
           },

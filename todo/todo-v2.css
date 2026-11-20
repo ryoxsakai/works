@@ -615,3 +615,145 @@ body .todo-page .todo-main { background: var(--works-page); color: var(--works-i
 #capture-suggest li { gap: 6px; overflow-wrap: anywhere; }
 .student-options { display: grid; max-height: 190px; overflow: auto; }
 .student-options button { min-height: 44px; text-align: start; }
+
+/* Shared dialog surfaces, headings, controls and action rows. */
+.todo-page dialog {
+  color: var(--works-ink);
+  background: var(--works-surface);
+  box-shadow: var(--works-shadow-lg);
+  overscroll-behavior: contain;
+}
+.todo-page dialog:not(#detail, #capture-sheet) {
+  width: min(540px, calc(100% - 32px));
+  padding: 16px 20px 20px;
+  border: 0;
+  border-radius: var(--works-radius);
+}
+.todo-page dialog:not(#detail)::backdrop { background: rgb(24 27 37 / .38); }
+.todo-page dialog .dialog-head, #detail .dialog-head, .summary-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 12px;
+  padding-bottom: 8px;
+  border: 0;
+  border-bottom: 1px solid var(--works-line);
+  border-image: none;
+}
+.todo-page dialog .dialog-head h2, #capture-sheet .dialog-head h2 {
+  margin: 0;
+  color: var(--works-ink);
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+.todo-page dialog .dialog-head [data-close] {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--works-radius);
+  background: var(--works-surface-sunken);
+  color: var(--works-ink-2);
+  box-shadow: none;
+  font-size: 22px;
+  line-height: 1;
+}
+.todo-page dialog .dialog-head [data-close]:hover { background: var(--works-hover); }
+.todo-page dialog .form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.todo-page dialog .btn { border-radius: var(--works-radius); }
+.todo-page dialog .dialog-actions,
+.todo-page dialog :is(#role-form, #categories-form, .summary-footer) {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--works-line);
+}
+.todo-page dialog .primary {
+  min-height: 44px;
+  padding-inline: 18px;
+  border: 0;
+  background: var(--works-gradient);
+  color: white;
+  font-weight: 700;
+}
+#organizer-delete { margin-right: auto; color: #b4232f; }
+#role-form > .primary, #categories-form > .primary, #clone-form > .primary { display: block; margin: 12px 0 0 auto; }
+#org-colors {
+  min-width: 0;
+  margin: 16px 0;
+  padding: 8px 12px 12px;
+  border: 0;
+  border-radius: var(--works-radius);
+  background: var(--works-surface-sunken);
+}
+#org-colors legend { float: left; width: 100%; margin: 0; font-size: .88rem; font-weight: 700; }
+#org-colors .color-custom { clear: both; display: flex; align-items: center; gap: 8px; min-height: 48px; }
+#org-colors label { flex: 1; margin: 0; }
+#organizer-color-value { color: var(--works-ink-2); font: .84rem ui-monospace, monospace; }
+.todo-page dialog input[type="color"] {
+  display: block;
+  width: 48px;
+  min-width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 4px;
+  cursor: pointer;
+}
+.todo-page input[type="color"]::-webkit-color-swatch-wrapper { padding: 2px; }
+.todo-page input[type="color"]::-webkit-color-swatch { border: 1px solid rgb(0 0 0 / .16); border-radius: 4px; }
+.todo-page input[type="color"]::-moz-color-swatch { border: 1px solid rgb(0 0 0 / .16); border-radius: 4px; }
+#color-options { gap: 2px; margin-top: 4px; }
+#color-options button {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+#color-options button:hover, #color-options button[aria-pressed="true"] { background: var(--works-surface); }
+#color-options .project-dot { width: 20px; height: 20px; }
+#color-options button:focus-visible, .todo-page dialog button:focus-visible { outline: 2px solid var(--works-accent); outline-offset: 1px; }
+.todo-page .badge.role-custom {
+  border-color: color-mix(in srgb, var(--role-color) 45%, var(--works-input-line));
+  background: color-mix(in srgb, var(--role-color) 16%, white);
+  color: var(--works-ink);
+}
+.todo-page .badge.role-custom::before {
+  content: "";
+  display: inline-block;
+  width: .65em;
+  height: .65em;
+  margin-inline-end: 4px;
+  border-radius: 50%;
+  background: var(--role-color);
+  box-shadow: 0 0 0 1px rgb(0 0 0 / .22);
+}
+#role-list .role-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+}
+#role-list .role-name { min-width: 0; width: 100%; }
+#role-list [data-role-icon] { width: auto; }
+#role-list [data-role-save] { grid-column: 2; justify-self: end; }
+#role-list [data-archive] { grid-column: span 2; }
+@media (max-width: 730px) {
+  .todo-page dialog:not(#detail, #capture-sheet) {
+    inset: auto 0 0;
+    box-sizing: border-box;
+    width: 100%;
+    max-width: none;
+    max-height: calc(100dvh - max(24px, env(safe-area-inset-top)));
+    margin: 0;
+    padding: 12px 16px max(16px, env(safe-area-inset-bottom));
+    border-radius: 16px 16px 0 0;
+  }
+  .todo-page dialog .form-control:not([type="checkbox"]) { font-size: 16px; }
+  #capture-sheet .dialog-head { padding-inline: var(--gutter); margin: 0; }
+}

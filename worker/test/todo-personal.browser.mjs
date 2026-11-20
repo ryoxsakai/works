@@ -470,6 +470,18 @@ try {
   );
   await openSection(page,".planner-settings");
   await page.locator("#roles-open").click();
+  const roleRow = page.locator("[data-role=students]");
+  await expect(roleRow.locator("[data-role-color]")).toHaveValue("#469444");
+  await roleRow.locator("[data-role-save]").click();
+  await expect.poll(async () => (await db()).roles.find(r => r.id === "students").color).toBe("green");
+  await roleRow.locator("[data-role-color]").fill("#fefeff");
+  await roleRow.locator("[data-role-save]").click();
+  await expect(roleRow.locator(".role-custom")).toBeVisible();
+  assert.equal((await db()).roles.find(r => r.id === "students").color, "#fefeff");
+  await page.locator("#role-form [name=name]").fill("色の確認");
+  await page.locator("#role-form [name=color]").fill("#251d32");
+  await page.locator("#role-form button").click();
+  await expect(page.locator('[data-role-color][aria-label="表示色：色の確認"]')).toHaveValue("#251d32");
   await page.locator("[data-role=students] [data-archive]").click();
   await expect(page.locator("[data-role=students] [data-archive]")).toHaveText(
     "再開",
@@ -711,6 +723,12 @@ async function verifyPlanner(page,db,origin,nav,rowMenu) {
   await page.locator("#organizer-form button[type=submit]").click();
   await expect(page.locator("#organizer")).toBeHidden();
   assert.equal((await db()).planner.projects.find(i=>i.id===first.plan.project).color,"green");
+  await page.locator("#edit-view").click();
+  await expect(page.locator("#organizer-color")).toHaveValue("#469444");
+  await page.locator("#organizer-color").fill("#245579");
+  await page.locator("#organizer-form button[type=submit]").click();
+  await expect(page.locator("#organizer")).toBeHidden();
+  assert.equal((await db()).planner.projects.find(i => i.id === first.plan.project).color, "#245579");
   await openCapture(page);
   await page.locator("#quick-title").fill("板書案");
   await page.locator("#quick-title").press("Enter");
@@ -731,6 +749,22 @@ async function verifyPlanner(page,db,origin,nav,rowMenu) {
   await page.locator("#organizer-form button[type=submit]").click();
   await expect(page.locator("#organizer")).toBeHidden();
   assert.equal((await db()).planner.labels.find(i=>i.id===labelId).color,"orange");
+  await page.locator("#edit-view").click();
+  await page.locator("#organizer-color").fill("#b373ac");
+  await expect(page.locator("#organizer-color-value")).toHaveText("#B373AC");
+  await expect(page.locator('#color-options [aria-pressed="true"]')).toHaveCount(0);
+  for (const width of [320, 390, 1440]) {
+    await page.setViewportSize({width, height: 820});
+    assert.ok(await page.locator("#organizer").evaluate(el => el.scrollWidth <= el.clientWidth));
+    await page.screenshot({path: `${artifacts}/label-color-${width}.png`});
+  }
+  await page.locator("#organizer-form button[type=submit]").click();
+  await expect(page.locator("#organizer")).toBeHidden();
+  assert.equal((await db()).planner.labels.find(i => i.id === labelId).color, "#b373ac");
+  await expect(page.locator(`#tasks [data-label="${labelId}"] .project-dot`).first()).toHaveCSS("background-color", "rgb(179, 115, 172)");
+  await page.locator("#edit-view").click();
+  await expect(page.locator("#organizer-color")).toHaveValue("#b373ac");
+  await page.keyboard.press("Escape");
   await page.locator("#new-filter").click();
   await page.locator("#organizer-name").fill("準備中の教材");
   await page.locator("#filter-label").selectOption(labelId);

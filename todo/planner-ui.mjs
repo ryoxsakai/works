@@ -6,13 +6,14 @@ import {
   defaults,
   isInbox,
   palette,
+  colorValue,
   parseQuick,
   priorityOf,
   projectPath,
   reviewItems,
   sortTasks,
   statusOf,
-} from "./model.mjs?v=2";
+} from "./model.mjs?v=color-picker-1";
 export { createPlanner };
 function createPlanner({
   $,
@@ -75,7 +76,7 @@ function createPlanner({
   const option = (id, name) =>
     `<option value="${esc(id)}">${esc(name)}</option>`;
   const dot = (color) =>
-    `<i class="project-dot" style="--dot:${palette[color]?.[1] || palette.slate[1]}" aria-hidden="true"></i>`;
+    `<i class="project-dot" style="--dot:${colorValue(color)}" aria-hidden="true"></i>`;
   const matchProject = (t, id) =>
     ancestry(p().projects, t.plan?.project).some((i) => i.id === id);
   const params = new URLSearchParams(location.hash.slice(1));
@@ -966,12 +967,11 @@ function createPlanner({
     $("organizer-error").textContent = "";
   }
   function paintColors() {
-    $("color-options").innerHTML = Object.entries(palette)
-      .map(
-        ([key, [name]]) =>
-          `<button type="button" data-color="${key}" aria-pressed="${key === chosenColor}">${dot(key)}${name}</button>`,
-      )
-      .join("");
+    const hex = colorValue(chosenColor);
+    $("organizer-color").value = hex;
+    $("organizer-color-value").textContent = hex.toUpperCase();
+    for (const button of $("color-options").children)
+      button.setAttribute("aria-pressed", String(colorValue(button.dataset.color) === hex));
   }
   function manage(kind, show = true) {
     organizer = kind;
@@ -1015,6 +1015,13 @@ function createPlanner({
   $("org-up").onclick = () => moveOrganizer(-1);
   $("org-down").onclick = () => moveOrganizer(1);
   $("organizer-item").onchange = fillManager;
+  $("color-options").innerHTML = Object.entries(palette)
+    .map(([key, [name]]) => `<button type="button" data-color="${key}" aria-label="${name}" title="${name}">${dot(key)}</button>`)
+    .join("");
+  $("organizer-color").oninput = (event) => {
+    chosenColor = event.target.value;
+    paintColors();
+  };
   $("color-options").onclick = (e) => {
     const b = e.target.closest("[data-color]");
     if (b) {

@@ -6,6 +6,7 @@ import {
   reviewItems,
   sortTasks,
   defaults,
+  isHexColor,
 } from "../../todo/model.mjs";
 import { preparePlanner } from "../src/todo-planner.js";
 import { deliverTodoWork, integrationRequest } from "../src/todo-delivery.js";
@@ -22,6 +23,19 @@ const task = {
     time: "12:15",
   },
 };
+test("planner colors accept palette keys and six-digit hex", () => {
+  const old = { tasks: [], planner: defaults() };
+  for (const color of ["slate", "#00ABf0", "#ffffff", "#000000", "#abc", "#111111ff", "red;background:blue", ["blue"], null]) {
+    const next = structuredClone(old);
+    next.planner.labels.push({ id: "l", name: "資料", color });
+    if (color === "slate" || ["#00ABf0", "#ffffff", "#000000"].includes(color))
+      assert.doesNotThrow(() => preparePlanner(next, old, now));
+    else {
+      assert.equal(isHexColor(color), false);
+      assert.throws(() => preparePlanner(next, old, now), /色/);
+    }
+  }
+});
 test("Japanese quick capture, saved order, review and independent recurrence", () => {
   const q = parseQuick(
     "毎週水曜 12:15 WTを準備 #代官山/冬期 @準備 @印刷 p1",
