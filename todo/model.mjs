@@ -9,6 +9,12 @@ export const palette = {
   pink: ["ピンク", "#c4558b"],
   purple: ["紫", "#9164be"],
 };
+export const isHexColor = (value) =>
+  typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value);
+export function colorValue(color) {
+  if (isHexColor(color)) return color.toLowerCase();
+  return Object.hasOwn(palette, color) ? palette[color][1] : palette.slate[1];
+}
 export const defaults = () => ({
   projects: [],
   labels: [],

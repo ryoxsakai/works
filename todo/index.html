@@ -18,7 +18,7 @@
     <link rel="stylesheet" href="/shared/header.css?v=8" /><link rel="preconnect" href="https://fonts.googleapis.com" /><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin /><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+2:wght@300;400;500;700;800&display=swap" /><link rel="stylesheet" href="/shared/works-design.css?v=4" />
     <script defer src="/dashboard/vendor/Sortable-1.15.6.min.js"></script>
     <script type="module" src="/shared/header.js?v=7"></script>
-    <link rel="stylesheet" href="/todo/todo-v2.css?v=student-links-1" />
+    <link rel="stylesheet" href="/todo/todo-v2.css?v=color-picker-1" />
   </head>
   <body>
     <header class="page-header works-header">
@@ -314,7 +314,11 @@
     <dialog id="organizer" aria-labelledby="organizer-title"><div class="dialog-head"><h2 id="organizer-title"></h2><button data-close aria-label="閉じる">×</button></div>
       <label>編集対象<select id="organizer-item"></select></label><form id="organizer-form"><label>名前<input id="organizer-name" required maxlength="100"></label>
       <label id="org-parent-field">親プロジェクト<select id="organizer-parent"></select></label>
-      <fieldset id="org-colors"><legend>表示色</legend><div id="color-options"></div></fieldset>
+      <fieldset id="org-colors">
+        <legend>表示色</legend>
+        <div class="color-custom"><label for="organizer-color">カスタムカラー</label><output id="organizer-color-value" for="organizer-color"></output><input type="color" id="organizer-color"></div>
+        <div id="color-options" role="group" aria-label="定型色"></div>
+      </fieldset>
       <div id="filter-fields"><label>検索語<input id="filter-query" maxlength="500"></label><div class="form-grid"><label>プロジェクト<select id="filter-project"></select></label><label>ラベル<select id="filter-label"></select></label>
       <label>状態<select id="filter-status"><option value="">すべて</option><option value="pending">未着手</option><option value="doing">進行中</option><option value="waiting">連絡待ち</option><option value="done">完了</option></select></label>
       <label>優先度<select id="filter-priority"><option value="">すべて</option><option>1</option><option>2</option><option>3</option><option>4</option></select></label></div>
@@ -348,13 +352,7 @@
               <option>⭐</option>
             </select></label
           ><label
-            >色<select name="color">
-              <option value="blue">ブルー</option>
-              <option value="green">グリーン</option>
-              <option value="pink">ピンク</option>
-              <option value="purple">パープル</option>
-              <option value="yellow">イエロー</option>
-            </select></label
+            >表示色<input type="color" name="color" value="#377ad2"></label
           >
         </div>
         <button class="primary">役割を追加</button>
@@ -415,6 +413,6 @@
       </form>
     </dialog>
     </div>
-    <script type="module" src="/todo/todo.js?v=student-links-1"></script>
+    <script type="module" src="/todo/todo.js?v=color-picker-1"></script>
   </body>
 </html>

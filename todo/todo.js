@@ -1,4 +1,5 @@
-import {createPlanner} from "./planner-ui.mjs?v=student-links-1";
+import {colorValue, isHexColor} from "./model.mjs?v=color-picker-1";
+import {createPlanner} from "./planner-ui.mjs?v=color-picker-1";
 import { startTodoPresentation } from "../shared/ui/todo-presentation.mjs?v=2";
 startTodoPresentation();
 import {
@@ -209,10 +210,15 @@ async function save(next, success = "保存しました") {
       focusOrigin.focus();
   }
 }
+function roleBadgeAttrs(color) {
+  return isHexColor(color)
+    ? `class="badge role-custom" style="--role-color:${colorValue(color)}"`
+    : `class="badge role-${esc(color)}"`;
+}
 function roleBadge(t) {
   const r = state.roles.find((r) => r.id === t.roleId);
   return r
-    ? `<span class="badge role-${esc(r.color)}">${esc(r.icon)} ${esc(r.name)}${r.archived ? "（保管）" : ""}</span>`
+    ? `<span ${roleBadgeAttrs(r.color)}>${esc(r.icon)} ${esc(r.name)}${r.archived ? "（保管）" : ""}</span>`
     : "";
 }
 // Deadline chip tone, matching the Home widget (DESIGN.md: status-chip).
@@ -706,22 +712,7 @@ function renderRoles() {
     state.roles
       .map(
         (r) =>
-          `<div class="role-row" data-role="${esc(r.id)}"><span class="badge role-${esc(r.color)}">${esc(r.icon)}</span><input class="role-name" value="${esc(r.name)}" maxlength="100" aria-label="役割名：${esc(r.name)}"><select data-role-icon aria-label="役割のアイコン">${["📚", "👥", "📝", "🏠", "💼", "⭐"].map((i) => `<option ${i === r.icon ? "selected" : ""}>${i}</option>`).join("")}</select><select data-role-color aria-label="役割の色">${Object.entries(
-            {
-              blue: "ブルー",
-              green: "グリーン",
-              pink: "ピンク",
-              purple: "パープル",
-              yellow: "イエロー",
-            },
-          )
-            .map(
-              ([v, n]) =>
-                `<option value="${v}" ${v === r.color ? "selected" : ""}>${n}</option>`,
-            )
-            .join(
-              "",
-            )}</select><button data-role-save>変更を保存</button><button data-archive>${r.archived ? "再開" : "アーカイブ"}</button></div>`,
+          `<div class="role-row" data-role="${esc(r.id)}"><span ${roleBadgeAttrs(r.color)}>${esc(r.icon)}</span><input class="role-name" value="${esc(r.name)}" maxlength="100" aria-label="役割名：${esc(r.name)}"><select data-role-icon aria-label="役割のアイコン">${["📚", "👥", "📝", "🏠", "💼", "⭐"].map((i) => `<option ${i === r.icon ? "selected" : ""}>${i}</option>`).join("")}</select><input type="color" data-role-color aria-label="表示色：${esc(r.name)}" value="${colorValue(r.color)}"><button data-role-save>変更を保存</button><button data-archive>${r.archived ? "再開" : "アーカイブ"}</button></div>`,
       )
       .join("") || '<p class="empty">自分の役割を登録しましょう。</p>';
   if (focusedRole)
@@ -762,7 +753,8 @@ $("role-list").onclick = async (e) => {
   else if (e.target.hasAttribute("data-role-save")) {
     r.name = row.querySelector("input").value.trim();
     r.icon = row.querySelector("[data-role-icon]").value;
-    r.color = row.querySelector("[data-role-color]").value;
+    const color = row.querySelector("[data-role-color]").value;
+    if (color !== colorValue(r.color)) r.color = color;
     if (!r.name) return;
   } else return;
   if ((await save(next)) && epoch === dialogEpoch) renderRoles();
