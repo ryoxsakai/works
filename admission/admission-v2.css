@@ -1,0 +1,220 @@
+/*
+ * 入試管理 (Works design, see DESIGN.md): full width on a grey page, views as
+ * white cards lifted by shadow, segmented view tabs on PC and the same floating
+ * icon-only bottom bar as 授業管理 on phones. Loaded last; visual layer only.
+ */
+body.admission-bootstrap { background: var(--works-page); }
+body.admission-bootstrap > main.admission-main { max-width: none; margin: 0; padding: 24px var(--works-gutter) 48px; }
+
+/* Panel sits directly on the grey page. */
+body.admission-bootstrap .admission-panel {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* Heading: grey eyebrow, quiet 20px title, white secondary print button. */
+body.admission-bootstrap .admission-heading { align-items: flex-end; min-height: 48px; margin: 0 0 16px; }
+body.admission-bootstrap .admission-heading .eyebrow {
+  margin: 0 0 2px;
+  background: none;
+  color: var(--works-ink-3);
+  font-size: .7rem;
+  font-weight: 700;
+  letter-spacing: .12em;
+}
+body.admission-bootstrap .admission-heading h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--works-ink);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+body.admission-bootstrap .admission-heading h2 :is(svg, .works-icon) { color: var(--works-ink-3); }
+body.admission-bootstrap :is(.admission-print, .admission-filter-open) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 36px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--works-radius);
+  background: var(--works-surface);
+  box-shadow: var(--works-shadow-sm);
+  color: var(--works-ink-2);
+  font-size: .88rem;
+  font-weight: 600;
+}
+body.admission-bootstrap .admission-print { padding: 0; }
+body.admission-bootstrap .admission-filter-open { color: var(--works-accent); }
+body.admission-bootstrap :is(.admission-print, .admission-filter-open):hover { background: var(--works-surface); box-shadow: var(--works-shadow); }
+body.admission-bootstrap .admission-filter-count { border-radius: 999px; background: var(--works-accent); color: #fff; }
+body.admission-bootstrap .admission-filter-bar { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; padding: 0; border: 0; background: transparent; }
+body.admission-bootstrap .admission-filter-summary { color: var(--works-ink-3); font-size: .85rem; }
+body.admission-bootstrap .admission-filter-reset { border: 0; border-radius: var(--works-radius); background: transparent; color: var(--works-ink-3); }
+body.admission-bootstrap .admission-filter-reset:hover { background: var(--works-hover); color: var(--works-ink); }
+
+/* View tabs: grey track, selected tab is a white face (PC). */
+body.admission-bootstrap .admission-view-tabs {
+  position: sticky;
+  top: calc(var(--works-header-height, 60px) + 12px);
+  z-index: 15;
+  display: inline-flex;
+  align-self: flex-start;
+  justify-self: start;
+  width: fit-content;
+  max-width: 100%;
+  gap: 2px;
+  margin: 0 0 16px;
+  padding: 3px;
+  border: 0;
+  border-radius: var(--works-radius);
+  background: var(--works-track);
+  box-shadow: none;
+}
+body.admission-bootstrap .admission-view-tab {
+  flex: 0 0 auto;
+  gap: 8px;
+  min-height: 36px;
+  padding: 6px 16px;
+  border: 0;
+  border-radius: var(--works-radius-sm);
+  background: transparent;
+  box-shadow: none;
+  color: var(--works-ink-2);
+  font-size: .9rem;
+  font-weight: 600;
+}
+body.admission-bootstrap .admission-view-tab:hover { color: var(--works-ink); }
+body.admission-bootstrap .admission-view-tab[aria-selected="true"] {
+  background: var(--works-surface);
+  box-shadow: var(--works-shadow-sm);
+  color: var(--works-ink);
+}
+
+/* List: white cards lifted by shadow; the university colour stays as a thin stripe. */
+body.admission-bootstrap .admission-list-item {
+  margin: 0 0 10px;
+  padding: 12px 14px 12px 16px;
+  border: 0;
+  border-radius: var(--works-radius-lg);
+  background: var(--works-surface);
+  box-shadow: inset 4px 0 0 var(--admission-color), var(--works-shadow);
+}
+body.admission-bootstrap .admission-list-title { color: var(--works-ink); font-weight: 700; }
+body.admission-bootstrap .admission-list-item time { color: var(--works-ink-2); }
+
+/* Calendar, Gantt and table: one white card each. */
+body.admission-bootstrap :is(.admission-calendar-shell, .admission-gantt-shell, .admission-table-shell) {
+  border: 0;
+  border-radius: var(--works-radius-lg);
+  background: var(--works-surface);
+  box-shadow: var(--works-shadow);
+}
+body.admission-bootstrap .admission-calendar-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 12px; }
+body.admission-bootstrap .admission-calendar-mode {
+  display: inline-flex;
+  gap: 2px;
+  margin: 0;
+  padding: 3px;
+  border: 0;
+  border-radius: var(--works-radius);
+  background: var(--works-track);
+  box-shadow: none;
+}
+body.admission-bootstrap .admission-calendar-mode button {
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--works-radius-sm);
+  background: transparent;
+  box-shadow: none;
+  color: var(--works-ink-2);
+  font-size: .86rem;
+  font-weight: 600;
+}
+body.admission-bootstrap .admission-calendar-mode button[aria-pressed="true"] { background: var(--works-surface); box-shadow: var(--works-shadow-sm); color: var(--works-ink); }
+body.admission-bootstrap .admission-calendar-nav { display: inline-flex; align-items: center; gap: 4px; margin: 0; }
+body.admission-bootstrap .admission-calendar-nav strong { min-width: 7em; color: var(--works-ink); font-size: 1rem; font-weight: 700; text-align: center; }
+body.admission-bootstrap .admission-calendar-nav button {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--works-radius);
+  background: transparent;
+  box-shadow: none;
+  color: var(--works-ink-2);
+}
+body.admission-bootstrap .admission-calendar-nav button:hover { background: var(--works-hover); color: var(--works-ink); }
+body.admission-bootstrap .admission-calendar-weekday { color: var(--works-ink-3); font-weight: 700; }
+body.admission-bootstrap .admission-calendar-cell { border-color: var(--works-line); }
+body.admission-bootstrap .admission-table th { color: var(--works-ink-3); font-size: .78rem; font-weight: 700; letter-spacing: .04em; }
+body.admission-bootstrap .admission-view-note { color: var(--works-ink-3); }
+
+/* Filter dialog: the apply action is the one primary. */
+body.admission-bootstrap .app-modal { border: 0; border-radius: var(--works-radius-lg); box-shadow: var(--works-shadow-lg); }
+
+/* Phones: view tabs become the floating icon-only bar used by 授業管理. */
+@media (max-width: 640px) {
+  body.admission-bootstrap > main.admission-main { padding: 16px 12px calc(96px + env(safe-area-inset-bottom)); }
+  body.admission-bootstrap .admission-heading h2 { font-size: 18px; }
+  body.admission-bootstrap .admission-view-tabs {
+    position: fixed;
+    top: auto;
+    right: 16px;
+    bottom: calc(12px + env(safe-area-inset-bottom));
+    left: 16px;
+    z-index: 35;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 4px;
+    width: auto !important;
+    justify-self: stretch;
+    align-self: auto;
+    max-width: 380px;
+    margin: 0 auto;
+    padding: 6px;
+    border-radius: 999px;
+    background: rgb(255 255 255 / .96);
+    box-shadow: 0 0 0 1px rgb(16 18 24 / .04), 0 8px 24px rgb(16 18 24 / .14), 0 2px 6px rgb(16 18 24 / .08);
+  }
+  body.admission-bootstrap .admission-view-tab {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    min-height: 48px;
+    padding: 0;
+    border-radius: 999px;
+    color: var(--works-ink-3);
+    font-size: 0 !important;
+    line-height: 0;
+  }
+  body.admission-bootstrap .admission-view-tab :is(svg, .works-icon) { width: 24px; height: 24px; margin: 0; }
+  body.admission-bootstrap .admission-view-tab[aria-selected="true"] {
+    background: var(--works-ink);
+    box-shadow: 0 2px 6px rgb(16 18 24 / .2);
+    color: #fff;
+  }
+}
+@media print {
+  body.admission-bootstrap > main.admission-main { padding: 0; }
+  body.admission-bootstrap :is(.admission-list-item, .admission-calendar-shell, .admission-gantt-shell, .admission-table-shell) { box-shadow: none; }
+}
