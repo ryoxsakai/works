@@ -117,7 +117,14 @@
   font-size: .9rem;
   font-weight: 700;
 }
-.works-header-actions .works-quick-add:hover { filter: brightness(1.06); color: #fff !important; }
+/* Keep the gradient and white label in every state; the generic header hover
+ * (grey face, ink text) must not reach the one primary button. */
+html body .works-header .works-header-actions .works-quick-add:is(:hover, :focus-visible, :active, [aria-expanded="true"]) {
+  background: var(--works-gradient, #4d5bd8) !important;
+  color: #fff !important;
+}
+html body .works-header .works-header-actions .works-quick-add:hover { filter: brightness(1.08); box-shadow: 0 4px 14px rgb(91 99 240 / .4) !important; }
+html body .works-header .works-header-actions .works-quick-add:active { filter: brightness(.96); }
 .works-header-actions .works-quick-add svg { width: 18px; height: 18px; }
 .works-quick-menu {
   position: absolute;
