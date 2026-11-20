@@ -388,3 +388,79 @@ body.material-bootstrap .material-dialog-actions .btn-primary {
   body.material-bootstrap .material-file-list,
   body.material-bootstrap .material-folder-card { box-shadow: none; }
 }
+
+/* Native dialog shell: bounded viewport, fixed header, independently scrolling
+ * contents. Leave native focus trapping, Escape and all write handlers intact. */
+body.material-bootstrap dialog.app-modal {
+  width: min(480px, calc(100vw - 32px));
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  background: var(--works-surface);
+  color: var(--works-ink);
+}
+body.material-bootstrap dialog.app-modal[open] { display: flex; flex-direction: column; }
+body.material-bootstrap .app-modal .modal-header {
+  flex: 0 0 auto;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--works-line);
+  background: var(--works-surface);
+}
+body.material-bootstrap .app-modal .modal-header h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+body.material-bootstrap .app-modal .modal-header h2 > span { min-width: 0; }
+body.material-bootstrap .app-modal .modal-header h2 :is(i, svg) { flex-shrink: 0; color: var(--works-ink-3); }
+body.material-bootstrap .app-modal :is(.modal-close, .material-preview-actions button) {
+  flex: 0 0 auto;
+  display: inline-grid;
+  place-items: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px;
+  border: 0;
+  border-radius: var(--works-radius);
+  background: transparent;
+  box-shadow: none;
+  color: var(--works-ink-3);
+}
+body.material-bootstrap .app-modal :is(.modal-close, .material-preview-actions button):hover { color: var(--works-ink); background: var(--works-hover); }
+body.material-bootstrap .material-preview-actions { flex: 0 0 auto; }
+body.material-bootstrap .app-modal .modal-tab-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  padding: 16px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+body.material-bootstrap .material-dialog-field > span { color: var(--works-ink-3); font-size: .82rem; font-weight: 700; }
+body.material-bootstrap .material-dialog-field small { color: var(--works-ink-3); }
+body.material-bootstrap .material-dialog-actions .btn-primary { min-height: 44px; }
+body.material-bootstrap .material-dialog-error {
+  margin: 0 0 12px;
+  padding: 12px;
+  border: 0;
+  border-radius: var(--works-radius);
+  background: var(--works-surface-sunken);
+  color: var(--works-ink);
+  font-size: .9rem;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+body.material-bootstrap dialog.material-preview-modal {
+  width: min(960px, calc(100vw - 32px)) !important;
+}
+body.material-bootstrap .material-preview-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  overscroll-behavior: contain;
+}
+body.material-bootstrap .material-text-preview { min-height: 0; }

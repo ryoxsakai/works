@@ -23,7 +23,9 @@
 <link rel="stylesheet" href="/shared/owner-memo.css?v=1"><link rel="stylesheet" href="/shared/card-loading.css?v=1" />
   <link rel="stylesheet" href="/shared/lesson-ui.css?v=5" />
   <link rel="stylesheet" href="/tutor/student-todos.css?v=1">
-</head>
+  <link rel="stylesheet" href="/tutor/dialogs.css?v=c2b03464">
+    <link rel="stylesheet" href="/shared/works-dialogs.css?v=fb98327c" />
+  </head>
 <body class="tutor-bootstrap">
   <header class="page-header works-header">
     <h1><a class="works-home" href="/" aria-label="Works ホーム"><span class="page-header-icon" aria-hidden="true">W</span><span>Works</span></a><span class="works-page-title">授業管理</span></h1>
@@ -257,9 +259,9 @@
     </section>
   </main>
 
-  <dialog id="settings-modal" class="app-modal">
+  <dialog id="settings-modal" class="app-modal" aria-labelledby="settings-modal-title">
     <div class="modal-header">
-      <h2><i class="bx bx-cog"></i> 設定</h2>
+      <h2 id="settings-modal-title"><i class="bx bx-cog"></i> 設定</h2>
       <button type="button" id="settings-close" class="modal-close" aria-label="閉じる"><i class="bx bx-x"></i></button>
     </div>
     <div class="modal-tabs" role="tablist">
@@ -338,7 +340,7 @@
     </div>
   </dialog>
 
-  <dialog id="material-chapters-modal" class="app-modal">
+  <dialog id="material-chapters-modal" class="app-modal" aria-labelledby="material-chapters-title">
     <div class="modal-header">
       <h2><i class="bx bx-list-ol"></i> <span id="material-chapters-title">教材のチャプター</span></h2>
       <button type="button" id="material-chapters-close" class="modal-close" aria-label="閉じる"><i class="bx bx-x"></i></button>
@@ -352,9 +354,9 @@
     </div>
   </dialog>
 
-  <dialog id="curriculum-search-modal" class="app-modal">
+  <dialog id="curriculum-search-modal" class="app-modal" aria-labelledby="curriculum-search-modal-title">
     <div class="modal-header">
-      <h2><i class="bx bx-cog"></i> 表示・印刷設定</h2>
+      <h2 id="curriculum-search-modal-title"><i class="bx bx-cog"></i> 表示・印刷設定</h2>
       <button type="button" id="curriculum-search-modal-close" class="modal-close" aria-label="閉じる"><i class="bx bx-x"></i> 閉じる</button>
     </div>
     <form id="curriculum-filter-form" class="modal-tab-panel">
@@ -378,9 +380,9 @@
     </form>
   </dialog>
 
-  <dialog id="goal-modal" class="app-modal">
+  <dialog id="goal-modal" class="app-modal" aria-labelledby="goal-modal-title">
     <div class="modal-header">
-      <h2><i class="bx bx-flag"></i> 目標を編集</h2>
+      <h2 id="goal-modal-title"><i class="bx bx-flag"></i> 目標を編集</h2>
       <button type="button" id="goal-modal-close" class="modal-close" aria-label="閉じる"><i class="bx bx-x"></i></button>
     </div>
     <div class="modal-tabs" role="tablist">
@@ -432,9 +434,9 @@
     </div>
   </dialog>
 
-  <dialog id="schools-modal" class="app-modal">
+  <dialog id="schools-modal" class="app-modal" aria-labelledby="schools-modal-title">
     <div class="modal-header">
-      <h2><i class="bx bx-building-house"></i> 受験校・志望校の設定</h2>
+      <h2 id="schools-modal-title"><i class="bx bx-building-house"></i> 受験校・志望校の設定</h2>
       <button type="button" id="schools-modal-close" class="modal-close" aria-label="閉じる"><i class="bx bx-x"></i></button>
     </div>
     <div class="modal-tabs" role="tablist">

@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
@@ -19,9 +19,11 @@
   <link rel="stylesheet" href="/shared/ui/memo-bootstrap.css?v=1">
   <link rel="stylesheet" href="/shared/ui/memo-tokens.css?v=1">
     <link rel="stylesheet" href="/shared/ui/button-states.css?v=1" />
-  <link rel="stylesheet" href="/memo/memo.css?v=61a266cc">
+  <link rel="stylesheet" href="/memo/memo.css?v=dialog-layout-2">
   <script type="module" src="/shared/header.js?v=7"></script>
-</head>
+
+    <link rel="stylesheet" href="/shared/works-dialogs.css?v=fb98327c" />
+  </head>
 <body class="todo-page memo-page memo-bootstrap min-h-screen">
 
   <!-- ── Header ─────────────────────────────────────────────── -->
@@ -59,14 +61,14 @@
   <dialog id="memo-modal" class="memo-dialog hidden" aria-labelledby="memo-modal-title">
     <div class="todo-modal">
 
-      <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+      <div class="memo-dialog-header flex items-center justify-between px-6 py-4 border-b border-gray-100">
         <h3 id="memo-modal-title" class="font-semibold text-gray-700">新規メモ</h3>
         <button onclick="closeMemoModal()" class="icon-btn text-gray-400 hover:text-gray-600 hover:bg-gray-100" aria-label="閉じる">
           <span data-works-icon="memo-close"></span>
         </button>
       </div>
 
-      <div class="px-6 py-4 flex flex-col gap-4 overflow-y-auto flex-1">
+      <div class="memo-dialog-body px-6 py-4 flex flex-col gap-4 overflow-y-auto flex-1">
 
         <!-- タイトル -->
         <div>
@@ -82,7 +84,7 @@
             <select id="modal-category"
               class="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent">
             </select>
-            <button onclick="openCategoryModal()" title="カテゴリを管理"
+            <button onclick="openCategoryModal()" title="カテゴリを管理" aria-label="カテゴリを管理" aria-haspopup="dialog"
               class="px-2.5 py-2 bg-gray-50 hover:bg-gray-100 text-gray-500 rounded-xl border border-gray-200 transition-colors flex items-center justify-center">
               <span data-works-icon="memo-settings"></span>
             </button>
@@ -125,7 +127,7 @@
         </div>
       </div>
 
-      <div class="px-6 py-4 border-t border-gray-100 flex justify-end gap-2">
+      <div class="memo-dialog-footer px-6 py-4 border-t border-gray-100 flex justify-end gap-2">
         <button onclick="closeMemoModal()"
           class="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-colors" aria-label="閉じる">
           キャンセル
@@ -186,7 +188,7 @@
   <dialog id="view-modal" class="memo-dialog hidden" aria-labelledby="view-title">
     <div class="todo-modal">
 
-      <div class="flex items-start justify-between px-6 py-4 border-b border-gray-100">
+      <div class="memo-dialog-header flex items-start justify-between px-6 py-4 border-b border-gray-100">
         <div class="flex-1 pr-4">
           <p id="view-category" class="text-xs text-slate-400 mb-1"></p>
           <h3 id="view-title" class="font-semibold text-gray-800 leading-snug"></h3>
@@ -196,25 +198,25 @@
         </button>
       </div>
 
-      <div class="px-6 py-4 overflow-y-auto flex-1">
+      <div class="memo-dialog-body px-6 py-4 overflow-y-auto flex-1">
         <div id="view-body-container"></div>
         <div id="view-notes-wrap" class="hidden mt-3 pt-3 border-t border-gray-100 flex flex-col gap-1.5"></div>
       </div>
 
       <div id="view-tags" class="hidden px-6 pb-3 flex flex-wrap gap-1.5"></div>
 
-      <div class="px-6 py-3 border-t border-gray-100 flex items-center justify-between">
+      <div class="memo-dialog-footer px-6 py-3 border-t border-gray-100 flex items-center justify-between">
         <p id="view-dates" class="text-xs text-gray-300"></p>
         <div class="flex gap-1">
-          <button onclick="viewCopyMemo()" title="コピー"
+          <button onclick="viewCopyMemo()" title="コピー" aria-label="メモをコピー"
             class="icon-btn text-gray-300 hover:text-slate-500 hover:bg-slate-50">
             <span data-works-icon="memo-copy"></span>
           </button>
-          <button onclick="viewEditMemo()" title="編集"
+          <button onclick="viewEditMemo()" title="編集" aria-label="メモを編集"
             class="icon-btn text-gray-300 hover:text-slate-500 hover:bg-slate-50">
             <span data-works-icon="memo-edit"></span>
           </button>
-          <button onclick="viewDeleteMemo()" title="削除"
+          <button onclick="viewDeleteMemo()" title="削除" aria-label="メモを削除"
             class="icon-btn text-gray-300 hover:text-red-400 hover:bg-red-50">
             <span data-works-icon="memo-delete"></span>
           </button>

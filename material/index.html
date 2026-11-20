@@ -17,8 +17,9 @@
     <link rel="stylesheet" href="/shared/ui/button-states.css?v=1" />
   <link rel="stylesheet" href="/shared/header.css?v=8" /><link rel="preconnect" href="https://fonts.googleapis.com" /><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin /><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+2:wght@300;400;500;700;800&display=swap" /><link rel="stylesheet" href="/shared/works-design.css?v=4" />
   <script type="module" src="/shared/header.js?v=7"></script>
-  <link rel="stylesheet" href="/material/material-v2.css?v=row-alignment-1" />
-</head>
+  <link rel="stylesheet" href="/material/material-v2.css?v=dialogs-2" />
+    <link rel="stylesheet" href="/shared/works-dialogs.css?v=fb98327c" />
+  </head>
 <body class="material-bootstrap">
   <header class="page-header works-header">
     <h1><a class="works-home" href="/" aria-label="Works ホーム"><span class="page-header-icon" aria-hidden="true">W</span><span>Works</span></a><span class="works-page-title">教材管理</span></h1>
@@ -140,14 +141,15 @@
     </section>
   </main>
 
-  <dialog id="new-folder-modal" class="app-modal">
+  <dialog id="new-folder-modal" class="app-modal" aria-labelledby="new-folder-title">
     <div class="modal-header">
-      <h2><i class="bx bx-folder-plus"></i> 新しいフォルダ</h2>
+      <h2 id="new-folder-title"><i class="bx bx-folder-plus"></i> 新しいフォルダ</h2>
       <button type="button" id="new-folder-close" class="modal-close" aria-label="閉じる">
         <i class="bx bx-x"></i>
       </button>
     </div>
     <form id="new-folder-form" class="modal-tab-panel">
+      <p class="material-dialog-error" role="alert" hidden></p>
       <label class="material-dialog-field">
         <span>フォルダ名</span>
         <input id="new-folder-name" type="text" maxlength="120" required />
@@ -158,7 +160,7 @@
     </form>
   </dialog>
 
-  <dialog id="rename-material-modal" class="app-modal">
+  <dialog id="rename-material-modal" class="app-modal" aria-labelledby="rename-material-title">
     <div class="modal-header">
       <h2><i class="bx bx-pencil"></i> <span id="rename-material-title">名前を変更</span></h2>
       <button type="button" id="rename-material-close" class="modal-close" aria-label="閉じる">
@@ -166,6 +168,7 @@
       </button>
     </div>
     <form id="rename-material-form" class="modal-tab-panel">
+      <p class="material-dialog-error" role="alert" hidden></p>
       <label class="material-dialog-field">
         <span>新しい名前</span>
         <input id="rename-material-name" type="text" maxlength="255" required />
@@ -181,7 +184,7 @@
     </form>
   </dialog>
 
-  <dialog id="material-preview-modal" class="app-modal material-preview-modal">
+  <dialog id="material-preview-modal" class="app-modal material-preview-modal" aria-labelledby="material-preview-title">
     <div class="modal-header">
       <h2><i class="bx bx-file-find"></i> <span id="material-preview-title">教材を閲覧</span></h2>
       <div class="material-preview-actions">
@@ -196,6 +199,6 @@
     <div id="material-preview-body" class="material-preview-body"></div>
   </dialog>
 
-  <script type="module" src="./app.js?v=10-avatar-u1"></script>
+  <script type="module" src="./app.js?v=11-dialog-feedback"></script>
 </body>
 </html>
