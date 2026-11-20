@@ -212,7 +212,11 @@ function createPlanner({
     const week = Array.from({ length: 7 }, (_, i) => addDays(monday, i));
     if (agenda) {
       $("week-picker").innerHTML =
-        `<div class="week-tools"><button data-week="-7" aria-label="前の週">‹</button><strong>${Number(focusDay.slice(0, 4))}年${Number(focusDay.slice(5, 7))}月</strong><button data-week="7" aria-label="次の週">›</button><button data-day="${day}">今日へ</button></div><div class="week-days">${week.map((date, i) => `<button data-day="${date}" aria-label="${fullDate.format(new Date(date))}" aria-pressed="${date === focusDay}"><small>${"月火水木金土日"[i]}</small><b>${Number(date.slice(8))}</b></button>`).join("")}</div>`;
+        `<div class="week-tools"><strong class="week-month">${Number(focusDay.slice(0, 4))}年${Number(focusDay.slice(5, 7))}月</strong><span class="week-nav"><button data-week="-7" aria-label="前の週">‹</button><button data-day="${day}" class="week-today">今日</button><button data-week="7" aria-label="次の週">›</button></span></div><div class="week-days">${week.map((date, i) => {
+          // A dot marks days that already have open tasks (DESIGN.md: upcoming).
+          const count = list.filter((t) => t.plannedDay === date && statusOf(t) !== "done").length;
+          return `<button data-day="${date}" aria-label="${fullDate.format(new Date(date))}${count ? `（${count}件）` : ""}" aria-pressed="${date === focusDay}"${date === day ? ' data-today="true"' : ""}${i > 4 ? ' data-weekend="true"' : ""}><small>${"月火水木金土日"[i]}</small><b>${Number(date.slice(8))}</b><i class="week-dot"${count ? "" : " hidden"} aria-hidden="true"></i></button>`;
+        }).join("")}</div>`;
     }
     const visible = list.filter((t) => {
       const active = statusOf(t) !== "done";
