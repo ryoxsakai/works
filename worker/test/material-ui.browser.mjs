@@ -9,6 +9,24 @@ try{for(const width of [320,390,768,1440])for(const theme of ['light','dark']){
  if(p==='/folders')return route.fulfill({json:folders});if(p==='/files')return route.fulfill({json:files.filter(f=>u.searchParams.has('all')||f.folder_id===(u.searchParams.get('folder_id')||null))});if(p.endsWith('/view')||p.endsWith('/download')){const id=p.split('/')[2];if(holdPreview&&p.endsWith('/view'))await new Promise(r=>releasePreview=r);const asset=media.get(id);return route.fulfill(asset?{contentType:asset.type,body:asset.bytes}:{contentType:'text/plain',body:'<script>synthetic</script>\nsecond line'});}throw Error('unexpected GET '+p);}
  const file=path.join(root,u.pathname+(u.pathname.endsWith('/')?'index.html':''));if(!fs.existsSync(file))return route.fulfill({status:404,body:''});return route.fulfill({contentType:({'.html':'text/html','.js':'text/javascript','.mjs':'text/javascript','.css':'text/css','.png':'image/png'})[path.extname(file)],body:fs.readFileSync(file)});});
  await page.goto('https://material.test/material/');await expect(page.locator('#material-file-list')).toContainText('Synthetic.txt');await expect(page.locator('#user-avatar-fallback')).toBeVisible();
+ const fileRow = page.locator('[data-file-id="file"]');
+ const folderRow = page.locator('[data-folder-id="folder"]');
+ const center = async (locator) => {
+   const box = await locator.boundingBox();
+   assert.ok(box);
+   return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+ };
+ const move = await center(fileRow.locator('.material-drag-handle svg'));
+ for (const icon of await fileRow.locator('.material-file-icon, .material-file-actions svg').all()) {
+   assert.ok(Math.abs((await center(icon)).y - move.y) <= 1, 'file row icons share a centerline');
+ }
+ const folderMove = await center(folderRow.locator('.material-drag-handle svg'));
+ assert.ok(Math.abs(folderMove.x - move.x) <= 1, 'move handles share a leading column');
+ if (width < 500) {
+   const deleteIcon = (row) => row.getByRole('button', {name: /削除/}).locator('svg');
+   assert.ok(Math.abs((await center(deleteIcon(folderRow))).x - (await center(deleteIcon(fileRow))).x) <= 1,
+     'delete icons share a trailing column on phones');
+ }
  if(width<500)assert.equal(await page.locator('.material-inline-upload-action').evaluate(el=>getComputedStyle(el).fontSize),'0px');
  for(const tab of ['library','tree','tags']){await page.locator(`[data-material-tab="${tab}"]`).click();await expect(page.locator(`[data-material-tab-panel="${tab}"]`)).toBeVisible();assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await page.screenshot({path:`${out}/${width}-${theme}-${tab}.png`,fullPage:true});}
  await page.reload();await expect(page.locator('[data-material-tab="tags"]')).toHaveAttribute('aria-selected','true');await page.locator('[data-material-tab="library"]').click();await page.locator('#material-search-input').fill('abc');await expect(page.locator('[data-file-id]')).toHaveCount(1);await page.locator('#material-search-input').fill('');
