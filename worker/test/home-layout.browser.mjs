@@ -1,5 +1,6 @@
 import { chromium, expect } from '@playwright/test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { readFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -7,6 +8,9 @@ import { fileURLToPath } from 'node:url';
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const artifacts = new URL('../test-artifacts/home-layout/', import.meta.url);
 const base = 'https://home-layout.test';
+const temporarilyHidden = ['/workflow/', '/wiki/', '/kdp/', '/ss/'];
+const menuPaths = ['/', '/tutor/', '/material/', '/admission/', '/todo/', '/memo/'];
+const layoutKey = 'works-home-dashboard-v1:' + createHash('sha256').update('home-fixture@example.test').digest('hex');
 const browser = await chromium.launch(process.env.BROWSER_EXECUTABLE ? { executablePath: process.env.BROWSER_EXECUTABLE } : {});
 const auth = `
  export const getSessionToken = () => 'synthetic';
@@ -33,6 +37,11 @@ try {
    hasTouch: width < 641,
    reducedMotion: 'reduce',
   });
+  await context.addInitScript(({ key, shortcuts }) => {
+   if (localStorage.getItem(key) === null) {
+    localStorage.setItem(key, JSON.stringify({ version: 1, widgets: ['lessons', 'todo', 'shortcuts'], shortcuts }));
+   }
+  }, { key: layoutKey, shortcuts: [...temporarilyHidden, '/todo/'] });
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
@@ -59,6 +68,18 @@ try {
   await expect(widgets.first()).toHaveAttribute('data-id', 'lessons');
   await expect(page.locator('[data-content="lessons"]')).toHaveAttribute('aria-busy', 'false');
   assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
+  const menu = page.locator('#home-navigation');
+  if (width < 1024) await menu.locator('summary').click();
+  await expect(menu.locator('nav')).toBeVisible();
+  assert.deepEqual(await menu.locator('nav a').evaluateAll(links => links.map(link => link.getAttribute('href'))), menuPaths);
+  await expect(menu.locator('nav > span')).toHaveText(['授業・教材', '業務']);
+  if (width < 1024) {
+   await page.keyboard.press('Escape');
+   await expect(menu.locator('summary')).toBeFocused();
+  }
+  const shortcuts = page.locator('.dashboard-shortcut-links a');
+  await expect(shortcuts).toHaveCount(1);
+  await expect(shortcuts).toHaveAttribute('href', '/todo/');
   const linkHeight = await page.locator('[data-id=lessons] .widget-link').evaluate(el => el.getBoundingClientRect().height);
   assert(linkHeight >= (width <= 640 ? 44 : 36));
   await page.screenshot({ path: fileURLToPath(new URL(width + '-dashboard.png', artifacts)) });
@@ -96,10 +117,22 @@ try {
   await page.locator('#dashboard-cancel').click();
   await expect(page.locator('#dashboard-editor')).toBeHidden();
   await expect(widgets.first()).toHaveAttribute('data-id', 'lessons');
+
+  await open.click();
+  await page.locator('#dashboard-edit').click();
+  const options = page.locator('#dashboard-shortcuts input');
+  assert.deepEqual(await options.evaluateAll(inputs => inputs.map(input => input.value)), menuPaths.slice(1));
+  await page.locator('#dashboard-shortcuts input[value="/memo/"]').check();
+  await page.locator('#dashboard-save').click();
+  const saved = await page.evaluate(key => JSON.parse(localStorage.getItem(key)).shortcuts, layoutKey);
+  assert.deepEqual([...saved].sort(), [...temporarilyHidden, '/todo/', '/memo/'].sort());
+  await page.reload();
+  await expect(shortcuts).toHaveCount(2);
+  assert.deepEqual(await shortcuts.evaluateAll(links => links.map(link => link.getAttribute('href'))), ['/todo/', '/memo/']);
   assert.deepEqual(errors, []);
   await context.close();
  }
- console.log('Home local fixture: four viewports, settings focus/return, touch targets, edit preview order and cancel PASS');
+ console.log('Home local fixture: four viewports, settings focus/return, touch targets, edit preview order/cancel, menu and retained shortcut preferences PASS');
 } finally {
  await browser.close();
 }

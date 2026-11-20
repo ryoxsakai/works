@@ -157,8 +157,7 @@ async function assertLightOnly(page) {
   await page.goto(base + '/');
   assert.equal(await page.locator('.module-card[href="/material-print/"]').count(),0);
   await page.locator('#home-navigation').evaluate(el=>el.open=true);
-  assert.equal(await page.locator('#home-navigation a[href="/wiki/"]').innerText(),'Wiki');
-  assert.equal(await page.locator('#home-navigation a:not([aria-current])').count(),9);
+  assert.deepEqual(await page.locator('#home-navigation a').allTextContents(),['ホーム','授業管理','教材管理','入試管理','ToDo管理','メモ']);
   // A previously stored dark choice and a dark OS both resolve to light.
   await page.evaluate(()=>localStorage.setItem('works_theme','dark'));
   await page.emulateMedia({colorScheme:'dark'});
@@ -177,7 +176,7 @@ async function assertLightOnly(page) {
   await page.locator('.works-header .works-quick-add').waitFor();
   await page.evaluate(()=>{document.querySelector('.works-home').onclick=e=>{window.qaGuard=true;e.preventDefault();};});
   if (await page.locator('.works-navigation summary').isVisible()) await page.locator('.works-navigation summary').click();
-  await page.locator('.works-navigation a[href="/kdp/"]').click();
+  await page.locator('.works-navigation a[href="/todo/"]').click();
   assert.equal(await page.evaluate(()=>window.qaGuard),true);
   assert.equal(new URL(page.url()).pathname,'/wiki/');
   // Record saves stay inside the fixture; never touch production lessons.

@@ -15,7 +15,9 @@ import {
 import { createReader } from "./data.mjs?v=3";
 
 import { icon } from "../shared/ui/icons.mjs";
+import { isListedServicePath } from "../shared/menu-visibility.mjs";
 
+const listedModules = MODULES.filter(([path]) => isListedServicePath(path));
 const $ = (id) => document.getElementById(id);
 const time = (value) =>
   value
@@ -126,14 +128,14 @@ export function createDashboard({
     } catch(e) { if(request===epoch){host.setAttribute('aria-busy', 'false');host.textContent='授業カードを表示できませんでした。再読み込みしてください。';} }
   }
   function shortcutBody() {
-    return `<div class="dashboard-shortcut-links">${current()
-      .shortcuts.map((path) => {
+    const paths = current().shortcuts.filter(isListedServicePath);
+    return `<div class="dashboard-shortcut-links">${paths.map((path) => {
         const m = MODULES.find((m) => m[0] === path);
         return `<a href="${path}">${icon(m[2])}${m[1]}</a>`;
       })
       .join(
         "",
-      )}</div>${current().shortcuts.length ? "" : '<p class="dashboard-muted">設定からリンクを追加できます。</p>'}`;
+      )}</div>${paths.length ? "" : '<p class="dashboard-muted">設定からリンクを追加できます。</p>'}`;
   }
   // Small coloured chips for urgency (overdue / today / tomorrow / later).
   function dayAfter(day) {
@@ -223,7 +225,7 @@ export function createDashboard({
         .join("") || '<p class="dashboard-muted">すべて追加済みです。</p>';
     $("dashboard-shortcuts").innerHTML =
       "<legend>よく使う機能に表示するリンク</legend>" +
-      MODULES.map(
+      listedModules.map(
         (m) =>
           `<label><input class="check" type="checkbox" value="${m[0]}" ${current().shortcuts.includes(m[0]) ? "checked" : ""}>${m[1]}</label>`,
       ).join("");
@@ -523,12 +525,13 @@ export function createDashboard({
     }
   };
   $("dashboard-shortcuts").onchange = (e) => {
-    if (draft && MODULES.some((m) => m[0] === e.target.value)) {
-      draft.shortcuts = MODULES.filter(
-        (m) =>
-          $("dashboard-shortcuts").querySelector(`input[value="${m[0]}"]`)
-            .checked,
-      ).map((m) => m[0]);
+    if (draft && listedModules.some(([path]) => path === e.target.value)) {
+      // Keep temporarily hidden choices so restoring the menu restores them too.
+      draft.shortcuts = MODULES.filter(([path]) =>
+        isListedServicePath(path)
+          ? $("dashboard-shortcuts").querySelector(`input[value="${path}"]`).checked
+          : draft.shortcuts.includes(path),
+      ).map(([path]) => path);
       const el = document.querySelector('[data-content="shortcuts"]');
       if (el) el.innerHTML = shortcutBody();
     }

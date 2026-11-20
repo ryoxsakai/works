@@ -159,7 +159,7 @@ try {
       await page.locator("#modal").waitFor({ state: "hidden" });
     };
     await page.goto(origin + "/");
-    assert.equal(await page.locator("#home-navigation a:not([aria-current])").count(), 9);
+    assert.equal(await page.locator('#home-navigation a[href="/kdp/"]').count(), 0);
     await page.locator("#dashboard-widgets .dashboard-widget").first().waitFor();
     assert.equal(await page.locator("#dashboard-widgets .dashboard-widget").count(), 3);
     await width();
@@ -167,8 +167,7 @@ try {
       path: `test-artifacts/menu-${name}.png`,
       fullPage: true,
     });
-    await page.locator('#home-navigation').evaluate(el=>el.open=true);
-    await page.locator('#home-navigation a[href="/kdp/"]').click();
+    await page.goto(origin + "/kdp/");
     await page.locator("#new-book").waitFor();
     await expect(page.locator('#new-book')).toBeVisible();
     await expect(page.locator('#new-book')).toHaveClass(/btn-solid/);
@@ -445,10 +444,10 @@ try {
     });
     await page.reload();
     await page.locator('#home-navigation').evaluate(el=>el.open=true);
-    await page.locator('#home-navigation a[href="/kdp/"]').click();
+    await page.locator('#home-navigation a[href="/memo/"]').click();
     assert.equal(
       await page.evaluate(() => localStorage.fixtureDestination),
-      "/kdp/",
+      "/memo/",
     );
     await page.locator('#home-navigation').evaluate(el=>el.open=true);
     // A sign-in redirect is coalesced briefly to ignore accidental double taps.

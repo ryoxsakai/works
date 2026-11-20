@@ -1,6 +1,7 @@
 // Works app shell shared by every page: app navigation (PC sidebar / mobile
 // drawer) and quick add. Pages keep their own settings and account buttons.
 import "./theme.js?v=7";
+import { isListedServicePath } from "./menu-visibility.mjs";
 
 const ICONS = {
   home: '<path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
@@ -57,9 +58,11 @@ if (actions) {
   const navigation = document.createElement("details");
   navigation.className = "works-navigation";
   navigation.innerHTML = `<summary aria-label="サービス一覧">${svg("menu", 22)}</summary>
-    <nav aria-label="Works サービス">${GROUPS.map(([label, links]) =>
-      (label ? `<span>${label}</span>` : "") + links.map(([href, key, text]) => `<a href="${href}">${appIcon(key)}<span>${text}</span></a>`).join("")
-    ).join("")}</nav>`;
+    <nav aria-label="Works サービス">${GROUPS.map(([label, links]) => {
+      const listed = links.filter(([href]) => isListedServicePath(href));
+      return listed.length ? (label ? `<span>${label}</span>` : "") +
+        listed.map(([href, key, text]) => `<a href="${href}">${appIcon(key)}<span>${text}</span></a>`).join("") : "";
+    }).join("")}</nav>`;
   navigation.querySelectorAll("a").forEach((link) => {
     if (link.pathname === location.pathname) link.setAttribute("aria-current", "page");
     guard(link);
