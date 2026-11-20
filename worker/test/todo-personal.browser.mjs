@@ -233,7 +233,8 @@ try {
       });
       // Every service shares the Works typeface (M PLUS 2); weights keep their hierarchy.
       assert.deepEqual(type.map(([family])=>family),Array(6).fill("M PLUS 2"));
-      assert.deepEqual(type.slice(0,5).map(([,weight])=>weight),["300","300","400","500","500"]);
+      // DESIGN.md hierarchy: caption 400, labels/buttons/task names 600, page title 700.
+      assert.deepEqual(type.slice(0,5).map(([,weight])=>weight),["400","600","600","600","700"]);
       assert.equal(await page.evaluate(()=>document.documentElement.dataset.theme),"light");
       await expect(page.locator('.works-header .works-quick-add')).toBeVisible();
       await expect(page.locator('.works-header .btn, .works-settings-dialog')).toHaveCount(0);

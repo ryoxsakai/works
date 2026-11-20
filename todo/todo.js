@@ -215,6 +215,16 @@ function roleBadge(t) {
     ? `<span class="badge role-${esc(r.color)}">${esc(r.icon)} ${esc(r.name)}${r.archived ? "（保管）" : ""}</span>`
     : "";
 }
+// Deadline chip tone, matching the Home widget (DESIGN.md: status-chip).
+function dueTone(deadline, base, done) {
+  if (done) return "due-neutral";
+  const next = new Date(base + "T00:00:00Z");
+  next.setUTCDate(next.getUTCDate() + 1);
+  if (deadline < base) return "due-danger";
+  if (deadline === base) return "due-info";
+  if (deadline === next.toISOString().slice(0, 10)) return "due-success";
+  return "due-neutral";
+}
 function card(t, groupDay) {
   const done = statusOf(t) === "done",
     base = today();
@@ -224,7 +234,7 @@ function card(t, groupDay) {
     <button class="done-toggle" data-action="complete" aria-pressed="${done}" aria-label="${done ? "未着手に戻す" : "完了にする"}：${esc(t.name)}">${done ? "✓" : "○"}</button>
     <div class="task-body"><button class="task-name" data-action="detail" aria-label="詳細：${esc(t.name)}">${t.important ? "★ " : ""}${esc(t.name)}</button>
     <div class="task-meta">${planner.meta(t)}${roleBadge(t)}
-    ${t.plannedDay && t.plannedDay !== groupDay ? `<small>作業日 ${esc(t.plannedDay)}</small>` : ""}${t.deadline ? `<small class="${t.deadline < base && !done ? "overdue" : ""}">締切 ${esc(t.deadline)}</small>` : ""}
+    ${t.plannedDay && t.plannedDay !== groupDay ? `<small>作業日 ${esc(t.plannedDay)}</small>` : ""}${t.deadline ? `<small class="due-chip ${dueTone(t.deadline, base, done)}${t.deadline < base && !done ? " overdue" : ""}">${t.deadline < base && !done ? "期限超過 · " : ""}締切 ${esc(t.deadline)}</small>` : ""}
     ${statusOf(t)!=="pending" ? `<small>${statusNames[statusOf(t)]}</small>` : ""}
     ${t.checklist?.length ? `<small>☑ ${t.checklist.filter(c=>c.checked).length}/${t.checklist.length}</small>` : ""}</div></div>
     <details class="row-menu"><summary aria-label="${esc(t.name)}の操作">•••</summary><div>

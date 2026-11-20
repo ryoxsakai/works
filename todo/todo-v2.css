@@ -1,0 +1,356 @@
+/*
+ * ToDo (Works design, see DESIGN.md): grey page, white cards lifted by shadow,
+ * quiet 20px title, one gradient primary per screen (the header's quick add),
+ * selected items as white faces on grey, floating icon-only tab bar on phones.
+ * Loaded last on /todo/; visual layer only.
+ */
+body .todo-page,
+body .todo-page .todo-main { background: var(--works-page); color: var(--works-ink); }
+
+/* ---------- Secondary menu (views, projects, labels) ---------- */
+.todo-page .planner-sidebar {
+  padding: 16px 8px;
+  border: 0;
+  background: transparent;
+}
+.todo-page .planner-sidebar #sidebar-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 40px;
+  margin: 0 0 12px;
+  padding: 0 12px;
+  border: 1px solid var(--works-input-line);
+  border-radius: var(--works-radius);
+  background: var(--works-surface);
+  box-shadow: none;
+  color: var(--works-ink-3);
+  font-size: .92rem;
+}
+.todo-page .planner-sidebar nav .btn,
+.todo-page .planner-sidebar nav button {
+  min-height: 40px;
+  margin: 1px 0;
+  padding-inline: 12px;
+  border: 0;
+  border-radius: var(--works-radius);
+  background: transparent;
+  box-shadow: none;
+  color: var(--works-ink-2);
+  font-size: .95rem;
+}
+.todo-page .planner-sidebar nav .btn:hover,
+.todo-page .planner-sidebar nav button:hover { background: rgb(255 255 255 / .6); color: var(--works-ink); }
+.todo-page .planner-sidebar nav [aria-current="page"] {
+  background: var(--works-surface);
+  box-shadow: var(--works-shadow-sm);
+  color: var(--works-ink);
+  font-weight: 700;
+}
+.todo-page .side-heading {
+  margin-top: 14px;
+  padding: 0 4px 0 12px;
+  border: 0;
+}
+.todo-page .side-heading h3 {
+  color: var(--works-ink-3);
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+}
+.todo-page .side-heading .btn,
+.todo-page .side-heading button {
+  border: 0;
+  border-radius: var(--works-radius);
+  background: transparent;
+  box-shadow: none;
+  color: var(--works-ink-3);
+}
+.todo-page .side-heading button:hover { background: rgb(255 255 255 / .6); color: var(--works-ink); }
+.todo-page .planner-settings { margin-top: 14px; border: 0; }
+.todo-page .planner-settings > summary { padding-inline: 12px; color: var(--works-ink-2); font-size: .9rem; }
+
+/* ---------- Page heading ---------- */
+.todo-page .planner-content { padding: 20px var(--works-gutter) 48px; }
+.todo-page .planner-content .heading {
+  margin: 0 0 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  align-items: flex-end;
+}
+.todo-page .planner-content .heading h2,
+.todo-page #view-title {
+  margin: 0;
+  color: var(--works-ink);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: .01em;
+}
+.todo-page #today-label, .todo-page .planner-content #today-label { margin: 2px 0 0; color: var(--works-ink-3); font-size: .82rem; font-weight: 400; }
+/* Header actions: secondary buttons (the gradient lives on the header's quick add). */
+.todo-page .heading-actions .btn,
+.todo-page .heading-actions button {
+  min-height: 36px;
+  height: 36px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--works-radius);
+  background: var(--works-surface);
+  box-shadow: var(--works-shadow-sm);
+  color: var(--works-ink-2);
+  font-size: .9rem;
+  font-weight: 600;
+}
+.todo-page .heading-actions .btn:hover,
+.todo-page .heading-actions button:hover { box-shadow: var(--works-shadow); color: var(--works-ink); }
+.todo-page .heading-actions #new-task { color: var(--works-accent); }
+
+/* ---------- Task list as one white card ---------- */
+.todo-page .planner-content #task-count {
+  margin: 0 0 8px;
+  padding: 0 2px;
+  border: 0;
+  background: transparent;
+  color: var(--works-ink-3);
+  font-size: .8rem;
+  font-weight: 600;
+  line-height: 1.6;
+}
+.todo-page #tasks {
+  overflow: hidden;
+  border-radius: var(--works-radius-lg);
+  background: var(--works-surface);
+  box-shadow: var(--works-shadow);
+}
+.todo-page #tasks:empty { display: none; }
+.todo-page .planner-list .group-heading {
+  min-height: 40px;
+  padding: 0 16px;
+  border: 0;
+  border-bottom: 1px solid var(--works-line);
+  background: var(--works-surface);
+  color: var(--works-ink-3);
+}
+.todo-page .planner-list .group-heading h3 { color: var(--works-ink-2); font-size: .82rem; font-weight: 700; letter-spacing: .04em; }
+.todo-page .planner-list .group-heading button { color: var(--works-accent); }
+.todo-page .planner-content .planner-row {
+  padding: 6px 12px 6px 6px;
+  border: 0;
+  border-bottom: 1px solid var(--works-line);
+  background: var(--works-surface);
+}
+.todo-page .planner-content .planner-row:last-child { border-bottom: 0; }
+.todo-page .planner-row:hover { background: #fafbfc; }
+.todo-page .planner-row.inspected { background: var(--works-accent-soft); box-shadow: inset 3px 0 var(--works-accent); }
+.todo-page .planner-row .task-name { color: var(--works-ink); font-size: 1rem; font-weight: 600; }
+.todo-page .planner-row .drag-grip,
+.todo-page .planner-row .row-menu summary { color: var(--works-ink-3); }
+.todo-page .planner-row .row-menu summary { border-radius: var(--works-radius); }
+.todo-page .planner-row .row-menu summary:hover { background: var(--works-hover); }
+
+/* Round check everywhere (phones used a square before). */
+.todo-page .planner-row .done-toggle::before,
+.todo-page .completed-today .done-toggle::before,
+.todo-page .planner-list .planner-row .done-toggle::before {
+  width: 20px;
+  height: 20px;
+  border: 1.6px solid var(--works-line-strong);
+  border-radius: 50% !important;
+}
+.todo-page .planner-row .done-toggle:hover::before { border-color: var(--works-accent); }
+.todo-page .planner-row .done-toggle[aria-pressed="true"]::before {
+  border-color: var(--works-accent);
+  background: var(--works-accent);
+  color: #fff;
+}
+
+/* Meta line: role badges and deadline chips. */
+.todo-page .planner-row .task-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
+.todo-page .task-meta small,
+.todo-page .task-meta .badge,
+.todo-page .task-meta .meta-project {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 20px;
+  padding: 1px 8px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--works-track);
+  color: var(--works-ink-2);
+  font-size: .78rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+/* The legacy meta rule uses an ID inside :is(), so match its weight with IDs here. */
+.todo-page :is(#tasks, #deadlines) .task-meta :is(small, .badge, .meta-project) { color: var(--works-ink-2); font-weight: 600; }
+.todo-page :is(#tasks, #deadlines) .task-meta .due-danger { background: #fdecee; color: #b4232f; }
+.todo-page :is(#tasks, #deadlines) .task-meta .due-info { background: #e8efff; color: #2f5bd0; }
+.todo-page :is(#tasks, #deadlines) .task-meta .due-success { background: #e4f5ec; color: #17784f; }
+.todo-page :is(#tasks, #deadlines) .task-meta .due-neutral { background: var(--works-track); color: var(--works-ink-2); }
+
+/* "完了済み" sits at the bottom of the list card as a quiet footer row. */
+.todo-page #tasks .completed-today { margin: 0; border-top: 1px solid var(--works-line); }
+.todo-page #tasks .completed-today > summary,
+.todo-page .planner-content #tasks .completed-today > summary {
+  display: list-item;
+  min-height: 40px;
+  padding: 10px 16px;
+  border: 0;
+  background: transparent;
+  color: var(--works-ink-3);
+  font-size: .82rem;
+  font-weight: 600;
+  line-height: 1.5;
+  cursor: pointer;
+}
+/* Deadline section reads as a quiet label with its own card. */
+.todo-page .completed-today:not(#tasks .completed-today),
+.todo-page .deadline-panel { margin: 16px 0 0; border: 0; background: transparent; box-shadow: none; }
+.todo-page .deadline-panel > summary {
+  min-height: 36px;
+  padding: 0 2px;
+  border: 0;
+  background: transparent;
+  color: var(--works-ink-2);
+  font-size: .85rem;
+  font-weight: 700;
+}
+.todo-page #deadlines:not(:empty) {
+  margin-top: 8px;
+  padding: 8px 16px;
+  border-radius: var(--works-radius-lg);
+  background: var(--works-surface);
+  box-shadow: var(--works-shadow);
+}
+.todo-page #display-panel {
+  margin: 0 0 12px;
+  border: 0;
+  border-radius: var(--works-radius-lg);
+  background: var(--works-surface);
+  box-shadow: var(--works-shadow);
+}
+
+/* Inputs follow the shared rule: white with a thin line. */
+.todo-page :is(input:not([type="checkbox"], [type="radio"]), select, textarea) {
+  border: 1px solid var(--works-input-line);
+  border-radius: var(--works-radius);
+  background: var(--works-surface);
+  color: var(--works-ink);
+  box-shadow: none;
+}
+.todo-page :is(input:not([type="checkbox"], [type="radio"]), select, textarea):focus {
+  border-color: var(--works-accent);
+  box-shadow: var(--works-focus);
+  outline: none;
+}
+
+/* ---------- Add sheet ---------- */
+#capture-sheet { border: 0; border-radius: var(--works-radius-lg); box-shadow: var(--works-shadow-lg); }
+#capture-sheet .dialog-head h2,
+#capture-heading { color: var(--works-ink); font-size: 20px; font-weight: 700; }
+#capture-sheet .dialog-head button { border: 0; border-radius: var(--works-radius); background: transparent; color: var(--works-ink-3); }
+#capture-sheet .dialog-head button:hover { background: var(--works-hover); }
+.todo-page #quick-title, #quick-title { font-size: max(16px, 1.1rem); font-weight: 600; } /* never under 16px: iOS zooms smaller fields */
+.date-shortcuts {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--works-radius);
+  background: var(--works-track);
+}
+.date-shortcuts .btn,
+.date-shortcuts button {
+  min-height: 34px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--works-radius-sm);
+  background: transparent;
+  box-shadow: none;
+  color: var(--works-ink-2);
+}
+.date-shortcuts [aria-pressed="true"] { border: 0; background: var(--works-surface); box-shadow: var(--works-shadow-sm); color: var(--works-ink); }
+/* In the sheet, adding is the one primary action. */
+#capture-sheet #capture-submit {
+  min-height: 44px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--works-gradient);
+  box-shadow: 0 2px 10px rgb(91 99 240 / .28);
+  color: #fff;
+  font-weight: 700;
+}
+#capture-sheet #capture-submit:disabled { opacity: .45; box-shadow: none; }
+
+/* ---------- Phones ---------- */
+@media (max-width: 730px) {
+  /* Phones keep the edge-to-edge list (decided for ToDo; see DESIGN.md). */
+  .todo-page .planner-content { padding: 16px 0 calc(96px + env(safe-area-inset-bottom)); }
+  .todo-page .planner-content .heading { padding: 0 16px; background: transparent; }
+  .todo-page .planner-content #task-count,
+  .todo-page .deadline-panel > summary { padding-inline: 16px; }
+  .todo-page #tasks,
+  .todo-page #deadlines:not(:empty),
+  .todo-page #display-panel {
+    border-radius: 0;
+    box-shadow: 0 -1px 0 var(--works-line), 0 1px 0 var(--works-line);
+  }
+  .todo-page .planner-content .planner-row { padding-inline: 4px 12px; }
+  .todo-page .planner-content #task-count { background: transparent; }
+  .todo-page #tasks .completed-today > summary { background: transparent; }
+  .todo-page .planner-list .task-name::after { color: var(--works-ink-3); }
+
+  /* Floating, rounded, icon-only bar like 授業管理. */
+  .todo-page .bottom-tabs {
+    inset: auto 16px calc(12px + env(safe-area-inset-bottom));
+    z-index: 9;
+    gap: 2px;
+    max-width: 400px;
+    margin: 0 auto;
+    padding: 6px;
+    border: 0;
+    border-radius: 999px;
+    background: rgb(255 255 255 / .96);
+    box-shadow: 0 0 0 1px rgb(16 18 24 / .04), 0 8px 24px rgb(16 18 24 / .14), 0 2px 6px rgb(16 18 24 / .08);
+  }
+  .todo-page .bottom-tabs .btn,
+  .todo-page .bottom-tabs button,
+  .todo-page .bottom-tabs #mobile-nav {
+    flex-direction: row;
+    gap: 0;
+    height: 48px;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    box-shadow: none;
+    color: var(--works-ink-3);
+    font-size: 0;
+    line-height: 0;
+  }
+  .todo-page .bottom-tabs :is(svg, .works-icon, .search-icon) { width: 24px; height: 24px; color: currentColor; }
+  .todo-page .bottom-tabs [aria-current="page"],
+  .todo-page .bottom-tabs #mobile-nav[aria-expanded="true"] {
+    background: var(--works-ink);
+    color: #fff;
+    font-weight: 400;
+  }
+  .todo-page .browsing .bottom-tabs [aria-current="page"],
+  .todo-page.browsing .bottom-tabs [aria-current="page"] { background: transparent; color: var(--works-ink-3); }
+  /* Add stays visible but secondary: the gradient belongs to the header's quick add. */
+  .todo-page .bottom-tabs #mobile-add {
+    align-self: stretch;
+    border-radius: 999px;
+    height: 48px;
+    margin: 0;
+    background: var(--works-accent-soft);
+    color: var(--works-accent);
+    font-size: 0;
+  }
+  .todo-page .bottom-tabs #mobile-add span { width: auto; background: transparent; color: currentColor; font-size: 24px; line-height: 1; }
+  .todo-page #notice:not(:empty) { bottom: calc(84px + env(safe-area-inset-bottom)); }
+  #capture-sheet { border-radius: 16px 16px 0 0; }
+}
