@@ -111,12 +111,16 @@ import { watchAuth, signIn, signOutUser as worksSignOut, getSessionToken } from 
       renderModalNotes();
       renderModalTags();
 
-      document.getElementById('memo-modal').classList.remove('hidden');
-      setTimeout(() => inputTitle.focus(), 50);
+      const dialog = document.getElementById('memo-modal');
+      dialog.classList.remove('hidden');
+      dialog.showModal();
+      inputTitle.focus();
     }
 
     function closeMemoModal() {
-      document.getElementById('memo-modal').classList.add('hidden');
+      const dialog = document.getElementById('memo-modal');
+      dialog.close();
+      dialog.classList.add('hidden');
       editingMemoId = null;
       modalTags   = [];
       modalNotes  = [];
@@ -279,18 +283,18 @@ import { watchAuth, signIn, signOutUser as worksSignOut, getSessionToken } from 
     // ─── Tabs ─────────────────────────────────────────────────
     function setTab(tab) { activeTab = tab; activeTag = null; try { localStorage.setItem(TAB_KEY, tab); } catch {} renderTabs(); renderTagFilter(); renderMemoGrid(); }
 
+    function showAllMemos() {
+      setTab('すべて');
+      window.scrollTo(0, 0);
+    }
+
     function renderTabs() {
       const container = document.getElementById('tab-list');
       const tabs = ['すべて', ...categories];
       if (!tabs.includes(activeTab)) activeTab = 'すべて';
-      container.innerHTML = tabs.map(t => {
-        const active = t === activeTab;
-        return `<button onclick="setTab(${jsArg(t)})"
-          class="tab-btn px-4 py-2.5 text-sm font-medium rounded-t-lg border-b-2 whitespace-nowrap
-            ${active ? 'border-slate-700 text-slate-700 bg-slate-50' : 'border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50'}">
-          ${esc(t)}
-        </button>`;
-      }).join('');
+      container.innerHTML = tabs.map(tab =>
+        `<button type="button" class="tab-btn" aria-pressed="${tab === activeTab}" onclick="setTab(${jsArg(tab)})">${esc(tab)}</button>`
+      ).join('');
     }
 
     // ─── Category modal ────────────────────────────────────────
@@ -422,19 +426,17 @@ import { watchAuth, signIn, signOutUser as worksSignOut, getSessionToken } from 
       const base = activeTab === 'すべて' ? memos : memos.filter(m => m.category === activeTab);
       const allTags = [...new Set(base.flatMap(m => m.tags || []))].sort();
       if (!allTags.includes(activeTag)) activeTag = null;
+      const listAction = document.querySelector('.memo-list-action');
+      if (activeTab === 'すべて' && !activeTag) listAction.setAttribute('aria-current', 'page');
+      else listAction.removeAttribute('aria-current');
       if (!allTags.length) {
         container.classList.add('hidden');
-        if (!allTags.includes(activeTag)) activeTag = null;
         return;
       }
       container.classList.remove('hidden');
       container.innerHTML = allTags.map(tag => {
         const on = tag === activeTag;
-        return `<button onclick="setTagFilter(${jsArg(tag)})"
-          class="px-2.5 py-1 rounded-full text-xs border transition-colors whitespace-nowrap
-            ${on ? 'bg-slate-700 text-white border-slate-700' : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'}">
-          #${esc(tag)}
-        </button>`;
+        return `<button type="button" aria-pressed="${on}" onclick="setTagFilter(${jsArg(tag)})">#${esc(tag)}</button>`;
       }).join('');
     }
 
@@ -498,16 +500,14 @@ import { watchAuth, signIn, signOutUser as worksSignOut, getSessionToken } from 
           ? esc(firstBody).replace(/\n/g, '<br>')
           : '<span class="text-gray-300 italic">内容なし</span>';
 
-        return `<div class="memo-card relative bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col cursor-pointer" style="min-height:150px" onclick="openMemoView(${jsArg(memo.id)}, event)">
-  <span class="absolute top-3 right-3 px-2 py-0.5 rounded-full text-xs bg-slate-50 text-slate-500 border border-slate-100 max-w-28 truncate">${esc(memo.category)}</span>
-  <div class="px-4 pt-4 pb-2 pr-28">
-    <p class="font-semibold text-gray-800 text-sm leading-snug">${esc(memo.title)}</p>
+        return `<article class="memo-card">
+  <div class="memo-card-content">
+    <span class="memo-chip">${esc(memo.category)}</span>
+    <h3><button type="button" class="memo-title" onclick="openMemoView(${jsArg(memo.id)})">${esc(memo.title)}</button></h3>
+    <p class="memo-preview">${preview}</p>
+    ${memo.tags?.length ? `<div class="memo-tags">${memo.tags.map(t => `<span class="memo-chip">#${esc(t)}</span>`).join('')}</div>` : ''}
   </div>
-  <div class="px-4 pb-2 flex-1">
-    <p class="text-xs text-gray-500 leading-relaxed" style="display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden">${preview}</p>
-  </div>
-  ${(memo.tags && memo.tags.length) ? `<div class="px-4 pb-2 flex flex-wrap gap-1">${memo.tags.map(t => `<span class="px-2 py-0.5 rounded-full text-xs bg-slate-50 text-slate-500 border border-slate-200">#${esc(t)}</span>`).join('')}</div>` : ''}
-  <div class="px-3 pb-1.5 flex items-center justify-between border-t border-gray-50 pt-1">
+  <div class="memo-card-actions">
     <div class="flex gap-0.5">
       <button onclick="moveMemo(${jsArg(memo.id)},-1)" ${isFirst ? 'disabled' : ''} title="上へ"
         class="icon-btn w-6 h-6 text-gray-300 hover:text-gray-500 hover:bg-gray-100 ${isFirst ? 'opacity-20 pointer-events-none' : ''}">
@@ -533,7 +533,7 @@ import { watchAuth, signIn, signOutUser as worksSignOut, getSessionToken } from 
       </button>
     </div>
   </div>
-</div>`;
+</article>`;
       }).join('');
     }
 
@@ -553,9 +553,7 @@ import { watchAuth, signIn, signOutUser as worksSignOut, getSessionToken } from 
       }, 2000);
     }
 
-    function openMemoView(id, e) {
-      if (e?.target.closest("button")) return;
-      if (e && e.target.closest('button')) return;
+    function openMemoView(id) {
       const memo = memos.find(m => m.id === id);
       if (!memo) return;
       viewingMemoId = id;
@@ -589,11 +587,17 @@ import { watchAuth, signIn, signOutUser as worksSignOut, getSessionToken } from 
       if (memo.createdAt) parts.push(`作成: ${formatDate(memo.createdAt)}`);
       if (memo.updatedAt && memo.updatedAt !== memo.createdAt) parts.push(`更新: ${formatDate(memo.updatedAt)}`);
       document.getElementById('view-dates').textContent = parts.join('　');
-      document.getElementById('view-modal').classList.remove('hidden');
+      const dialog = document.getElementById('view-modal');
+      dialog.append(document.getElementById('toast'));
+      dialog.classList.remove('hidden');
+      dialog.showModal();
     }
 
     function closeViewModal() {
-      document.getElementById('view-modal').classList.add('hidden');
+      const dialog = document.getElementById('view-modal');
+      dialog.close();
+      dialog.classList.add('hidden');
+      document.body.append(document.getElementById('toast'));
       viewingMemoId = null;
     }
 
@@ -677,7 +681,12 @@ import { watchAuth, signIn, signOutUser as worksSignOut, getSessionToken } from 
         if (message) document.querySelector('#login-form p').textContent = message;
       }
     });
-    // Card actions already have their own handler; ignore their bubbling view event.
+    for (const [id, close] of [['memo-modal', closeMemoModal], ['view-modal', closeViewModal]]) {
+      document.getElementById(id).addEventListener('cancel', event => {
+        event.preventDefault();
+        close();
+      });
+    }
     for (const modal of document.querySelectorAll('[id$="modal"]')) {
       modal.setAttribute('role', 'dialog'); modal.setAttribute('aria-modal', 'true');
       modal.addEventListener('keydown', event => {
@@ -693,7 +702,7 @@ import { watchAuth, signIn, signOutUser as worksSignOut, getSessionToken } from 
     };
     // ─── Expose globals ───────────────────────────────────────
     Object.assign(window, {
-      exportDraft, setTab,
+      exportDraft, setTab, showAllMemos,
       openCategoryModal, closeCategoryModal,
       addCategory, startEditCat, cancelEditCat, saveEditCat, deleteCat, moveCat,
       openMemoModal, closeMemoModal, saveMemo,
