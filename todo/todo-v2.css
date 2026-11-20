@@ -599,3 +599,19 @@ body .todo-page .todo-main { background: var(--works-page); color: var(--works-i
   .todo-page #week-picker:not([hidden]) { padding: 0 12px; }
   .todo-page #week-picker .week-days { padding: 4px; }
 }
+
+.student-task-chip, .student-task-choice {
+  display: inline-flex; align-items: center; gap: 4px; max-width: 100%;
+  overflow-wrap: anywhere; padding: 3px 8px; border-radius: 999px;
+  color: var(--works-accent-strong); background: var(--works-accent-soft);
+  font-size: .85rem; text-decoration: none;
+}
+.student-task-chip svg, .student-task-choice svg { flex: none; }
+.student-task-choices { display: flex; flex-wrap: wrap; gap: 6px; }
+.student-task-choices:empty, .student-options:empty { display: none; }
+#capture > #capture-students { order: 5; }
+.student-task-choice button { border: 0; background: transparent; color: inherit; }
+#capture-suggest { max-height: min(30dvh, 260px); overflow-y: auto; }
+#capture-suggest li { gap: 6px; overflow-wrap: anywhere; }
+.student-options { display: grid; max-height: 190px; overflow: auto; }
+.student-options button { min-height: 44px; text-align: start; }

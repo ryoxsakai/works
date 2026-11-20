@@ -18,7 +18,7 @@
     <link rel="stylesheet" href="/shared/header.css?v=8" /><link rel="preconnect" href="https://fonts.googleapis.com" /><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin /><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+2:wght@300;400;500;700;800&display=swap" /><link rel="stylesheet" href="/shared/works-design.css?v=4" />
     <script defer src="/dashboard/vendor/Sortable-1.15.6.min.js"></script>
     <script type="module" src="/shared/header.js?v=7"></script>
-    <link rel="stylesheet" href="/todo/todo-v2.css?v=11" />
+    <link rel="stylesheet" href="/todo/todo-v2.css?v=student-links-1" />
   </head>
   <body>
     <header class="page-header works-header">
@@ -113,9 +113,9 @@
       <div class="dialog-head"><h2 id="capture-heading">タスクを追加</h2><button data-close aria-label="追加を閉じる">×</button></div>
       <form id="capture">
         <p id="capture-added" class="capture-added" role="status" hidden><span id="capture-added-text"></span><button type="button" id="capture-jump">表示 <span aria-hidden="true">›</span></button></p>
-        <label for="quick-title" class="capture-title-label">タスク名</label><input id="quick-title" maxlength="500" required placeholder="タスク名" autocomplete="off" aria-autocomplete="list" aria-controls="capture-suggest" aria-expanded="false">
-        <ul id="capture-suggest" class="capture-suggest" role="listbox" aria-label="プロジェクトの候補" hidden></ul>
-        <div id="capture-source"></div><div id="quick-preview" aria-live="polite"></div>
+        <label for="quick-title" class="capture-title-label">タスク名</label><input id="quick-title" role="combobox" maxlength="500" required placeholder="タスク名" autocomplete="off" aria-autocomplete="list" aria-controls="capture-suggest" aria-expanded="false">
+        <ul id="capture-suggest" class="capture-suggest" role="listbox" aria-label="プロジェクト・生徒・ラベルの候補" hidden></ul>
+        <div id="capture-students" class="student-task-choices"></div><div id="capture-source"></div><div id="quick-preview" aria-live="polite"></div>
         <div class="capture-chips" role="group" aria-label="追加の設定">
           <button type="button" id="capture-more" class="capture-chip capture-chip-icon" aria-expanded="false" aria-controls="capture-extra" aria-label="作業日・メモ・その他を表示">＋</button>
           <button type="button" id="capture-project-chip" class="capture-chip" aria-haspopup="listbox" aria-expanded="false"><span class="capture-chip-mark" aria-hidden="true">#</span><span id="capture-project-label">インボックス</span></button>
@@ -153,6 +153,7 @@
         </div>
         <p class="summary-label">タスク詳細</p>
         <h2 id="summary-name"></h2>
+        <div id="summary-students" class="student-task-choices"></div>
         <button type="button" id="summary-day" class="summary-day">
           <span data-works-icon="bx-calendar-event"></span><span>作業日 <strong></strong></span><span>変更</span>
         </button>
@@ -234,6 +235,9 @@
               </select></label
             >
             <datalist id="known-sections"></datalist>
+            <label>関連する生徒<input id="task-student-search" placeholder="氏名で検索" autocomplete="off"></label>
+            <div id="task-student-options" class="student-options"></div>
+            <div id="task-students" class="student-task-choices"></div>
             <div id="task-labels" class="label-options" aria-label="ラベル"></div>
             <label class="check-label"
               ><input type="checkbox" name="important" /> ★ 大切なタスク</label
@@ -411,6 +415,6 @@
       </form>
     </dialog>
     </div>
-    <script type="module" src="/todo/todo.js?v=12"></script>
+    <script type="module" src="/todo/todo.js?v=student-links-1"></script>
   </body>
 </html>

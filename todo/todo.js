@@ -1,4 +1,4 @@
-import {createPlanner} from "./planner-ui.mjs?v=6";
+import {createPlanner} from "./planner-ui.mjs?v=student-links-1";
 import { startTodoPresentation } from "../shared/ui/todo-presentation.mjs?v=2";
 startTodoPresentation();
 import {
@@ -627,7 +627,7 @@ $("tasks").onclick = async (e) => {
   if (busy) return;
   if (!button) {
     const row = e.target.closest("[data-task]");
-    if (row && !e.target.closest("button,details,.drag-grip")) row.querySelector("[data-action=detail]").click();
+    if (row && !e.target.closest("a,button,details,.drag-grip")) row.querySelector("[data-action=detail]").click();
     return;
   }
   const id = button.closest("[data-task]").dataset.task;

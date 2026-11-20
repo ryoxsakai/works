@@ -22,6 +22,7 @@
   <link rel="stylesheet" href="./record-carousel.css?v=1" />
 <link rel="stylesheet" href="/shared/owner-memo.css?v=1"><link rel="stylesheet" href="/shared/card-loading.css?v=1" />
   <link rel="stylesheet" href="/shared/lesson-ui.css?v=5" />
+  <link rel="stylesheet" href="/tutor/student-todos.css?v=1">
 </head>
 <body class="tutor-bootstrap">
   <header class="page-header works-header">
@@ -118,6 +119,7 @@
       </div>
 
       <div data-page-tab-panel="curriculum" hidden>
+        <section id="linked-student-profile" class="panel student-todos" hidden></section>
         <div class="panel curriculum-panel">
           <div class="panel-header curriculum-heading">
             <div>
@@ -135,6 +137,7 @@
           <nav id="student-groups" class="student-slider" aria-label="教室・授業区分"></nav>
           <div class="student-slider-heading"><span id="student-selector-context"></span><small>名前順 · 横にスライド</small></div>
           <div id="student-selector" class="student-slider" aria-label="生徒・授業の選択" aria-busy="false"></div>
+          <section id="student-related-todos" class="student-todos" hidden></section>
           <input id="curriculum-name" type="hidden" />
           <p id="curriculum-print-header" class="print-only"></p>
 
@@ -464,7 +467,7 @@
     </div>
   </dialog>
 
-  <script type="module" src="./app.js?v=104-u1"></script>
+  <script type="module" src="./app.js?v=student-links-1"></script>
 </body>
 </html>
 

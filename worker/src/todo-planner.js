@@ -110,6 +110,11 @@ function validate(state) {
           a.repeat.days > 3650))
     )
       reject("タスクの日付・分類・繰り返し設定を確認してください");
+    if (a.students !== undefined && (!array(a.students, 100) ||
+        a.students.some(student => !student || !text(student.id, 120) || !text(student.name, 200)) ||
+        new Set(a.students.map(student => student.id)).size !== a.students.length)) {
+      reject("関連する生徒を選び直してください");
+    }
     const source = a.source;
     if (
       source &&
@@ -123,6 +128,16 @@ function validate(state) {
       reject("紐付け元を確認してください");
   }
 }
+export async function validateNewStudentLinks(db, tasks, previousTasks) {
+  const previous = new Map(previousTasks.map(task => [task.id, new Set((task.plan?.students || []).map(s => s.id))]));
+  const ids = [...new Set(tasks.flatMap(task => (task.plan?.students || [])
+    .filter(student => !previous.get(task.id)?.has(student.id)).map(student => student.id)))];
+  for (let start = 0; start < ids.length; start += 80) {
+    const batch = ids.slice(start, start + 80);
+    const result = await db.prepare(`SELECT id FROM lesson_owners WHERE kind='student' AND id IN (${batch.map(() => '?').join(',')})`).bind(...batch).all();
+    if (result.results.length !== batch.length) reject("選択した生徒を確認できません。生徒候補から選び直してください");
+  }
+}
 export function preparePlanner(state, previous, now = Date.now()) {
   const day = dayAt(now);
   state.planner = { ...defaults(), ...(state.planner ?? previous.planner) };
@@ -134,6 +149,7 @@ export function preparePlanner(state, previous, now = Date.now()) {
     if (old?.plan && t.plan === undefined) t.plan = { ...old.plan };
     if (!t.plan) continue;
     const plan = (t.plan = { ...t.plan });
+    if (plan.students === undefined && old?.plan?.students) plan.students = old.plan.students;
     if (plan.parent && oldTasks.has(plan.parent) && !taskIds.has(plan.parent))
       plan.parent = null;
     // A legacy task editor can change the old numeric priority field on its own.

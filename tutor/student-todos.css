@@ -1,0 +1,13 @@
+.student-todos { color: var(--works-ink); overflow-wrap: anywhere; }
+.student-todos[hidden], .curriculum-panel[hidden] { display: none !important; }
+#linked-student-profile { padding: 16px var(--works-gutter); }
+#student-related-todos { margin: 12px 0; padding: 12px 0; border-block: 1px solid var(--works-line); }
+.student-todos h2 { font-size: 1.35rem; }
+.student-todos h3 { margin: 12px 0 6px; font-size: 1rem; }
+.student-todos p { margin: 4px 0; white-space: pre-wrap; }
+.student-todos a { color: var(--works-accent-strong); }
+.student-todos ul { margin: 0; padding: 0; list-style: none; }
+.student-todos li { display: flex; gap: 8px; align-items: baseline; justify-content: space-between; padding: 8px 0; }
+.student-todos small { color: var(--works-ink-3); flex: none; }
+.student-todos details { padding: 8px 0; border-top: 1px solid var(--works-line); }
+@media print { .student-todos { display: none; } }
