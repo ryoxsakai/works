@@ -5,7 +5,7 @@ import {
   getSessionToken,
   signIn,
   signOutUser,
-} from "../shared/auth.js?v=12";
+} from "../shared/auth.js?v=14";
 import { esc, renderMarkdown } from "./markdown.js?v=2";
 import { createFolderBrowser } from "./folders.js?v=5";
 import { compare, closeReview, selectPanel } from "./review.js?v=2";

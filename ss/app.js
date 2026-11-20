@@ -4,7 +4,7 @@ hydrateIcons();
 for (const el of document.querySelectorAll("[data-sort-icon]")) {
   el.innerHTML = icon(el.dataset.sortIcon);
 }
-import { getSessionToken, signOutUser, watchAuth } from "../shared/auth.js?v=11";
+import { getSessionToken, signOutUser, watchAuth } from "../shared/auth.js?v=14";
 
 const STATUS_CLASSES = {
   "原稿待ち": "waiting",

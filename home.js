@@ -1,5 +1,5 @@
 import { setUserAvatar } from "./shared/avatar.mjs?v=1";
-import "./shared/header.js?v=5";
+import "./shared/header.js?v=7";
 import { hydrateIcons } from "./shared/ui/icons.mjs";
 import {
   signIn,
@@ -7,7 +7,7 @@ import {
   watchAuth,
   getSessionToken,
   getGoogleAccessToken,
-} from "./shared/auth.js?v=12";
+} from "./shared/auth.js?v=14";
 import { getTheme, setTheme } from "./shared/theme.js?v=7";
 
 import { createDashboard } from "./dashboard/dashboard.mjs?v=16";

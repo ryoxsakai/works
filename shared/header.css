@@ -285,3 +285,33 @@ html body .works-header .works-header-actions .works-quick-add:active { filter: 
 .print-library { top: calc(var(--works-header-height, 60px) + 1rem); max-height: calc(100vh - var(--works-header-height, 60px) - 2rem); }
 
 .works-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* Account button: photo replaces the outline icon once it has loaded. */
+.works-header .works-account .works-avatar-photo { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; }
+.works-header .works-account.has-photo > :not(.works-avatar-photo) { display: none; }
+/* Workflow's text "ログイン/ログアウト" button reads as the same icon button. */
+.works-header #auth.works-account { width: 44px; font-size: 0 !important; }
+.works-header #auth.works-account:not(.has-photo)::before {
+  content: "";
+  width: 24px;
+  height: 24px;
+  background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.5'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Ccircle cx='12' cy='9' r='3'/%3E%3Cpath d='M5.5 18c1-3 3-4.5 6.5-4.5s5.5 1.5 6.5 4.5'/%3E%3C/svg%3E") center / contain no-repeat;
+          mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.5'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Ccircle cx='12' cy='9' r='3'/%3E%3Cpath d='M5.5 18c1-3 3-4.5 6.5-4.5s5.5 1.5 6.5 4.5'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.works-header #auth.works-account.has-photo::before {
+  content: "";
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--works-avatar) center / cover no-repeat;
+}
+/* One account photo size on every service (pages had their own sizes). */
+html body .works-header :is(#user-avatar, .works-avatar-photo) {
+  flex-shrink: 0;
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 50% !important;
+  object-fit: cover;
+}
+html body .works-header #auth.works-account.has-photo::before { flex: 0 0 32px; min-width: 32px; }

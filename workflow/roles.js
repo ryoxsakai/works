@@ -6,7 +6,7 @@ import {
   signIn,
   signOutUser,
   getSessionToken,
-} from "/shared/auth.js?v=12";
+} from "/shared/auth.js?v=14";
 const $ = (s) => document.querySelector(s),
   dialog = $("#role-editor"),
   form = $("#role-form");
