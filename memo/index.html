@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
@@ -15,36 +15,12 @@
   <script src="/shared/theme-init.js?v=1"></script>
   <link rel="stylesheet" href="/shared/styles.css?v=56">
   <link rel="stylesheet" href="/shared/task-ui.css?v=2">
-  <link rel="stylesheet" href="/memo/memo.css?v=2">
   <link rel="stylesheet" href="/shared/header.css?v=8"><link rel="preconnect" href="https://fonts.googleapis.com" /><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin /><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+2:wght@300;400;500;700;800&display=swap" /><link rel="stylesheet" href="/shared/works-design.css?v=4" />
   <link rel="stylesheet" href="/shared/ui/memo-bootstrap.css?v=1">
   <link rel="stylesheet" href="/shared/ui/memo-tokens.css?v=1">
     <link rel="stylesheet" href="/shared/ui/button-states.css?v=1" />
-  <script type="module" src="/shared/header.js?v=7"></script><style>
-    body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
-
-    .icon-btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      border: none;
-      background: transparent;
-      cursor: pointer;
-      transition: background-color 0.15s;
-    }
-
-    .tab-btn { transition: color 0.15s, border-color 0.15s, background-color 0.15s; }
-
-    .memo-card { transition: box-shadow 0.15s; }
-    .memo-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
-
-    input, select, textarea { font-size: 16px !important; }
-
-    #tab-list::-webkit-scrollbar { display: none; }
-  </style>
+  <link rel="stylesheet" href="/memo/memo.css?v=3">
+  <script type="module" src="/shared/header.js?v=7"></script>
 </head>
 <body class="todo-page memo-page memo-bootstrap min-h-screen">
 
@@ -53,49 +29,35 @@
     <h1><a class="works-home" href="/" aria-label="Works ホーム"><span class="page-header-icon" aria-hidden="true">W</span><span>Works</span></a><span class="works-page-title">メモ</span></h1>
     <div class="works-header-actions"><div id="memo-user-bar" class="user-bar" hidden><button class="user-icon-btn" aria-label="ログアウト" onclick="signOutUser()"><span data-works-icon="bx-user-circle"></span></button></div></div>
   </header>
-  <main class="todo-main w-full mx-auto px-4 py-5">
-
-    <div class="todo-heading"><p class="eyebrow">MEMO</p><h2>メモ一覧</h2></div>
-    <p id="save-status" role="status" aria-live="polite"></p><button id="export-draft" hidden onclick="exportDraft()">未保存JSONを保存</button>
-    <!-- ── メモ一覧 ────────────────────────────────────────── -->
-    <section class="todo-panel flex-1 overflow-hidden flex flex-col min-h-0 bg-white rounded-2xl shadow-sm border border-gray-200">
-
-      <!-- カテゴリタブ + ボタン群 -->
-      <div class="flex-shrink-0 px-4 pt-3 border-b border-gray-200 flex items-end gap-2">
-        <div id="tab-list" class="nav flex gap-0.5 overflow-x-auto flex-1" style="scrollbar-width:none"></div>
-        <div class="flex items-center gap-2 pb-1 flex-shrink-0">
-          <button onclick="openCategoryModal()" title="カテゴリを管理"
-            class="icon-btn w-8 h-8 bg-gray-50 hover:bg-gray-100 text-gray-500 border border-gray-200">
-            <span data-works-icon="memo-settings"></span>
-          </button>
-          <button onclick="openMemoModal(null)" title="新規メモ"
-            class="icon-btn w-8 h-8 bg-slate-700 hover:bg-slate-800 active:bg-slate-900 text-white">
-            <span data-works-icon="memo-new"></span>
-          </button>
-        </div>
-      </div>
-
-      <!-- タグフィルター -->
-      <div id="tag-filter" class="hidden flex-shrink-0 px-4 py-2 border-b border-gray-100 flex gap-1.5 overflow-x-auto" style="scrollbar-width:none;-webkit-overflow-scrolling:touch"></div>
-
-      <!-- スクロールエリア（カードのみ） -->
-      <div class="flex-1 overflow-y-auto min-h-0" style="-webkit-overflow-scrolling:touch">
-        <div id="memo-grid" class="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
-        <div id="empty-state" class="hidden py-16 text-center">
-          <div class="text-4xl mb-3">🗒️</div>
-          <p class="text-gray-400 font-medium">メモがありません</p>
-          <p class="text-gray-300 text-xs mt-1">「新規メモ」ボタンからメモを追加してください</p>
-        </div>
-      </div>
-    </section>
-
+  <main class="memo-main">
+    <div class="memo-heading">
+      <div><p class="eyebrow">MEMO</p><h2>メモ一覧</h2></div>
+      <nav class="memo-menu" aria-label="メモメニュー">
+        <button class="memo-list-action" type="button" onclick="showAllMemos()" aria-label="すべてのメモ" title="すべてのメモ">
+          <span data-works-icon="bx-note"></span>
+        </button>
+        <button type="button" onclick="openCategoryModal()" aria-label="カテゴリ管理" title="カテゴリ管理" aria-haspopup="dialog">
+          <span data-works-icon="memo-settings"></span><span class="menu-label">カテゴリ管理</span>
+        </button>
+        <button class="memo-add-action" type="button" onclick="openMemoModal(null)" aria-label="新規メモ" title="新規メモ" aria-haspopup="dialog">
+          <span data-works-icon="memo-new"></span><span class="menu-label">新規メモ</span>
+        </button>
+      </nav>
+    </div>
+    <p id="save-status" role="status" aria-live="polite"></p>
+    <button id="export-draft" hidden onclick="exportDraft()">未保存JSONを保存</button>
+    <div id="tab-list" class="nav" role="group" aria-label="カテゴリで絞り込み"></div>
+    <div id="tag-filter" class="hidden" role="group" aria-label="タグで絞り込み"></div>
+    <div id="memo-grid"></div>
+    <div id="empty-state" class="hidden">
+      <p>メモがありません</p>
+      <button type="button" onclick="openMemoModal(null)">新規メモを作成</button>
+    </div>
   </main>
 
   <!-- ── メモ作成・編集モーダル ──────────────────────────────── -->
-  <div id="memo-modal"
-    class="fixed inset-0 flex items-center justify-center z-50 hidden"
-    style="background:rgba(0,0,0,0.2);backdrop-filter:blur(4px)">
-    <div class="todo-modal bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 flex flex-col" style="max-height:90vh">
+  <dialog id="memo-modal" class="memo-dialog hidden" aria-labelledby="memo-modal-title">
+    <div class="todo-modal">
 
       <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
         <h3 id="memo-modal-title" class="font-semibold text-gray-700">新規メモ</h3>
@@ -108,14 +70,14 @@
 
         <!-- タイトル -->
         <div>
-          <label class="block text-xs font-medium text-gray-500 mb-1.5">タイトル</label>
+          <label class="block text-xs font-medium text-gray-500 mb-1.5" for="modal-title">タイトル</label>
           <input id="modal-title" type="text" placeholder="メモのタイトル"
             class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent placeholder-gray-300"/>
         </div>
 
         <!-- カテゴリ -->
         <div>
-          <label class="block text-xs font-medium text-gray-500 mb-1.5">カテゴリ</label>
+          <label class="block text-xs font-medium text-gray-500 mb-1.5" for="modal-category">カテゴリ</label>
           <div class="flex gap-2">
             <select id="modal-category"
               class="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent">
@@ -129,7 +91,7 @@
 
         <!-- タグ -->
         <div>
-          <label class="block text-xs font-medium text-gray-500 mb-1.5">タグ</label>
+          <label class="block text-xs font-medium text-gray-500 mb-1.5" for="modal-tag-input">タグ</label>
           <div id="modal-tags-list" class="flex flex-wrap gap-1.5 mb-2"></div>
           <input id="modal-tag-input" type="text" placeholder="タグを入力してEnterで追加"
             class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent placeholder-gray-300"
@@ -174,7 +136,7 @@
         </button>
       </div>
     </div>
-  </div>
+  </dialog>
 
   <!-- ── カテゴリ管理モーダル ──────────────────────────────────── -->
   <dialog id="category-modal" class="category-dialog" aria-labelledby="category-title" aria-describedby="category-help">
@@ -221,10 +183,8 @@
   </div>
 
   <!-- ── メモ表示モーダル ─────────────────────────────────────────────── -->
-  <div id="view-modal"
-    class="fixed inset-0 flex items-center justify-center z-50 hidden"
-    style="background:rgba(0,0,0,0.2);backdrop-filter:blur(4px)">
-    <div class="todo-modal bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 flex flex-col" style="max-height:85vh">
+  <dialog id="view-modal" class="memo-dialog hidden" aria-labelledby="view-title">
+    <div class="todo-modal">
 
       <div class="flex items-start justify-between px-6 py-4 border-b border-gray-100">
         <div class="flex-1 pr-4">
@@ -261,13 +221,13 @@
         </div>
       </div>
     </div>
-  </div>
+  </dialog>
 
   <!-- ── トースト通知 ──────────────────────────────────────────── -->
   <div id="toast"
     class="fixed left-1/2 z-50 pointer-events-none bg-gray-800 text-white text-sm px-4 py-2.5 rounded-xl shadow-lg whitespace-nowrap max-w-xs truncate"
     style="top:1rem;transform:translateX(-50%) translateY(-120%);transition:transform 0.3s ease,opacity 0.3s ease;opacity:0"></div>
 
-  <script type="module" src="/memo/app.js?v=3-u1"></script>
+  <script type="module" src="/memo/app.js?v=4"></script>
 </body>
 </html>

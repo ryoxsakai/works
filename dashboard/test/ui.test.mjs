@@ -66,7 +66,7 @@ test('Memo CSS is scoped and utility-hidden/private overlays keep their original
  assert.ok(source.includes("el.closest('#view-body-container,#modal-tags-list')"));
  assert.ok(!/fetch\(|localStorage|showModal\(|\.value\s*=|\.disabled\s*=/.test(source));
  assert.match(await load('shared/ui/memo-tokens.css'),/\.hidden.*display: none !important/);
- assert.match(await load('memo/index.html'),/Segoe UI/);
+ assert.match(await load('memo/index.html'),/shared\/works-design\.css/);
 });
 
 test('Admission CSS and projector leave calendar, filters, native dialog and printing in the original owner',async()=>{

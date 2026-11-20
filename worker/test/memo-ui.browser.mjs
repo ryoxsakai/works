@@ -34,8 +34,6 @@ try {
  await page.evaluate(async()=>{const {startMemoPresentation}=await import('/shared/ui/memo-presentation.mjs');startMemoPresentation().stop();startMemoPresentation();startMemoPresentation();});
  assert.equal(state.revision,revisionBefore,'presentation lifecycle never saves');
  await page.evaluate(()=>openMemoModal(null));
- // The original modal focuses its title after 50ms. Wait for that transition
- // before typing so its delayed focus cannot redirect a fast fill into the title.
  await page.waitForFunction(()=>document.activeElement?.id==='modal-title');
  await page.locator('#modal-title').fill('複数本文');
  await page.locator('#modal-body-0').fill('first https://example.test');
@@ -53,7 +51,7 @@ try {
  assert.deepEqual(state.memos[0].bodies,['second','first https://example.test']); assert.deepEqual(state.memos[0].notes,['補足']);
  await page.reload(); await page.waitForFunction(()=>document.querySelectorAll('.memo-card').length===1);
  await page.evaluate(()=>setTagFilter("tag'quoted")); assert.equal(await page.locator('.memo-card').count(),1);
- await page.evaluate(()=>openMemoView(document.querySelector('.memo-card').getAttribute('onclick').match(/openMemoView\("([^"]+)/)[1]));
+ await page.getByRole('button',{name:'複数本文',exact:true}).click();
  assert.equal(await page.locator('#view-body-container a').getAttribute('href'),'https://example.test');
  await page.evaluate(()=>viewEditMemo()); await page.waitForFunction(()=>document.activeElement?.id==='modal-title'); await page.evaluate(()=>removeModalTag(0)); await page.evaluate(()=>saveMemo());
  await page.waitForFunction(()=>document.querySelector('#save-status').textContent==='保存済み'); assert.equal(await page.locator('.memo-card').count(),1);
@@ -67,7 +65,16 @@ try {
    assert.equal(await page.evaluate(()=>document.documentElement.dataset.theme),'light');
    assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
    await page.screenshot({path:`test-artifacts/memo/${width}-${theme}.png`,fullPage:true});
-   await page.evaluate(()=>openMemoModal(null));
+   const menu=page.getByRole('navigation',{name:'メモメニュー'});
+   const all=menu.getByRole('button',{name:'すべてのメモ'});
+   assert.equal(await all.isVisible(),width<=730);
+   if(width<=730) {
+    await page.locator('#tab-list').getByRole('button',{name:'仕事'}).click();
+    await all.click();
+    assert.equal(await all.getAttribute('aria-current'),'page');
+    assert.equal(await menu.evaluate(el=>getComputedStyle(el).position),'fixed');
+   }
+   await menu.getByRole('button',{name:'新規メモ'}).click();
    await page.waitForFunction(()=>document.activeElement?.id==='modal-title');
    await page.locator('#modal-title').fill('未保存の入力');
    await page.locator('#modal-body-0').fill('日本語変換中\n本文');
@@ -84,5 +91,5 @@ try {
  }
  conflict=true; await page.evaluate(()=>openMemoModal(null)); await page.waitForFunction(()=>document.activeElement?.id==='modal-title'); await page.locator('#modal-title').fill('未保存'); await page.evaluate(()=>saveMemo());
  await page.locator('#export-draft').waitFor({state:'visible'}); assert.equal(state.memos.length,1); assert.equal(await page.locator('.memo-card').count(),2);
- assert.deepEqual(errors,[]); console.log('Memo browser: CRUD persistence, bodies, notes, quoted tags, tag cleanup, reserved category, 15 theme/width scenarios, conflict recovery PASS');
+ assert.deepEqual(errors,[]); console.log('Memo browser: CRUD persistence, bodies, notes, quoted tags, tag cleanup, reserved category, 5 responsive layouts and memo menus, conflict recovery PASS');
 } finally { await browser.close(); }
