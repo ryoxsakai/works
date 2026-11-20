@@ -239,7 +239,10 @@ body.admission-bootstrap .admission-filter-tabs button {
   color: var(--works-ink-2);
   font-size: .86rem;
   font-weight: 600;
+  line-height: 1.25;
+  white-space: normal;
 }
+.admission-filter-tab-label { min-inline-size: 0; overflow-wrap: anywhere; }
 body.admission-bootstrap .admission-filter-tabs button[aria-selected="true"] {
   background: var(--works-surface);
   color: var(--works-ink);
@@ -345,6 +348,9 @@ body.admission-bootstrap .admission-filter-actions button[type="submit"]:hover {
 @media (max-width: 640px) {
   body.admission-bootstrap > main.admission-main { padding: 16px 12px calc(96px + env(safe-area-inset-bottom)); }
   body.admission-bootstrap .admission-heading h2 { font-size: 18px; }
+  body.admission-bootstrap .admission-filter-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) minmax(0, 1.45fr);
+  }
   body.admission-bootstrap .admission-view-tabs {
     position: fixed;
     top: auto;

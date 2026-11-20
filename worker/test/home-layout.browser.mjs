@@ -53,6 +53,7 @@ try {
     : route.fulfill({ status: 404, body: '' });
   });
   await page.goto(base + '/');
+  assert.deepEqual(errors, [], 'Home failed during boot');
   const widgets = page.locator('.dashboard-widget');
   await expect(widgets).toHaveCount(3);
   await expect(widgets.first()).toHaveAttribute('data-id', 'lessons');
@@ -67,6 +68,7 @@ try {
   await open.focus();
   await page.keyboard.press('Enter');
   await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole('button', { name: '表示を更新' }).locator('svg[aria-hidden=true]')).toBeVisible();
   const layout = await dialog.evaluate(el => {
    const r = el.getBoundingClientRect(), close = el.querySelector('.modal-close').getBoundingClientRect();
    return { modal: el.matches(':modal'), contained: r.left >= 0 && r.right <= innerWidth + 1 && r.top >= 0 && r.bottom <= innerHeight + 1,

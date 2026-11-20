@@ -43,11 +43,11 @@ try {
    return {withinViewport:box.top>=0&&box.bottom<=innerHeight+1&&box.left>=0&&box.right<=innerWidth+1,
     applyVisible:apply.height>=44&&apply.bottom<=box.bottom+1,
     scrollablePanel:getComputedStyle(panel).overflowY==='auto',
-    tabsFit:tabs.every(tab=>tab.scrollWidth<=tab.clientWidth+1),
+    overflowingTabs:tabs.filter(tab=>tab.scrollWidth>tab.clientWidth+1).map(tab=>({label:tab.textContent.trim(),scrollWidth:tab.scrollWidth,clientWidth:tab.clientWidth})),
     lightCard:getComputedStyle(el).backgroundColor==='rgb(255, 255, 255)',
     radius:getComputedStyle(el).borderRadius};
   });
-  assert.deepEqual(layout,{withinViewport:true,applyVisible:true,scrollablePanel:true,tabsFit:true,lightCard:true,radius:'8px'});
+  assert.deepEqual(layout,{withinViewport:true,applyVisible:true,scrollablePanel:true,overflowingTabs:[],lightCard:true,radius:'8px'});
   await expect(page.locator('#admission-filter-university-search')).toHaveAccessibleName('大学名を検索');
   await page.locator('#admission-filter-university-search').fill('北里');
   await page.locator('input[name="filter_university"]').filter({visible:true}).first().check();
