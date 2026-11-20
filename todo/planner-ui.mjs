@@ -1,3 +1,5 @@
+import {studentMark} from '../shared/todo-students.mjs?v=1';
+import {studentPicker} from './student-picker.mjs?v=1';
 import {
   ancestry,
   addDays,
@@ -82,12 +84,51 @@ function createPlanner({
     params.get("name")
   ) {
     source = Object.fromEntries(
-      ["kind", "name", "calendar", "event", "day", "group"].map((k) => [
+      ["kind", "name", "calendar", "event", "day", "group","owner"].map((k) => [
         k,
         params.get(k) || "",
       ]),
     );
   }
+  let studentMode = '', sourceRequest = 0, sourcePending = false, sourceError = '';
+  const chosenLabels = new Set();
+  const picker = studentPicker(esc, refreshStudents);
+  function refreshStudents() {
+    if (studentMode === 'capture') {
+      picker.chips($('capture-students'), false);
+      for (const name of chosenLabels) {
+        const chip = document.createElement('button');
+        chip.className = 'capture-chip'; chip.type = 'button';
+        chip.textContent = '@' + name + ' ×'; chip.setAttribute('aria-label',name + 'のラベルを解除');
+        chip.onclick = () => { chosenLabels.delete(name); refreshStudents(); preview(); };
+        $('capture-students').append(chip);
+      }
+      renderSuggest();
+    } else if (studentMode === 'detail') {
+      picker.chips($('task-students'), true);
+      renderDetailOptions();
+    }
+  }
+  function renderDetailOptions() {
+    const host = $('task-student-options'), query = value('task-student-search').trim();
+    host.replaceChildren();
+    if (!query) return;
+    const matches = picker.matches(query).slice(0, 20);
+    for (const student of matches) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = [student.name, picker.hint(student)].filter(Boolean).join('　');
+      button.onclick = () => {
+        picker.select(student);
+        $('task-student-search').value = '';
+        refreshStudents();
+      };
+      host.append(button);
+    }
+    if (!matches.length) host.textContent = picker.failed() ? '生徒候補を取得できません。再入力で再試行します。' :
+      picker.ready() ? '該当する生徒はいません' : '生徒を読み込み中…';
+  }
+  $('task-student-search').addEventListener('input', () => { picker.load(); renderDetailOptions(); });
   function setView(id) {
     view = id;
     setBrowse(false);
@@ -106,6 +147,7 @@ function createPlanner({
         ? `<span class="meta-project">${dot(project.color)}${esc(projectPath(p().projects, a.project))}</span>`
         : "") +
       (a.section ? `<span>${esc(a.section)}</span>` : "") +
+      (a.students || []).map(picker.link).join('') +
       (a.labels || [])
         .map((id) => p().labels.find((l) => l.id === id))
         .filter(Boolean)
@@ -492,13 +534,19 @@ function createPlanner({
     picker.hidden = false;
     $("capture-project-chip").setAttribute("aria-expanded", "true");
   }
-  // "#" at the caret lists projects; choosing one removes the typed token and sets the project.
-  let suggestIndex = 0;
-  function hashToken() {
-    const input = $("quick-title");
-    const before = input.value.slice(0, input.selectionStart ?? input.value.length);
-    const match = /(^|\s)#([^\s#]*)$/u.exec(before);
-    return match ? { start: before.length - match[2].length - 1, end: before.length, query: match[2] } : null;
+  let suggestIndex = -1;
+  let suggestions = [];
+  function currentToken() {
+    const input = $('quick-title'), caret = input.selectionStart ?? input.value.length;
+    const before = input.value.slice(0, caret);
+    let match = /(?:^|\s)([#＃@＠])([^\s#＃@＠]*)$/u.exec(before);
+    if (!match && picker.ready()) {
+      const fullName = /(?:^|\s)([@＠])([^#＃@＠\s]+(?:[ \u3000]+[^#＃@＠\s]+)+)$/u.exec(before);
+      if (fullName && picker.matches(fullName[2]).length) match = fullName;
+    }
+    if (!match) return null;
+    const rest = /^[^\s#＃@＠]*/u.exec(input.value.slice(caret))[0];
+    return {mark:match[1].normalize('NFKC'), start:caret - match[2].length - 1, end:caret + rest.length, query:match[2] + rest};
   }
   function hideSuggest() {
     $("capture-suggest").hidden = true;
@@ -506,53 +554,91 @@ function createPlanner({
     $("quick-title").setAttribute("aria-expanded", "false");
     $("quick-title").removeAttribute("aria-activedescendant");
   }
-  function applySuggestion(id) {
-    const token = hashToken();
-    const input = $("quick-title");
-    if (token) {
-      input.value = (input.value.slice(0, token.start) + input.value.slice(token.end)).replace(/\s{2,}/gu, " ").trimStart();
-      input.setSelectionRange(token.start, token.start);
-    }
-    chooseProject(id);
+  function applySuggestion(item) {
+    const token = currentToken(), input = $('quick-title');
+    if (!token || !item) return;
+    if (item.kind === 'project') chooseProject(item.id);
+    else if (item.kind === 'student') picker.select(item.student);
+    else chosenLabels.add(item.name);
+    const prefix = input.value.slice(0, token.start);
+    const suffix = input.value.slice(token.end);
+    input.value = (prefix + suffix.replace(/^\s+/u, '')).trimStart();
+    const caret = Math.min(prefix.trimStart().length, input.value.length);
+    input.setSelectionRange(caret, caret);
     hideSuggest();
-    input.dispatchEvent(new Event("input", { bubbles: true }));
+    refreshStudents();
+    input.dispatchEvent(new Event('input', {bubbles:true}));
     input.focus();
   }
   function renderSuggest() {
-    const token = hashToken();
-    const items = token ? projectChoices(token.query) : [];
-    if (!token || !items.length) return hideSuggest();
-    suggestIndex = Math.min(suggestIndex, items.length - 1);
-    $("capture-suggest").replaceChildren(...items.map((item, i) => {
-      const li = document.createElement("li");
-      li.id = "capture-suggest-" + i;
-      li.setAttribute("role", "option");
-      li.setAttribute("aria-selected", String(i === suggestIndex));
-      li.dataset.projectId = item.id;
-      li.textContent = "# " + item.path;
-      li.onpointerdown = (e) => { e.preventDefault(); applySuggestion(item.id); };
+    const token = currentToken();
+    if (!token || studentMode !== 'capture') return hideSuggest();
+    if (token.mark === '#') {
+      suggestions = projectChoices(token.query).map(i => ({kind:'project', id:i.id, text:'# ' + i.path}));
+      if (suggestions.length && suggestIndex < 0) suggestIndex = 0;
+    } else {
+      const matches = picker.matches(token.query).slice(0, 12);
+      const names = p().labels.map(label => label.name).filter(name => name.includes(token.query)).slice(0, 8);
+      if (token.query && !names.includes(token.query)) names.push(token.query);
+      suggestions = [
+        ...matches.map(student => ({kind:'student', student, text:[student.name, picker.hint(student)].filter(Boolean).join('　')})),
+        ...names.map(name => ({kind:'label',name,text:'ラベル　@' + name})),
+      ];
+      if (suggestIndex < 0 && matches.length === 1 && token.query) suggestIndex = 0;
+    }
+    const host = $('capture-suggest');
+    if (!suggestions.length && token.mark === '#') return hideSuggest();
+    suggestIndex = Math.min(suggestIndex, suggestions.length - 1);
+    host.replaceChildren(...suggestions.map((item,i) => {
+      const li = document.createElement('li');
+      li.id = 'capture-suggest-' + i;
+      li.setAttribute('role','option');
+      li.setAttribute('aria-selected', String(i === suggestIndex));
+      if (item.kind === 'project') li.dataset.projectId = item.id;
+      if (item.kind === 'student') li.innerHTML = studentMark;
+      li.append(item.text);
+      li.onpointerdown = e => e.preventDefault();
+      li.onclick = () => applySuggestion(item);
       return li;
     }));
-    $("capture-suggest").hidden = false;
-    $("quick-title").setAttribute("aria-expanded", "true");
-    $("quick-title").setAttribute("aria-activedescendant", "capture-suggest-" + suggestIndex);
-  }
-  $("quick-title").addEventListener("input", () => { suggestIndex = 0; renderSuggest(); });
-  $("quick-title").addEventListener("keydown", (e) => {
-    if ($("capture-suggest").hidden || e.isComposing || e.keyCode === 229) return;
-    const options = [...$("capture-suggest").children];
-    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-      e.preventDefault();
-      suggestIndex = (suggestIndex + (e.key === "ArrowDown" ? 1 : options.length - 1)) % options.length;
-      renderSuggest();
-    } else if (e.key === "Enter" || e.key === "Tab") {
-      e.preventDefault();
-      applySuggestion(options[suggestIndex].dataset.projectId);
-    } else if (e.key === "Escape") {
-      e.preventDefault();
-      e.stopPropagation();
-      hideSuggest();
+    if (token.mark === '@' && !picker.ready()) {
+      const note = document.createElement('li');
+      note.setAttribute('role','presentation');
+      note.textContent = picker.failed() ? '生徒候補を取得できません。再入力で再試行します。' : '生徒候補を読み込み中…';
+      host.prepend(note);
     }
+    host.hidden = !host.childElementCount;
+    $('quick-title').setAttribute('aria-expanded', String(!host.hidden));
+    if (suggestIndex >= 0) $('quick-title').setAttribute('aria-activedescendant','capture-suggest-' + suggestIndex);
+    else $('quick-title').removeAttribute('aria-activedescendant');
+  }
+  $('quick-title').addEventListener('input', () => {
+    suggestIndex = -1;
+    if (currentToken()?.mark === '@' || parse().labels.length) picker.load();
+    renderSuggest();
+  });
+  $('quick-title').addEventListener('keydown', e => {
+    if ($('capture-suggest').hidden || e.isComposing || e.keyCode === 229) return;
+    const count = suggestions.length;
+    if (count && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+      e.preventDefault();
+      suggestIndex = e.key === 'ArrowDown' ? (suggestIndex + 1) % count : (suggestIndex <= 0 ? count - 1 : suggestIndex - 1);
+      renderSuggest();
+      document.getElementById('capture-suggest-' + suggestIndex)?.scrollIntoView({block:'nearest'});
+    } else if (e.key === 'Enter' || (e.key === 'Tab' && currentToken()?.mark === '#')) {
+      if (suggestIndex >= 0 || currentToken()?.mark === '@' && (!picker.ready() || suggestions.some(i => i.kind === 'student'))) {
+        e.preventDefault(); applySuggestion(suggestions[suggestIndex]);
+      }
+    } else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); hideSuggest(); }
+  });
+  function updateCaretSuggestions() {
+    suggestIndex = -1;
+    if (currentToken()?.mark === '@') picker.load();
+    renderSuggest();
+  }
+  $('quick-title').addEventListener('click',updateCaretSuggestions);
+  $('quick-title').addEventListener('keyup',e => {
+    if (['ArrowLeft','ArrowRight','Home','End'].includes(e.key)) updateCaretSuggestions();
   });
   $("quick-title").addEventListener("blur", () => setTimeout(hideSuggest, 120));
   $("capture-project-chip").onclick = openProjectPicker;
@@ -573,6 +659,23 @@ function createPlanner({
     if (target) setView(target);
   };
   function openCapture(date, parentId = null, replaceDialog = false) {
+    studentMode = 'capture';
+    picker.reset(); chosenLabels.clear(); sourceError = ''; sourcePending = false;
+    const version = ++sourceRequest;
+    picker.chips($('capture-students'), false);
+    if (source && (params.get('candidate') || params.get('owner') || source.kind === 'lesson')) {
+      sourcePending = true;
+      picker.originStudent(source, params.get('owner') || params.get('candidate')).then(student => {
+        if (version !== sourceRequest) return;
+        if (student) picker.select(student);
+        else if (params.get('owner')) throw Error('指定された生徒が見つかりません');
+        refreshStudents();
+      }).catch(() => {
+        if (version !== sourceRequest) return;
+        sourceError = params.get('owner') ? '生徒を確認できません。元の生徒情報から開き直してください。' : '';
+        $('capture-error').textContent = sourceError || 'この授業の生徒を確認できません。必要な場合は @ で選んでください。';
+      }).finally(() => { if (version === sourceRequest) sourcePending = false; });
+    }
     captureParent = parentId;
     explicitCaptureDay = false;
     const projects = p().projects;
@@ -597,6 +700,12 @@ function createPlanner({
   }
   function capture(next, task) {
     const q = parse();
+    if (sourcePending || sourceError) throw Error(sourceError || '紐付け元の生徒を確認しています');
+    if (q.labels.length && !picker.ready() && !picker.failed()) {
+      picker.load();
+      throw Error('生徒候補を確認しています。表示後にもう一度追加してください');
+    }
+    if (q.labels.some(name => picker.matches(name).length)) throw Error('候補から生徒、または同名のラベルを選んでください');
     if (!q.name) throw Error("タスク名を入力してください");
     const data = (next.planner = { ...defaults(), ...next.planner });
     const mk = (name) => ({
@@ -632,7 +741,7 @@ function createPlanner({
     }
     const labels = new Set(view.startsWith("label:") ? [view.slice(6)] : []);
     for (const name of [
-      ...q.labels,
+      ...chosenLabels, ...q.labels,
       ...value("capture-tags").trim().split(/\s+/).filter(Boolean),
     ]) {
       let item = data.labels.find((i) => i.name === name);
@@ -654,10 +763,12 @@ function createPlanner({
       reminder: value("capture-reminder") || null,
       repeat: q.repeat,
       time: q.time,
+      students: picker.students(),
       source: source || null,
     };
   }
   function clearCapture() {
+    ++sourceRequest; studentMode = ''; chosenLabels.clear(); picker.reset();
     source = null;
     captureParent = null;
     $("capture").reset();
@@ -687,6 +798,7 @@ function createPlanner({
     $("capture-added").hidden = false;
     clearTimeout(addedTimer);
     addedTimer = setTimeout(() => { $("capture-added").hidden = true; }, 8000);
+    ++sourceRequest; chosenLabels.clear(); picker.reset(); picker.chips($('capture-students'),false);
     source = null;
     captureParent = null;
     $("capture-memo").value = "";
@@ -754,6 +866,12 @@ function createPlanner({
           )
           .join("")
       : "";
+    studentMode = 'detail';
+    picker.reset(a.students || []);
+    $('summary-students').innerHTML = (a.students || []).map(picker.link).join('');
+    $('task-student-search').value = '';
+    refreshStudents();
+    if (a.students?.length) picker.load();
     const origin = a.source;
     $("origin-link").replaceChildren();
     if (origin) {
@@ -764,7 +882,8 @@ function createPlanner({
         q.set("todo_event", origin.event);
         q.set("todo_calendar", origin.calendar);
       } else {
-        q.set("todo_student", origin.name);
+        if (origin.owner) q.set("todo_owner", origin.owner);
+        else q.set("todo_student", origin.name);
         if (origin.group) q.set("todo_group", origin.group);
       }
       link.href = "/tutor/?" + q;
@@ -798,6 +917,7 @@ function createPlanner({
     let priority = Number(value("task-priority"));
     t.plan = {
       ...old,
+      students: picker.students(),
       project: value("task-project") || null,
       parent: value("task-parent") || null,
       labels: [...$("task-labels").querySelectorAll(":checked")].map(
@@ -965,7 +1085,8 @@ function createPlanner({
     }
     if (await save(next)) {
       closeDialog($("organizer"));
-      setView("today");
+      if (s().tasks.some(t => t.plan?.students?.length)) picker.load().then(render);
+    setView("today");
     }
   };
   $("edit-view").onclick = () => {
@@ -1134,6 +1255,7 @@ function createPlanner({
     }
   };
   function initial() {
+    if (s().tasks.some(t => t.plan?.students?.length)) picker.load().then(render);
     setView("today");
     preview();
     const task = new URLSearchParams(location.search).get("task");

@@ -151,3 +151,17 @@ test('explicitly excluded bound and unbound occurrences are skipped before earli
  await env.DB.prepare("INSERT INTO lesson_history_exclusions VALUES('a',?,'excluded')").bind(events[2].id).run();result=await readNextLessonPlan(env,'a',events[0].id,deps);assert.equal(result.target,null);assert.equal(result.reason,'none');
 });
 
+
+test('ToDo mentions use individual IDs, retain renamed students and reject class links', async t => {
+ const {env,owner,makeOwner} = await setup(t);
+ const other = await makeOwner(owner.name), group = await makeOwner(owner.name,'class');
+ await renameLessonOwner(env,owner.id,{revision:owner.revision,name:'改名後',request_id:request()});
+ const {studentLinkDirectory} = await import('../src/lesson-owner-history.js');
+ const {validateNewStudentLinks} = await import('../src/todo-planner.js');
+ const rows = await studentLinkDirectory(env);
+ assert.deepEqual(new Set(rows.map(s=>s.id)),new Set([owner.id,other.id]));
+ assert.ok(rows.find(s=>s.id===owner.id).aliases.includes(owner.name));
+ const task = id => ({id:'task',plan:{students:[{id,name:'同姓'}]}});
+ await validateNewStudentLinks(env.DB,[task(owner.id)],[]);
+ await assert.rejects(validateNewStudentLinks(env.DB,[task(group.id)],[]),/生徒/);
+});

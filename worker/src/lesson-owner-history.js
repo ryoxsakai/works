@@ -60,6 +60,19 @@ async function transaction(env,body,action,build){
  return response;
 }
 export async function listLessonOwners(env){await policy(env);return (await rows(env,`SELECT o.*,COUNT(r.id) AS record_count FROM lesson_owners o LEFT JOIN lesson_history_records r ON r.owner_id=o.id GROUP BY o.id`)).sort((a,b)=>a.name.localeCompare(b.name,'ja',{numeric:true})||a.id.localeCompare(b.id));}
+// Only identity and classroom hints go to the task picker, never lesson contents.
+export async function studentLinkDirectory(env) {
+ const owners = await rows(env, "SELECT id, name, kind FROM lesson_owners WHERE kind='student' ORDER BY name, id");
+ const byId = new Map(owners.map(owner => [owner.id, {...owner, aliases: [], calendars: []}]));
+ const aliases = await rows(env, 'SELECT owner_id, name FROM lesson_owner_aliases');
+ for (const alias of aliases) byId.get(alias.owner_id)?.aliases.push(alias.name);
+ const rooms = await rows(env, `SELECT r.owner_id, l.calendar_id, MAX(r.lesson_date) AS last_date
+   FROM lesson_event_links l JOIN lesson_history_records r ON r.id=l.record_id
+   JOIN lesson_owners o ON o.id=r.owner_id WHERE o.kind='student'
+   GROUP BY r.owner_id, l.calendar_id ORDER BY last_date DESC`);
+ for (const room of rooms) byId.get(room.owner_id)?.calendars.push({id: room.calendar_id, lastDate: room.last_date});
+ return [...byId.values()];
+}
 export async function listOwnerRecords(env,ownerId){
  await policy(env);if(!await first(env,'SELECT id FROM lesson_owners WHERE id=?',ownerId))throw fail('生徒・クラスがありません',404);
  return rows(env,`SELECT r.*,l.calendar_id,l.event_id,l.target_json,l.revision AS link_revision FROM lesson_history_records r LEFT JOIN lesson_event_links l ON l.record_id=r.id WHERE r.owner_id=? ORDER BY r.lesson_date,r.id`,ownerId);
@@ -339,7 +352,7 @@ export async function handleOwnerHistory(env,request,url,deps){
  const input=()=>readHistoryInput(request);
  if(path==='/status'&&method==='GET')return {mode:env.LESSON_HISTORY_MODE||'off'};
  await policy(env,ownerHistoryActive(env));
- if(path==='/owners'&&method==='GET')return listLessonOwners(env);
+ if(path==='/owners'&&method==='GET')return url.searchParams.get('view')==='student-links' ? studentLinkDirectory(env) : listLessonOwners(env);
  if(path==='/owners'&&method==='POST')return createLessonOwner(env,await input());
  const owner=path.match(/^\/owners\/([^/]+)$/);
  if(owner&&method==='PUT')return renameLessonOwner(env,owner[1],await input());

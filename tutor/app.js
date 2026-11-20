@@ -1,3 +1,4 @@
+import {createStudentTodos} from './student-todos.mjs?v=1';
 import { cardLoading } from "../shared/card-loading.mjs?v=1";
 import {sameNameLessonCount} from '../shared/lesson-counts.mjs?v=1';
 import {unassignedLessonDisplay} from '../shared/unassigned-lesson.mjs?v=1';
@@ -483,6 +484,8 @@ els.themeRadios.forEach((radio) => {
 
 // --- ページ上部のタブ(授業記録 / 授業予定 / カリキュラム) ---
 
+let linkedStudentReady;
+const studentTodos = createStudentTodos(path => apiFetch(path,{},null));
 function setActivePageTab(tab) {
   const target = [...els.pageTabBtns].some((btn) => btn.dataset.pageTab === tab) ? tab : "record";
   els.pageTabBtns.forEach((btn) => btn.setAttribute("aria-selected", String(btn.dataset.pageTab === target)));
@@ -493,7 +496,7 @@ function setActivePageTab(tab) {
   requestAnimationFrame(() => { resizeRecordInputs(); renderStudentMemos(); renderLessonPlans(); });
 }
 
-setActivePageTab(new URLSearchParams(location.search).has("todo_event") ? "record" : localStorage.getItem(ACTIVE_PAGE_TAB_KEY) || "record");
+setActivePageTab(studentTodos.requested ? "curriculum" : new URLSearchParams(location.search).has("todo_event") ? "record" : localStorage.getItem(ACTIVE_PAGE_TAB_KEY) || "record");
 
 els.pageTabBtns.forEach((btn) => {
   btn.addEventListener("click", () => setActivePageTab(btn.dataset.pageTab));
@@ -731,6 +734,9 @@ document.querySelector("#student-todo").onclick=()=>{
   const name=els.curriculumName.value;
   if (!name || navigatingStudent || selectingStudent) {showActionError(new Error("生徒を選択してください"));return;}
   const hash=new URLSearchParams({kind:"student",name,group:studentGroup||""});
+  const student = studentTodos.selected();
+  if (student) { hash.set("owner",student.id); hash.set("name",student.name); }
+  else if (studentTodos.candidate()) hash.set("candidate",studentTodos.candidate());
   window.open("/todo/#"+hash,"_blank","noopener");
 };
 
@@ -858,7 +864,21 @@ async function loadSignedInTutor(){
     try{
       await loadCalendarEvents();
       const params=new URLSearchParams(location.search),calendarId=params.get('student_calendar'),eventId=params.get('student_event');
-      if(params.has("todo_student")) {
+      if (params.has('todo_owner')) {
+        const profile = await linkedStudentReady;
+        if (!profile?.unique || request !== calendarEventsRequest || !new URLSearchParams(location.search).has('todo_owner')) return;
+        const {student,records} = profile;
+        const linked = records.find(row => rawEvents.some(event => event.id === row.event_id &&
+          event._calendarId === row.calendar_id && curriculumSelectionName(event.summary) === student.name));
+        if (!linked) return;
+        const day = tokyoDateKey(new Date(linked.lesson_date));
+        const term = terms.find(t => selectedTermIds.has(t.id) && day >= t.start_date && day <= t.end_date);
+        if (!term || !selectedCalendarIds.has(linked.calendar_id)) return;
+        await goToCurriculum(student.name,term,linked.calendar_id,true);
+        const rows = [...els.curriculumTbody.rows];
+        if (els.curriculumName.value === student.name && rows.length &&
+            rows.every(row => row.dataset.recordOwner === student.id)) studentTodos.useRegular(student.id);
+      } else if(params.has("todo_student")) {
         const choice=studentChoices.find(i=>i.name===params.get("todo_student") && (!params.get("todo_group") || i.group===params.get("todo_group")));
         if(choice){studentGroup=choice.group;await goToCurriculum(choice.name,null,choice.calendarIds?.[0]);}
         else showActionError(new Error("紐付け元の生徒が現在の表示期間・教室に見つかりません"));
@@ -895,6 +915,7 @@ watchAuth({
     els.signOutBtn.title = `${user.email} (クリックでログアウト)`;
     setUserAvatar(els.userAvatar, els.userAvatarFallback, user.picture);
     els.actionError.textContent = "";
+    if (studentTodos.requested) linkedStudentReady = studentTodos.openFixed();
     await loadSignedInTutor();
   },
   onSignedOut: () => {
@@ -2388,6 +2409,7 @@ function isStudentSelectionEvent(event) {
 }
 
 function clearStudentDetails() {
+  studentTodos.reset();
   studentGeneration++;
   invalidateStudentPref();
   document.querySelectorAll("[data-page-tab-panel=curriculum] .collapsible-section").forEach((section) => { section.inert = true; });
@@ -2571,6 +2593,7 @@ async function refreshStudentDetails({ closeSettings = false } = {}) {
 }
 
 els.studentGroups.addEventListener("click", (event) => {
+  studentTodos.leaveFixed();
   const button = event.target.closest("[data-student-group]");
   if (!button) return;
   studentGroup = button.dataset.studentGroup;
@@ -2624,6 +2647,7 @@ async function loadCurriculumEvents(context = captureStudentContext()) {
 async function renderCurriculumTable(events, context = captureStudentContext(), countEvents = events) {
   assertStudentContext(context);
   if (events.length === 0) {
+    studentTodos.reset();
     els.curriculumTbody.innerHTML = `<tr><td colspan="7">該当する予定がありません</td></tr>`;
     return;
   }
@@ -2632,6 +2656,9 @@ async function renderCurriculumTable(events, context = captureStudentContext(), 
   const entries = await readRecordEntries(events,context);
   assertStudentContext(context);
   const entryMap = new Map(entries.map((entry) => [entry.calendar_event_id, entry]));
+  const confirmedStudents = events.map(event => attributedLessonRecord(entryMap.get(event.id), lessonEventRef(event)))
+    .filter(record => record.attribution_status === 'confirmed' && record.owner_id).map(record => record.owner_id);
+  void studentTodos.showRelated(confirmedStudents);
   const retainedCopies = pendingRecoveryCopies();
 
   els.curriculumTbody.innerHTML = events
@@ -3571,7 +3598,8 @@ function applyNameFilter(token) {
 
 // 授業予定・授業記録の生徒名をクリックしたときの遷移先。
 // カリキュラムタブに切り替え、その名前(・分かればその学期)で検索を実行する。
-async function goToCurriculum(name, term, sourceCalendarId) {
+async function goToCurriculum(name, term, sourceCalendarId, keepOwner = false) {
+  if (!keepOwner) studentTodos.leaveFixed();
   // Inspect the original schedule title before annotations can hide an exclusion.
   if (isNonLessonSelectionTitle(name)) return;
   const curriculumTabBtn = [...els.pageTabBtns].find((b) => b.dataset.pageTab === "curriculum");

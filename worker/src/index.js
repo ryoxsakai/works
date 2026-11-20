@@ -5606,8 +5606,9 @@ async function writeTodo(env, state, cloneRequests) {
   state = { ...state, roles: state.roles ?? current.roles };
   if (Number.isInteger(state.revision) && state.revision !== current.revision) throw httpError(409, "変更が競合しました。再読み込みしてください");
   if (state.planner || current.planner || state.tasks?.some(t => t?.plan)) {
-    const {preparePlanner} = await import("./todo-planner.js");
+    const {preparePlanner, validateNewStudentLinks} = await import("./todo-planner.js");
     preparePlanner(state, current);
+    await validateNewStudentLinks(env.DB, state.tasks, current.tasks);
   }
   validateTodo(state);
   if (!Number.isSafeInteger(state.revision) || state.revision < 0)
