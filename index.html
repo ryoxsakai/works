@@ -28,8 +28,10 @@
     <link rel="stylesheet" href="/dashboard/lesson-cards.css?v=1" />
     <link rel="stylesheet" href="/home-refined.css?v=1" />
     <link rel="stylesheet" href="/shared/lesson-ui.css?v=5" />
-    <link rel="stylesheet" href="/home-v2.css?v=3" />
-  <link rel="stylesheet" href="/shared/owner-memo.css?v=1"><link rel="stylesheet" href="/shared/card-loading.css?v=1" /></head>
+    <link rel="stylesheet" href="/home-v2.css?v=4" />
+  <link rel="stylesheet" href="/shared/owner-memo.css?v=1"><link rel="stylesheet" href="/shared/card-loading.css?v=1" />
+    <link rel="stylesheet" href="/shared/works-dialogs.css?v=f172ba7b" />
+  </head>
   <body class="dashboard-home">
     <a class="skip-link" href="#dashboard-main">本文へ</a>
     <header class="page-header works-header">
@@ -74,8 +76,9 @@
           </div>
         </section>
         <p id="dashboard-message" class="alert" role="status" aria-live="polite"></p>
-        <div id="dashboard-editor" class="dashboard-editor" hidden>
-          <p>
+        <div id="dashboard-editor" class="dashboard-editor" role="region" aria-labelledby="dashboard-editor-title" hidden>
+          <h3 id="dashboard-editor-title">ホーム画面の配置</h3>
+          <p class="dashboard-muted">
             このユーザー・ブラウザだけの配置です。非表示にしても元のデータは削除されません。
           </p>
           <div class="dashboard-actions">
@@ -118,8 +121,14 @@
       <div class="modal-tab-panel">
         <div class="home-settings-dashboard">
           <h3>ホーム画面</h3>
-          <button id="dashboard-edit" type="button" class="btn btn-outline">ホーム画面の配置を編集</button>
-          <button id="dashboard-refresh" type="button" class="btn btn-outline">表示を更新</button>
+          <button id="dashboard-edit" type="button" class="btn btn-outline">
+            <span data-works-icon="bx-grid-alt" aria-hidden="true"></span>
+            ホーム画面の配置を編集
+          </button>
+          <button id="dashboard-refresh" type="button" class="btn btn-outline">
+            <span data-works-icon="bx-refresh" aria-hidden="true"></span>
+            表示を更新
+          </button>
         </div>
       </div>
     </dialog>

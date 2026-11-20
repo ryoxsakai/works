@@ -757,3 +757,13 @@ body .todo-page .todo-main { background: var(--works-page); color: var(--works-i
   .todo-page dialog .form-control:not([type="checkbox"]) { font-size: 16px; }
   #capture-sheet .dialog-head { padding-inline: var(--gutter); margin: 0; }
 }
+
+/* Narrow dialogs must not force dates or long select labels beyond the sheet. */
+.todo-page dialog :is(.form-grid > *, .inline > *, label, fieldset) { min-width: 0; }
+.todo-page dialog :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) { max-width: 100%; }
+.todo-page #detail .dialog-actions .danger { margin-inline-end: auto; }
+@media (max-width: 420px) {
+  .todo-page dialog .form-grid { grid-template-columns: minmax(0, 1fr); }
+  .todo-page #detail .dialog-actions { gap: 8px; }
+  .todo-page #detail .dialog-actions button { min-height: 44px; }
+}

@@ -55,12 +55,19 @@ body.admission-bootstrap :is(.admission-print, .admission-filter-open) {
   font-size: .88rem;
   font-weight: 600;
 }
-body.admission-bootstrap .admission-print { padding: 0; }
 body.admission-bootstrap .admission-filter-open { color: var(--works-accent); }
 body.admission-bootstrap :is(.admission-print, .admission-filter-open):hover { background: var(--works-surface); box-shadow: var(--works-shadow); }
-body.admission-bootstrap .admission-filter-count { border-radius: 999px; background: var(--works-accent); color: #fff; }
+body.admission-bootstrap .admission-filter-count { border-radius: 999px; background: var(--works-accent-strong); color: #fff; }
 body.admission-bootstrap .admission-filter-bar { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; padding: 0; border: 0; background: transparent; }
-body.admission-bootstrap .admission-filter-summary { color: var(--works-ink-3); font-size: .85rem; }
+body.admission-bootstrap .admission-filter-summary {
+  flex: 1 1 auto;
+  overflow: visible;
+  color: var(--works-ink-3);
+  font-size: .85rem;
+  line-height: 1.5;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
 body.admission-bootstrap .admission-filter-reset { border: 0; border-radius: var(--works-radius); background: transparent; color: var(--works-ink-3); }
 body.admission-bootstrap .admission-filter-reset:hover { background: var(--works-hover); color: var(--works-ink); }
 
@@ -167,8 +174,172 @@ body.admission-bootstrap .admission-calendar-cell { border-color: var(--works-li
 body.admission-bootstrap .admission-table th { color: var(--works-ink-3); font-size: .78rem; font-weight: 700; letter-spacing: .04em; }
 body.admission-bootstrap .admission-view-note { color: var(--works-ink-3); }
 
-/* Filter dialog: the apply action is the one primary. */
-body.admission-bootstrap .app-modal { border: 0; border-radius: var(--works-radius-lg); box-shadow: var(--works-shadow-lg); }
+/* Native filter dialog: the panel scrolls, Apply stays within reach. */
+body.admission-bootstrap .admission-filter-modal {
+  width: min(520px, calc(100% - 32px)) !important;
+  max-height: calc(100dvh - 32px);
+  border: 0;
+  border-radius: var(--works-radius);
+  background: var(--works-surface);
+  color: var(--works-ink);
+  box-shadow: var(--works-shadow-lg);
+}
+body.admission-bootstrap .admission-filter-modal[open] {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+.admission-filter-modal .modal-header {
+  padding: 10px 12px 10px 20px;
+  border-color: var(--works-line);
+}
+.admission-filter-modal .modal-header h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--works-ink);
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+.admission-filter-modal .modal-header h2 .works-icon { color: var(--works-ink-3); }
+body.admission-bootstrap .admission-filter-modal .modal-close {
+  display: inline-grid;
+  inline-size: 44px;
+  min-inline-size: 44px;
+  min-block-size: 44px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: var(--works-radius);
+  background: transparent;
+  color: var(--works-ink-2);
+  box-shadow: none;
+}
+body.admission-bootstrap .admission-filter-modal .modal-close:hover {
+  background: var(--works-hover);
+  color: var(--works-ink);
+}
+body.admission-bootstrap .admission-filter-tabs {
+  gap: 3px;
+  padding: 3px;
+  margin: 12px 16px 0;
+  border: 0;
+  border-radius: var(--works-radius);
+  background: var(--works-track);
+}
+body.admission-bootstrap .admission-filter-tabs button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 40px;
+  padding: 3px;
+  border: 0;
+  border-radius: var(--works-radius-sm);
+  background: transparent;
+  color: var(--works-ink-2);
+  font-size: .86rem;
+  font-weight: 600;
+}
+body.admission-bootstrap .admission-filter-tabs button[aria-selected="true"] {
+  background: var(--works-surface);
+  color: var(--works-ink);
+  box-shadow: var(--works-shadow-sm);
+}
+.admission-filter-tabs .works-icon { flex: 0 0 auto; width: 16px; height: 16px; }
+body.admission-bootstrap .admission-filter-form {
+  grid-template-rows: minmax(0, 1fr) auto;
+  height: min(26rem, max(0px, 100dvh - 158px));
+  min-height: 0;
+}
+body.admission-bootstrap .admission-filter-panel {
+  min-height: 0;
+  max-height: none;
+  padding: 16px;
+}
+body.admission-bootstrap .admission-filter-modal-search {
+  min-height: 44px;
+  padding: 0 10px;
+  margin-bottom: 12px;
+  border-color: var(--works-input-line);
+  border-radius: var(--works-radius);
+  background: var(--works-surface);
+  color: var(--works-ink-3);
+}
+body.admission-bootstrap .admission-filter-modal-search:focus-within {
+  border-color: var(--works-accent);
+  box-shadow: var(--works-focus);
+}
+body.admission-bootstrap .admission-filter-modal-search input {
+  color: var(--works-ink);
+  font-size: 1rem;
+}
+body.admission-bootstrap .admission-filter-help { color: var(--works-ink-3); font-size: .88rem; }
+body.admission-bootstrap .admission-filter-panel-tools { flex-wrap: wrap; gap: 6px 12px; margin-bottom: 8px; }
+body.admission-bootstrap .admission-filter-panel-tools > div { max-width: 100%; gap: 4px; }
+body.admission-bootstrap .admission-filter-panel-tools button {
+  min-height: 36px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: var(--works-radius-sm);
+  background: var(--works-surface);
+  color: var(--works-ink-2);
+  font-size: .82rem;
+}
+body.admission-bootstrap .admission-filter-panel-tools button:hover {
+  background: var(--works-hover);
+  color: var(--works-ink);
+}
+body.admission-bootstrap .admission-filter-options { gap: 6px; }
+body.admission-bootstrap .admission-filter-option {
+  min-height: 38px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: var(--works-radius);
+  background: var(--works-surface-sunken);
+  color: var(--works-ink);
+  font-size: .93rem;
+}
+body.admission-bootstrap .admission-filter-option:hover { background: var(--works-hover); }
+body.admission-bootstrap .admission-filter-option:has(input:checked) { background: var(--works-accent-soft); }
+body.admission-bootstrap .admission-filter-option input { width: 16px; height: 16px; flex-basis: 16px; }
+body.admission-bootstrap .admission-filter-option span { overflow-wrap: anywhere; }
+body.admission-bootstrap .admission-filter-actions {
+  padding: 12px 16px;
+  border-color: var(--works-line);
+  background: var(--works-surface);
+}
+body.admission-bootstrap .admission-filter-actions button {
+  min-height: 44px;
+  padding: 6px 14px;
+  border: 0;
+  border-radius: var(--works-radius);
+  background: var(--works-surface);
+  color: var(--works-ink-2);
+  font-size: .9rem;
+  font-weight: 700;
+  box-shadow: var(--works-shadow-sm);
+}
+body.admission-bootstrap .admission-filter-actions button[type="button"]:hover { background: var(--works-hover); }
+body.admission-bootstrap .admission-filter-actions button[type="submit"] {
+  min-width: 96px;
+  border-radius: 999px;
+  background: var(--works-accent-strong);
+  /* Preserve the primary accent while keeping white text legible at every stop. */
+  background-image: linear-gradient(rgb(28 29 33 / .24), rgb(28 29 33 / .24)), var(--works-gradient);
+  color: #fff;
+}
+body.admission-bootstrap .admission-filter-actions button[type="submit"]:hover { background: var(--works-accent-strong); }
+@media (pointer: coarse), (max-width: 640px) {
+  body.admission-bootstrap :is(.admission-print, .admission-filter-open, .admission-filter-reset, .admission-calendar-nav button) {
+    min-height: 44px;
+  }
+  body.admission-bootstrap :is(.admission-filter-reset, .admission-calendar-nav button) { min-width: 44px; }
+  body.admission-bootstrap :is(.admission-filter-tabs button, .admission-filter-panel-tools button, .admission-filter-option) { min-height: 44px; }
+}
+@media (max-height: 380px) {
+  body.admission-bootstrap .admission-filter-modal { max-height: calc(100dvh - 16px); overflow-y: auto; }
+  body.admission-bootstrap .admission-filter-form { height: auto; }
+}
 
 /* Phones: view tabs become the floating icon-only bar used by 授業管理. */
 @media (max-width: 640px) {

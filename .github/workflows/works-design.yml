@@ -1,0 +1,36 @@
+name: Test Works service design
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/works-design.yml'
+      - 'shared/works-dialogs.css'
+      - 'worker/test/works-dialogs.browser.mjs'
+      - 'index.html'
+      - 'home-v2.css'
+      - 'tutor/**'
+      - 'material/**'
+      - 'admission/**'
+      - 'todo/**'
+      - 'memo/**'
+
+permissions:
+  contents: read
+
+jobs:
+  service-design:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: node scripts/prepare-synthetic-test-fixture.mjs
+      - run: npm ci --prefix worker --ignore-scripts
+      - run: node worker/node_modules/playwright/cli.js install --with-deps chromium
+      - name: Check dialog foundation across six services
+        run: node worker/test/works-dialogs.browser.mjs
+      - name: Check ToDo and Memo long dialog layout
+        run: node scripts/test/todo-memo-dialog-layout.mjs
