@@ -354,3 +354,125 @@ body .todo-page .todo-main { background: var(--works-page); color: var(--works-i
   .todo-page #notice:not(:empty) { bottom: calc(84px + env(safe-area-inset-bottom)); }
   #capture-sheet { border-radius: 16px 16px 0 0; }
 }
+
+/* ---------- Quick capture: one line, chips, "#" suggestions, continuous entry ---------- */
+#capture { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: 8px; }
+#capture > * { grid-column: 1 / -1; }
+#capture > .capture-added { order: 1; }
+#capture > .capture-title-label { order: 2; }
+#capture > #quick-title { order: 3; }
+#capture > #capture-suggest { order: 4; }
+#capture > #capture-source { order: 5; }
+#capture > #quick-preview { order: 6; }
+#capture > .capture-chips { order: 7; grid-column: 1; }
+#capture > #capture-submit { order: 8; grid-column: 2; position: static; width: auto; margin: 0; padding: 0 18px; }
+#capture > #capture-picker { order: 9; }
+#capture > .capture-extra { order: 10; }
+#capture > #capture-error { order: 11; }
+#capture .capture-title-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+#capture #quick-title { margin: 4px 0 0; border-color: transparent; padding-inline: 4px; background: transparent; box-shadow: none; }
+#capture #quick-title:focus { border-color: transparent; box-shadow: none; }
+#capture #quick-preview:empty, #capture #capture-source:empty { display: none; }
+
+/* Added notice inside the sheet (the page toast is behind the modal). */
+.capture-added {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  padding: 8px 8px 8px 12px;
+  border-radius: var(--works-radius);
+  background: var(--works-ink);
+  color: #fff;
+  font-size: .85rem;
+  font-weight: 600;
+}
+.capture-added[hidden] { display: none; }
+.capture-added span { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+#capture-sheet .capture-added button {
+  flex: 0 0 auto;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 999px;
+  background: rgb(255 255 255 / .16);
+  color: #fff;
+  font-weight: 700;
+}
+#capture-sheet .capture-added button:hover { background: rgb(255 255 255 / .26); }
+
+/* Chips row */
+.capture-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 10px 0; }
+#capture-sheet .capture-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--works-track);
+  box-shadow: none;
+  color: var(--works-ink-2);
+  font-size: .85rem;
+  font-weight: 600;
+}
+#capture-sheet .capture-chip:hover { background: var(--works-line-strong); color: var(--works-ink); }
+#capture-sheet .capture-chip.is-set { background: var(--works-accent-soft); color: var(--works-accent-strong); }
+.capture-chip-mark { opacity: .7; }
+#capture-sheet .capture-chip-icon { width: 32px; padding: 0; justify-content: center; font-size: 1.1rem; }
+#capture-sheet .capture-chip[aria-expanded="true"] { box-shadow: 0 0 0 2px var(--works-accent-line); }
+
+/* Pickers (project / date) */
+.capture-picker {
+  margin: 0 0 8px;
+  padding: 6px;
+  border-radius: var(--works-radius);
+  background: var(--works-surface);
+  box-shadow: var(--works-shadow-lg);
+}
+.capture-picker[hidden] { display: none; }
+.capture-pick-list { display: grid; gap: 2px; max-height: 240px; overflow-y: auto; }
+#capture-sheet .capture-pick {
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--works-radius-sm);
+  background: transparent;
+  color: var(--works-ink);
+  font-size: .92rem;
+  justify-content: flex-start;
+  text-align: left;
+}
+#capture-sheet .capture-pick:hover { background: var(--works-hover); }
+#capture-sheet .capture-pick[aria-pressed="true"] { background: var(--works-accent-soft); color: var(--works-accent-strong); font-weight: 700; }
+.capture-pick-date { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 4px; padding: 6px 10px 2px; border-top: 1px solid var(--works-line); color: var(--works-ink-3); font-size: .85rem; }
+.capture-pick-date input { max-width: 60%; }
+
+/* "#" suggestions under the title */
+.capture-suggest {
+  margin: 4px 0 0;
+  padding: 4px;
+  list-style: none;
+  border-radius: var(--works-radius);
+  background: var(--works-surface);
+  box-shadow: var(--works-shadow-lg);
+}
+.capture-suggest[hidden] { display: none; }
+.capture-suggest li { display: flex; align-items: center; min-height: 40px; padding: 0 10px; border-radius: var(--works-radius-sm); color: var(--works-ink); cursor: pointer; }
+.capture-suggest li[aria-selected="true"], .capture-suggest li:hover { background: var(--works-accent-soft); color: var(--works-accent-strong); }
+
+/* PC shows the extra fields; phones keep the sheet to one line until "＋". */
+#capture-sheet #capture-more { display: none; }
+/* The date chip replaces the day field and its 今日/明日 shortcuts (kept in the DOM for the form). */
+#capture-sheet .capture-extra > .sheet-field:first-child,
+#capture-sheet .capture-extra > .date-shortcuts { display: none; }
+@media (max-width: 730px) {
+  #capture-sheet #capture-more { display: inline-flex; }
+  .capture-extra:not(.is-open) { display: none; }
+  #capture-sheet .dialog-head { min-height: 0; padding-block: 4px; border: 0; }
+  #capture-sheet .dialog-head h2 { font-size: 16px; color: var(--works-ink-3); }
+  #capture > #capture-submit { min-width: 44px; padding: 0 14px; }
+}

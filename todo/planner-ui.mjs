@@ -384,11 +384,10 @@ function createPlanner({
   let explicitCaptureDay = false;
   function preview() {
     const q = parse();
+    refreshChips(q);
+    // Day, time and project now show on the chips; keep the rest as a hint line.
     $("quick-preview").textContent = [
-      explicitCaptureDay ? value("capture-day") : q.day,
-      q.time,
       q.repeat && `↻ ${q.repeat.days}日`,
-      q.project && "#" + q.project,
       ...q.labels.map((n) => "@" + n),
       q.priority && "P" + q.priority,
     ]
@@ -401,6 +400,174 @@ function createPlanner({
           (s().tasks.find((t) => t.id === captureParent)?.name || "")
         : "";
   }
+  // ---- Quick capture: chips, "#" project suggestions, continuous entry ----
+  const weekday = (day) => "日月火水木金土"[new Date(day + "T00:00:00Z").getUTCDay()];
+  function dayText(day) {
+    if (!day) return "日付なし";
+    if (day === today()) return "今日";
+    if (day === addDays(today(), 1)) return "明日";
+    const [, m, d] = day.split("-");
+    return `${Number(m)}/${Number(d)}(${weekday(day)})`;
+  }
+  function refreshChips(q = parse()) {
+    const select = $("capture-project");
+    const chosen = select.selectedOptions[0]?.textContent || "インボックス";
+    $("capture-project-label").textContent = q.project ? q.project.split("/").join(" / ") : chosen;
+    $("capture-project-chip").classList.toggle("is-set", Boolean(q.project || select.value));
+    const day = explicitCaptureDay || !q.day ? value("capture-day") || q.day : q.day;
+    $("capture-day-label").textContent = dayText(day || null) + (q.time ? " " + q.time : "");
+    $("capture-day-chip").classList.toggle("is-set", Boolean(day));
+  }
+  function closePicker() {
+    $("capture-picker").hidden = true;
+    $("capture-picker").replaceChildren();
+    $("capture-project-chip").setAttribute("aria-expanded", "false");
+    $("capture-day-chip").setAttribute("aria-expanded", "false");
+  }
+  function pickerButton(label, onPick, pressed = false) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "capture-pick";
+    b.textContent = label;
+    b.setAttribute("aria-pressed", String(pressed));
+    b.onclick = () => { onPick(); closePicker(); refreshChips(); $("quick-title").focus(); };
+    return b;
+  }
+  function setCaptureDay(day) {
+    $("capture-day").value = day || "";
+    $("capture-day").dispatchEvent(new Event("input", { bubbles: true }));
+  }
+  function openDayPicker() {
+    const picker = $("capture-picker");
+    if (!picker.hidden && $("capture-day-chip").getAttribute("aria-expanded") === "true") return closePicker();
+    closePicker();
+    const current = value("capture-day");
+    const nextMonday = addDays(today(), ((8 - new Date(today() + "T00:00:00Z").getUTCDay()) % 7) || 7);
+    const list = document.createElement("div");
+    list.className = "capture-pick-list";
+    list.append(
+      pickerButton("今日", () => setCaptureDay(today()), current === today()),
+      pickerButton("明日", () => setCaptureDay(addDays(today(), 1)), current === addDays(today(), 1)),
+      pickerButton("来週 " + dayText(nextMonday), () => setCaptureDay(nextMonday), current === nextMonday),
+      pickerButton("日付なし", () => setCaptureDay(""), !current),
+    );
+    const other = document.createElement("label");
+    other.className = "capture-pick-date";
+    other.textContent = "日付を選ぶ";
+    const input = document.createElement("input");
+    input.type = "date";
+    input.value = current;
+    input.onchange = () => { setCaptureDay(input.value); closePicker(); refreshChips(); $("quick-title").focus(); };
+    other.append(input);
+    picker.append(list, other);
+    picker.hidden = false;
+    $("capture-day-chip").setAttribute("aria-expanded", "true");
+  }
+  function projectChoices(query = "") {
+    const needle = query.normalize("NFKC").toLocaleLowerCase("ja");
+    return p().projects
+      .filter((item) => !item.archived)
+      .map((item) => ({ id: item.id, path: projectPath(p().projects, item.id) }))
+      .filter((item) => !needle || item.path.normalize("NFKC").toLocaleLowerCase("ja").includes(needle))
+      .slice(0, 8);
+  }
+  function chooseProject(id) {
+    $("capture-project").value = id || "";
+    refreshChips();
+  }
+  function openProjectPicker() {
+    const picker = $("capture-picker");
+    if (!picker.hidden && $("capture-project-chip").getAttribute("aria-expanded") === "true") return closePicker();
+    closePicker();
+    const list = document.createElement("div");
+    list.className = "capture-pick-list";
+    list.setAttribute("role", "listbox");
+    list.append(pickerButton("インボックス", () => chooseProject(""), !value("capture-project")));
+    for (const item of projectChoices()) list.append(pickerButton("# " + item.path, () => chooseProject(item.id), value("capture-project") === item.id));
+    picker.append(list);
+    picker.hidden = false;
+    $("capture-project-chip").setAttribute("aria-expanded", "true");
+  }
+  // "#" at the caret lists projects; choosing one removes the typed token and sets the project.
+  let suggestIndex = 0;
+  function hashToken() {
+    const input = $("quick-title");
+    const before = input.value.slice(0, input.selectionStart ?? input.value.length);
+    const match = /(^|\s)#([^\s#]*)$/u.exec(before);
+    return match ? { start: before.length - match[2].length - 1, end: before.length, query: match[2] } : null;
+  }
+  function hideSuggest() {
+    $("capture-suggest").hidden = true;
+    $("capture-suggest").replaceChildren();
+    $("quick-title").setAttribute("aria-expanded", "false");
+    $("quick-title").removeAttribute("aria-activedescendant");
+  }
+  function applySuggestion(id) {
+    const token = hashToken();
+    const input = $("quick-title");
+    if (token) {
+      input.value = (input.value.slice(0, token.start) + input.value.slice(token.end)).replace(/\s{2,}/gu, " ").trimStart();
+      input.setSelectionRange(token.start, token.start);
+    }
+    chooseProject(id);
+    hideSuggest();
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.focus();
+  }
+  function renderSuggest() {
+    const token = hashToken();
+    const items = token ? projectChoices(token.query) : [];
+    if (!token || !items.length) return hideSuggest();
+    suggestIndex = Math.min(suggestIndex, items.length - 1);
+    $("capture-suggest").replaceChildren(...items.map((item, i) => {
+      const li = document.createElement("li");
+      li.id = "capture-suggest-" + i;
+      li.setAttribute("role", "option");
+      li.setAttribute("aria-selected", String(i === suggestIndex));
+      li.dataset.projectId = item.id;
+      li.textContent = "# " + item.path;
+      li.onpointerdown = (e) => { e.preventDefault(); applySuggestion(item.id); };
+      return li;
+    }));
+    $("capture-suggest").hidden = false;
+    $("quick-title").setAttribute("aria-expanded", "true");
+    $("quick-title").setAttribute("aria-activedescendant", "capture-suggest-" + suggestIndex);
+  }
+  $("quick-title").addEventListener("input", () => { suggestIndex = 0; renderSuggest(); });
+  $("quick-title").addEventListener("keydown", (e) => {
+    if ($("capture-suggest").hidden || e.isComposing || e.keyCode === 229) return;
+    const options = [...$("capture-suggest").children];
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      suggestIndex = (suggestIndex + (e.key === "ArrowDown" ? 1 : options.length - 1)) % options.length;
+      renderSuggest();
+    } else if (e.key === "Enter" || e.key === "Tab") {
+      e.preventDefault();
+      applySuggestion(options[suggestIndex].dataset.projectId);
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      e.stopPropagation();
+      hideSuggest();
+    }
+  });
+  $("quick-title").addEventListener("blur", () => setTimeout(hideSuggest, 120));
+  $("capture-project-chip").onclick = openProjectPicker;
+  $("capture-day-chip").onclick = openDayPicker;
+  $("capture-project").addEventListener("change", () => refreshChips());
+  $("capture-more").onclick = () => {
+    const open = !$("capture-extra").classList.contains("is-open");
+    $("capture-extra").classList.toggle("is-open", open);
+    $("capture-more").setAttribute("aria-expanded", String(open));
+  };
+  $("capture-sheet").addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !$("capture-picker").hidden) { e.preventDefault(); closePicker(); }
+  });
+  let lastCapturedView = null;
+  $("capture-jump").onclick = () => {
+    const target = lastCapturedView;
+    closeDialog($("capture-sheet"));
+    if (target) setView(target);
+  };
   function openCapture(date, parentId = null, replaceDialog = false) {
     captureParent = parentId;
     explicitCaptureDay = false;
@@ -416,6 +583,9 @@ function createPlanner({
       (view.startsWith("project:") ? view.slice(8) : "");
     $("capture-day").value = date ?? (view === "today" ? today() : "");
     $("capture-error").textContent = "";
+    $("capture-added").hidden = true;
+    closePicker();
+    hideSuggest();
     syncShortcuts($("capture"), $("capture-day"));
     preview();
     openDialog($("capture-sheet"), replaceDialog);
@@ -490,22 +660,40 @@ function createPlanner({
     $("capture-details").open = false;
     preview();
   }
+  // Keep the sheet open for the next task; say where it went and offer a jump there.
+  let addedTimer;
   function captured(task) {
     if (task.plannedDay && task.plannedDay > today())
       selectedDay = task.plannedDay;
-    closeDialog($("capture-sheet"));
-    setView(
-      task.plan?.project
-        ? "project:" + task.plan.project
-        : !task.plannedDay
-          ? task.plan?.parent
-            ? "all"
-            : "inbox"
-          : task.plannedDay <= today()
-            ? "today"
-            : "upcoming",
-    );
+    lastCapturedView = task.plan?.project
+      ? "project:" + task.plan.project
+      : !task.plannedDay
+        ? task.plan?.parent
+          ? "all"
+          : "inbox"
+        : task.plannedDay <= today()
+          ? "today"
+          : "upcoming";
+    const where = task.plan?.project
+      ? projectPath(p().projects, task.plan.project)
+      : task.plannedDay
+        ? dayText(task.plannedDay) + "の予定"
+        : task.plan?.parent ? "サブタスク" : "インボックス";
+    $("capture-added-text").textContent = `「${task.name}」を${where}に追加しました`;
+    $("capture-added").hidden = false;
+    clearTimeout(addedTimer);
+    addedTimer = setTimeout(() => { $("capture-added").hidden = true; }, 8000);
+    source = null;
+    captureParent = null;
+    $("capture-memo").value = "";
+    $("capture-tags").value = "";
+    $("capture-deadline").value = "";
+    $("capture-reminder").value = "";
+    $("quick-title").value = "";
+    $("quick-title").dispatchEvent(new Event("input", { bubbles: true }));
+    render();
     preview();
+    $("quick-title").focus();
   }
   function fillDetail(t) {
     const d = p(),
