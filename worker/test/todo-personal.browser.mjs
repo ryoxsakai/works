@@ -205,6 +205,16 @@ async function openSection(page,selector) {
   if(!await row.evaluate(el=>el.open)) await row.locator('summary').first().click();
 }
 const rowMenu=(page,id)=>openSection(page,'[data-task="'+id+'"] .row-menu');
+// Quick capture stays open for continuous entry; close it before other work.
+async function closeCapture(page){
+  if(await page.locator('#capture-sheet').evaluate(d=>d.open)) await page.keyboard.press('Escape');
+  await expect(page.locator('#capture-sheet')).toBeHidden();
+}
+// Phones keep the sheet to one line; "＋" reveals day, memo and other settings.
+async function showCaptureExtra(page){
+  const more=page.locator('#capture-more');
+  if(await more.isVisible() && await more.getAttribute('aria-expanded')!=='true') await more.click();
+}
 try {
   for (const width of [320, 390, 1440])
     for (const theme of ["light", "dark"]) {
@@ -405,9 +415,13 @@ try {
   }
   assert.equal((await db()).tasks.length, beforeIme);
   await page.locator("#quick-title").fill("タイトルだけ");
+  await showCaptureExtra(page);
   await page.locator("#capture-memo").fill("確認用のメモ");
   await page.locator("#capture-submit").click();
   await expect(page.locator("#notice")).toContainText("インボックス");
+  await expect(page.locator("#capture-added")).toContainText("インボックスに追加しました");
+  await expect(page.locator("#quick-title")).toHaveValue("");
+  await closeCapture(page);
   assert.equal((await db()).tasks.at(-1).memo, "確認用のメモ");
   assert.equal((await db()).tasks.at(-1).plannedDay, null);
   await expect(page.locator("#task-search")).toHaveValue("");
@@ -417,6 +431,7 @@ try {
   await page.locator("#quick-title").fill("明日の保護者面談資料を準備");
   await page.locator("#quick-title").press("Enter");
   await expect(page.locator("#notice")).toContainText("2026-10-28");
+  await closeCapture(page);
   assert.equal((await db()).tasks.at(-1).plannedDay, "2026-10-28");
   assert.equal((await db()).tasks.at(-1).deadline, null);
   const newId = (await db()).tasks.at(-1).id;
@@ -684,6 +699,9 @@ async function verifyPlanner(page,db,origin,nav,rowMenu) {
   await openCapture(page);
   await page.locator("#quick-title").fill("毎週水曜 12:15 配布資料 #代官山/冬期講習 @準備 @印刷 p1");
   await page.locator("#quick-title").press("Enter");
+  await expect(page.locator("#capture-added")).toContainText("代官山 / 冬期講習");
+  await page.locator("#capture-jump").click();
+  await expect(page.locator("#capture-sheet")).toBeHidden();
   await expect(page.locator("#view-title")).toHaveText("代官山 / 冬期講習");
   const first=(await db()).tasks.at(-1);
   assert.equal(first.plan.labels.length,2);
@@ -697,6 +715,7 @@ async function verifyPlanner(page,db,origin,nav,rowMenu) {
   await page.locator("#quick-title").fill("板書案");
   await page.locator("#quick-title").press("Enter");
   await expect(page.locator("#tasks .planner-row")).toHaveCount(2);
+  await closeCapture(page);
   const secondTask=(await db()).tasks.at(-1);
   await rowMenu(page,secondTask.id);
   await page.locator('[data-task="'+secondTask.id+'"] [data-action=up]').click();
@@ -731,6 +750,7 @@ async function verifyPlanner(page,db,origin,nav,rowMenu) {
   await page.locator("#quick-title").fill("面談資料を用意");
   await page.locator("#quick-title").press("Enter");
   await expect(page.locator("#capture-source")).toBeEmpty();
+  await closeCapture(page);
   assert.equal((await db()).tasks.at(-1).plan.source.name,"合成生徒");
   const parent=(await db()).tasks.at(-1);
   await page.locator('[data-task="'+parent.id+'"] [data-action=detail]').click();
@@ -738,6 +758,7 @@ async function verifyPlanner(page,db,origin,nav,rowMenu) {
   await page.locator("#add-child").click();
   await page.locator("#quick-title").fill("合成サブタスク");
   await page.locator("#quick-title").press("Enter");
+  await closeCapture(page);
   await expect(page.locator("#tasks .task-name").filter({hasText:"合成サブタスク"})).toBeVisible();
   assert.equal((await db()).tasks.at(-1).plan.parent,parent.id);
   await nav(page,"upcoming");
@@ -748,13 +769,15 @@ async function verifyPlanner(page,db,origin,nav,rowMenu) {
   await dayButton.click();
   await expect(page.locator("#capture-day")).toHaveValue(planned);
   await page.locator("#quick-title").fill("16:00 教材を確認");
+  await showCaptureExtra(page);
   await page.locator("#capture-details summary").click();
   await page.locator("#capture-project").selectOption(first.plan.project);
   await page.locator("#capture-reminder").fill(planned+"T15:30");
   await page.locator("#capture-deadline").fill("2026-12-11");
   await page.locator("#capture-tags").fill("教材作成 印刷");
   await page.locator("#capture button[type=submit]").click();
-  await expect(page.locator("#capture-sheet")).toBeHidden();
+  await expect(page.locator("#capture-added")).toBeVisible();
+  await closeCapture(page);
   const scheduled = (await db()).tasks.at(-1);
   assert.equal(scheduled.plannedDay,planned);
   assert.equal(scheduled.plan.time,"16:00");
@@ -772,7 +795,8 @@ async function verifyPlanner(page,db,origin,nav,rowMenu) {
   await expect(page.locator("#capture-source")).toContainText("合成読解講座");
   await page.locator("#quick-title").fill("授業後の復習資料");
   await page.locator("#capture button[type=submit]").click();
-  await expect(page.locator("#capture-sheet")).toBeHidden();
+  await expect(page.locator("#capture-added")).toBeVisible();
+  await closeCapture(page);
   const linked = (await db()).tasks.at(-1);
   assert.equal(linked.plan.source.event,"test-event");
   await page.locator('[data-task="'+linked.id+'"] .task-name').click();

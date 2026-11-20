@@ -1,4 +1,4 @@
-import {createPlanner} from "./planner-ui.mjs?v=3";
+import {createPlanner} from "./planner-ui.mjs?v=5";
 import { startTodoPresentation } from "../shared/ui/todo-presentation.mjs?v=2";
 startTodoPresentation();
 import {
