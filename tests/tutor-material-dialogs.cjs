@@ -125,6 +125,8 @@ const folders = [{id:'synthetic-folder',name:'合成フォルダ',parent_id:null
       await checkDialog('#material-preview-modal');
       await page.screenshot({path:path.join(output,`material-preview-${viewport.width}.png`)});
       await page.keyboard.press('Escape');
+      await page.locator('#material-preview-modal').waitFor({state:'hidden'});
+      await page.waitForFunction(()=>document.querySelector('#material-preview-body').childElementCount===0);
       assert.equal(await page.locator('#material-preview-body').textContent(),'','preview close cleanup preserved');
       for(const tab of ['tree','tags','library'])await page.locator(`[data-material-tab="${tab}"]`).click();
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'no horizontal overflow');
