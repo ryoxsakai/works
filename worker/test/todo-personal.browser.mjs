@@ -233,6 +233,21 @@ try {
       );
       await page.goto(origin + "/todo/");
       await expect(page.locator("#app")).toBeVisible();
+      if (width < 731) {
+        await page.locator("#mobile-nav").click();
+        const menu = page.locator("#planner-menu");
+        await expect(menu).toBeVisible();
+        const background = await menu.evaluate(el => {
+          for (let node = el; node; node = node.parentElement) {
+            const color = getComputedStyle(node).backgroundColor;
+            if (color !== "rgba(0, 0, 0, 0)") return color;
+          }
+        });
+        assert.equal(background, "rgb(244, 245, 247)");
+        await expect(menu.locator('nav [aria-current="page"]').first()).toHaveCSS("background-color", "rgb(255, 255, 255)");
+        await expect(menu.locator("#sidebar-search")).toHaveCSS("background-color", "rgb(255, 255, 255)");
+        await page.locator("#mobile-nav").click();
+      }
       await expect(page.locator("#today-label")).toHaveAttribute("title",new RegExp(base));
       const type = await page.evaluate(() => {
         const selectors = ["#today-label","#task-count","#display-button",".planner-row .task-name","#view-title",".works-header h1"];

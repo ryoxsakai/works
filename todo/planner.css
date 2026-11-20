@@ -339,7 +339,6 @@
   }
   #planner-menu.is-open {
     display: block;
-    background: var(--panel);
     padding: 12px;
     border: 1px solid var(--line);
     border-radius: 12px;
@@ -709,7 +708,6 @@
     border: 0;
     border-radius: 0;
     padding: 8px 0 12px;
-    background: var(--panel);
   }
   .browsing .planner-content {
     display: none;
