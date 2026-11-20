@@ -6,7 +6,7 @@ import {
   signIn,
   signOutUser,
   getSessionToken,
-} from "../shared/auth.js";
+} from "../shared/auth.js?v=14";
 const $ = (id) => document.getElementById(id);
 const esc = (value) =>
   String(value ?? "").replace(

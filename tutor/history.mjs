@@ -1,6 +1,6 @@
 import {createOwnerMemoEditors,ownerMemoMarkup} from '../shared/owner-memo.mjs?v=2-autosave';
 import {installSnapshotExport} from './history-snapshot.mjs?v=1';
-import {watchAuth,getSessionToken} from '../shared/auth.js?v=12';
+import {watchAuth,getSessionToken} from '../shared/auth.js?v=14';
 const $=id=>document.getElementById(id),fields={lesson_plan:'授業予定',confirmation_test:'確認テスト',homework:'宿題',lesson_memo:'授業メモ'};
 const pendingKey='works_lesson_history_pending_operation';
 const drafts=new Map();

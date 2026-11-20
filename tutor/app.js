@@ -18,7 +18,7 @@ import {
   signOutUser,
   getGoogleAccessToken,
   getSessionToken,
-} from "../shared/auth.js?v=13";
+} from "../shared/auth.js?v=14";
 import { getTheme, setTheme } from "../shared/theme.js?v=7";
 import { tokyoDateKey, shiftRecordDate, recordDateRange } from "./record-date.js?v=1";
 import { createStudentMemoStore } from "./student-memo.js?v=1";

@@ -3,7 +3,7 @@ import {
   watchAuth,
   signOutUser,
   getSessionToken,
-} from "../shared/auth.js?v=11";
+} from "../shared/auth.js?v=14";
 import {
   parseWeeklyTestDraft,
   createPrintDocumentHtml,

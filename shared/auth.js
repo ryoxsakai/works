@@ -95,7 +95,15 @@ export async function getGoogleAccessToken({signal=AbortSignal.timeout(15000)}={
   return googleTokenPromise;
 }
 
-export async function watchAuth({ onSignedIn, onSignedOut }) {
+// Lets the shared header show the account photo on every service, including
+// pages whose own sign-in handler does not render an avatar.
+function announceUser(user) {
+  window.__worksUser = user;
+  window.dispatchEvent(new CustomEvent("works-user", { detail: user }));
+}
+
+export async function watchAuth({ onSignedIn, onSignedOut: pageSignedOut }) {
+  const onSignedOut = (...args) => { announceUser(null); return pageSignedOut(...args); };
   const params = new URLSearchParams(window.location.search);
   const code = params.get("code");
   const oauthError = params.get("error");
@@ -133,6 +141,7 @@ export async function watchAuth({ onSignedIn, onSignedOut }) {
   try {
     const googleToken = await getGoogleAccessToken();
     const info = await fetchUserInfo(googleToken);
+    announceUser({ picture: info.picture || "" });
     onSignedIn({ email: info.email, picture: info.picture });
   } catch (err) {
     sessionToken = null;

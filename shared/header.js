@@ -122,14 +122,54 @@ if (actions) {
   quick.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && !quickMenu.hidden) { setQuick(false); quickButton.focus(); }
   });
-  const userBar = actions.querySelector(".user-bar");
-  if (userBar) userBar.before(quick);
-  else actions.append(quick);
+  // Same order on every service: settings, account, then quick add on the far right.
+  actions.append(quick);
+  syncAvatar(window.__worksUser);
+  window.addEventListener("works-user", (event) => syncAvatar(event.detail));
   // Keep the logical order: menu, brand, then actions.
   header.prepend(navigation);
 
   runQuickAdd();
   window.addEventListener("hashchange", runQuickAdd);
+}
+
+// Show the account photo on the header's account button on every service.
+// Pages that already render their own avatar (#user-avatar) keep doing so.
+function syncAvatar(user) {
+  const header = document.querySelector(".works-header");
+  const button = header?.querySelector(".user-icon-btn, #auth");
+  if (!button || header.querySelector("#user-avatar")) return;
+  button.classList.add("works-account");
+  // Workflow rewrites this button's text, which would drop a child <img>; paint the photo as a background.
+  if (button.id === "auth") {
+    button.classList.remove("has-photo");
+    button.style.removeProperty("--works-avatar");
+    if (!user?.picture) return;
+    const probe = new Image();
+    probe.onload = () => {
+      button.style.setProperty("--works-avatar", `url("${user.picture.replaceAll('"', "%22")}")`);
+      button.classList.add("has-photo");
+    };
+    probe.src = user.picture;
+    return;
+  }
+  let photo = button.querySelector(".works-avatar-photo");
+  if (!photo) {
+    photo = document.createElement("img");
+    photo.className = "works-avatar-photo";
+    photo.alt = "";
+    photo.hidden = true;
+    photo.onload = () => { photo.hidden = false; button.classList.add("has-photo"); };
+    photo.onerror = () => { photo.hidden = true; button.classList.remove("has-photo"); };
+  }
+  if (!button.contains(photo)) button.append(photo);
+  if (user?.picture) {
+    if (photo.getAttribute("src") !== user.picture) { photo.hidden = true; button.classList.remove("has-photo"); photo.src = user.picture; }
+  } else {
+    photo.hidden = true;
+    photo.removeAttribute("src");
+    button.classList.remove("has-photo");
+  }
 }
 
 // Open the target page's own add form once that page has finished loading.

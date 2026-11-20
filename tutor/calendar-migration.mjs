@@ -1,4 +1,4 @@
-import {watchAuth,getSessionToken} from '../shared/auth.js?v=12';
+import {watchAuth,getSessionToken} from '../shared/auth.js?v=14';
 import {sameLessonEvent,lessonEventRef} from '../shared/lesson-plan.js';
 import {parseCalendarRecord} from '../shared/calendar-lesson-record.mjs';
 const $=id=>document.getElementById(id),records=[];let authenticated=false,busy=false,downloaded=false,scanned=false,baselineReady=false,scanMode='migration';

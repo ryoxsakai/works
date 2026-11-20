@@ -5,7 +5,7 @@ import {
   getSessionToken,
   signIn,
   signOutUser,
-} from "../shared/auth.js?v=12";
+} from "../shared/auth.js?v=14";
 const $ = (id) => document.getElementById(id);
 const state = {
   books: [],
