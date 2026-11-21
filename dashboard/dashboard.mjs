@@ -115,7 +115,7 @@ export function createDashboard({
     if(lessonCards){placeLessonCards(host);return;}
     if(!model?.rows?.length)return;
     host.setAttribute('aria-busy', 'true');
-    cardImport ||= import('./lesson-cards.mjs?v=8-student-link');
+    cardImport ||= import('./lesson-cards.mjs?v=9-periods');
     try {
       // Reuse the loaded factory synchronously: a cached refresh must not paint
       // a preparation skeleton between the old cards and their replacement.

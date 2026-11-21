@@ -22,7 +22,7 @@
 <link rel="stylesheet" href="/shared/owner-memo.css?v=1"><link rel="stylesheet" href="/shared/card-loading.css?v=1" />
   <link rel="stylesheet" href="/shared/lesson-ui.css?v=5" />
   <link rel="stylesheet" href="/tutor/student-todos.css?v=1">
-  <link rel="stylesheet" href="/tutor/dialogs.css?v=c2b03464">
+  <link rel="stylesheet" href="/tutor/dialogs.css?v=period-profiles-1">
     <link rel="stylesheet" href="/shared/works-dialogs.css?v=fb98327c" />
   </head>
 <body class="tutor-bootstrap">
@@ -263,14 +263,15 @@
       <h2 id="settings-modal-title"><i class="bx bx-cog"></i> 設定</h2>
       <button type="button" id="settings-close" class="modal-close" aria-label="閉じる"><i class="bx bx-x"></i></button>
     </div>
-    <div class="modal-tabs" role="tablist">
-      <button type="button" class="tab-btn" data-tab="materials" role="tab" aria-selected="false"><i class="bx bx-book"></i> 教材</button>
-      <button type="button" class="tab-btn" data-tab="calendar" role="tab" aria-selected="true"><i class="bx bx-calendar"></i> カレンダー</button>
-      <button type="button" class="tab-btn" data-tab="terms" role="tab" aria-selected="false"><i class="bx bx-layer"></i> 学期</button>
-      <button type="button" class="tab-btn" data-tab="periods" role="tab" aria-selected="false"><i class="bx bx-time-five"></i> 時限</button>
-      <button type="button" class="tab-btn" data-tab="excluded" role="tab" aria-selected="false"><i class="bx bx-block"></i> 空き枠</button>
+    <div class="modal-tabs" role="tablist" aria-label="授業管理の設定項目">
+      <button type="button" id="settings-tab-calendar" class="tab-btn" data-tab="calendar" role="tab" aria-selected="true" aria-controls="settings-panel-calendar"><i class="bx bx-calendar"></i><span>カレンダー</span></button>
+      <button type="button" id="settings-tab-periods" class="tab-btn" data-tab="periods" role="tab" aria-selected="false" aria-controls="settings-panel-periods" tabindex="-1"><i class="bx bx-time-five"></i><span>時限</span></button>
+      <button type="button" id="settings-tab-terms" class="tab-btn" data-tab="terms" role="tab" aria-selected="false" aria-controls="settings-panel-terms" tabindex="-1"><i class="bx bx-layer"></i><span>学期</span></button>
+      <button type="button" id="settings-tab-excluded" class="tab-btn" data-tab="excluded" role="tab" aria-selected="false" aria-controls="settings-panel-excluded" tabindex="-1"><i class="bx bx-block"></i><span>空き枠</span></button>
+      <button type="button" id="settings-tab-materials" class="tab-btn" data-tab="materials" role="tab" aria-selected="false" aria-controls="settings-panel-materials" tabindex="-1"><i class="bx bx-book"></i><span>教材</span></button>
     </div>
-    <div class="modal-tab-panel" data-tab-panel="materials" hidden>
+    <div id="settings-panel-materials" class="modal-tab-panel" data-tab-panel="materials" role="tabpanel" aria-labelledby="settings-tab-materials" tabindex="0" hidden>
+      <h3 class="tutor-settings-panel-title">教材とカテゴリ</h3>
       <p class="hint">教材カテゴリを作ると、教材を目的や科目ごとに整理できます。教材の詳細アイコンからチャプター(章)を登録してください。</p>
       <section class="material-settings-section" aria-labelledby="material-category-heading">
         <div class="settings-section-heading">
@@ -302,17 +303,19 @@
         </form>
       </section>
     </div>
-    <div class="modal-tab-panel" data-tab-panel="calendar">
+    <div id="settings-panel-calendar" class="modal-tab-panel" data-tab-panel="calendar" role="tabpanel" aria-labelledby="settings-tab-calendar" tabindex="0">
+      <h3 class="tutor-settings-panel-title">表示するカレンダー</h3>
       <p class="hint">授業予定が入っているカレンダーにチェックを入れてください(全デバイス共通の設定です)。色はGoogleカレンダー側の設定がそのまま使われます。</p>
       <div id="calendar-checklist"></div>
-      <section style="margin-top:1rem">
+      <section class="tutor-settings-section">
         <h3>授業記録の名前変更検出</h3>
         <p class="hint">開始日以降の既存授業について、現在の予定名を比較用に観測します。旧記録の生徒の所属が確認済みになることはありません。既に変更された枠は個別確認のまま残します。</p>
         <button type="button" id="initialize-lesson-baselines" class="btn-primary" style="min-height:44px">初回の比較用予定名を準備</button>
         <p id="lesson-baseline-progress" role="status" aria-live="polite"></p>
       </section>
     </div>
-    <div class="modal-tab-panel" data-tab-panel="excluded" hidden>
+    <div id="settings-panel-excluded" class="modal-tab-panel" data-tab-panel="excluded" role="tabpanel" aria-labelledby="settings-tab-excluded" tabindex="0" hidden>
+      <h3 class="tutor-settings-panel-title">表示しない予定</h3>
       <p class="hint">タイトルが完全一致する予定を、授業予定・カリキュラム・授業記録などすべての表示から除外します(空き枠など)。</p>
       <form id="add-excluded-title-form" class="inline-form">
         <input id="new-excluded-title" type="text" placeholder="例: ○" required />
@@ -320,7 +323,8 @@
       </form>
       <ul id="excluded-title-list" class="term-items"></ul>
     </div>
-    <div class="modal-tab-panel" data-tab-panel="terms" hidden>
+    <div id="settings-panel-terms" class="modal-tab-panel" data-tab-panel="terms" role="tabpanel" aria-labelledby="settings-tab-terms" tabindex="0" hidden>
+      <h3 class="tutor-settings-panel-title">年度・学期</h3>
       <p class="hint">年度ごとに学期(期間)を登録します。学期にチェックを入れると、複数またいでも予定を絞り込めます(全デバイス共通)。</p>
       <div id="year-groups"></div>
       <form id="add-year-form" class="term-form">
@@ -328,14 +332,66 @@
         <button type="submit" class="btn-add" aria-label="年度を追加"><i class="bx bx-plus"></i></button>
       </form>
     </div>
-    <div class="modal-tab-panel" data-tab-panel="periods" hidden>
-      <p class="hint">開始時刻を登録すると、次の時限の開始時刻の直前までをその時限とみなし、授業記録などで時刻の代わりに時限名(例: 3限)を表示します。</p>
-      <div id="period-list"></div>
-      <form id="add-period-form" class="inline-form">
-        <input id="new-period-label" type="text" placeholder="例: 1限" required />
-        <input type="time" id="new-period-start" required />
-        <button type="submit" class="btn-add" aria-label="時限を追加"><i class="bx bx-plus"></i></button>
+    <div id="settings-panel-periods" class="modal-tab-panel" data-tab-panel="periods" role="tabpanel" aria-labelledby="settings-tab-periods" tabindex="0" hidden>
+      <h3 class="tutor-settings-panel-title">時限の表示</h3>
+      <p class="hint">教室ごとに呼び方と開始時刻を設定できます。実際の授業時刻とカレンダーの予定は変更されません。</p>
+      <label class="tutor-period-field" for="period-school">設定する教室
+        <select id="period-school" disabled>
+          <option value="common">共通</option>
+          <option value="tomas">TOMAS</option>
+          <option value="daikanyama">代官山</option>
+          <option value="shukutoku_yono">淑徳与野</option>
+        </select>
+      </label>
+
+      <form id="period-profiles-form" class="tutor-period-form">
+        <label class="tutor-period-field" for="period-display-mode">表示方法
+          <select id="period-display-mode" disabled>
+            <option value="legacy">従来どおり</option>
+            <option value="label">時限名</option>
+            <option value="time">時刻</option>
+            <option value="both">時限名と時刻</option>
+          </select>
+        </label>
+        <fieldset id="period-school-fields" hidden>
+          <legend>教室の時限</legend>
+          <section class="tutor-settings-section" aria-labelledby="period-calendar-heading">
+            <h4 id="period-calendar-heading">使うカレンダー</h4>
+            <p class="hint">「カレンダー」で表示対象にしたものを割り当てます。複数選べますが、1つのカレンダーは1教室だけに設定できます。</p>
+            <div id="period-calendar-choices"></div>
+          </section>
+          <section class="tutor-settings-section" aria-labelledby="school-period-heading">
+            <h4 id="school-period-heading">時限名と開始時刻</h4>
+            <p class="hint">S限やA限など自由に入力できます。日本時間の開始時刻が一致しなければ、実際の時刻を表示します。</p>
+            <div id="period-school-entries"></div>
+            <button type="button" id="period-school-add" class="btn btn-outline">時限を追加</button>
+          </section>
+        </fieldset>
+        <p class="hint">表示方法と教室の設定は「設定を保存」で反映されます。</p>
+        <p id="period-profiles-error" role="alert" class="error" hidden></p>
+        <p id="period-profiles-status" role="status" aria-live="polite"></p>
+        <div class="tutor-period-actions">
+          <button type="submit" id="period-profiles-save" class="btn btn-solid theme-primary" disabled>設定を保存</button>
+          <button type="button" id="period-profiles-reset" class="btn btn-outline" disabled>変更を取り消す</button>
+          <button type="button" id="period-profiles-reload" class="btn btn-outline" hidden>最新の設定を読み込む</button>
+        </div>
       </form>
+
+      <section id="period-common-fields" class="tutor-settings-section" aria-labelledby="common-period-heading">
+        <h4 id="common-period-heading">共通の時限</h4>
+        <p class="hint">教室を割り当てていないカレンダーに使います。次の時限の開始直前までを同じ時限として扱います。下の共通時限の追加・編集・削除は、その操作で保存されます。</p>
+        <p id="period-common-error" role="alert" class="error" hidden></p>
+        <div id="period-list"></div>
+        <form id="add-period-form" class="inline-form">
+          <label class="tutor-period-field" for="new-period-label">時限名
+            <input id="new-period-label" type="text" placeholder="例：1限" required />
+          </label>
+          <label class="tutor-period-field" for="new-period-start">開始時刻
+            <input type="time" id="new-period-start" required />
+          </label>
+          <button type="submit" class="btn btn-outline tutor-common-period-add" aria-label="共通の時限を追加">追加</button>
+        </form>
+      </section>
     </div>
   </dialog>
 
@@ -468,7 +524,7 @@
     </div>
   </dialog>
 
-  <script type="module" src="/shared/service-entry.mjs?v=2" data-service-app="/tutor/app.js?v=student-links-1"></script>
+  <script type="module" src="/shared/service-entry.mjs?v=2" data-service-app="/tutor/app.js?v=period-profiles-1"></script>
 </body>
 </html>
 
