@@ -5,7 +5,6 @@ import { readFileSync } from 'node:fs';
 const base = 'https://works-dialogs.test';
 const root = new URL('../../', import.meta.url);
 const pages = [
-  ['/', '#home-settings-modal'],
   ['/tutor/', '#settings-modal'],
   ['/material/', '#new-folder-modal'],
   ['/admission/', '#admission-filter-modal'],
@@ -70,7 +69,7 @@ try {
       }
     }
   }
-  console.log('Works dialog baseline: 6 services × 4 viewports, native open/Escape, overlay and scroll isolation pass');
+  console.log('Works dialog baseline: 5 services × 4 viewports, native open/Escape, overlay and scroll isolation pass');
 } finally {
   await browser.close();
 }

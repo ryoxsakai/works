@@ -25,7 +25,7 @@ const TINTS = {
   todo: ["#eaf1ff", "#3c64d8"], memo: ["#fff7dc", "#a77800"], kdp: ["#fdecf3", "#c43c7a"], ss: ["#eef1f6", "#55607a"],
 };
 const services = [
-  ["/", "home", "ホーム"], ["/tutor/", "tutor", "授業管理"],
+  ["/tutor/", "tutor", "授業管理"],
   ["/material/", "material", "教材管理"], ["/admission/", "admission", "入試管理"],
   ["/workflow/", "workflow", "ワークフロー"], ["/wiki/", "wiki", "Wiki"],
   ["/todo/", "todo", "ToDo"], ["/memo/", "memo", "メモ"],

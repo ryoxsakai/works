@@ -49,9 +49,9 @@ jobs:
       - name: Check ToDo and Memo long dialog layout
         if: ${{ !cancelled() && steps.chromium.outcome == 'success' }}
         run: node scripts/test/todo-memo-dialog-layout.mjs
-      - name: Check Home settings and layout
+      - name: Check last service restore and overdue rescheduling
         if: ${{ !cancelled() && steps.chromium.outcome == 'success' }}
-        run: node worker/test/home-layout.browser.mjs
+        run: node worker/test/restore-agenda.browser.mjs
       - name: Check Admissions filters and layout
         if: ${{ !cancelled() && steps.chromium.outcome == 'success' }}
         run: node worker/test/admission-ui.browser.mjs

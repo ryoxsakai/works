@@ -1,142 +1,31 @@
 <!doctype html>
 <html lang="ja">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <meta
-      http-equiv="Cache-Control"
-      content="no-store, no-cache, must-revalidate, max-age=0"
-    />
-    <meta http-equiv="Pragma" content="no-cache" />
-    <meta http-equiv="Expires" content="0" />
-    <title>Works</title>
-    <script src="/shared/theme-init.js?v=1"></script>
-    <link rel="apple-touch-icon" href="/shared/logo.png" />
-    <link rel="stylesheet" href="/shared/styles.css?v=56" />
-    <link rel="stylesheet" href="/home.css?v=6" />
-    <link rel="stylesheet" href="/shared/header.css?v=navigation-2" /><link rel="preconnect" href="https://fonts.googleapis.com" /><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin /><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+2:wght@300;400;500;700;800&display=swap" /><link rel="stylesheet" href="/shared/works-design.css?v=4" />
-    <link rel="stylesheet" href="/shared/ui/menu-bootstrap.css?v=1" />
-    <link rel="stylesheet" href="/shared/ui/menu-tokens.css?v=1" />
-    <link rel="stylesheet" href="/shared/ui/button-states.css?v=1" />
-    <link rel="stylesheet" href="/shared/ui/tutor-bootstrap.css?v=1" />
-    <link rel="stylesheet" href="/shared/ui/tutor-tokens.css?v=1" />
-    <link rel="stylesheet" href="/tutor/record-layout.css?v=4-aligned" />
-    <link rel="stylesheet" href="/shared/ui/carousel-bootstrap.css?v=1" />
-    <link rel="stylesheet" href="/tutor/record-carousel.css?v=1" />
-    <link rel="stylesheet" href="/dashboard/lesson-cards.css?v=1" />
-    <link rel="stylesheet" href="/home-refined.css?v=1" />
-    <link rel="stylesheet" href="/shared/lesson-ui.css?v=5" />
-    <link rel="stylesheet" href="/home-v2.css?v=5" />
-  <link rel="stylesheet" href="/shared/owner-memo.css?v=1"><link rel="stylesheet" href="/shared/card-loading.css?v=1" />
-    <link rel="stylesheet" href="/shared/works-dialogs.css?v=fb98327c" />
-  </head>
-  <body class="dashboard-home">
-    <a class="skip-link" href="#dashboard-main">本文へ</a>
-    <header class="page-header works-header">
-      <h1>
-        <a class="works-home" href="/" aria-label="Works ホーム"
-          ><span class="page-header-icon" aria-hidden="true">W</span
-          ><span>Works</span></a
-        >
-      </h1>
-      <div class="works-header-actions">
-        <div class="user-bar">
-          <button class="btn btn-outline"
-            id="open-home-settings"
-            type="button"
-            aria-label="設定"
-            title="設定"
-          >
-            <span data-works-icon="bx-cog"></span>
-          </button>
-          <button
-            id="home-auth-action"
-            type="button"
-            class="user-icon-btn btn btn-outline"
-            aria-label="Googleでログイン"
-            title="Googleでログイン"
-          >
-            <img id="user-avatar" alt="" hidden />
-            <span data-works-icon="bx-user-circle" id="user-avatar-fallback"></span>
-          </button>
-        </div>
-      </div>
-    </header>
-
-    <div class="dashboard-shell">
-      <main id="dashboard-main" tabindex="-1">
-        <p id="home-auth-error" class="error home-auth-error alert" role="alert"></p>
-        <p id="dashboard-date" hidden></p>
-        <section class="home-hero" aria-labelledby="home-hero-title">
-          <div>
-            <p class="home-hero-date" id="home-hero-date"></p>
-            <h2 id="home-hero-title">今日の授業と準備</h2>
-          </div>
-        </section>
-        <p id="dashboard-message" class="alert" role="status" aria-live="polite"></p>
-        <div id="dashboard-editor" class="dashboard-editor" role="region" aria-labelledby="dashboard-editor-title" hidden>
-          <h3 id="dashboard-editor-title">ホーム画面の配置</h3>
-          <p class="dashboard-muted">
-            このユーザー・ブラウザだけの配置です。非表示にしても元のデータは削除されません。
-          </p>
-          <div class="dashboard-actions">
-            <button id="dashboard-save" type="button" class="btn btn-solid theme-primary">
-              配置を保存</button
-            ><button class="btn btn-outline" id="dashboard-cancel" type="button">キャンセル</button
-            ><button class="btn btn-outline" id="dashboard-reset" type="button">初期配置に戻す</button>
-          </div>
-          <h3>ウィジェットを追加</h3>
-          <div id="dashboard-catalog" class="dashboard-catalog"></div>
-          <fieldset id="dashboard-shortcuts">
-            <legend>よく使う機能に表示するリンク</legend>
-          </fieldset>
-        </div>
-        <div id="dashboard-widgets" class="dashboard-widgets"></div>
-        <noscript
-          >ダッシュボードの表示にはJavaScriptが必要です。全メニューから従来の画面に移動できます。</noscript
-        >
-      </main>
-    </div>
-
-    <dialog
-      aria-labelledby="home-settings-title"
-      id="home-settings-modal"
-      class="app-modal home-settings-modal"
-    >
-      <div class="modal-header">
-        <h2 id="home-settings-title">
-          <span data-works-icon="bx-cog"></span> 設定
-        </h2>
-        <button
-          type="button"
-          id="home-settings-close"
-          class="modal-close btn btn-outline"
-          aria-label="閉じる"
-        >
-          <span data-works-icon="bx-x"></span>
-        </button>
-      </div>
-      <div class="modal-tab-panel">
-        <div class="home-settings-dashboard">
-          <h3>ホーム画面</h3>
-          <button id="dashboard-edit" type="button" class="btn btn-outline">
-            <span data-works-icon="bx-grid-alt" aria-hidden="true"></span>
-            ホーム画面の配置を編集
-          </button>
-          <button id="dashboard-refresh" type="button" class="btn btn-outline">
-            <svg class="works-icon" width="20" height="20" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
-              <path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2z"/>
-              <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466"/>
-            </svg>
-            表示を更新
-          </button>
-        </div>
-      </div>
-    </dialog>
-
-    <script type="module" src="/shared/service-entry.mjs?v=4" data-service-app="/home.js?v=resident-1"></script>
-  </body>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Works</title>
+  <link rel="apple-touch-icon" href="/shared/logo.png">
+  <style>
+    body { margin:0; background:#f4f5f7; color:#191b22; font:16px system-ui,sans-serif; }
+    main { width:min(320px,85vw); margin:23vh auto; text-align:center; }
+    button { padding:12px 24px; border:0; border-radius:12px; background:#465bdd; color:white; font:inherit; }
+  </style>
+</head>
+<body>
+  <main hidden><h1>Works</h1><button type="button">Googleでログイン</button></main>
+  <script type="module">
+    import { lastService } from '/shared/resume-service.mjs';
+    import { signIn } from '/shared/auth.js?v=14';
+    let session;
+    try { session = localStorage.getItem('works_session_token'); } catch {}
+    if (session) location.replace(lastService());
+    else {
+      document.querySelector('main').hidden = false;
+      document.querySelector('button').onclick = () => {
+        try { localStorage.setItem('works_pending_destination', lastService()); } catch {}
+        signIn('/tutor/');
+      };
+    }
+  </script>
+</body>
 </html>
-

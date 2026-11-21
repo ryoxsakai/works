@@ -8,7 +8,7 @@ const root = fileURLToPath(new URL("../../", import.meta.url));
 const artifacts = fileURLToPath(new URL("../test-artifacts/header-theme/", import.meta.url));
 fs.mkdirSync(artifacts, { recursive: true });
 const base = 'https://works-header.test';
-const paths = ['/', '/tutor/', '/material/', '/admission/', '/wiki/', '/memo/', '/todo/', '/kdp/', '/ss/', '/material-print/'];
+const paths = [ '/tutor/', '/material/', '/admission/', '/wiki/', '/memo/', '/todo/', '/kdp/', '/ss/', '/material-print/'];
 const authStub = `export const getSessionToken = () => 'qa';
 export const getGoogleAccessToken = async () => 'qa';
 export const signIn = () => { window.qaSignIn = true; };
@@ -100,16 +100,16 @@ async function assertLightOnly(page) {
   await page.reload();
   await page.evaluate(() => window.qaShell = true);
   // All six service documents start before their first menu tap.
-  await page.waitForFunction(() => [...document.querySelectorAll('iframe')].length === 6 &&
+  await page.waitForFunction(() => [...document.querySelectorAll('iframe')].length === 5 &&
     [...document.querySelectorAll('iframe')].every(frame => frame.contentWindow.qaAuth));
   const residentTutor = page.frameLocator('iframe[src*="/tutor/"]');
   await residentTutor.locator('body[data-service-ready="true"]').waitFor({state:'attached'});
   const residentFrames = await page.evaluateHandle(() => [...document.querySelectorAll('iframe')].map(frame => frame.contentDocument));
-  for (const [from,to] of [['/','/todo/'],['/todo/','/memo/'],['/memo/','/tutor/'],['/tutor/','/admission/'],['/admission/','/material/'],['/material/','/']]) {
+  for (const [from,to] of [['/tutor/','/todo/'],['/todo/','/memo/'],['/memo/','/tutor/'],['/tutor/','/admission/'],['/admission/','/material/'],['/material/','/tutor/']]) {
     const frame = page.frameLocator('iframe:not([inert])');
     const bar = frame.locator('.works-service-bar');
     await bar.waitFor();
-    assert.equal(await bar.locator('a').count(),6);
+    assert.equal(await bar.locator('a').count(),5);
     assert.equal(await bar.locator('[aria-current]').getAttribute('href'),from);
     await bar.locator('a[href="'+to+'"]').click();
     await page.waitForURL(base + to, {timeout:12000});
@@ -119,7 +119,7 @@ async function assertLightOnly(page) {
   await page.goBack();
   await page.frameLocator('iframe:not([inert])').locator('.works-service-bar [aria-current][href="/material/"]').waitFor();
   await page.goForward();
-  await page.frameLocator('iframe:not([inert])').locator('.works-service-bar [aria-current][href="/"]').waitFor();
+  await page.frameLocator('iframe:not([inert])').locator('.works-service-bar [aria-current][href="/tutor/"]').waitFor();
   const touchSession = await context.newCDPSession(page);
   async function swipeBar(locator, distance) {
     const rect = await locator.boundingBox();
@@ -131,9 +131,7 @@ async function assertLightOnly(page) {
   const visibleView = page.frameLocator('iframe:not([inert])');
   const bottom = visibleView.locator('.works-service-bar');
   await swipeBar(bottom, 75);
-  assert.equal(new URL(page.url()).pathname,'/');
-  await swipeBar(bottom,-75);
-  await page.waitForURL(base+'/tutor/');
+  assert.equal(new URL(page.url()).pathname,'/tutor/');
   const local = visibleView.locator('.page-tabs');
   await swipeBar(local,-75);
   await local.locator('[data-page-tab="schedule"][aria-selected="true"]').waitFor();
@@ -144,10 +142,10 @@ async function assertLightOnly(page) {
   await local.locator('[data-page-tab="schedule"][aria-selected="true"]').waitFor();
   await swipeBar(local,75);
   await local.locator('[data-page-tab="record"][aria-selected="true"]').waitFor();
-  await swipeBar(bottom,75);
-  await page.waitForURL(base+'/');
+  await page.goto(base+'/');
+  await page.waitForURL(base+'/tutor/');
   console.log('Touch swipes on local and service bars, both directions and first-item boundary passed.');
-  console.log('Mobile service switcher: all six destinations, home, history and persistent outer document passed.');
+  console.log('Mobile service switcher: all five destinations, last-service launch, history and persistent outer document passed.');
   await page.evaluate(()=>localStorage.clear());
   const report = [];
   await page.goto(base + "/");
@@ -158,6 +156,7 @@ async function assertLightOnly(page) {
         await page.evaluate(value => localStorage.setItem('qa_signed_in',value), signedIn ? 'yes':'no');
         await page.goto(base + path);
         if (!signedIn && ["/tutor/", "/material/", "/admission/", "/ss/", "/material-print/"].includes(path)) await page.waitForURL(base + "/");
+        if (new URL(page.url()).pathname === '/') { await page.getByRole('button',{name:'Googleでログイン'}).waitFor(); continue; }
         await page.waitForFunction(() => !!window.qaAuth);
         await page.locator('.works-header .works-quick-add').waitFor();
         assert.equal(await page.locator('.works-header select').count(),0,'no selector in the header');
@@ -198,7 +197,7 @@ async function assertLightOnly(page) {
           if (width <= 730) {
             const links = serviceBar.locator('a');
             assert.deepEqual(await links.evaluateAll(nodes => nodes.map(n => n.pathname)),
-              ['/', '/tutor/', '/material/', '/admission/', '/todo/', '/memo/']);
+              ['/tutor/', '/material/', '/admission/', '/todo/', '/memo/']);
             const activePath = new URL(page.url()).pathname.replace('/material-print/', '/material/');
             if (await serviceBar.locator(`a[href="${activePath}"]`).count())
               assert.equal(await serviceBar.locator('[aria-current]').getAttribute('href'), activePath);
@@ -265,11 +264,7 @@ async function assertLightOnly(page) {
       }
     }
   }
-  await page.goto(base + '/');
-  assert.equal(await page.locator('.module-card[href="/material-print/"]').count(),0);
-  await page.locator('#home-navigation').evaluate(el=>el.open=true);
-  assert.equal(await page.locator('#home-navigation nav > span').count(),0);
-  assert.deepEqual(await page.locator('#home-navigation a').allTextContents(),['ホーム','授業管理','教材管理','入試管理','ToDo','メモ']);
+  await page.goto(base+'/todo/');
   // A previously stored dark choice and a dark OS both resolve to light.
   await page.evaluate(()=>localStorage.setItem('works_theme','dark'));
   await page.emulateMedia({colorScheme:'dark'});

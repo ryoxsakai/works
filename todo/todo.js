@@ -1,5 +1,5 @@
 import {colorValue, isHexColor} from "./model.mjs?v=color-picker-1";
-import {createPlanner} from "./planner-ui.mjs?v=service-shell-1";
+import {createPlanner} from "./planner-ui.mjs?v=agenda-2";
 import { startTodoPresentation } from "../shared/ui/todo-presentation.mjs?v=2";
 startTodoPresentation();
 import {
@@ -382,7 +382,8 @@ for (const dialog of document.querySelectorAll(".todo-page dialog")) {
           return;
         }
         openDetail(editId, false);
-      } else if (dialog.id === "organizer") planner.refreshManager();
+      } else if (dialog.id === "reschedule-dialog") { closeDialog(dialog); return; }
+      else if (dialog.id === "organizer") planner.refreshManager();
       else if (dialog.id === "role-dialog") renderRoles();
       else if (dialog.id === "categories-dialog") renderCategories();
       dialog.dataset.baseRevision = String(state.revision);

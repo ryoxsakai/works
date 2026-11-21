@@ -248,6 +248,7 @@ try {
         await expect(menu.locator("#sidebar-search")).toHaveCSS("background-color", "rgb(255, 255, 255)");
         await page.locator("#mobile-nav").click();
       }
+      await nav(page,"today");
       await expect(page.locator("#today-label")).toHaveAttribute("title",new RegExp(base));
       const type = await page.evaluate(() => {
         const selectors = ["#today-label","#task-count","#display-button",".planner-row .task-name","#view-title",".works-header h1"];
