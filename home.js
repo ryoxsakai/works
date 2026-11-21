@@ -10,7 +10,7 @@ import {
 } from "./shared/auth.js?v=14";
 import { getTheme, setTheme } from "./shared/theme.js?v=7";
 
-import { createDashboard } from "./dashboard/dashboard.mjs?v=service-shell-1";
+import { createDashboard } from "./dashboard/dashboard.mjs?v=period-profiles-1";
 const homeNavigation = document.querySelector(".works-navigation");
 homeNavigation.id = "home-navigation";
 // Keep the shared popover from covering dashboard edit controls when tabbing out.

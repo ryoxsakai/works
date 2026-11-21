@@ -7,6 +7,9 @@ on:
       - '.github/workflows/works-design.yml'
       - 'shared/works-dialogs.css'
       - 'worker/test/works-dialogs.browser.mjs'
+      - 'worker/test/tutor-period-profiles*'
+      - 'worker/src/tutor-period-profiles.js'
+      - 'shared/tutor-period-display.mjs'
       - 'index.html'
       - 'home-v2.css'
       - 'tutor/**'
@@ -32,6 +35,11 @@ jobs:
       - name: Install Chromium
         id: chromium
         run: node worker/node_modules/playwright/cli.js install --with-deps chromium
+      - name: Check school period settings and compatibility
+        run: node --test tutor/test/period-display.test.mjs worker/test/tutor-period-profiles.test.mjs
+      - name: Check school period settings in Chromium
+        if: ${{ !cancelled() && steps.chromium.outcome == 'success' }}
+        run: node worker/test/tutor-period-profiles.browser.mjs
       - name: Check dialog foundation across six services
         run: node worker/test/works-dialogs.browser.mjs
       - name: Check ToDo and Memo long dialog layout

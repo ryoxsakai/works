@@ -142,3 +142,102 @@ body.tutor-bootstrap .app-modal .edit-actions .btn-primary {
     width: 100%;
   }
 }
+
+/* Keep the settings navigation and close action visible while its panel scrolls. */
+body.tutor-bootstrap #settings-modal .modal-tabs {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+body.tutor-bootstrap #settings-modal .modal-tabs .tab-btn {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+body.tutor-bootstrap #settings-modal .modal-tabs .tab-btn > :is(svg, i) { flex: 0 0 auto; }
+body.tutor-bootstrap #settings-modal .modal-tab-panel { min-width: 0; }
+body.tutor-bootstrap #settings-modal .tutor-settings-panel-title {
+  font-size: 1.1rem;
+  margin: 0 0 6px;
+  color: var(--works-ink);
+}
+body.tutor-bootstrap #settings-modal .tutor-settings-section {
+  margin-block-start: 14px;
+  min-inline-size: 0;
+  padding: 12px;
+  border-radius: var(--works-radius);
+  background: var(--works-surface-sunken);
+}
+body.tutor-bootstrap #settings-modal .tutor-settings-section :is(h3, h4) {
+  margin: 0 0 4px;
+  font-size: 1rem;
+}
+body.tutor-bootstrap #settings-modal .tutor-period-form {
+  display: grid;
+  gap: 8px;
+  min-inline-size: 0;
+  margin-block-start: 12px;
+}
+body.tutor-bootstrap #settings-modal .tutor-period-field,
+body.tutor-bootstrap #settings-modal .period-school-row label {
+  display: grid;
+  gap: 4px;
+  min-inline-size: 0;
+  color: var(--works-ink-2);
+  font-size: .9rem;
+  font-weight: 600;
+}
+body.tutor-bootstrap #settings-modal :is(.tutor-period-field, .period-school-row) :is(input, select) {
+  width: 100%;
+  min-height: 44px;
+}
+body.tutor-bootstrap #settings-modal :is(#period-school, #period-display-mode) { max-width: 24rem; }
+body.tutor-bootstrap #settings-modal #period-school-fields {
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+body.tutor-bootstrap #settings-modal #period-school-fields legend {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  clip-path: inset(50%);
+  overflow: hidden;
+}
+body.tutor-bootstrap #settings-modal #period-calendar-choices .calendar-item {
+  align-items: center;
+  min-height: 44px;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+body.tutor-bootstrap #settings-modal .period-school-row,
+body.tutor-bootstrap #settings-modal #add-period-form {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(104px, 1fr) auto;
+  align-items: end;
+  gap: 8px;
+  margin: 0 0 8px;
+}
+body.tutor-bootstrap #settings-modal :is(.tutor-period-actions, .period-school-row, #add-period-form, #period-school-add) button,
+body.tutor-bootstrap #settings-modal #period-school-add { min-height: 44px; }
+body.tutor-bootstrap #settings-modal .tutor-period-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+body.tutor-bootstrap #settings-modal .tutor-period-actions .theme-primary:not(:disabled) {
+  background: var(--works-accent-strong);
+  color: #fff;
+}
+body.tutor-bootstrap #settings-modal :is(#period-profiles-status, #period-profiles-error):empty { display: none; }
+body.tutor-bootstrap #settings-modal :is(#period-common-fields, #period-school-fields, #period-profiles-reload)[hidden] { display: none; }
+
+@media (max-width: 580px) {
+  body.tutor-bootstrap #settings-modal .modal-tabs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  body.tutor-bootstrap #settings-modal .modal-tabs .tab-btn { padding-inline: 4px; }
+}
+@media (max-width: 390px) {
+  body.tutor-bootstrap #settings-modal .modal-tabs .tab-btn { flex-direction: column; gap: 2px; }
+  body.tutor-bootstrap #settings-modal .period-school-row,
+  body.tutor-bootstrap #settings-modal #add-period-form {
+    grid-template-columns: minmax(0, 1fr) minmax(100px, 1fr);
+  }
+  body.tutor-bootstrap #settings-modal :is(.period-school-row, #add-period-form) > button { grid-column: 2; }
+}

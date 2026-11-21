@@ -16,6 +16,8 @@ export function previousOwnerRecord(current,event,events,readRecord){
     .sort((a,b)=>b.time-a.time)[0]||null;
 }
 export function lessonRecordRows(rows, { escapeHtml, formatTimeOrPeriod, lessonRecordNeedsReview, lessonReviewRow, lightenHexColor, calendarName, lessonAttributionNotice, lessonPlanEditor, lessonPlanFeedback, recordStudentPrefName, lessonEventKey }) {
+  const period=(r)=>formatTimeOrPeriod(r.start, "Asia/Tokyo", r.calendarId);
+  const time=(r)=>`<span data-lesson-period="record" data-period-start="${escapeHtml(r.start || "")}" data-period-calendar="${escapeHtml(r.calendarId || "")}">${escapeHtml(period(r))}</span>`;
   const card=(html,r)=>html.replace(/^<tr(?=[\s>])/,`<tr data-record-card data-card-key="${escapeHtml(r.ref?lessonEventKey(r.ref):r.eventId||r.start||'')}"`);
   return rows
     .map((r) => {
@@ -23,12 +25,12 @@ export function lessonRecordRows(rows, { escapeHtml, formatTimeOrPeriod, lessonR
         const accent = r.iconColor ? ` style="--record-calendar-accent:${escapeHtml(r.iconColor)}"` : "";
         return card(`<tr class="record-empty-slot"${accent}>
           <td colspan="2"><span class="record-empty-label"><i class="bx bx-calendar"></i> 空き <small>${escapeHtml(r.calendarName)}</small></span></td>
-          <td class="record-empty-time">${formatTimeOrPeriod(r.start, "Asia/Tokyo")}</td>
+          <td class="record-empty-time">${time(r)}</td>
           <td colspan="4"></td>
         </tr>`,r);
       }
       const record=r.record?.record_storage==='d1_owner'?attributedLessonRecord(r.record,r.ref):r.record;
-      if (lessonRecordNeedsReview(record)) return card(lessonReviewRow(r.ref,record,r.label,formatTimeOrPeriod(r.start,"Asia/Tokyo")).replace('</strong>','</strong> <small class="semester-candidate-count">'+escapeHtml(String(r.n))+'/'+escapeHtml(String(r.m))+'回（同名の予定候補・所属未確定）</small>'),r);
+      if (lessonRecordNeedsReview(record)) return card(lessonReviewRow(r.ref,record,r.label,period(r),"record").replace('</strong>','</strong> <small class="semester-candidate-count">'+escapeHtml(String(r.n))+'/'+escapeHtml(String(r.m))+'回（同名の予定候補・所属未確定）</small>'),r);
       return card(`<tr data-event-id="${escapeHtml(r.eventId)}" data-record-ref="${escapeHtml(JSON.stringify(r.ref))}" data-record-revision="${r.record.record_revision}" data-record-owner="${escapeHtml(r.record.owner_id||'')}" data-completed="${r.completed ? 1 : 0}" data-calendar-name="${escapeHtml(calendarName(r.calendarId) || "カレンダー")}">
         <td>
           <div class="record-card-heading"><button type="button" class="record-student-link record-student-name" data-calendar-id="${escapeHtml(r.calendarId || "")}" data-source-event-id="${escapeHtml(r.eventId)}" data-name="${escapeHtml(r.label)}" data-term-id="${escapeHtml(String(r.termId || ""))}" aria-label="${escapeHtml(r.label)}の生徒情報を開く"><span class="record-avatar"${r.iconColor ? ` style="background-color:${escapeHtml(lightenHexColor(r.iconColor, 0.75))};color:${escapeHtml(r.iconColor)}"` : ""}><i class="bx bx-book-open"></i></span> ${escapeHtml(r.label)}</button><div class="record-card-meta"><span title="同じカレンダーの同名予定の回数">${r.n}/${r.m}回</span><button type="button" class="record-recheck btn btn-outline" aria-label="予定を再確認" title="予定を再確認" disabled><svg class="works-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-1l2 3M4 15l2 3a7 7 0 0 0 12-1"/></svg></button></div></div>
@@ -43,7 +45,7 @@ export function lessonRecordRows(rows, { escapeHtml, formatTimeOrPeriod, lessonR
           }
         </td>
         <td data-label="回数">${r.n}/${r.m}回</td>
-        <td data-label="時刻">${formatTimeOrPeriod(r.start, "Asia/Tokyo")}</td>
+        <td data-label="時刻">${time(r)}</td>
         <td data-label="授業予定">${lessonPlanEditor(r.ref, r.label, "record-plan",r.record.owner_id||"")}</td>
         <td data-label="確認テスト"><textarea class="record-test" rows="1" aria-label="${escapeHtml(r.label)}の確認テスト">${escapeHtml(r.confirmationTest)}</textarea></td>
         <td data-label="宿題"><textarea class="record-homework" rows="1" aria-label="${escapeHtml(r.label)}の宿題">${escapeHtml(r.homework)}</textarea></td>

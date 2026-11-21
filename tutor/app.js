@@ -1,3 +1,5 @@
+import { createPeriodSettings } from "./period-settings.mjs";
+import { defaultPeriodProfiles, lessonPeriodDisplay, lessonPeriodText, readPeriodProfiles } from "../shared/tutor-period-display.mjs";
 import {createStudentTodos} from './student-todos.mjs?v=1';
 import { cardLoading } from "../shared/card-loading.mjs?v=1";
 import {sameNameLessonCount} from '../shared/lesson-counts.mjs?v=1';
@@ -7,7 +9,7 @@ import {readPendingRecovery,persistPendingRecovery,clearPendingRecovery,pendingR
 import {createOwnerMemoEditors} from '../shared/owner-memo.mjs?v=2-autosave';
 import {boundedRead,precedingLegacyEvents,precedingOwnerEvents,recordTermScope,studentNavigationEvent} from './record-read.mjs?v=3-navigation';
 import {readNextLessonWithTemplate} from "../shared/next-lesson-read.mjs?v=1";
-import { lessonRecordRows, renderPlanEditors, renderMemoEditors, previousOwnerRecord } from "../shared/lesson-record-view.mjs?v=9-todo";
+import { lessonRecordRows, renderPlanEditors, renderMemoEditors, previousOwnerRecord } from "../shared/lesson-record-view.mjs?v=10-periods";
 import { setUserAvatar } from "../shared/avatar.mjs?v=1";
 import { attachRecordCarousel } from "./record-carousel.mjs?v=4";
 import { attachRecordToasts } from "./record-toasts.mjs?v=3-name";
@@ -272,6 +274,20 @@ let terms = [];
 let selectedTermIds = new Set();
 let excludedTitles = new Set();
 let periods = [];
+let periodProfiles = defaultPeriodProfiles();
+let periodPrimaryCalendarId = "";
+const periodEditor = createPeriodSettings({
+  panel: els.settingsModal.querySelector('[data-tab-panel="periods"]'),
+  request: (path, options) => apiFetch(path, options),
+  getCalendars: () => new Map([...selectedCalendarIds].map(id => {
+    const actual = id === "primary" ? periodPrimaryCalendarId || id : id;
+    return [actual, calendarColors.get(actual)?.name || actual];
+  }).filter(([id]) => calendarColors.has(id))),
+  onSaved: preferences => {
+    periodProfiles = preferences;
+    refreshPeriodLabels();
+  },
+});
 let editingPeriodId = null;
 let materialCategories = [];
 let materials = [];
@@ -467,14 +483,26 @@ els.openSettingsBtn.addEventListener("click", () => {
 
 els.settingsCloseBtn.addEventListener("click", () => els.settingsModal.close());
 
-els.tabBtns.forEach((btn) => {
-  btn.addEventListener("click", () => {
-    els.tabBtns.forEach((b) => b.setAttribute("aria-selected", String(b === btn)));
-    els.tabPanels.forEach((panel) => {
-      panel.hidden = panel.dataset.tabPanel !== btn.dataset.tab;
-    });
+const tutorSettingsTabs = [...els.tabBtns];
+function activateTutorSettingsTab(tab) {
+  for (const button of tutorSettingsTabs) {
+    button.setAttribute("aria-selected", String(button === tab));
+    button.tabIndex = button === tab ? 0 : -1;
+  }
+  for (const panel of els.tabPanels) panel.hidden = panel.dataset.tabPanel !== tab.dataset.tab;
+}
+for (const [index, tab] of tutorSettingsTabs.entries()) {
+  tab.addEventListener("click", () => activateTutorSettingsTab(tab));
+  tab.addEventListener("keydown", event => {
+    const offsets = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -1, ArrowDown: 1 };
+    const target = event.key === "Home" ? 0 : event.key === "End" ? tutorSettingsTabs.length - 1
+      : Object.hasOwn(offsets, event.key) ? (index + offsets[event.key] + tutorSettingsTabs.length) % tutorSettingsTabs.length : null;
+    if (target === null) return;
+    event.preventDefault();
+    activateTutorSettingsTab(tutorSettingsTabs[target]);
+    tutorSettingsTabs[target].focus();
   });
-});
+}
 
 els.themeRadios.forEach((radio) => {
   radio.addEventListener("change", () => {
@@ -595,6 +623,7 @@ async function loadRecordTable() {
         return {
           eventId: ev.id,
           emptySlot: true,
+          calendarId: ev._calendarId,
           start,
           iconColor: calendar?.raw || "",
           calendarName: calendar?.name || "カレンダー",
@@ -1021,6 +1050,9 @@ async function loadSettings() {
   selectedCalendarIds = new Set(settings.selected_calendars || []);
   selectedTermIds = new Set((settings.selected_term_ids || []).map(Number));
   excludedTitles = new Set(settings.excluded_titles || []);
+  periodProfiles = readPeriodProfiles(settings.lesson_period_profiles);
+  periodEditor.receive(settings.lesson_period_profiles);
+  refreshPeriodLabels();
 }
 
 async function saveSelectedCalendars() {
@@ -1057,6 +1089,8 @@ async function loadCalendarList() {
     return res.json();
   });
   const calendars = data.items || [];
+  const primaries = calendars.filter(calendar => calendar.primary === true);
+  periodPrimaryCalendarId = primaries.length === 1 ? primaries[0].id : "";
   calendarColors = new Map(
     calendars.map((c, i) => {
       const fallback = PASTEL_FALLBACK_COLORS[i % PASTEL_FALLBACK_COLORS.length];
@@ -1066,6 +1100,8 @@ async function loadCalendarList() {
     })
   );
   renderCalendarChecklist(calendars);
+  periodEditor.renderCalendars();
+  refreshPeriodLabels();
 }
 
 // Googleカレンダーの色はそのままだと予定チップの背景としては濃すぎるため、
@@ -1105,6 +1141,7 @@ els.calendarChecklist.addEventListener("change", async (e) => {
   } else {
     selectedCalendarIds.delete(checkbox.value);
   }
+  periodEditor.renderCalendars();
   clearStudentDetails();
   renderCurriculumNameSuggestions();
   setStudentBusy(true);
@@ -1180,6 +1217,7 @@ els.excludedTitleList.addEventListener("click", async (e) => {
 async function loadPeriods() {
   periods = await apiFetch("/periods");
   renderPeriodList();
+  refreshPeriodLabels();
 }
 
 function renderPeriodList() {
@@ -1211,9 +1249,15 @@ function renderPeriodList() {
     .join("");
 }
 
+function showCommonPeriodError(error = "") {
+  const output = document.querySelector("#period-common-error");
+  output.textContent = error ? "共通の時限を保存できませんでした。もう一度お試しください。" : "";
+  output.hidden = !error;
+}
+
 els.addPeriodForm.addEventListener("submit", async (e) => {
   e.preventDefault();
-  els.actionError.textContent = "";
+  showCommonPeriodError();
   const label = els.newPeriodLabel.value.trim();
   const startTime = els.newPeriodStart.value;
   if (!label || !startTime) return;
@@ -1227,11 +1271,12 @@ els.addPeriodForm.addEventListener("submit", async (e) => {
     await loadPeriods();
     await loadRecordTable();
   } catch (err) {
-    showActionError(err);
+    showCommonPeriodError(err);
   }
 });
 
 els.periodList.addEventListener("click", async (e) => {
+  showCommonPeriodError();
   const editBtn = e.target.closest(".period-edit");
   if (editBtn) {
     editingPeriodId = Number(editBtn.closest("[data-period-id]").dataset.periodId);
@@ -1248,7 +1293,7 @@ els.periodList.addEventListener("click", async (e) => {
       await loadPeriods();
       await loadRecordTable();
     } catch (err) {
-      showActionError(err);
+      showCommonPeriodError(err);
     }
     return;
   }
@@ -1275,7 +1320,7 @@ els.periodList.addEventListener("click", async (e) => {
       ]);
       await loadPeriods();
     } catch (err) {
-      showActionError(err);
+      showCommonPeriodError(err);
     }
   }
 });
@@ -1284,7 +1329,7 @@ els.periodList.addEventListener("submit", async (e) => {
   const editForm = e.target.closest(".period-edit-form");
   if (!editForm) return;
   e.preventDefault();
-  els.actionError.textContent = "";
+  showCommonPeriodError();
   const id = Number(editForm.dataset.periodId);
   const label = editForm.querySelector(".edit-period-label").value.trim();
   const startTime = editForm.querySelector(".edit-period-start").value;
@@ -1298,7 +1343,7 @@ els.periodList.addEventListener("submit", async (e) => {
     await loadPeriods();
     await loadRecordTable();
   } catch (err) {
-    showActionError(err);
+    showCommonPeriodError(err);
   }
 });
 
@@ -1965,41 +2010,43 @@ els.studentMaterialsGrid.addEventListener("touchend", async () => {
   }
 });
 
-// 時限は開始時刻だけを持ち、次の時限の開始時刻の直前までをその時限とみなす。
-// 並び順(sort_order)は設定画面の表示順のためだけのものなので、判定はstart_timeで
-// 都度ソートし直してから行う。
-function findPeriodLabel(iso, timeZone) {
-  if (!iso) return null;
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return null;
-  const t = timeZone ? d.toLocaleTimeString("en-GB", { timeZone, hour: "2-digit", minute: "2-digit" })
-    : `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-  const sorted = [...periods].sort((a, b) => a.start_time.localeCompare(b.start_time));
-  let match = null;
-  for (const p of sorted) {
-    if (p.start_time > t) break;
-    match = p;
-  }
-  return match ? match.label : null;
+function periodFor(start, calendarId, options = {}) {
+  const id = calendarId === "primary" ? periodPrimaryCalendarId || calendarId : calendarId;
+  return lessonPeriodDisplay(start, id, periods, periodProfiles, options);
 }
 
-function formatTimeOrPeriod(iso, timeZone) {
-  const periodLabel = findPeriodLabel(iso, timeZone);
-  if (periodLabel) return periodLabel;
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit", ...(timeZone ? { timeZone } : {}) });
+function formatTimeOrPeriod(iso, timeZone, calendarId) {
+  return lessonPeriodText(periodFor(iso, calendarId, { legacyTimeZone: timeZone }));
 }
 
-// カリキュラム表の日付欄用: mm/dd (曜) 時限(登録がなければ時刻)。
-function formatCurriculumDate(iso) {
+function formatCurriculumDate(iso, calendarId) {
   if (!iso) return "";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
   const weekday = WEEKDAY_LABELS[d.getDay()];
-  return `${mm}/${dd} (${weekday}) ${formatTimeOrPeriod(iso)}`;
+  return `${mm}/${dd} (${weekday}) ${formatTimeOrPeriod(iso, undefined, calendarId)}`;
+}
+
+function refreshPeriodLabels() {
+  // Leave surrounding rows, pending drafts, selections, and API activity intact.
+  document.querySelectorAll("[data-lesson-period]").forEach(node => {
+    const { lessonPeriod: view, periodStart: start, periodCalendar: calendarId } = node.dataset;
+    if (view === "list") {
+      const display = periodFor(start, calendarId, { legacyMode: "legacy-list" });
+      node.querySelector("span").textContent = display.primary;
+      const small = node.querySelector("small");
+      small.textContent = display.secondary;
+      small.hidden = !display.secondary;
+    } else if (view === "curriculum") {
+      node.textContent = formatCurriculumDate(start, calendarId);
+    } else if (view === "month") {
+      node.textContent = lessonPeriodText(periodFor(start, calendarId, { legacyMode: "time" }));
+    } else {
+      node.textContent = formatTimeOrPeriod(start, "Asia/Tokyo", calendarId);
+    }
+  });
 }
 
 // --- 年度(academic_years)・学期(terms)。年度を親、学期を子とした階層で管理する ---
@@ -2673,17 +2720,17 @@ async function renderCurriculumTable(events, context = captureStudentContext(), 
       if (unassigned && !retained) {
         const label = escapeHtml(ev.summary || '授業');
         return `<tr data-unassigned-progress data-pending-key="${escapeHtml(key)}" data-pending-target="${escapeHtml(JSON.stringify(ref))}" data-pending-context="${escapeHtml(unassigned.pendingContext)}"><td><input type="checkbox" disabled aria-label="${label}の完了（未紐付けのため編集不可）"></td>
-          <td>${count.n}/${count.m}回</td><td>${formatCurriculumDate(start)}</td>
+          <td>${count.n}/${count.m}回</td><td data-lesson-period="curriculum" data-period-start="${escapeHtml(start)}" data-period-calendar="${escapeHtml(ev._calendarId || "")}">${escapeHtml(formatCurriculumDate(start, ev._calendarId))}</td>
           <td><textarea rows="2" disabled aria-label="${label}の授業予定（未紐付けのため編集不可）">${escapeHtml(unassigned.lessonPlan)}</textarea></td>
           ${['確認テスト','宿題','授業メモ'].map(field=>`<td><textarea rows="2" disabled aria-label="${label}の${field}（未紐付けのため編集不可）"></textarea></td>`).join('')}</tr>`;
       }
-      if (lessonRecordNeedsReview(saved)) return lessonReviewRow(lessonEventRef(ev),saved,ev.summary || "授業",formatCurriculumDate(start)).replace('</strong>', `</strong> <small class="semester-candidate-count">${count.n}/${count.m}回（同名予定・所属未確定）</small>`);
+      if (lessonRecordNeedsReview(saved)) return lessonReviewRow(lessonEventRef(ev),saved,ev.summary || "授業",formatCurriculumDate(start, ev._calendarId), "curriculum").replace('</strong>', `</strong> <small class="semester-candidate-count">${count.n}/${count.m}回（同名予定・所属未確定）</small>`);
       const checked = saved.completed ? "checked" : "";
       lessonPlans.seed(ref, saved.lesson_plan || "", planReadVersion, saved.record_revision,saved.attribution_status,saved.owner_id||null);
       return `<tr data-event-id="${escapeHtml(ev.id)}" data-record-ref="${escapeHtml(JSON.stringify(ref))}" data-record-revision="${saved.record_revision}" data-record-owner="${escapeHtml(saved.owner_id||'')}" data-completed="${saved.completed ? 1 : 0}">
         <td><input type="checkbox" class="curriculum-completed" ${checked} /></td>
         <td>${count.n}/${count.m}回${lessonAttributionNotice(saved)}</td>
-        <td>${formatCurriculumDate(start)}</td>
+        <td data-lesson-period="curriculum" data-period-start="${escapeHtml(start)}" data-period-calendar="${escapeHtml(ev._calendarId || "")}">${escapeHtml(formatCurriculumDate(start, ev._calendarId))}</td>
         <td>${lessonPlanEditor(ref, ev.summary || "授業", "curriculum-plan",saved.owner_id||"")}</td>
         <td><textarea class="curriculum-test" rows="2">${escapeHtml(saved.confirmation_test || "")}</textarea></td>
         <td><textarea class="curriculum-homework" rows="2">${escapeHtml(saved.homework || "")}</textarea></td>
@@ -3458,14 +3505,6 @@ function formatWeekLabel(d) {
   return `${d.getMonth() + 1}/${d.getDate()}(${WEEKDAY_LABELS[d.getDay()]})`;
 }
 
-function formatEventTime(ev) {
-  if (!ev.start?.dateTime) return "終日";
-  return new Date(ev.start.dateTime).toLocaleTimeString("ja-JP", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
 function renderScheduleWeekDays(weekStart) {
   const weekEnd = new Date(weekStart.getTime() + 6 * 86400000);
   els.listWeekLabel.textContent = `${formatWeekLabel(weekStart)} 〜 ${formatWeekLabel(weekEnd)}`;
@@ -3505,10 +3544,12 @@ function renderListView(events) {
   }
 
   els.eventList.innerHTML = dayEvents.map((ev) => {
-    const period = escapeHtml(findPeriodLabel(ev.start?.dateTime) || "");
+    const start = ev.start?.dateTime || ev.start?.date || "";
+    const display = periodFor(start, ev._calendarId, { legacyMode: "legacy-list" });
+    const time = `<div class="event-time" data-lesson-period="list" data-period-start="${escapeHtml(start)}" data-period-calendar="${escapeHtml(ev._calendarId || "")}"><span>${escapeHtml(display.primary)}</span><small ${display.secondary ? "" : "hidden"}>${escapeHtml(display.secondary)}</small></div>`;
     if (isExcludedScheduleEvent(ev)) {
       return `<li class="event-item event-empty-slot"${eventColorStyle(ev)}>
-        <div class="event-time"><span>${formatEventTime(ev)}</span><small>${period}</small></div>
+        ${time}
         <div class="event-empty-label">空き</div>
       </li>`;
     }
@@ -3520,7 +3561,7 @@ function renderListView(events) {
     const homework = detail.homework || fallback;
     const memo = detail.lesson_memo || fallback;
     return `<li class="event-item"${eventColorStyle(ev)}>
-      <div class="event-time"><span>${formatEventTime(ev)}</span><small>${period}</small></div>
+      ${time}
       <div class="event-main">
         <button type="button" class="event-student-name name-token-text" data-calendar-id="${escapeHtml(ev._calendarId || "")}" data-token="${escapeHtml(summary)}">${escapeHtml(summary)}</button>
         ${lessonAttributionNotice(detail)}
@@ -3574,8 +3615,10 @@ function renderCalendarView(events) {
       const eventsHtml = dayEvents
         .map((ev) => {
           const summary = (ev.summary || "(無題)").trim();
+          const start = ev.start?.dateTime || ev.start?.date || "";
+          const time = lessonPeriodText(periodFor(start, ev._calendarId, { legacyMode: "time" }));
           return `<button type="button" class="cal-event name-token-text"${eventColorStyle(ev)} data-calendar-id="${escapeHtml(ev._calendarId || "")}" data-token="${escapeHtml(summary)}" aria-label="${escapeHtml(summary)}の生徒情報を開く">
-            <span class="cal-event-time">${formatEventTime(ev)}</span><span>${escapeHtml(summary)}</span>
+            <span class="cal-event-time" data-lesson-period="month" data-period-start="${escapeHtml(start)}" data-period-calendar="${escapeHtml(ev._calendarId || "")}">${escapeHtml(time)}</span><span>${escapeHtml(summary)}</span>
           </button>`;
         })
         .join("");
@@ -3668,12 +3711,13 @@ function escapeHtml(str) {
 }
 
 
-function lessonReviewRow(ref,record,label,date) {
-  if(record.attribution_status==='excluded')return `<tr><td colspan="7">${escapeHtml(label)} ${escapeHtml(date)}：授業履歴への取り込み・編集の対象外です。</td></tr>`;
-  if(record.attribution_status==='owner_unassigned'&&record.pending_allowed)return `<tr><td colspan="7"><strong>${escapeHtml(label)}</strong> ${escapeHtml(date)}<div class="pending-plan-label"><span>授業予定</span>${lessonPlanEditor(ref,label,'pending-record-plan','')}</div><p>未紐づけのため予定単位のD1下書きとして保存します。生徒の履歴へは自動で移しません。</p><a class="pending-bind-link" href="/tutor/history.html?calendar_id=${encodeURIComponent(ref.calendar_id)}&event_id=${encodeURIComponent(ref.id)}">下書きと紐づけを確認</a><p><a class="series-start-link" href="/tutor/history.html?calendar_id=${encodeURIComponent(ref.calendar_id)}&event_id=${encodeURIComponent(ref.id)}&series_start=1">この授業から次回・共有メモの連動を開始</a></p></td></tr>`;
-  if(record.record_storage==='d1_owner'||record.attribution_status==='owner_unassigned')return `<tr><td colspan="7"><strong>${escapeHtml(label)}</strong> ${escapeHtml(date)}<p>生徒・クラスの紐づけを確認してください。保存済みの授業履歴は保持されています。</p><a href="/tutor/history.html?calendar_id=${encodeURIComponent(ref.calendar_id)}&event_id=${encodeURIComponent(ref.id)}">授業履歴で紐づけを確認</a></td></tr>`;
-  if(record.record_pending_operation)return `<tr><td colspan="7"><strong>${escapeHtml(label)}</strong> ${escapeHtml(date)}<p role="status">カレンダー保存の結果確認が必要です。再送は停止しています。</p><button type="button" class="calendar-record-reconcile" data-ref="${escapeHtml(JSON.stringify(ref))}">保存結果を照合する</button><small role="status"></small></td></tr>`;
-  return `<tr><td colspan="7"><strong>${escapeHtml(label)}</strong> ${escapeHtml(date)}
+function lessonReviewRow(ref,record,label,date,view) {
+  const time = view ? `<span data-lesson-period="${escapeHtml(view)}" data-period-start="${escapeHtml(ref.start || "")}" data-period-calendar="${escapeHtml(ref.calendar_id || "")}">${escapeHtml(date)}</span>` : escapeHtml(date);
+  if(record.attribution_status==='excluded')return `<tr><td colspan="7">${escapeHtml(label)} ${time}：授業履歴への取り込み・編集の対象外です。</td></tr>`;
+  if(record.attribution_status==='owner_unassigned'&&record.pending_allowed)return `<tr><td colspan="7"><strong>${escapeHtml(label)}</strong> ${time}<div class="pending-plan-label"><span>授業予定</span>${lessonPlanEditor(ref,label,'pending-record-plan','')}</div><p>未紐づけのため予定単位のD1下書きとして保存します。生徒の履歴へは自動で移しません。</p><a class="pending-bind-link" href="/tutor/history.html?calendar_id=${encodeURIComponent(ref.calendar_id)}&event_id=${encodeURIComponent(ref.id)}">下書きと紐づけを確認</a><p><a class="series-start-link" href="/tutor/history.html?calendar_id=${encodeURIComponent(ref.calendar_id)}&event_id=${encodeURIComponent(ref.id)}&series_start=1">この授業から次回・共有メモの連動を開始</a></p></td></tr>`;
+  if(record.record_storage==='d1_owner'||record.attribution_status==='owner_unassigned')return `<tr><td colspan="7"><strong>${escapeHtml(label)}</strong> ${time}<p>生徒・クラスの紐づけを確認してください。保存済みの授業履歴は保持されています。</p><a href="/tutor/history.html?calendar_id=${encodeURIComponent(ref.calendar_id)}&event_id=${encodeURIComponent(ref.id)}">授業履歴で紐づけを確認</a></td></tr>`;
+  if(record.record_pending_operation)return `<tr><td colspan="7"><strong>${escapeHtml(label)}</strong> ${time}<p role="status">カレンダー保存の結果確認が必要です。再送は停止しています。</p><button type="button" class="calendar-record-reconcile" data-ref="${escapeHtml(JSON.stringify(ref))}">保存結果を照合する</button><small role="status"></small></td></tr>`;
+  return `<tr><td colspan="7"><strong>${escapeHtml(label)}</strong> ${time}
     <p role="status">${record.attribution_status === "known_change" ? "既に予定名が変更されたことが分かっている枠です。" : record.attribution_status === "target_unavailable" ? "予定が削除・変更されたため再読み込みが必要です。" : record.attribution_status === "id_collision" ? "複数カレンダーに同じ予定IDがあり、安全に対応できません。" : record.record_title != null ? `確認済みの予定名「${escapeHtml(record.record_title)}」から変更されています。` : `比較開始時に観測した予定名「${escapeHtml(record.record_observed_title || "不明")}」から変更されています。この観測値は所属の証明ではありません。`} 対応を確認するまで授業記録の表示・保存を停止しています。</p>
     <button type="button" class="lesson-record-review" style="min-height:44px" data-ref="${escapeHtml(JSON.stringify(ref))}">旧記録を確認して対応を選ぶ</button></td></tr>`;
 }

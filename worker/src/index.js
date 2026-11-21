@@ -6137,6 +6137,11 @@ export default {
         return json(await createLesson(env, body), headers, 201);
       }
 
+      if (url.pathname === "/api/tutor-period-profiles") {
+        const { handlePeriodProfiles } = await import("./tutor-period-profiles.js");
+        return json(await handlePeriodProfiles(request, env, browserSession), {...headers, "Cache-Control": "no-store"});
+      }
+
       if (url.pathname === "/api/settings" && request.method === "GET") {
         return json(await readSettings(env), headers);
       }
