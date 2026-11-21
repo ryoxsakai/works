@@ -131,7 +131,7 @@ export async function readEventOwnerRecord(env,target,event,deps){
  let record;try{record=await first(env,'SELECT r.*,EXISTS(SELECT 1 FROM lesson_owner_memos m WHERE m.owner_id=r.owner_id) AS fixed_memo FROM lesson_history_records r WHERE r.id=?',link.record_id);}catch(error){if(!String(error.message).includes('no such table'))throw error;record=await first(env,'SELECT * FROM lesson_history_records WHERE id=?',link.record_id);}const old=JSON.parse(link.target_json),source=JSON.parse(record.source_json||'{}');
  const changed=lessonTitleKey(old.title)!==lessonTitleKey(target.title);
  const recreated=event&&encode(eventIdentity(event))!==link.event_identity_json;
- return {...observation,record_exists:true,record_revision:record.revision,record_id:record.id,owner_id:record.owner_id,record_calendar_id:target.calendar_id,record_title:old.title,attribution_status:recreated?'event_recreated':changed?'title_changed':'confirmed',...(changed||recreated?{...calendarRecordValues({}),attribution_notice:'予定名または予定の生成情報が変わりました。同じ生徒か、別の生徒かを確認してください'}:{...calendarRecordValues(record),completed:record.completed}),link_revision:link.revision,...((record.fixed_memo||source.series_rule_id||['new','different_owner'].includes(source.binding_decision))?{owner_memo_storage:'owner_id'}:{})};
+ return {...observation,record_exists:true,record_revision:record.revision,record_id:record.id,owner_id:record.owner_id,record_calendar_id:target.calendar_id,record_title:old.title,attribution_status:recreated?'event_recreated':changed?'title_changed':'confirmed',...(changed||recreated?{...calendarRecordValues({}),attribution_notice:'予定名または予定の生成情報が変わりました。同じ生徒か、別の生徒かを確認してください'}:{...calendarRecordValues(record),completed:record.completed}),link_revision:link.revision,...((record.fixed_memo||source.series_rule_id||['new','different_owner','next_confirmed'].includes(source.binding_decision))?{owner_memo_storage:'owner_id'}:{})};
 }
 function currentSeriesGuard(env,shown,target){return guard(env,'EXISTS(SELECT 1 FROM lesson_series_owners WHERE id=? AND revision=?) AND NOT EXISTS(SELECT 1 FROM lesson_series_owners WHERE calendar_id=? AND series_id=? AND julianday(anchor_original)>julianday(?) AND julianday(anchor_original)<=julianday(?))',[shown.series_rule_id,shown.series_rule_revision,target.calendar_id,shown.series_id,shown.series_anchor_original,shown.series_original_time]);}
 export async function writeEventOwnerRecord(env,body,deps){
@@ -176,6 +176,97 @@ export async function changeLessonBinding(env,body,deps){await policy(env);retur
  const after={link:{calendar_id:ref.calendar_id,event_id:ref.id,record_id:record?.id||null,revision:(link?.revision||0)+1,target_json:encode(ref),event_identity_json:identity},record};
  conditions.push(statement(env,`INSERT INTO lesson_event_links VALUES (?,?,?,?,?,?) ON CONFLICT(calendar_id,event_id) DO UPDATE SET record_id=excluded.record_id,revision=excluded.revision,target_json=excluded.target_json,event_identity_json=excluded.event_identity_json`,ref.calendar_id,ref.id,record?.id||null,after.link.revision,encode(ref),identity));
  return {before:{link},after,statements:conditions};});}
+
+// This shortcut proposes exactly one occurrence. Names are only a veto against
+// ambiguity; the selected owner comes from the source event's confirmed fixed ID.
+const bindingDirectorySQL=`SELECT json_group_array(json_array(owner_id,name)) AS names FROM
+ (SELECT id AS owner_id,name FROM lesson_owners UNION SELECT owner_id,name FROM lesson_owner_aliases ORDER BY owner_id,name)`;
+const bindingTargetClearSQL=`NOT EXISTS(SELECT 1 FROM lesson_event_links WHERE calendar_id=? AND event_id=?)
+ AND NOT EXISTS(SELECT 1 FROM lesson_history_exclusions WHERE calendar_id=? AND event_id=?)
+ AND NOT EXISTS(SELECT 1 FROM curriculum_entries WHERE calendar_event_id=?)
+ AND NOT EXISTS(SELECT 1 FROM lesson_record_hold WHERE event_id=? AND resolved_at IS NULL)
+ AND NOT EXISTS(SELECT 1 FROM lesson_history_imports WHERE calendar_id=? AND event_id=?)
+ AND NOT EXISTS(SELECT 1 FROM calendar_lesson_migration WHERE calendar_id=? AND event_id=? AND status IN ('reserved','dispatching','unknown','verified'))`;
+const bindingTargetClearArgs=ref=>[ref.calendar_id,ref.id,ref.calendar_id,ref.id,ref.id,ref.id,ref.calendar_id,ref.id,ref.calendar_id,ref.id];
+const otherPendingSQL=`NOT EXISTS(SELECT 1 FROM lesson_pending_plans WHERE calendar_id=? AND event_id=? AND id<>? AND lesson_plan<>'')`;
+const targetSeriesClearSQL=`NOT EXISTS(SELECT 1 FROM lesson_series_owners WHERE calendar_id=? AND series_id=? AND julianday(anchor_original)<=julianday(?))`;
+function validBindingIdentity(event){
+ const identity=eventIdentity(event);
+ return !!identity.iCalUID&&Number.isFinite(Date.parse(identity.created))&&(!identity.recurringEventId||Number.isFinite(Date.parse(identity.originalStartTime)));
+}
+async function prepareNextBinding(env,source,sourceEvent,sourceRecord,target,targetEvent,targetRecord){
+ const name=lessonTitleKey(source.title);
+ if(source.calendar_id!==target.calendar_id||source.id===target.id||!source.etag||!target.etag||!name||name!==lessonTitleKey(target.title)
+ ||!validBindingIdentity(sourceEvent)||!validBindingIdentity(targetEvent)||sourceEvent?.recurrence||targetEvent?.recurrence||String(targetEvent?.description||'').trim()
+ ||sourceRecord.attribution_status!=='confirmed'||!sourceRecord.owner_id
+ ||targetRecord.attribution_status!=='owner_unassigned'||!targetRecord.pending_storage_available)return null;
+ const owner=await first(env,'SELECT id,name,kind,revision FROM lesson_owners WHERE id=?',sourceRecord.owner_id);
+ const directory=(await first(env,bindingDirectorySQL)).names;
+ const matching=new Set(JSON.parse(directory).filter(([,title])=>lessonTitleKey(title)===name).map(([id])=>id));
+ if(!owner||matching.size!==1||!matching.has(owner.id))return null;
+ if(!(await first(env,`SELECT ${bindingTargetClearSQL} AS ok`,...bindingTargetClearArgs(target)))?.ok)return null;
+ // Use the current context first. If it has no row, only one old nonempty
+ // context may follow an immutable event across a time/ETag-only edit.
+ const context=targetRecord.pending_context;
+ let draft={context,revision:targetRecord.record_revision,exists:targetRecord.pending_exists,plan:targetRecord.lesson_plan||'',moved:false};
+ if(!draft.exists){
+  const old=await rows(env,`SELECT * FROM lesson_pending_plans WHERE calendar_id=? AND event_id=? AND id<>? AND lesson_plan<>'' LIMIT 2`,target.calendar_id,target.id,context);
+  if(old.length){
+   if(old.length!==1||old[0].event_identity_json!==encode(eventIdentity(targetEvent)))return null;
+   let previous;try{previous=JSON.parse(old[0].target_json);}catch{return null;}
+   if(lessonTitleKey(previous?.title)!==lessonTitleKey(target.title)
+     ||!sameLessonEvent({...previous,title:target.title,start:target.start,end:target.end,etag:target.etag},target))return null;
+   draft={context:old[0].id,revision:old[0].revision,exists:true,plan:old[0].lesson_plan,moved:true};
+  }
+ }
+ const sourceBasis={record_id:sourceRecord.record_id||null,link_revision:sourceRecord.link_revision||null,series_rule_id:sourceRecord.series_rule_id||null,series_rule_revision:sourceRecord.series_rule_revision||null};
+ const fingerprint=await historyDigest({source,sourceIdentity:eventIdentity(sourceEvent),sourceBasis,target,targetIdentity:eventIdentity(targetEvent),owner,draft,context});
+ return {owner,directory,draft,context,fingerprint,automatic:!!draft.plan.trim()&&Date.parse(target.start)>Date.now()};
+}
+export async function nextBindingOffer(env,source,sourceEvent,sourceRecord,target,targetEvent,targetRecord){
+ let shown;
+ try{shown=await prepareNextBinding(env,source,sourceEvent,sourceRecord,target,targetEvent,targetRecord);}
+ catch(error){if(!String(error.message).includes('no such table'))throw error;}
+ if(!shown)return undefined;
+ return {owner_id:shown.owner.id,owner_name:shown.owner.name,owner_kind:shown.owner.kind,fingerprint:shown.fingerprint,has_draft:shown.draft.exists,...(shown.automatic?{automatic:true}:{}),...(shown.draft.moved?{moved_draft:shown.draft.plan}:{})};
+}
+export async function confirmNextLessonBinding(env,body,deps,findNext){
+ await policy(env,true);
+ if(!ownerHistoryActive(env)||body.confirm!==true||typeof body.fingerprint!=='string'||!/^[a-f0-9]{64}$/.test(body.fingerprint))throw fail('次回の予定・所属と保存する下書きを確認してください',400);
+ if(body.automatic===true&&body.request_id!=='auto-next-'+body.fingerprint)throw fail('自動紐づけの操作IDが一致しません',400);
+ return transaction(env,body,'confirm_next_binding',async()=>{
+  const stale=()=>fail('次回予定・所属・下書きが変わりました。現在の情報を再確認してください');
+  const current=await findNext(body.source?.calendar_id,body.source?.id);
+  if(!current.next_binding||current.next_binding.fingerprint!==body.fingerprint||!sameLessonEvent(current.source,body.source)||!sameLessonEvent(current.target,body.target))throw stale();
+  const sourceLive=await liveHistoryTarget(env,body.source,deps),targetLive=await liveHistoryTarget(env,body.target,deps);
+  if(!sameLessonEvent(sourceLive.ref,body.source)||!sameLessonEvent(targetLive.ref,body.target))throw stale();
+  const sourceRecord=await readEventOwnerRecord(env,sourceLive.ref,sourceLive.event,deps),targetRecord=await readEventOwnerRecord(env,targetLive.ref,targetLive.event,deps);
+  const {ref,event}=targetLive;
+  const shown=await prepareNextBinding(env,sourceLive.ref,sourceLive.event,sourceRecord,ref,event,targetRecord);
+  if(!shown||shown.fingerprint!==body.fingerprint||(body.automatic===true&&!shown.automatic))throw stale();
+  const {owner,draft,context}=shown;
+  const sourceGuard=sourceRecord.record_id
+   ?guard(env,`EXISTS(SELECT 1 FROM lesson_event_links l JOIN lesson_history_records r ON r.id=l.record_id
+     WHERE l.calendar_id=? AND l.event_id=? AND l.record_id=? AND l.revision=? AND r.owner_id=?)`,[sourceLive.ref.calendar_id,sourceLive.ref.id,sourceRecord.record_id,sourceRecord.link_revision,owner.id])
+   :currentSeriesGuard(env,sourceRecord,sourceLive.ref);
+  const record=newRecord(owner.id,{lesson_date:ref.start,title_snapshot:ref.title,lesson_plan:draft.plan},{binding_decision:'next_confirmed',source:sourceLive.ref,draft_context:draft.exists?draft.context:null,draft_revision:draft.revision,automatic:body.automatic===true});
+  const eventLink={calendar_id:ref.calendar_id,event_id:ref.id,record_id:record.id,revision:1,target_json:encode(ref),event_identity_json:encode(eventIdentity(event))};
+  return {before:{source:sourceLive.ref,owner_id:owner.id,draft},after:{target:ref,record,link:eventLink},statements:[
+   sourceGuard,
+   ...(!sourceRecord.record_id?[guard(env,'NOT EXISTS(SELECT 1 FROM lesson_event_links WHERE calendar_id=? AND event_id=?)',[sourceLive.ref.calendar_id,sourceLive.ref.id])]:[]),
+   guard(env,'NOT EXISTS(SELECT 1 FROM lesson_history_exclusions WHERE calendar_id=? AND event_id=?)',[sourceLive.ref.calendar_id,sourceLive.ref.id]),
+   guard(env,'EXISTS(SELECT 1 FROM lesson_owners WHERE id=? AND revision=?)',[owner.id,owner.revision]),
+   guard(env,`(SELECT names FROM (${bindingDirectorySQL}))=?`,[shown.directory]),
+   guard(env,bindingTargetClearSQL,bindingTargetClearArgs(ref)),
+   ...(event.recurringEventId?[guard(env,targetSeriesClearSQL,[ref.calendar_id,event.recurringEventId,originalTime(event)])]:[]),
+   ...(draft.exists?[guard(env,'EXISTS(SELECT 1 FROM lesson_pending_plans WHERE id=? AND revision=? AND lesson_plan=?)',[draft.context,draft.revision,draft.plan])]
+     :[guard(env,'NOT EXISTS(SELECT 1 FROM lesson_pending_plans WHERE id=?)',[context]),guard(env,otherPendingSQL,[ref.calendar_id,ref.id,context])]),
+   ...(draft.moved?[guard(env,'NOT EXISTS(SELECT 1 FROM lesson_pending_plans WHERE id=?)',[context]),guard(env,otherPendingSQL,[ref.calendar_id,ref.id,draft.context])]:[]),
+   recordInsert(env,record),
+   statement(env,'INSERT INTO lesson_event_links VALUES(?,?,?,?,?,?)',...Object.values(eventLink)),
+  ]};
+ });
+}
 
 // A preview is an exact, expiring comparison, never an attribution inference.
 export async function previewOwnerImport(env,target,deps){
@@ -382,6 +473,7 @@ export async function handleOwnerHistory(env,request,url,deps){
  }
  if(path==='/target'&&method==='POST'){const {ref}=await liveHistoryTarget(env,(await input()).target,deps);return {target:ref,link:await first(env,'SELECT * FROM lesson_event_links WHERE calendar_id=? AND event_id=?',ref.calendar_id,ref.id)};}
  if(path==='/binding'&&method==='POST')return changeLessonBinding(env,await input(),deps);
+ if(path==='/next-binding'&&method==='POST'){const {readNextLessonPlan}=await import('./lesson-plan.js');return confirmNextLessonBinding(env,await input(),deps,(calendar,id)=>readNextLessonPlan(env,calendar,id,deps));}
  if(path==='/import/preview'&&method==='POST')return previewOwnerImport(env,(await input()).target,deps);
  if(path==='/import'&&method==='POST')return importOwnerRecord(env,await input(),deps);
  throw fail('not found',404);

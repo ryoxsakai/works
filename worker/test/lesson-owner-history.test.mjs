@@ -4,7 +4,7 @@ import {readFile} from 'node:fs/promises';
 import {Miniflare} from 'miniflare';
 import {ensureAttribution} from '../src/lesson-attribution.js';
 import {lessonEventRef} from '../../shared/lesson-plan.js';
-import {createLessonOwner,renameLessonOwner,createOwnerRecord,editOwnerRecord,listLessonOwners,listOwnerRecords,changeLessonBinding,readEventOwnerRecord,previewOwnerImport,importOwnerRecord,writeEventOwnerRecord} from '../src/lesson-owner-history.js';
+import {createLessonOwner,renameLessonOwner,createOwnerRecord,editOwnerRecord,listLessonOwners,listOwnerRecords,changeLessonBinding,readEventOwnerRecord,previewOwnerImport,importOwnerRecord,writeEventOwnerRecord,writePendingLessonPlan,confirmNextLessonBinding} from '../src/lesson-owner-history.js';
 import {readNextLessonPlan} from '../src/lesson-plan.js';
 import {plainCalendarRecordLayout} from '../../shared/calendar-lesson-record.mjs';
 const request=()=>crypto.randomUUID();
@@ -164,4 +164,149 @@ test('ToDo mentions use individual IDs, retain renamed students and reject class
  const task = id => ({id:'task',plan:{students:[{id,name:'同姓'}]}});
  await validateNewStudentLinks(env.DB,[task(owner.id)],[]);
  await assert.rejects(validateNewStudentLinks(env.DB,[task(group.id)],[]),/生徒/);
+});
+
+async function nextBindingFixture(t,{future=false,past=false}={}){
+ const f=await setup(t),{env,events,deps,owner,ref}=f;
+ for(const event of events)Object.assign(event,{created:'2026-01-01T05:00:00Z',iCalUID:event.id+'-uid'});
+ if(future||past)events.forEach((event,i)=>{const date=new Date(Date.now()+(past?i-5:i+1)*86400000).toISOString().slice(0,10);
+  event.start.dateTime=date+'T10:00:00+09:00';event.end.dateTime=date+'T11:00:00+09:00';
+ });
+ events[1].summary='○';const former=ref(1);
+ const record=(await bind(env,owner,ref(),deps)).record;
+ await editOwnerRecord(env,record.id,{request_id:request(),revision:1,lesson_plan:'前の授業の予定',lesson_memo:'引き継がないメモ'});
+ env.LESSON_HISTORY_MODE='active';
+ const find=(cal='a',id=events[0].id)=>readNextLessonPlan(env,cal,id,deps);
+ assert.equal((await find()).target,null,'a vacant circle is not a lesson');
+ Object.assign(events[1],{summary:'甲',etag:'after-name-change'});
+ const pending=async plan=>{
+  const candidate=await find();
+  return writePendingLessonPlan(env,{target:candidate.target,pending_context:candidate.pending_context,record_revision:candidate.record_revision,expected_lesson_plan:candidate.lesson_plan,lesson_plan:plan,request_id:request()},deps);
+ };
+ const body=candidate=>({source:candidate.source,target:candidate.target,fingerprint:candidate.next_binding.fingerprint,confirm:true,request_id:request()});
+ const confirm=payload=>confirmNextLessonBinding(env,payload,deps,find);
+ return {...f,former,record,find,pending,body,confirm};
+}
+test('explicit same-owner shortcut binds a renamed vacancy and adopts only the current saved draft',async t=>{
+ const {env,events,owner,former,record,find,pending,body,confirm}=await nextBindingFixture(t);
+ const draft=await pending('合成の次回予定\nそのまま残す  ');
+ const savedDraft=(await env.DB.prepare('SELECT * FROM lesson_pending_plans').first());
+ let candidate=await find();
+ assert.equal(candidate.target.id,former.id);assert.notEqual(candidate.target.etag,former.etag);
+ assert.equal(candidate.attribution_status,'owner_unassigned');assert.equal(candidate.owner_id,null);
+ assert.deepEqual(candidate.next_binding,{owner_id:owner.id,owner_name:owner.name,owner_kind:'student',fingerprint:candidate.next_binding.fingerprint,has_draft:true});
+ assert.equal((await listOwnerRecords(env,owner.id)).length,1,'GET does not bind');
+ const payload=body(candidate);
+ await assert.rejects(confirm({...payload,confirm:false}),e=>e.status===400);
+ const result=await confirm(payload);
+ assert.equal(result.record.owner_id,owner.id);assert.equal(result.record.lesson_plan,draft.lesson_plan);
+ assert.equal(result.record.lesson_memo,'');assert.notEqual(result.record.id,record.id);
+ assert.deepEqual(await confirm(payload),result,'operation retry is idempotent');
+ const all=await listOwnerRecords(env,owner.id);
+ assert.deepEqual(all.map(r=>r.event_id),[events[0].id,events[1].id]);
+ assert.equal(all[0].lesson_plan,'前の授業の予定');assert.equal(all[0].lesson_memo,'引き継がないメモ');
+ assert.deepEqual(await env.DB.prepare('SELECT * FROM lesson_pending_plans').first(),savedDraft,'original draft retained byte for byte');
+ candidate=await find();assert.equal(candidate.owner_id,owner.id);assert.equal(candidate.lesson_plan,draft.lesson_plan);assert.equal(candidate.next_binding,undefined);
+});
+test('next shortcut rejects stale draft revision atomically, including a competing update just before the write batch',async t=>{
+ const {env,find,pending,body,confirm}=await nextBindingFixture(t);
+ await pending('first');const old=body(await find());await pending('another tab edited');
+ await assert.rejects(confirm(old),e=>e.status===409);
+ const next=body(await find()),db=env.DB;
+ env.DB={prepare:sql=>db.prepare(sql),async batch(items){
+  await db.prepare("UPDATE lesson_pending_plans SET lesson_plan='winner', revision=revision+1").run();
+  return db.batch(items);
+ }};
+ await assert.rejects(confirm(next),e=>e.code==='LESSON_HISTORY_RELOAD');
+ env.DB=db;
+ assert.equal((await db.prepare('SELECT count(*) AS n FROM lesson_event_links').first()).n,1);
+ assert.equal((await db.prepare('SELECT count(*) AS n FROM lesson_history_records').first()).n,1);
+ assert.deepEqual(await db.prepare('SELECT lesson_plan,revision FROM lesson_pending_plans').first(),{lesson_plan:'winner',revision:3});
+ assert.equal((await db.prepare('SELECT COUNT(*) AS n FROM lesson_history_audit WHERE action=?').bind('confirm_next_binding').first()).n,0);
+});
+test('shortcut remains unavailable for ambiguity, different fixed owners, exclusions, old contexts, legacy or unstable slot identities',async t=>{
+ const {env,events,deps,owner,makeOwner,ref,find,pending,body,confirm}=await nextBindingFixture(t),db=env.DB;
+ const old=body(await find());
+ const competitor=await makeOwner('甲','class');
+ assert.equal((await find()).next_binding,undefined,'case of identical student/class cannot be guessed');
+ await assert.rejects(confirm(old),e=>e.status===409);
+ await db.prepare('DELETE FROM lesson_owner_aliases WHERE owner_id=?').bind(competitor.id).run();await db.prepare('DELETE FROM lesson_owners WHERE id=?').bind(competitor.id).run();
+ events.push({...events[1],id:'tie',iCalUID:'tie-uid'});
+ assert.equal((await find()).reason,'ambiguous');await assert.rejects(confirm(old),e=>e.status===409);events.pop();
+ await db.prepare("INSERT INTO lesson_history_exclusions VALUES('a',?,'explicit exclusion')").bind(events[1].id).run();
+ assert.equal((await find()).target,null);await assert.rejects(confirm(old),e=>e.status===409);
+ await db.prepare('DELETE FROM lesson_history_exclusions').run();
+ await db.prepare("INSERT INTO curriculum_entries VALUES(?,0,'legacy','','','','old')").bind(events[1].id).run();
+ assert.equal((await find()).next_binding,undefined);await assert.rejects(confirm(old),e=>e.status===409);
+ await db.prepare('DELETE FROM curriculum_entries').run();
+ events[1].description='授業予定：元の情報';assert.equal((await find()).next_binding,undefined);delete events[1].description;
+ const originalIdentity=events[1].iCalUID;delete events[1].iCalUID;
+ assert.equal((await find()).next_binding,undefined);events[1].iCalUID=originalIdentity;
+ await pending('元の版の下書き'); const beforeMove=body(await find());
+ events[1].etag='moved';events[1].iCalUID='new-event-generation';events[1].start.dateTime='2026-11-02T12:00:00+09:00';events[1].end.dateTime='2026-11-02T13:00:00+09:00';
+ assert.equal((await find()).next_binding,undefined,'older context from a different generation remains manual');
+ await assert.rejects(confirm(beforeMove),e=>e.status===409);
+ const different=await makeOwner('別の生徒'); const other=await bind(env,different,ref(1),deps);
+ assert.equal((await find()).next_binding,undefined);assert.equal((await find()).owner_id,other.record.owner_id);
+ assert.equal((await listOwnerRecords(env,owner.id)).length,1);
+});
+test('stale list identity is not enough: direct Google re-read guards the next slot',async t=>{
+ const {env,events,deps,find,pending,body,confirm}=await nextBindingFixture(t);
+ await pending('keep exact draft');
+ const payload=body(await find()),stored=(await env.DB.prepare('SELECT * FROM lesson_pending_plans').first());
+ const direct=deps.event;deps.event=(token,cal,id)=>id===events[1].id?{...events[1],iCalUID:'other-generation'}:direct(token,cal,id);
+ await assert.rejects(confirm(payload),e=>e.status===409);
+ assert.deepEqual(await env.DB.prepare('SELECT * FROM lesson_pending_plans').first(),stored);
+ assert.equal((await env.DB.prepare('SELECT COUNT(*) AS n FROM lesson_event_links').first()).n,1);
+});
+
+const automaticPayload=offer=>({source:offer.source,target:offer.target,fingerprint:offer.next_binding.fingerprint,
+ confirm:true,automatic:true,request_id:'auto-next-'+offer.next_binding.fingerprint});
+test('automatic binding follows an earlier renamed slot, never moving the prior next event plan',async t=>{
+ const {env,events,deps,owner,ref,find,pending,confirm}=await nextBindingFixture(t,{future:true});
+ events[1].summary='○';events[2].summary='甲';
+ const previous=(await bind(env,owner,ref(2),deps)).record;
+ await editOwnerRecord(env,previous.id,{request_id:request(),revision:1,lesson_plan:'後日の確定済み予定'});
+ assert.equal((await find()).target.id,events[2].id);
+ events[1].summary='甲';events[1].etag='new-earlier-slot';
+ let current=await find();
+ assert.equal(current.target.id,events[1].id);
+ assert.equal(current.next_binding.automatic,undefined,'never auto-creates an empty record');
+ await assert.rejects(confirm(automaticPayload(current)),e=>e.status===409);
+ const text='この予定に保存した下書き';
+ await pending(text);
+ current=await find();
+ assert.equal(current.next_binding.automatic,true);
+ assert.equal((await listOwnerRecords(env,owner.id)).length,2,'GET stays pure');
+ const payload=automaticPayload(current),result=await confirm(payload);
+ assert.equal(result.record.lesson_plan,text);assert.equal((await find()).target.id,events[1].id);
+ assert.equal((await listOwnerRecords(env,owner.id)).find(r=>r.id===previous.id).lesson_plan,'後日の確定済み予定');
+ assert.deepEqual(await confirm(payload),result,'retry is idempotent and does not target the later appointment');
+});
+test('unique pending draft follows the same immutable Calendar event across time/ETag changes',async t=>{
+ const {env,events,find,pending,confirm}=await nextBindingFixture(t,{future:true});
+ await pending('既存の下書き\n保持');const original=await find(),old=automaticPayload(original);
+ events[1].etag='time-change';events[1].start.dateTime=events[1].start.dateTime.replace('T10:00','T13:00');events[1].end.dateTime=events[1].end.dateTime.replace('T11:00','T14:00');
+ const moved=await find();assert.equal(moved.target.id,original.target.id);
+ assert.equal(moved.next_binding.automatic,true);assert.equal(moved.next_binding.moved_draft,'既存の下書き\n保持');
+ assert.equal(moved.lesson_plan,'','do not seed stale draft as editable current context');
+ await assert.rejects(confirm(old),e=>e.status===409);
+ const result=await confirm(automaticPayload(moved));
+ assert.equal(result.record.lesson_plan,'既存の下書き\n保持');assert.equal(result.target.start,moved.target.start);
+ assert.equal((await env.DB.prepare('SELECT count(*) n FROM lesson_pending_plans').first()).n,1);
+});
+test('a saved current blank is authoritative and multiple older contexts are never chosen automatically',async t=>{
+ const {events,find,pending,confirm}=await nextBindingFixture(t,{future:true});
+ await pending('古い記述');events[1].etag='second-version';
+ await pending('');let current=await find();
+ assert.equal(current.next_binding.has_draft,true);assert.equal(current.next_binding.moved_draft,undefined);assert.equal(current.next_binding.automatic,undefined);
+ await assert.rejects(confirm(automaticPayload(current)),e=>e.status===409);
+ await pending('別の記述');events[1].etag='third-version';current=await find();
+ assert.equal(current.next_binding,undefined,'multiple old drafts require manual selection');
+});
+test('the automatic endpoint refuses past starts even when a valid saved draft exists',async t=>{
+ const {find,pending,confirm}=await nextBindingFixture(t,{past:true});
+ await pending('歴史的な下書き');const shown=await find();
+ assert.equal(shown.next_binding.has_draft,true);assert.equal(shown.next_binding.automatic,undefined);
+ await assert.rejects(confirm(automaticPayload(shown)),e=>e.status===409);
 });

@@ -65,7 +65,7 @@ export function lessonRecordRows(rows, { escapeHtml, formatTimeOrPeriod, lessonR
     .join("");
 }
 
-export function renderPlanEditors(root, lessonPlans, { lessonPlanDate, resizeRecordInput }) {
+export function renderPlanEditors(root, lessonPlans, { lessonPlanDate, resizeRecordInput, allowNextBinding = false }) {
   const states = { unsaved: "未保存・入力を終えると自動保存", saving: "保存中…", saved: "保存済み", error: "保存できませんでした。入力は残っています", conflict: "予定または内容が変更されています。入力を残して保存を停止しました" };
   const reasons = { owner_confirmation_required: "次回候補は見つかりました。生徒・クラスの紐づけを確認してください", owner_unassigned: "この授業の生徒・クラスの紐づけを確認してください", attribution: "次回の記録は予定名の対応確認が必要です。次回授業の授業記録画面で確認してください", loading: "次回を確認中…", none: "366日先までに次回の授業が見つかりません", ineligible: "この予定は次回連動の対象外です", ambiguous: "同時刻に候補が複数あるため連動できません", error: "次回を取得できませんでした", conflict: states.conflict };
   root.querySelectorAll(".lesson-plan-editor").forEach((editor) => {
@@ -99,7 +99,17 @@ export function renderPlanEditors(root, lessonPlans, { lessonPlanDate, resizeRec
       const target = conflict ? link?.current?.target || link?.target : link?.target;
       editor.querySelector(".lesson-plan-target").dataset.conflict = String(!!conflict);
       editor.querySelector(".lesson-plan-target").dataset.review = String(reviewRequired);
-      if(reviewRequired&&target){const review=editor.ownerDocument.createElement('a');review.className='next-owner-review';review.textContent='次回候補の紐づけを確認';review.inert=!!state?.pendingUnknown;review.setAttribute('aria-disabled',String(!!state?.pendingUnknown));review.href='/tutor/history.html?'+new URLSearchParams({calendar_id:target.calendar_id,event_id:target.id});editor.append(review);}
+      if(reviewRequired&&target){
+        const review=editor.ownerDocument.createElement('a'),offer=link?.current?.next_binding;
+        const quick=allowNextBinding&&offer&&link.source?.id&&!conflict&&!state?.dirty&&!state?.pending&&!state?.pendingUnknown;
+        review.className='next-owner-review';
+        const pendingDraft=allowNextBinding&&(state?.dirty||state?.pending);
+        review.textContent=pendingDraft&&!state?.pendingUnknown?'下書きを保存してから紐づけを確認':quick?(offer.has_draft?'次回の紐づけと下書きを確認':'次回の紐づけを確認'):'次回候補の紐づけを確認';
+        review.inert=!!(state?.pendingUnknown||pendingDraft);
+        review.setAttribute('aria-disabled',String(review.inert));
+        review.href='/tutor/history.html?'+new URLSearchParams({calendar_id:target.calendar_id,event_id:target.id,...(quick?{next_source_id:link.source.id}:{})});
+        editor.append(review);
+      }
       editor.querySelector(".lesson-plan-target").textContent = target ? `${conflict ? "最新候補" : reviewRequired ? "次回候補" : "連動先"}: ${lessonPlanDate(target)}` : "";
     }
     action.hidden = false; action.disabled = !!state?.pending || linkStatus === "loading" && !!sourceKey;

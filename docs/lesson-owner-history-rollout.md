@@ -52,3 +52,9 @@ UIは送信前に操作UUIDを記録し、結果不明では入力を保持し�
 `npm test`、`node --test ../tutor/test/*.test.mjs`、`node test/lesson-owner-history.browser.mjs`で保存、競合、入替、削除・再作成、最新値の取り込み、失敗・不明時の再送停止を検証する。ブラウザ確認はChromiumのPC/390px幅・reduced motion。iPhone Safariの実機操作は未確認。
 
 参考：[Workers best practices](https://developers.cloudflare.com/workers/best-practices/workers-best-practices/)、[D1 batch](https://developers.cloudflare.com/d1/worker-api/d1-database/)、[Bootstrap 6 AI](https://getbootstrap.com/docs/6.0/getting-started/ai/)。
+
+## 次回の予定を安全に引き継ぐ
+
+確認済みの授業カードで次回を読み直したとき、同じカレンダーの未紐づけ候補が一意で、同じ所属の確認が取れ、開始前の予定に空欄でない保存済み下書きがある場合に限り、紐づけと下書きの引き継ぎを行う。GETは読み取り専用。開いている授業記録・タブに戻ったとき・次回予定の保存後に、本人のブラウザから別のPOSTで最新の予定・所属・下書きの版を確認してから記録する。元の下書きと元の授業は保持する。
+
+同じGoogle予定で開始・終了時刻や版だけが変わった場合、同じ作成情報・予定ID・名前で、以前の下書きが一つに絞れるときだけその下書きを候補とする。現時点の下書きがある場合は空欄を含めて現時点の内容を優先する。別の予定IDの予定や本文、Google予定、既存の他の履歴は変更しない。名前・別名に他の所属がある場合や、旧記録、除外、解除履歴、別の所属、異なる生成の下書き、複数の古い下書き等は確認画面へ案内する。編集中の入力を置き換えず、不明な保存は再送せず読み直す。

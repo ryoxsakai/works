@@ -1,11 +1,13 @@
-import {readPendingRecovery,persistPendingRecovery,clearPendingRecovery} from './pending-plan-draft.mjs?v=2';
+import {readPendingRecovery,persistPendingRecovery,clearPendingRecovery,pendingRecoveryCopies} from './pending-plan-draft.mjs?v=2';
 import { lessonEventKey, sameLessonEvent } from "../shared/lesson-plan.js";
 
 // All editors of one event share one draft and one write queue. Nothing is copied
 // into the preceding event's record, and responses never use the later selection.
-export function createLessonPlanController({ readNext, write, readCurrent, readOperation, onChange = () => {} }) {
+export function createLessonPlanController({ readNext, write, readCurrent, readOperation, confirmBinding, canAutoBind = () => true, onChange = () => {} }) {
   const plans = new Map(), links = new Map();
-  const ownTargets=new Map();
+  const ownTargets=new Map(), attemptedBindings=new Set(), autoBindingReads=new Map();
+  const hasEdit=state=>!!(state?.dirty||state?.pending||state?.pendingUnknown);
+  const savedRecoveryFor=target=>pendingRecoveryCopies().some(copy=>copy.target?.calendar_id===target.calendar_id&&copy.target?.id===target.id);
   function latestOwn(ref){let current=ref;const seen=new Set();while(current&&ownTargets.has(JSON.stringify(current))&&!seen.has(JSON.stringify(current))){seen.add(JSON.stringify(current));current=ownTargets.get(JSON.stringify(current));}return current;}
   function observeTarget(before,after){
     if(!before||!after||!sameLessonEvent({...after,etag:before.etag},before))return;
@@ -30,7 +32,7 @@ export function createLessonPlanController({ readNext, write, readCurrent, readO
     }
     return state;
   }
-  return {
+  const controller = {
     get version() { return version; }, seed, observeTarget,
     observeRecord(target, revision) {
       const state=plans.get(lessonEventKey(target));
@@ -45,18 +47,59 @@ export function createLessonPlanController({ readNext, write, readCurrent, readO
       const generation = ++link.generation, readVersion = version;
       Object.assign(link, { source, status: "loading" }); notify();
       try {
-        const rawResult = await readNext(source);
-        const result={...rawResult,source:latestOwn(rawResult.source),target:latestOwn(rawResult.target)};
+        const withLatest=result=>({...result,source:latestOwn(result.source),target:latestOwn(result.target)});
+        let result=withLatest(await readNext(source));
         if (link.generation !== generation) return;
-        const old = plans.get(link.targetKey);
-        const sourceState=plans.get(key);
-        const changed = !sameLessonEvent(latestOwn(source), result.source)
-          || (sourceState?.ownerId&&Object.hasOwn(result,'source_owner_id')&&sourceState.ownerId!==result.source_owner_id)
-          || (old?.dirty && !sameLessonEvent(link.target, result.target))
-          || (old?.ownerId&&Object.hasOwn(result,'owner_id')&&old.ownerId!==result.owner_id)
-          || (old?.dirty&&old.pendingContext&&old.pendingContext!==result.pending_context);
-        link.current = result;
-        if (changed) { link.status = "conflict"; notify(); return; }
+        const changed=()=>{
+          const old=plans.get(link.targetKey),sourceState=plans.get(key);
+          const safeRetarget=!!(!hasEdit(old)&&sourceState?.ownerId&&(
+            (!result.target&&['none','ambiguous'].includes(result.reason))
+            ||(result.target&&lessonEventKey(result.target)!==link.targetKey
+              &&(result.owner_confirmation_required||result.owner_id===sourceState.ownerId))));
+
+          return !sameLessonEvent(latestOwn(source),result.source)
+            || (sourceState?.ownerId&&Object.hasOwn(result,'source_owner_id')&&sourceState.ownerId!==result.source_owner_id)
+            || (hasEdit(old)&&!sameLessonEvent(link.target,result.target))
+            || (old?.ownerId&&Object.hasOwn(result,'owner_id')&&old.ownerId!==result.owner_id&&!safeRetarget)
+            || (hasEdit(old)&&old.pendingContext&&old.pendingContext!==result.pending_context);
+        };
+        link.current=result;
+        if(changed()){link.status="conflict";notify();return;}
+        const offer=result.next_binding,sourceState=plans.get(key),candidate=result.target;
+        const candidateKey=candidate?lessonEventKey(candidate):null;
+        const targetState=()=>candidateKey?plans.get(candidateKey):null;
+        if(confirmBinding&&offer?.automatic&&result.owner_confirmation_required&&candidate
+          &&sourceState?.ownerId===offer.owner_id&&result.source_owner_id===offer.owner_id
+          &&sourceState?.attributionStatus==="confirmed"&&sameLessonEvent(sourceState.target,source)
+          &&!hasEdit(sourceState)&&!hasEdit(plans.get(link.targetKey))&&!hasEdit(targetState())&&!savedRecoveryFor(candidate)
+          &&canAutoBind(source)&&(autoBindingReads.has(offer.fingerprint)||!attemptedBindings.has(offer.fingerprint))){
+          const fingerprint=offer.fingerprint;
+          let pending=autoBindingReads.get(fingerprint);
+          if(!pending){
+            if(attemptedBindings.size>=128)attemptedBindings.delete(attemptedBindings.values().next().value);
+            attemptedBindings.add(fingerprint);
+            const confirmed={source:structuredClone(result.source),target:structuredClone(candidate),fingerprint,
+              request_id:"auto-next-"+fingerprint,confirm:true,automatic:true};
+            // A lost POST response is not replayed. Re-read the actual association.
+            pending=(async()=>{
+              try{await confirmBinding(confirmed);}catch{}
+              try{return withLatest(await readNext(source));}catch{return null;}
+            })();
+            autoBindingReads.set(fingerprint,pending);
+            void pending.finally(()=>autoBindingReads.delete(fingerprint));
+          }
+          const fresh=await pending;
+          if(link.generation!==generation)return;
+          if(hasEdit(targetState())||hasEdit(plans.get(link.targetKey))||hasEdit(plans.get(key))||savedRecoveryFor(candidate)
+            ||targetState()?.changedAt>readVersion){
+            link.current=fresh||result;link.status="conflict";
+            if(hasEdit(targetState())&&(!link.targetKey||link.targetKey===candidateKey)){link.target=candidate;link.targetKey=candidateKey;}
+            notify();return;
+          }
+          result=fresh||{...result,pending_allowed:false,next_binding:undefined};
+          link.current=result;
+          if(changed()){link.status="conflict";notify();return;}
+        }
         if(result.owner_confirmation_required){
           link.target=result.target;link.targetKey=result.pending_allowed?seed(result.target,result.lesson_plan||'',readVersion,result.record_revision,result.attribution_status,null,result.pending_context).key:'';link.status=result.pending_allowed?'pending_owner':'owner_confirmation_required';notify();return;
         }
@@ -122,6 +165,8 @@ export function createLessonPlanController({ readNext, write, readCurrent, readO
         if (state.pending && state.status !== "conflict") state.status = "saving";
         notify();
       }
+      if(confirmBinding&&pendingContext&&link&&!state.dirty&&!state.pending&&!state.pendingUnknown&&state.status==="saved"
+        &&sameLessonEvent(link.target,state.target)&&canAutoBind(link.source))await controller.loadNext(link.source);
     },
     async verifyPending(key){
       const state=plans.get(key);if(!state?.pendingUnknown||!state.operationId||!readOperation||!readCurrent)return false;
@@ -141,4 +186,5 @@ export function createLessonPlanController({ readNext, write, readCurrent, readO
       state.changedAt = ++version;clearPendingRecovery(state); notify(); return true;
     },
   };
+  return controller;
 }
