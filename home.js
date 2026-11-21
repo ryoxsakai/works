@@ -1,5 +1,5 @@
 import { setUserAvatar } from "./shared/avatar.mjs?v=1";
-import "./shared/header.js?v=service-bar-1";
+import "./shared/header.js?v=service-shell-1";
 import { hydrateIcons } from "./shared/ui/icons.mjs";
 import {
   signIn,
@@ -10,7 +10,7 @@ import {
 } from "./shared/auth.js?v=14";
 import { getTheme, setTheme } from "./shared/theme.js?v=7";
 
-import { createDashboard } from "./dashboard/dashboard.mjs?v=17";
+import { createDashboard } from "./dashboard/dashboard.mjs?v=service-shell-1";
 const homeNavigation = document.querySelector(".works-navigation");
 homeNavigation.id = "home-navigation";
 // Keep the shared popover from covering dashboard edit controls when tabbing out.

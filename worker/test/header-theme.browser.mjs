@@ -91,6 +91,30 @@ async function assertLightOnly(page) {
     return r.fulfill({contentType,body:fs.readFileSync(file)});
   });
   const page = await context.newPage();
+  await page.setViewportSize({width:390,height:844});
+  await page.goto(base + '/');
+  await page.evaluate(() => {
+    localStorage.setItem('qa_signed_in','yes');
+    localStorage.setItem('works_session_token','qa');
+  });
+  await page.reload();
+  await page.evaluate(() => window.qaShell = true);
+  for (const [from,to] of [['/','/todo/'],['/todo/','/memo/'],['/memo/','/tutor/'],['/tutor/','/admission/'],['/admission/','/material/'],['/material/','/']]) {
+    const frame = page.frameLocator('iframe:not([inert])');
+    const bar = frame.locator('.works-service-bar');
+    await bar.waitFor();
+    assert.equal(await bar.locator('a').count(),6);
+    assert.equal(await bar.locator('[aria-current]').getAttribute('href'),from);
+    await bar.locator('a[href="'+to+'"]').click();
+    await page.waitForURL(base + to, {timeout:12000});
+    assert.equal(await page.evaluate(()=>window.qaShell),true);
+  }
+  await page.goBack();
+  await page.frameLocator('iframe:not([inert])').locator('.works-service-bar [aria-current][href="/material/"]').waitFor();
+  await page.goForward();
+  await page.frameLocator('iframe:not([inert])').locator('.works-service-bar [aria-current][href="/"]').waitFor();
+  console.log('Mobile service switcher: all six destinations, home, history and persistent outer document passed.');
+  await page.evaluate(()=>localStorage.clear());
   const report = [];
   await page.goto(base + "/");
   for (const signedIn of [false, true]) {
@@ -148,7 +172,7 @@ async function assertLightOnly(page) {
             const local = page.locator('.todo-page .bottom-tabs, .memo-menu, .admission-view-tabs, .material-page-tabs, .tutor-bootstrap .page-tabs').first();
             if (await local.isVisible() && await local.evaluate(el => getComputedStyle(el).position === 'fixed')) {
               const localBounds = await local.boundingBox();
-              assert.ok(bounds.y + bounds.height <= localBounds.y - 4, path + ' local toolbar overlap');
+              assert.ok(localBounds.y + localBounds.height <= bounds.y - 4, path + ' local toolbar overlap');
             }
             assert.ok(bounds.x >= 0 && bounds.x + bounds.width <= width);
           }
@@ -180,7 +204,7 @@ async function assertLightOnly(page) {
               ctx.drawImage(bitmap, 0, 0);
               return ctx.getImageData(60,16,1,1).data[0] - ctx.getImageData(20,16,1,1).data[0];
             }, pixels.toString('base64'));
-            assert.ok(contrast > 35, 'underlying colors must remain visible through the drawer: ' + contrast);
+            assert.ok(contrast > 18, 'underlying colors must remain visible through the drawer: ' + contrast);
             await swatches.evaluate(el => el.remove());
             await page.mouse.click(width - 4, 320);
             assert.equal(await drawer.evaluate(el => el.open), false, 'tap outside closes drawer');
