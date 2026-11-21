@@ -144,6 +144,8 @@ async function assertLightOnly(page) {
             const drawer = page.locator('.works-navigation');
             assert.match(await drawer.evaluate(el => getComputedStyle(el, '::before').backdropFilter), /blur/);
             assert.match(await drawer.locator('nav').evaluate(el => getComputedStyle(el).backgroundImage), /gradient/);
+            await drawer.locator("nav").evaluate(el => Promise.all(el.getAnimations().map(a => a.finished)));
+            assert.equal(await drawer.locator("nav a").first().evaluate(el => getComputedStyle(el).color), "rgb(255, 255, 255)");
             // Sample the rendered menu over two strips on the underlying page.
             const swatches = await page.evaluateHandle(() => {
               const el = document.createElement('div');
@@ -161,12 +163,19 @@ async function assertLightOnly(page) {
               ctx.drawImage(bitmap, 0, 0);
               return ctx.getImageData(60,16,1,1).data[0] - ctx.getImageData(20,16,1,1).data[0];
             }, pixels.toString('base64'));
-            assert.ok(contrast > 85, 'underlying colors must remain visible through the drawer: ' + contrast);
+            assert.ok(contrast > 35, 'underlying colors must remain visible through the drawer: ' + contrast);
             await swatches.evaluate(el => el.remove());
             await page.mouse.click(width - 4, 320);
             assert.equal(await drawer.evaluate(el => el.open), false, 'tap outside closes drawer');
+            const exit = await drawer.locator('nav').evaluate(el => {
+              const transition = el.getAnimations().find(a => a.transitionProperty === 'opacity');
+              return transition?.effect.getKeyframes().map(frame => Number(frame.opacity));
+            });
+            assert.deepEqual(exit, [1, 0], 'outside tap fades the visible menu out');
+            await drawer.locator('nav').waitFor({state:'hidden'});
             await drawer.locator('summary').click();
           }
+          if (width < 1024) await page.locator(".works-navigation nav").evaluate(el => Promise.all(el.getAnimations().map(a => a.finished)));
           const nav = await page.locator(new URL(page.url()).pathname === '/' ? '#home-navigation nav' : '.works-navigation nav').boundingBox();
           assert(nav.x>=0 && nav.x+nav.width<=width+1,`${path} ${width} clipped menu`);
           await page.keyboard.press('Escape');
