@@ -23,13 +23,13 @@ const TINTS = {
   admission: ["#f2edff", "#7650e0"], workflow: ["#fff3e2", "#c26a00"], wiki: ["#e9f7f1", "#1d8a5f"],
   todo: ["#eaf1ff", "#3c64d8"], memo: ["#fff7dc", "#a77800"], kdp: ["#fdecf3", "#c43c7a"], ss: ["#eef1f6", "#55607a"],
 };
-const GROUPS = [
-  [null, [["/", "home", "ホーム"]]],
-  ["授業・教材", [["/tutor/", "tutor", "授業管理"], ["/material/", "material", "教材管理"], ["/admission/", "admission", "入試管理"]]],
-  ["自動実行", [["/workflow/", "workflow", "ワークフロー"], ["/wiki/", "wiki", "Wiki"]]],
-  ["業務", [["/todo/", "todo", "ToDo管理"], ["/memo/", "memo", "メモ"]]],
-  ["制作", [["/kdp/", "kdp", "KDP管理"], ["/ss/", "ss", "SS管理"]]],
-];
+const services = [
+  ["/", "home", "ホーム"], ["/tutor/", "tutor", "授業管理"],
+  ["/material/", "material", "教材管理"], ["/admission/", "admission", "入試管理"],
+  ["/workflow/", "workflow", "ワークフロー"], ["/wiki/", "wiki", "Wiki"],
+  ["/todo/", "todo", "ToDo"], ["/memo/", "memo", "メモ"],
+  ["/kdp/", "kdp", "KDP管理"], ["/ss/", "ss", "SS管理"],
+].filter(([href]) => isListedServicePath(href));
 const QUICK = [
   ["todo", "/todo/#works-quick=todo", "ToDoを追加", "タイトルと日付だけですぐ登録"],
   ["memo", "/memo/#works-quick=memo", "メモを追加", "思いついたことを書き留める"],
@@ -58,11 +58,8 @@ if (actions) {
   const navigation = document.createElement("details");
   navigation.className = "works-navigation";
   navigation.innerHTML = `<summary aria-label="サービス一覧">${svg("menu", 22)}</summary>
-    <nav aria-label="Works サービス">${GROUPS.map(([label, links]) => {
-      const listed = links.filter(([href]) => isListedServicePath(href));
-      return listed.length ? (label ? `<span>${label}</span>` : "") +
-        listed.map(([href, key, text]) => `<a href="${href}">${appIcon(key)}<span>${text}</span></a>`).join("") : "";
-    }).join("")}</nav>`;
+    <nav aria-label="Works サービス">${services.map(([href, key, text]) =>
+      `<a href="${href}">${appIcon(key)}<span>${text}</span></a>`).join("")}</nav>`;
   navigation.querySelectorAll("a").forEach((link) => {
     if (link.pathname === location.pathname) link.setAttribute("aria-current", "page");
     guard(link);
@@ -71,19 +68,16 @@ if (actions) {
   serviceBar.className = "works-service-bar";
   serviceBar.setAttribute("aria-label", "サービス切り替え");
   const currentPath = location.pathname.replace(/index\.html$/, "");
-  for (const [, links] of GROUPS) {
-    for (const [href, icon, label] of links) {
-      if (!isListedServicePath(href)) continue;
-      const link = document.createElement("a");
-      link.href = href;
-      link.setAttribute("aria-label", label);
-      link.title = label;
-      link.innerHTML = appIcon(icon);
-      if (currentPath === href || (href === "/material/" && currentPath === "/material-print/"))
-        link.setAttribute("aria-current", "page");
-      guard(link);
-      serviceBar.append(link);
-    }
+  for (const [href, icon, label] of services) {
+    const link = document.createElement("a");
+    link.href = href;
+    link.setAttribute("aria-label", label);
+    link.title = label;
+    link.innerHTML = appIcon(icon);
+    if (currentPath === href || (href === "/material/" && currentPath === "/material-print/"))
+      link.setAttribute("aria-current", "page");
+    guard(link);
+    serviceBar.append(link);
   }
   document.body.append(serviceBar);
 

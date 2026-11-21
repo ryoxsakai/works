@@ -99,6 +99,12 @@ async function assertLightOnly(page) {
   });
   await page.reload();
   await page.evaluate(() => window.qaShell = true);
+  const warmTodo = page.locator('iframe[data-standby][src*="/todo/"]');
+  await warmTodo.waitFor({state:'attached'});
+  const warmView = await warmTodo.elementHandle();
+  const todoFrame = await warmView.contentFrame();
+  await todoFrame.locator('link[rel="modulepreload"]').waitFor({state:'attached'});
+  assert.equal(await todoFrame.evaluate(()=>Boolean(window.qaAuth)),false);
   for (const [from,to] of [['/','/todo/'],['/todo/','/memo/'],['/memo/','/tutor/'],['/tutor/','/admission/'],['/admission/','/material/'],['/material/','/']]) {
     const frame = page.frameLocator('iframe:not([inert])');
     const bar = frame.locator('.works-service-bar');
@@ -108,6 +114,7 @@ async function assertLightOnly(page) {
     await bar.locator('a[href="'+to+'"]').click();
     await page.waitForURL(base + to, {timeout:12000});
     assert.equal(await page.evaluate(()=>window.qaShell),true);
+    if (to === '/todo/') assert.equal(await warmView.evaluate(el=>el.isConnected && !el.inert),true);
   }
   await page.goBack();
   await page.frameLocator('iframe:not([inert])').locator('.works-service-bar [aria-current][href="/material/"]').waitFor();
@@ -234,7 +241,8 @@ async function assertLightOnly(page) {
   await page.goto(base + '/');
   assert.equal(await page.locator('.module-card[href="/material-print/"]').count(),0);
   await page.locator('#home-navigation').evaluate(el=>el.open=true);
-  assert.deepEqual(await page.locator('#home-navigation a').allTextContents(),['ホーム','授業管理','教材管理','入試管理','ToDo管理','メモ']);
+  assert.equal(await page.locator('#home-navigation nav > span').count(),0);
+  assert.deepEqual(await page.locator('#home-navigation a').allTextContents(),['ホーム','授業管理','教材管理','入試管理','ToDo','メモ']);
   // A previously stored dark choice and a dark OS both resolve to light.
   await page.evaluate(()=>localStorage.setItem('works_theme','dark'));
   await page.emulateMedia({colorScheme:'dark'});
