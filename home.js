@@ -1,5 +1,5 @@
 import { setUserAvatar } from "./shared/avatar.mjs?v=1";
-import "./shared/header.js?v=service-shell-1";
+import "./shared/header.js?v=navigation-2";
 import { hydrateIcons } from "./shared/ui/icons.mjs";
 import {
   signIn,

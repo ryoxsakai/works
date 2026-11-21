@@ -1093,7 +1093,7 @@ try {
     assert.ok(contrast>=4.5, `${mode} primary text contrast ${contrast}`);
   }
   assert.deepEqual(await ui.page.locator('#home-navigation nav > span').allTextContents(), ['授業・教材','業務']);
-  assert.deepEqual(await ui.page.locator('#home-navigation a').allTextContents(), ['ホーム','授業管理','教材管理','入試管理','ToDo管理','メモ']);
+  assert.deepEqual(await ui.page.locator('#home-navigation a').allTextContents(), ['ホーム','授業管理','教材管理','入試管理','ToDo','メモ']);
   assert.equal(await ui.page.locator('#home-navigation [aria-current="page"]').getAttribute('href'), '/');
   for (const width of [390,1440]) for (const theme of ['light']) {
     await ui.page.setViewportSize({width,height:900});
