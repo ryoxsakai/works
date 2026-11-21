@@ -1,5 +1,6 @@
 // Works app shell shared by every page: app navigation (PC sidebar / mobile
 // drawer) and quick add. Pages keep their own settings and account buttons.
+import { enableMenuSwipes } from "./menu-swipe.mjs?v=1";
 import "./theme.js?v=7";
 import { isListedServicePath } from "./menu-visibility.mjs";
 
@@ -80,6 +81,7 @@ if (actions) {
     serviceBar.append(link);
   }
   document.body.append(serviceBar);
+  enableMenuSwipes();
 
   // Older engines without ::details-content keep the PC sidebar open with JS.
   const desktop = window.matchMedia("(min-width: 1024px)");

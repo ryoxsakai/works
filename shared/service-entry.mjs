@@ -26,7 +26,7 @@ if (!embedded && window === top && mobile && hasSession() &&
     await new Promise(resolve => window.addEventListener('works-activate', resolve, {once:true}));
   }
   if (embedded) connectView();
-  await import('/shared/header.js?v=navigation-2');
+  await import('/shared/header.js?v=menu-swipe-1');
   await import(app);
   if (embedded) {
     const ready = () => {
@@ -68,7 +68,7 @@ function connectView() {
     if (next.origin === location.origin && next.pathname === location.pathname && next.hash && next.search === location.search) return;
     event.preventDefault();
     if (next.origin === location.origin && destinations.has(next.pathname)) {
-      parent.dispatchEvent(new CustomEvent('works-service-visit', {detail:{frame:frameElement, url:next.href}}));
+      parent.dispatchEvent(new CustomEvent('works-service-visit', {detail:{frame:frameElement, url:next.href, step:Number(link.dataset.swipeStep) || 0}}));
     } else parent.location.assign(next.href);
   });
 }
@@ -135,12 +135,12 @@ function startHost() {
       }
     }
   }
-  function visit(url, push) {
+  function visit(url, push, step = 0) {
     const path = canonical(url);
     cancelPending();
     if (visible && path === activeAddress) return;
     const frame = standby.get(path) || createFrame(path);
-    pending = {frame, path, push};
+    pending = {frame, path, push, step};
     if (standby.delete(path)) {
       frame.removeAttribute('data-standby');
       frame.contentWindow.dispatchEvent(new Event('works-activate'));
@@ -151,7 +151,7 @@ function startHost() {
   function reveal(frame) {
     if (!pending || frame !== pending.frame) return;
     clearTimeout(timer);
-    const {path, push} = pending;
+    const {path, push, step} = pending;
     pending = null;
     const old = visible;
     visible = frame;
@@ -169,17 +169,17 @@ function startHost() {
     if (window.requestIdleCallback) requestIdleCallback(prepareServices, {timeout:2500});
     else setTimeout(prepareServices, 350);
     if (old && motion()) {
-      const fade = frame.animate([{opacity:0},{opacity:1}], {duration:210,easing:'ease-out'});
+      const fade = frame.animate([{opacity:0, translate:`${step * 22}px 0`},{opacity:1, translate:"0 0"}], {duration:210,easing:'ease-out'});
       fade.finished.then(() => old.remove(), () => old.remove());
     } else old?.remove();
     if (old) frame.focus({preventScroll:true});
   }
   window.addEventListener('works-view-ready', event => reveal(event.detail));
   window.addEventListener('works-service-visit', event => {
-    const {frame, url} = event.detail;
+    const {frame, url, step} = event.detail;
     const next = new URL(url);
     if (!visible && frame === pending?.frame) reveal(frame);
-    if (frame === visible && next.origin === location.origin && destinations.has(next.pathname)) visit(next, true);
+    if (frame === visible && next.origin === location.origin && destinations.has(next.pathname)) visit(next, true, step);
   });
   window.addEventListener('popstate', () => visit(location.href, false));
   window.addEventListener('storage', event => {

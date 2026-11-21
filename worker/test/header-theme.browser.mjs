@@ -120,6 +120,28 @@ async function assertLightOnly(page) {
   await page.frameLocator('iframe:not([inert])').locator('.works-service-bar [aria-current][href="/material/"]').waitFor();
   await page.goForward();
   await page.frameLocator('iframe:not([inert])').locator('.works-service-bar [aria-current][href="/"]').waitFor();
+  const touchSession = await context.newCDPSession(page);
+  async function swipeBar(locator, distance) {
+    const rect = await locator.boundingBox();
+    const x = rect.x + rect.width / 2, y = rect.y + rect.height / 2;
+    for (const [type,offset] of [['touchStart',0],['touchMove',distance/2],['touchMove',distance],['touchEnd',0]]) {
+      await touchSession.send('Input.dispatchTouchEvent', {type,touchPoints:type==='touchEnd'?[]:[{x:x+offset,y}]});
+    }
+  }
+  const visibleView = page.frameLocator('iframe:not([inert])');
+  const bottom = visibleView.locator('.works-service-bar');
+  await swipeBar(bottom, 75);
+  assert.equal(new URL(page.url()).pathname,'/');
+  await swipeBar(bottom,-75);
+  await page.waitForURL(base+'/tutor/');
+  const local = visibleView.locator('.page-tabs');
+  await swipeBar(local,-75);
+  await local.locator('[data-page-tab="schedule"][aria-selected="true"]').waitFor();
+  await swipeBar(local,75);
+  await local.locator('[data-page-tab="record"][aria-selected="true"]').waitFor();
+  await swipeBar(bottom,75);
+  await page.waitForURL(base+'/');
+  console.log('Touch swipes on local and service bars, both directions and first-item boundary passed.');
   console.log('Mobile service switcher: all six destinations, home, history and persistent outer document passed.');
   await page.evaluate(()=>localStorage.clear());
   const report = [];
