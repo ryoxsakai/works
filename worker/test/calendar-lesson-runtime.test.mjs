@@ -282,3 +282,31 @@ test('actual Worker explicit series start and owner memo are browser-only, paren
  const memoURL='/api/lesson-history/owner-memo?'+new URLSearchParams({owner_id:result.rule.owner_id,target:JSON.stringify(future)}),memo=await(await call(memoURL)).json();assert.equal(memo.memo,'');const saved=await put('/api/lesson-history/owner-memo',{owner_id:memo.owner_id,owner_revision:memo.owner_revision,target:future,memo:'共有本文',expected_memo:'',revision:0,request_id:crypto.randomUUID()},headers);assert.equal(saved.status,200,await saved.clone().text());assert.equal((await(await call(memoURL)).json()).memo,'共有本文');assert.deepEqual((await DB.prepare('SELECT * FROM curriculum_entries').all()).results,original);assert.equal(control.patches.length,0);
  assert.equal((await call(memoURL,null,{})).status,401);const mcp='Bearer '+await token(bindings.SESSION_SECRET,{aud:'works-mcp',scope:'schedule:read'});assert.equal((await call(memoURL,null,{Authorization:mcp})).status,401);assert.equal((await call('/api/lesson-history/series/start',body)).status,403);
 });
+
+test('browser-session next-binding endpoint verifies origin and adopts the exact pending plan without a Calendar write',async t=>{
+ const {DB,events,control,call,put,bindings}=await setup(t,{historyMode:'active'}),env={DB,LESSON_HISTORY_MODE:'active'};
+ const headers={Authorization:'Bearer '+await token(bindings.SESSION_SECRET),'Content-Type':'application/json',Origin:origin};
+ const deps={settings:async()=>({selected_calendars:['synthetic-calendar']}),token:async()=>({access_token:'synthetic'}),event:async(token,cal,id)=>events.find(e=>e.id===id)};
+ const [source,,candidate]=events;Object.assign(source,{created:'2026-01-01T00:00:00Z',iCalUID:'source-uid'});Object.assign(candidate,{created:'2026-01-01T00:00:00Z',iCalUID:'candidate-uid'});
+ events[1].status='cancelled';candidate.summary='○';
+ const person=(await createLessonOwner(env,{request_id:crypto.randomUUID(),name:source.summary,kind:'student'})).owner;
+ await changeLessonBinding(env,{request_id:crypto.randomUUID(),target:lessonEventRef(source,'synthetic-calendar'),link_revision:0,decision:'new',owner_id:person.id,owner_revision:1},deps);
+ candidate.summary=source.summary;candidate.etag='"renamed-slot"';
+ const nextURL='/api/next-lesson-plan?calendar_id=synthetic-calendar&event_id=a';
+ let next=await (await call(nextURL)).json();assert.equal(next.target.id,candidate.id);
+ const savedDraft=await put('/api/lesson-plan',{source:next.source,expected_source_owner_id:person.id,target:next.target,pending_context:next.pending_context,record_revision:0,expected_lesson_plan:'',lesson_plan:'合成の保存済み次回予定',request_id:crypto.randomUUID()},headers);
+ assert.equal(savedDraft.status,200,await savedDraft.clone().text());
+ next=await (await call(nextURL)).json();assert.equal(next.next_binding.owner_id,person.id);
+ const payload={source:next.source,target:next.target,fingerprint:next.next_binding.fingerprint,confirm:true,request_id:crypto.randomUUID()};
+ const url='/api/lesson-history/next-binding';
+ assert.equal((await call(url,payload,{})).status,401);
+ assert.equal((await call(url,payload,{...headers,Authorization:'Bearer '+await token(bindings.SESSION_SECRET,{aud:'works-mcp',scope:'schedule:read'})})).status,401);
+ assert.equal((await call(url,payload,{...headers,Origin:'https://other.example.test'})).status,403);
+ assert.equal((await call(url,{...payload,confirm:false},headers)).status,400);
+ assert.equal((await DB.prepare('SELECT count(*) AS n FROM lesson_event_links').first()).n,1);
+ const bound=await call(url,payload,headers);assert.equal(bound.status,200,await bound.clone().text());assert.match(bound.headers.get('Cache-Control'),/no-store/);
+ const result=await bound.json();assert.equal(result.record.lesson_plan,next.lesson_plan);assert.equal(result.record.owner_id,person.id);
+ assert.deepEqual(await (await call(url,payload,headers)).json(),result);
+ assert.equal((await DB.prepare('SELECT count(*) AS n FROM lesson_pending_plans').first()).n,1);
+ assert.equal(control.patches.length,0);
+});

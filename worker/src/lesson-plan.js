@@ -4,7 +4,7 @@ import { NEXT_LESSON_DAYS, lessonEventRef, sameLessonEvent, findNextLesson, isSc
 import {calendarRecordEligible,overlayCalendarLessonRecord,writeCalendarLessonRecord,calendarRecordsEnabled,loadCalendarStorageState} from './calendar-lesson-records.js';
 import {lessonTitleKey} from '../../shared/lesson-attribution.js';
 import {calendarRecordValues} from '../../shared/calendar-lesson-record.mjs';
-import {ownerHistoryActive,readEventOwnerRecord,writeEventOwnerRecord,writePendingLessonPlan} from './lesson-owner-history.js';
+import {ownerHistoryActive,readEventOwnerRecord,writeEventOwnerRecord,writePendingLessonPlan,nextBindingOffer} from './lesson-owner-history.js';
 
 // A stale write may refer to a different ownership generation, even with an identical title.
 // Conflict responses identify the fresh target but never return another generation's plan.
@@ -79,7 +79,8 @@ export async function readNextLessonPlan(env, calendarId, eventId, deps) {
     // source ownership and the target's own revision/owner independently.
     if(next.attribution_status==='confirmed'&&(next.owner_id===record.owner_id||lessonTitleKey(chosen.ref.title)===lessonTitleKey(source.title)))return {...base,target:chosen.ref,...next};
     // Schedule discovery is not an ownership decision. Never expose/copy a candidate's record.
-    return {...base,target:chosen.ref,reason:'owner_confirmation_required',owner_confirmation_required:true,owner_id:null,attribution_status:next.attribution_status,lesson_plan:next.pending_allowed?next.lesson_plan||'':'',record_revision:next.record_revision,pending_context:next.pending_context,pending_allowed:next.pending_allowed,pending_storage_available:next.pending_storage_available};
+    const next_binding=owners.has(chosen.ref.id)?undefined:await nextBindingOffer(env,source,context.event,record,chosen.ref,chosen.event,next);
+    return {...base,target:chosen.ref,reason:'owner_confirmation_required',owner_confirmation_required:true,owner_id:null,attribution_status:next.attribution_status,lesson_plan:next.pending_allowed?next.lesson_plan||'':'',record_revision:next.record_revision,pending_context:next.pending_context,pending_allowed:next.pending_allowed,pending_storage_available:next.pending_storage_available,...(next_binding?{next_binding}:{})};
   }
   const events=await deps.events(context.token,calendarId,source.start,searchEnd);
   const result = findNextLesson(source, events, context.settings.excluded_titles || []);

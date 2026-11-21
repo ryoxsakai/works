@@ -4,7 +4,7 @@ import {readFile} from 'node:fs/promises';
 import {Miniflare} from 'miniflare';
 import {ensureAttribution} from '../src/lesson-attribution.js';
 import {lessonEventRef} from '../../shared/lesson-plan.js';
-import {createLessonOwner,renameLessonOwner,createOwnerRecord,editOwnerRecord,listLessonOwners,listOwnerRecords,changeLessonBinding,readEventOwnerRecord,previewOwnerImport,importOwnerRecord,writeEventOwnerRecord} from '../src/lesson-owner-history.js';
+import {createLessonOwner,renameLessonOwner,createOwnerRecord,editOwnerRecord,listLessonOwners,listOwnerRecords,changeLessonBinding,readEventOwnerRecord,previewOwnerImport,importOwnerRecord,writeEventOwnerRecord,writePendingLessonPlan,confirmNextLessonBinding} from '../src/lesson-owner-history.js';
 import {readNextLessonPlan} from '../src/lesson-plan.js';
 import {plainCalendarRecordLayout} from '../../shared/calendar-lesson-record.mjs';
 const request=()=>crypto.randomUUID();
@@ -164,4 +164,95 @@ test('ToDo mentions use individual IDs, retain renamed students and reject class
  const task = id => ({id:'task',plan:{students:[{id,name:'同姓'}]}});
  await validateNewStudentLinks(env.DB,[task(owner.id)],[]);
  await assert.rejects(validateNewStudentLinks(env.DB,[task(group.id)],[]),/生徒/);
+});
+
+async function nextBindingFixture(t){
+ const f=await setup(t),{env,events,deps,owner,ref}=f;
+ for(const event of events)Object.assign(event,{created:'2026-01-01T05:00:00Z',iCalUID:event.id+'-uid'});
+ events[1].summary='○';const former=ref(1);
+ const record=(await bind(env,owner,ref(),deps)).record;
+ await editOwnerRecord(env,record.id,{request_id:request(),revision:1,lesson_plan:'前の授業の予定',lesson_memo:'引き継がないメモ'});
+ env.LESSON_HISTORY_MODE='active';
+ const find=(cal='a',id=events[0].id)=>readNextLessonPlan(env,cal,id,deps);
+ assert.equal((await find()).target,null,'a vacant circle is not a lesson');
+ Object.assign(events[1],{summary:'甲',etag:'after-name-change'});
+ const pending=async plan=>{
+  const candidate=await find();
+  return writePendingLessonPlan(env,{target:candidate.target,pending_context:candidate.pending_context,record_revision:candidate.record_revision,expected_lesson_plan:candidate.lesson_plan,lesson_plan:plan,request_id:request()},deps);
+ };
+ const body=candidate=>({source:candidate.source,target:candidate.target,fingerprint:candidate.next_binding.fingerprint,confirm:true,request_id:request()});
+ const confirm=payload=>confirmNextLessonBinding(env,payload,deps,find);
+ return {...f,former,record,find,pending,body,confirm};
+}
+test('explicit same-owner shortcut binds a renamed vacancy and adopts only the current saved draft',async t=>{
+ const {env,events,owner,former,record,find,pending,body,confirm}=await nextBindingFixture(t);
+ const draft=await pending('合成の次回予定\nそのまま残す  ');
+ const savedDraft=(await env.DB.prepare('SELECT * FROM lesson_pending_plans').first());
+ let candidate=await find();
+ assert.equal(candidate.target.id,former.id);assert.notEqual(candidate.target.etag,former.etag);
+ assert.equal(candidate.attribution_status,'owner_unassigned');assert.equal(candidate.owner_id,null);
+ assert.deepEqual(candidate.next_binding,{owner_id:owner.id,owner_name:owner.name,owner_kind:'student',fingerprint:candidate.next_binding.fingerprint,has_draft:true});
+ assert.equal((await listOwnerRecords(env,owner.id)).length,1,'GET does not bind');
+ const payload=body(candidate);
+ await assert.rejects(confirm({...payload,confirm:false}),e=>e.status===400);
+ const result=await confirm(payload);
+ assert.equal(result.record.owner_id,owner.id);assert.equal(result.record.lesson_plan,draft.lesson_plan);
+ assert.equal(result.record.lesson_memo,'');assert.notEqual(result.record.id,record.id);
+ assert.deepEqual(await confirm(payload),result,'operation retry is idempotent');
+ const all=await listOwnerRecords(env,owner.id);
+ assert.deepEqual(all.map(r=>r.event_id),[events[0].id,events[1].id]);
+ assert.equal(all[0].lesson_plan,'前の授業の予定');assert.equal(all[0].lesson_memo,'引き継がないメモ');
+ assert.deepEqual(await env.DB.prepare('SELECT * FROM lesson_pending_plans').first(),savedDraft,'original draft retained byte for byte');
+ candidate=await find();assert.equal(candidate.owner_id,owner.id);assert.equal(candidate.lesson_plan,draft.lesson_plan);assert.equal(candidate.next_binding,undefined);
+});
+test('next shortcut rejects stale draft revision atomically, including a competing update just before the write batch',async t=>{
+ const {env,find,pending,body,confirm}=await nextBindingFixture(t);
+ await pending('first');const old=body(await find());await pending('another tab edited');
+ await assert.rejects(confirm(old),e=>e.status===409);
+ const next=body(await find()),db=env.DB;
+ env.DB={prepare:sql=>db.prepare(sql),async batch(items){
+  await db.prepare("UPDATE lesson_pending_plans SET lesson_plan='winner', revision=revision+1").run();
+  return db.batch(items);
+ }};
+ await assert.rejects(confirm(next),e=>e.code==='LESSON_HISTORY_RELOAD');
+ env.DB=db;
+ assert.equal((await db.prepare('SELECT count(*) AS n FROM lesson_event_links').first()).n,1);
+ assert.equal((await db.prepare('SELECT count(*) AS n FROM lesson_history_records').first()).n,1);
+ assert.deepEqual(await db.prepare('SELECT lesson_plan,revision FROM lesson_pending_plans').first(),{lesson_plan:'winner',revision:3});
+ assert.equal((await db.prepare('SELECT COUNT(*) AS n FROM lesson_history_audit WHERE action=?').bind('confirm_next_binding').first()).n,0);
+});
+test('shortcut remains unavailable for ambiguity, different fixed owners, exclusions, old contexts, legacy or unstable slot identities',async t=>{
+ const {env,events,deps,owner,makeOwner,ref,find,pending,body,confirm}=await nextBindingFixture(t),db=env.DB;
+ const old=body(await find());
+ const competitor=await makeOwner('甲','class');
+ assert.equal((await find()).next_binding,undefined,'case of identical student/class cannot be guessed');
+ await assert.rejects(confirm(old),e=>e.status===409);
+ await db.prepare('DELETE FROM lesson_owner_aliases WHERE owner_id=?').bind(competitor.id).run();await db.prepare('DELETE FROM lesson_owners WHERE id=?').bind(competitor.id).run();
+ events.push({...events[1],id:'tie',iCalUID:'tie-uid'});
+ assert.equal((await find()).reason,'ambiguous');await assert.rejects(confirm(old),e=>e.status===409);events.pop();
+ await db.prepare("INSERT INTO lesson_history_exclusions VALUES('a',?,'explicit exclusion')").bind(events[1].id).run();
+ assert.equal((await find()).target,null);await assert.rejects(confirm(old),e=>e.status===409);
+ await db.prepare('DELETE FROM lesson_history_exclusions').run();
+ await db.prepare("INSERT INTO curriculum_entries VALUES(?,0,'legacy','','','','old')").bind(events[1].id).run();
+ assert.equal((await find()).next_binding,undefined);await assert.rejects(confirm(old),e=>e.status===409);
+ await db.prepare('DELETE FROM curriculum_entries').run();
+ events[1].description='授業予定：元の情報';assert.equal((await find()).next_binding,undefined);delete events[1].description;
+ const originalIdentity=events[1].iCalUID;delete events[1].iCalUID;
+ assert.equal((await find()).next_binding,undefined);events[1].iCalUID=originalIdentity;
+ await pending('元の版の下書き'); const beforeMove=body(await find());
+ events[1].etag='moved';events[1].start.dateTime='2026-11-02T12:00:00+09:00';events[1].end.dateTime='2026-11-02T13:00:00+09:00';
+ assert.equal((await find()).next_binding,undefined,'older context remains manual');
+ await assert.rejects(confirm(beforeMove),e=>e.status===409);
+ const different=await makeOwner('別の生徒'); const other=await bind(env,different,ref(1),deps);
+ assert.equal((await find()).next_binding,undefined);assert.equal((await find()).owner_id,other.record.owner_id);
+ assert.equal((await listOwnerRecords(env,owner.id)).length,1);
+});
+test('stale list identity is not enough: direct Google re-read guards the next slot',async t=>{
+ const {env,events,deps,find,pending,body,confirm}=await nextBindingFixture(t);
+ await pending('keep exact draft');
+ const payload=body(await find()),stored=(await env.DB.prepare('SELECT * FROM lesson_pending_plans').first());
+ const direct=deps.event;deps.event=(token,cal,id)=>id===events[1].id?{...events[1],iCalUID:'other-generation'}:direct(token,cal,id);
+ await assert.rejects(confirm(payload),e=>e.status===409);
+ assert.deepEqual(await env.DB.prepare('SELECT * FROM lesson_pending_plans').first(),stored);
+ assert.equal((await env.DB.prepare('SELECT COUNT(*) AS n FROM lesson_event_links').first()).n,1);
 });

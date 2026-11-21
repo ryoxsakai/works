@@ -9,7 +9,7 @@ import {readPendingRecovery,persistPendingRecovery,clearPendingRecovery,pendingR
 import {createOwnerMemoEditors} from '../shared/owner-memo.mjs?v=2-autosave';
 import {boundedRead,precedingLegacyEvents,precedingOwnerEvents,recordTermScope,studentNavigationEvent} from './record-read.mjs?v=3-navigation';
 import {readNextLessonWithTemplate} from "../shared/next-lesson-read.mjs?v=1";
-import { lessonRecordRows, renderPlanEditors, renderMemoEditors, previousOwnerRecord } from "../shared/lesson-record-view.mjs?v=10-periods";
+import { lessonRecordRows, renderPlanEditors, renderMemoEditors, previousOwnerRecord } from "../shared/lesson-record-view.mjs?v=11-next-binding";
 import { setUserAvatar } from "../shared/avatar.mjs?v=1";
 import { attachRecordCarousel } from "./record-carousel.mjs?v=4";
 import { attachRecordToasts } from "./record-toasts.mjs?v=3-name";
@@ -715,7 +715,7 @@ function lessonPlanDate(ref) {
   return `${start}–${end}`;
 }
 function renderLessonPlans() {
-  renderPlanEditors(document, lessonPlans, { lessonPlanDate, resizeRecordInput });
+  renderPlanEditors(document, lessonPlans, { lessonPlanDate, resizeRecordInput, allowNextBinding: true });
   for (const row of document.querySelectorAll('[data-unassigned-progress][data-pending-key]')) {
     const state=lessonPlans.get(row.dataset.pendingKey),input=row.querySelector('textarea');
     if(!state || !input)continue;

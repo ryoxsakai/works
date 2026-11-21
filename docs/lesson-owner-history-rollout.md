@@ -52,3 +52,7 @@ UIは送信前に操作UUIDを記録し、結果不明では入力を保持し�
 `npm test`、`node --test ../tutor/test/*.test.mjs`、`node test/lesson-owner-history.browser.mjs`で保存、競合、入替、削除・再作成、最新値の取り込み、失敗・不明時の再送停止を検証する。ブラウザ確認はChromiumのPC/390px幅・reduced motion。iPhone Safariの実機操作は未確認。
 
 参考：[Workers best practices](https://developers.cloudflare.com/workers/best-practices/workers-best-practices/)、[D1 batch](https://developers.cloudflare.com/d1/worker-api/d1-database/)、[Bootstrap 6 AI](https://getbootstrap.com/docs/6.0/getting-started/ai/)。
+
+## 次回の予定を個別に引き継ぐ
+
+確認済みの授業カードと同じカレンダーで、次回候補が一意かつ未紐づけの場合だけ、元の生徒・クラスを指定した確認を表示する。名前・別名に他の所属がある場合、旧記録・除外・解除履歴・別の所属・古い下書きしかない場合は従来の個別確認へ案内する。予定の閲覧だけでは変更しない。本人の確認後、最新の予定と所属を再検証し、今回の予定で保存済みの授業予定下書きだけを新しい記録と同時に登録する。元の下書き、元の授業、既存の他の履歴、Google Calendarは変更しない。
