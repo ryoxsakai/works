@@ -101,3 +101,73 @@ test('same-name next cards keep independent source and target owners and revisio
  const key=lessonEventKey(target);assert.equal(store.getLink(lessonEventKey(source)).status,'ready');store.edit(key,'edited target');await store.save(key,lessonEventKey(source));
  assert.equal(sent.expected_source_owner_id,'source-owner');assert.equal(sent.expected_owner_id,'target-owner');assert.equal(sent.record_revision,7);assert.equal(sent.expected_lesson_plan,'target plan');assert.equal(store.get(lessonEventKey(source)).value,'source plan');
 });
+
+function automaticFixture(overrides={}){
+ const source=ref('auto-source'),target=ref('earlier'),later=ref('later'),owner='fixed-owner';
+ const confirmed=(target,plan)=>({source,target,source_owner_id:owner,owner_id:owner,attribution_status:'confirmed',lesson_plan:plan,record_revision:1});
+ const offer=(plan='saved target draft')=>({source,target,source_owner_id:owner,owner_id:null,attribution_status:'owner_unassigned',
+  lesson_plan:plan,record_revision:plan?1:0,pending_context:'draft-context',pending_allowed:true,owner_confirmation_required:true,
+  next_binding:{owner_id:owner,automatic:!!plan,fingerprint:'f'.repeat(64),has_draft:!!plan}});
+ let result=confirmed(later,'old later plan'),attempts=[];
+ const store=createLessonPlanController({readNext:async()=>result,write:async()=>{throw Error('ordinary plan write disabled');},
+  confirmBinding:async body=>{attempts.push(body);result=confirmed(target,result.lesson_plan);},...overrides});
+ store.seed(source,'prior lesson',0,1,'confirmed',owner);
+ return {store,source,target,later,owner,offer,confirmed,attempts,set:value=>{result=value;}};
+}
+test('a clean next editor retargets from a later confirmed slot to the new earlier saved draft',async()=>{
+ const f=automaticFixture(),{store,source,target,later,owner}=f;
+ await store.loadNext(source);
+ f.set(f.offer());await store.loadNext(source);await store.loadNext(source);
+ assert.equal(f.attempts.length,1);assert.equal(f.attempts[0].request_id,'auto-next-'+'f'.repeat(64));
+ assert.equal(f.attempts[0].automatic,true);assert.deepEqual(f.attempts[0].target,target);
+ assert.equal(store.getLink(lessonEventKey(source)).targetKey,lessonEventKey(target));
+ assert.equal(store.get(lessonEventKey(target)).ownerId,owner);
+ assert.equal(store.get(lessonEventKey(target)).value,'saved target draft');
+ assert.equal(store.get(lessonEventKey(later)).value,'old later plan');
+});
+test('conflicting local edit during automatic bind is retained, not marked saved after the owner changes',async()=>{
+ const pending=gate(),started=gate();
+ const f=automaticFixture({confirmBinding:async()=>{started.resolve();await pending.promise;}});
+ f.set(f.offer());const {store,source,target,owner}=f;
+ const key=lessonEventKey(target);store.seed(target,'saved target draft',0,1,'owner_unassigned',null,'draft-context');
+ const run=store.loadNext(source);await started.promise;
+ store.edit(key,'local new unsaved draft');f.set(f.confirmed(target,'saved target draft'));pending.resolve();await run;
+ assert.equal(store.getLink(lessonEventKey(source)).status,'conflict');
+ assert.equal(store.get(key).value,'local new unsaved draft');assert.equal(store.get(key).dirty,true);
+ assert.notEqual(store.get(key).ownerId,owner);
+});
+test('two refreshes share the POST, and a lost reply is verified by read without replay',async()=>{
+ const pending=gate(),started=gate();let writes=0;
+ const f=automaticFixture({confirmBinding:async()=>{writes++;started.resolve();await pending.promise;throw Error('lost response');}});
+ f.set(f.offer());const {store,source,target,owner}=f;
+ const one=store.loadNext(source);await started.promise;
+ const two=store.loadNext(source);await Promise.resolve();
+ f.set(f.confirmed(target,'saved target draft'));pending.resolve();await Promise.all([one,two]);
+ assert.equal(writes,1);assert.equal(store.get(lessonEventKey(target)).ownerId,owner);
+ assert.equal(store.getLink(lessonEventKey(source)).status,'ready');
+});
+test('unverified automatic attempt keeps manual fallback and does not resend on repeat refresh',async()=>{
+ let writes=0;
+ const f=automaticFixture({confirmBinding:async()=>{writes++;throw Error('unconfirmed');}});
+ f.set(f.offer());await f.store.loadNext(f.source);await f.store.loadNext(f.source);
+ assert.equal(writes,1);assert.equal(f.store.getLink(lessonEventKey(f.source)).status,'pending_owner');
+ assert.equal(f.store.get(lessonEventKey(f.target)).value,'saved target draft');
+});
+test('the first successful next-plan save rechecks the unbound target before automatically binding',async()=>{
+ let normal=0;
+ const f=automaticFixture({write:async body=>{normal++;f.set(f.offer(body.lesson_plan));return {target:f.target,lesson_plan:body.lesson_plan,record_revision:1};}});
+ f.set(f.offer(''));const {store,source,target,owner}=f,key=lessonEventKey(target);
+ await store.loadNext(source);assert.equal(f.attempts.length,0);
+ store.edit(key,'user saved this target');await store.save(key,lessonEventKey(source));
+ assert.equal(normal,1);assert.equal(f.attempts.length,1);assert.equal(store.get(key).ownerId,owner);assert.equal(store.get(key).value,'user saved this target');
+});
+test('a new ambiguous owner keeps its specific manual review link without moving the previous plan',async()=>{
+ const f=automaticFixture(),{store,source,target,later}=f;
+ await store.loadNext(source);
+ const fallback=f.offer('the new target draft');delete fallback.next_binding;
+ f.set(fallback);await store.loadNext(source);
+ assert.equal(store.getLink(lessonEventKey(source)).status,'pending_owner');
+ assert.equal(store.get(lessonEventKey(target)).value,'the new target draft');
+ assert.equal(store.get(lessonEventKey(later)).value,'old later plan');
+ assert.equal(f.attempts.length,0);
+});

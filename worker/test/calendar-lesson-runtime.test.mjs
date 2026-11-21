@@ -289,6 +289,8 @@ test('browser-session next-binding endpoint verifies origin and adopts the exact
  const deps={settings:async()=>({selected_calendars:['synthetic-calendar']}),token:async()=>({access_token:'synthetic'}),event:async(token,cal,id)=>events.find(e=>e.id===id)};
  const [source,,candidate]=events;Object.assign(source,{created:'2026-01-01T00:00:00Z',iCalUID:'source-uid'});Object.assign(candidate,{created:'2026-01-01T00:00:00Z',iCalUID:'candidate-uid'});
  events[1].status='cancelled';candidate.summary='○';
+ const future=day=>new Date(Date.now()+day*86400000).toISOString().slice(0,10);
+ for(const [item,date]of [[source,future(2)],[candidate,future(4)]]){item.start.dateTime=date+'T10:00:00+09:00';item.end.dateTime=date+'T11:00:00+09:00';}
  const person=(await createLessonOwner(env,{request_id:crypto.randomUUID(),name:source.summary,kind:'student'})).owner;
  await changeLessonBinding(env,{request_id:crypto.randomUUID(),target:lessonEventRef(source,'synthetic-calendar'),link_revision:0,decision:'new',owner_id:person.id,owner_revision:1},deps);
  candidate.summary=source.summary;candidate.etag='"renamed-slot"';
@@ -297,7 +299,8 @@ test('browser-session next-binding endpoint verifies origin and adopts the exact
  const savedDraft=await put('/api/lesson-plan',{source:next.source,expected_source_owner_id:person.id,target:next.target,pending_context:next.pending_context,record_revision:0,expected_lesson_plan:'',lesson_plan:'合成の保存済み次回予定',request_id:crypto.randomUUID()},headers);
  assert.equal(savedDraft.status,200,await savedDraft.clone().text());
  next=await (await call(nextURL)).json();assert.equal(next.next_binding.owner_id,person.id);
- const payload={source:next.source,target:next.target,fingerprint:next.next_binding.fingerprint,confirm:true,request_id:crypto.randomUUID()};
+ const payload={source:next.source,target:next.target,fingerprint:next.next_binding.fingerprint,confirm:true,automatic:true,request_id:'auto-next-'+next.next_binding.fingerprint};
+ assert.equal(next.next_binding.automatic,true);
  const url='/api/lesson-history/next-binding';
  assert.equal((await call(url,payload,{})).status,401);
  assert.equal((await call(url,payload,{...headers,Authorization:'Bearer '+await token(bindings.SESSION_SECRET,{aud:'works-mcp',scope:'schedule:read'})})).status,401);
@@ -308,5 +311,8 @@ test('browser-session next-binding endpoint verifies origin and adopts the exact
  const result=await bound.json();assert.equal(result.record.lesson_plan,next.lesson_plan);assert.equal(result.record.owner_id,person.id);
  assert.deepEqual(await (await call(url,payload,headers)).json(),result);
  assert.equal((await DB.prepare('SELECT count(*) AS n FROM lesson_pending_plans').first()).n,1);
+ const mcpHeader={Authorization:'Bearer '+await token(bindings.SESSION_SECRET,{aud:'works-mcp',scope:'schedule:read'}),'Content-Type':'application/json'};
+ const mcp=await (await call('/mcp',{jsonrpc:'2.0',id:1,method:'tools/call',params:{name:'get_schedule',arguments:{date:future(4)}}},mcpHeader)).json();
+ assert.equal(mcp.result.structuredContent.events.find(event=>event.id===candidate.id).lesson_plan,next.lesson_plan);
  assert.equal(control.patches.length,0);
 });

@@ -25,7 +25,7 @@ import {
 import { getTheme, setTheme } from "../shared/theme.js?v=7";
 import { tokyoDateKey, shiftRecordDate, recordDateRange } from "./record-date.js?v=1";
 import { createStudentMemoStore } from "./student-memo.js?v=1";
-import { createLessonPlanController } from "./lesson-plan.js?v=8";
+import { createLessonPlanController } from "./lesson-plan.js?v=9-auto-next";
 import { isScheduledLesson, isWorksTodoEvent, lessonEventRef, lessonEventKey, sameLessonEvent } from "../shared/lesson-plan.js?v=2";
 
 const PASTEL_FALLBACK_COLORS = [
@@ -251,6 +251,9 @@ const ownerMemos=createOwnerMemoEditors({request:(path,opts)=>apiFetch(path,opts
 const lessonPlans = createLessonPlanController({
   readCurrent:target=>apiFetch('/lesson-plan?'+new URLSearchParams({calendar_id:target.calendar_id,event_id:target.id}),{},null),
   readOperation:id=>apiFetch('/lesson-history/audit?operation_id='+encodeURIComponent(id),{},null),
+  confirmBinding:body=>apiFetch('/lesson-history/next-binding',{method:'POST',body:JSON.stringify(body),signal:AbortSignal.timeout(15000)},null),
+  canAutoBind:source=>document.visibilityState==='visible'&&!!getSessionToken()
+    &&[...els.recordTbody.querySelectorAll('tr[data-event-id][data-card-key]')].some(row=>row.dataset.cardKey===lessonEventKey(source)&&!row.closest('[hidden]')),
   readNext: (source) => readNextLessonWithTemplate(source,(path,opts={})=>apiFetch(path,opts,null),(before,after,revision)=>applyCalendarTarget(before,after,revision),getSessionToken(),getSessionToken),
   write: async (body) => {
     const result = await apiFetch("/lesson-plan", { method: "PUT", body: JSON.stringify(body) }, null);
@@ -714,6 +717,16 @@ function lessonPlanDate(ref) {
   const end = new Intl.DateTimeFormat("ja-JP", { timeZone: "Asia/Tokyo", hour: "2-digit", minute: "2-digit" }).format(new Date(ref.end));
   return `${start}–${end}`;
 }
+function refreshVisibleNextLessons(){
+  if(document.visibilityState!=='visible'||!getSessionToken()||els.recordTbody.closest('[hidden]'))return;
+  for(const row of els.recordTbody.querySelectorAll('tr[data-event-id][data-card-key]')){
+    const link=lessonPlans.getLink(row.dataset.cardKey),states=[lessonPlans.get(row.dataset.cardKey),lessonPlans.get(link?.targetKey)];
+    if(link?.source&&link.status!=='loading'&&!states.some(s=>s?.dirty||s?.pending||s?.pendingUnknown))void lessonPlans.loadNext(link.source);
+  }
+}
+document.addEventListener('visibilitychange',refreshVisibleNextLessons);
+window.addEventListener('focus',refreshVisibleNextLessons);
+
 function renderLessonPlans() {
   renderPlanEditors(document, lessonPlans, { lessonPlanDate, resizeRecordInput, allowNextBinding: true });
   for (const row of document.querySelectorAll('[data-unassigned-progress][data-pending-key]')) {

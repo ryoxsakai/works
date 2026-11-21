@@ -100,7 +100,8 @@ async function previewNextBinding(sourceId){
  box.append(element('p','元の授業：'+shown.source.title+' / '+formatDate(shown.source.start)),
   element('p','紐づける次回：'+shown.target.title+' / '+formatDate(shown.target.start)),
   element('p','紐づけ先：'+ownerLabel));
- if(offer.has_draft)box.append(element('p','引き継ぐ授業予定（元の下書きも保持します）'),element('pre',shown.lesson_plan||'（空欄）'));
+ const chosenPlan=offer.moved_draft??shown.lesson_plan??'';
+ if(offer.has_draft)box.append(element('p','引き継ぐ授業予定（元の下書きも保持します）'),element('pre',chosenPlan||'（空欄）'));
  else box.append(element('p','この回に新しい空欄の授業記録を作ります。元の授業記録は変更しません。'));
  const button=element('button',offer.has_draft?'同じ'+ownerLabel+'に紐づけて下書きを引き継ぐ':'同じ'+ownerLabel+'に紐づける');
  button.type='button';button.className='btn-solid history-primary';
@@ -108,7 +109,7 @@ async function previewNextBinding(sourceId){
  button.onclick=()=>action(async dispatch=>{
   if(JSON.stringify(target)!==JSON.stringify(shown.target))throw Error('表示した予定と紐づけ先を再確認してください');
   const result=await mutate('/next-binding',{source:shown.source,target:shown.target,fingerprint:offer.fingerprint,confirm:true},'POST',dispatch);
-  if(result.operation_id!==lastOperation||result.record?.owner_id!==offer.owner_id||result.record?.lesson_plan!==(shown.lesson_plan||'')||JSON.stringify(result.target)!==JSON.stringify(shown.target)){
+  if(result.operation_id!==lastOperation||result.record?.owner_id!==offer.owner_id||result.record?.lesson_plan!==chosenPlan||JSON.stringify(result.target)!==JSON.stringify(shown.target)){
    localStorage.setItem(pendingKey,lastOperation);throw Object.assign(Error('保存した紐づけを確認してください'),{code:'LESSON_HISTORY_RELOAD'});
   }
   await lookup();await loadOwners(result.record.owner_id);
