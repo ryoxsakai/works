@@ -246,12 +246,12 @@ html body .works-header .works-header-actions .works-quick-add:active { filter: 
   }
   @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
     .works-navigation[open]::before {
-      background: rgb(235 238 244 / .42);
-      -webkit-backdrop-filter: blur(18px) saturate(.8);
-      backdrop-filter: blur(18px) saturate(.8);
+      background: rgb(38 45 62 / .07);
+      -webkit-backdrop-filter: blur(4px);
+      backdrop-filter: blur(4px);
     }
     .works-navigation[open] nav {
-      background: linear-gradient(90deg, rgb(244 245 247 / .76) 0%, rgb(244 245 247 / .66) 76%, transparent);
+      background: linear-gradient(90deg, rgb(249 250 252 / .36) 0%, rgb(249 250 252 / .20) 76%, transparent);
     }
   }
   @media (prefers-reduced-transparency: reduce) {

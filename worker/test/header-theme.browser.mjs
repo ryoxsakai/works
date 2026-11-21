@@ -144,6 +144,25 @@ async function assertLightOnly(page) {
             const drawer = page.locator('.works-navigation');
             assert.match(await drawer.evaluate(el => getComputedStyle(el, '::before').backdropFilter), /blur/);
             assert.match(await drawer.locator('nav').evaluate(el => getComputedStyle(el).backgroundImage), /gradient/);
+            // Sample the rendered menu over two strips on the underlying page.
+            const swatches = await page.evaluateHandle(() => {
+              const el = document.createElement('div');
+              el.style.cssText = 'position:fixed;top:580px;left:80px;width:80px;height:32px;z-index:1;background:linear-gradient(90deg,#3065ac 50%,#e9bb53 50%)';
+              document.body.append(el);
+              return el;
+            });
+            const pixels = await page.screenshot({clip:{x:80,y:580,width:80,height:32}});
+            const contrast = await page.evaluate(async png => {
+              const bitmap = await createImageBitmap(await (await fetch('data:image/png;base64,' + png)).blob());
+              const canvas = document.createElement('canvas');
+              canvas.width = bitmap.width;
+              canvas.height = bitmap.height;
+              const ctx = canvas.getContext('2d');
+              ctx.drawImage(bitmap, 0, 0);
+              return ctx.getImageData(60,16,1,1).data[0] - ctx.getImageData(20,16,1,1).data[0];
+            }, pixels.toString('base64'));
+            assert.ok(contrast > 85, 'underlying colors must remain visible through the drawer: ' + contrast);
+            await swatches.evaluate(el => el.remove());
             await page.mouse.click(width - 4, 320);
             assert.equal(await drawer.evaluate(el => el.open), false, 'tap outside closes drawer');
             await drawer.locator('summary').click();
