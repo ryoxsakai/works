@@ -1,5 +1,6 @@
 // Keep each legacy service's modules, styles and document-level handlers isolated.
-const destinations = new Set(['/', '/tutor/', '/material/', '/admission/', '/todo/', '/memo/']);
+import { servicePaths, rememberService } from './resume-service.mjs';
+const destinations = new Set(servicePaths);
 const mobile = matchMedia('(max-width: 730px)').matches;
 const motion = () => !matchMedia('(prefers-reduced-motion: reduce)').matches;
 const embedded = window.frameElement?.classList.contains('works-service-frame');
@@ -19,7 +20,13 @@ if (!embedded && window === top && mobile && hasSession() &&
   startHost();
 } else {
   if (embedded) connectView();
-  await import('/shared/header.js?v=menu-swipe-1');
+  else {
+    window.addEventListener('works-user', event => {
+      if (event.detail && !address.searchParams.has('code')) rememberService(location.pathname);
+    });
+    if (hasSession() && !address.searchParams.has('code')) rememberService(location.pathname);
+  }
+  await import('/shared/header.js?v=resume-1');
   await import(app);
   if (embedded) {
     const ready = () => {
@@ -159,6 +166,7 @@ function startHost() {
     const old = visible;
     visible = frame;
     activeAddress = path;
+    rememberService(new URL(path, location.origin).pathname);
     if (push) history.pushState({worksService:true}, '', path);
     frame.inert = false;
     frame.removeAttribute('aria-hidden');

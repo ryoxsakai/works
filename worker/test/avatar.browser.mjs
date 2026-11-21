@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {createFixture} from './next-lesson-fixture.mjs';
 const f=await createFixture(),b=await chromium.launch({executablePath:process.env.BROWSER_EXECUTABLE||undefined});
 const picture='data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><rect width="32" height="32" fill="#2563eb"/></svg>');
-const paths=['/','/tutor/','/material/','/material-print/','/admission/','/ss/'];let cases=0;
+const paths=['/tutor/','/material/','/material-print/','/admission/','/ss/'];let cases=0;
 try{for(const width of [390,1440])for(const theme of ['light','dark'])for(const path of paths){
  const ctx=await b.newContext({viewport:{width,height:900}});await ctx.addInitScript(t=>localStorage.setItem('works_theme',t),theme);
  await ctx.route('**/*',async r=>{

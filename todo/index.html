@@ -17,7 +17,7 @@
     <link rel="stylesheet" href="/todo/planner.css?v=browse-bg-1" />
     <link rel="stylesheet" href="/shared/header.css?v=navigation-2" /><link rel="preconnect" href="https://fonts.googleapis.com" /><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin /><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+2:wght@300;400;500;700;800&display=swap" /><link rel="stylesheet" href="/shared/works-design.css?v=4" />
     <script defer src="/dashboard/vendor/Sortable-1.15.6.min.js"></script>
-    <link rel="stylesheet" href="/todo/todo-v2.css?v=dialog-layout-2" />
+    <link rel="stylesheet" href="/todo/todo-v2.css?v=agenda-2" />
 
     <link rel="stylesheet" href="/shared/works-dialogs.css?v=fb98327c" />
   </head>
@@ -103,13 +103,22 @@
       <details class="panel deadline-panel"><summary>締切の確認 <span id="due-count"></span></summary><div id="deadlines"></div></details>
       </div></div>
       <nav class="bottom-tabs" aria-label="ToDo ナビゲーション">
-        <button data-view="today"><span data-works-icon="bx-list-check"></span>今日</button>
         <button data-view="upcoming"><span data-works-icon="bx-calendar-event"></span>近日予定</button>
+        <button data-view="inbox"><span data-works-icon="bx-library"></span>インボックス</button>
         <button id="mobile-nav" aria-expanded="false" aria-controls="planner-menu"><span data-works-icon="bx-library"></span>閲覧</button>
         <button id="mobile-search"><span class="search-icon" aria-hidden="true"></span>検索</button>
         <button id="mobile-add" aria-label="タスクを追加"><span aria-hidden="true">＋</span> 追加</button>
       </nav>
     </main>
+    <dialog id="reschedule-dialog" aria-labelledby="reschedule-title">
+      <div class="dialog-head"><h2 id="reschedule-title">期限切れをリスケジュール</h2><button type="button" data-close aria-label="閉じる">×</button></div>
+      <form id="reschedule-form">
+        <p>変更するタスクを選んでください。選んだ日付に、過ぎている作業日・締切を移します。</p>
+        <fieldset id="reschedule-items"><legend>対象タスク</legend></fieldset>
+        <label>新しい日付<input type="date" id="reschedule-date" required></label>
+        <button type="submit" class="primary">日付を変更</button>
+      </form>
+    </dialog>
     <dialog id="capture-sheet" aria-labelledby="capture-heading">
       <div class="dialog-head"><h2 id="capture-heading">タスクを追加</h2><button data-close aria-label="追加を閉じる">×</button></div>
       <form id="capture">
@@ -414,6 +423,6 @@
       </form>
     </dialog>
     </div>
-    <script type="module" src="/shared/service-entry.mjs?v=4" data-service-app="/todo/todo.js?v=service-shell-1"></script>
+    <script type="module" src="/shared/service-entry.mjs?v=5" data-service-app="/todo/todo.js?v=agenda-2"></script>
   </body>
 </html>

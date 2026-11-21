@@ -767,3 +767,16 @@ body .todo-page .todo-main { background: var(--works-page); color: var(--works-i
   .todo-page #detail .dialog-actions { gap: 8px; }
   .todo-page #detail .dialog-actions button { min-height: 44px; }
 }
+
+.todo-page .overdue-section { padding: 12px 16px; border-bottom: 1px solid var(--works-line); }
+.todo-page .overdue-section > .group-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.todo-page #reschedule-open { width:auto; color:var(--works-accent); background:transparent; border:0; min-height:44px; font-size:.9rem; }
+#reschedule-form { display:grid; gap:14px; }
+#reschedule-form p { margin:0; color:var(--works-ink-3); }
+#reschedule-items { max-height:35dvh; overflow:auto; padding:8px; border:1px solid var(--works-line); border-radius:8px; }
+#reschedule-items label { display:block; padding:8px; }
+#reschedule-items small { display:block; margin-left:1.6em; color:var(--works-ink-3); }
+
+.todo-page #reschedule-open { margin-inline-start:auto; }
+.todo-page #overdue-toggle { min-width:44px; min-height:44px; border:0; background:transparent; }
+.todo-page #overdue-toggle[aria-expanded="false"] { transform:rotate(-90deg); }

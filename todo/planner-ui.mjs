@@ -31,9 +31,9 @@ function createPlanner({
   syncShortcuts,
 }) {
   const views = {
-    today: "今日",
-    inbox: "インボックス",
     upcoming: "近日予定",
+    inbox: "インボックス",
+    today: "今日",
     all: "すべてのタスク",
     review: "週次レビュー",
     done: "完了履歴",
@@ -135,6 +135,7 @@ function createPlanner({
   $('task-student-search').addEventListener('input', () => { picker.load(); renderDetailOptions(); });
   function setView(id) {
     view = id;
+    try { localStorage.setItem("works_todo_view", id); } catch {}
     setBrowse(false);
     if (view === "upcoming") selectedDay ||= today();
     try {
@@ -243,6 +244,31 @@ function createPlanner({
         (t.deadline && t.deadline <= addDays(day, 7) && statusOf(t) !== "done"))
     );
   }
+  let overdueTasks = [];
+  let showOverdue = true;
+  const past = (date, day) => Boolean(date && date < day);
+  $("reschedule-form").onsubmit = async event => {
+    event.preventDefault();
+    const selected = new Set([...$("reschedule-items").querySelectorAll("input:checked")].map(el => el.value));
+    if (!selected.size) { message("変更するタスクを選んでください"); return; }
+    const date = $("reschedule-date").value, day = today();
+    if (date < day) return;
+    const next = structuredClone(s());
+    for (const task of next.tasks) {
+      if (!selected.has(task.id) || statusOf(task) === "done") continue;
+      if (past(task.plannedDay, day)) task.plannedDay = date;
+      if (past(task.deadline, day)) task.deadline = date;
+    }
+    if (await save(next, "日付を変更しました") && $("reschedule-dialog").open) closeDialog($("reschedule-dialog"));
+  };
+  function openReschedule(day) {
+    $("reschedule-items").innerHTML = '<legend>対象タスク</legend>' + overdueTasks.map(t =>
+      `<label><input type="checkbox" value="${esc(t.id)}" checked> ${esc(t.name)} <small>${[past(t.plannedDay, day) && "作業日 " + t.plannedDay, past(t.deadline, day) && "締切 " + t.deadline].filter(Boolean).map(esc).join("・")}</small></label>`
+    ).join("");
+    $("reschedule-date").min = day;
+    $("reschedule-date").value = day;
+    openDialog($("reschedule-dialog"));
+  }
   function renderList(list, mode, day) {
     for (const instance of dragging) instance.destroy();
     dragging = [];
@@ -264,6 +290,8 @@ function createPlanner({
           return `<button data-day="${date}" aria-label="${fullDate.format(new Date(date))}${count ? `（${count}件）` : ""}" aria-pressed="${date === focusDay}"${date === day ? ' data-today="true"' : ""}${i > 4 ? ' data-weekend="true"' : ""}><small>${"月火水木金土日"[i]}</small><b>${Number(date.slice(8))}</b><i class="week-dot"${count ? "" : " hidden"} aria-hidden="true"></i></button>`;
         }).join("")}</div>`;
     }
+    overdueTasks = view === "upcoming" ? list.filter(t => statusOf(t) !== "done" && (past(t.plannedDay, day) || past(t.deadline, day))) : [];
+    const overdueIds = new Set(overdueTasks.map(t => t.id));
     const visible = list.filter((t) => {
       const active = statusOf(t) !== "done";
       if (view === "done") return !active;
@@ -276,7 +304,7 @@ function createPlanner({
       if (view === "inbox") return isInbox(t);
       if (view === "upcoming")
         return (
-          active && (agenda ? week.includes(t.plannedDay) : t.plannedDay >= day)
+          active && !overdueIds.has(t.id) && (agenda ? week.includes(t.plannedDay) : t.plannedDay >= day)
         );
       if (view.startsWith("project:"))
         return active && matchProject(t, view.slice(8));
@@ -331,7 +359,7 @@ function createPlanner({
     }
     $("task-count").textContent =
       (view === "today" ? "未完了 " : "") +
-      sorted.length +
+      (sorted.length + overdueTasks.length) +
       "件" +
       ($("clear-filters").hidden ? "" : " · 絞り込み中");
     const groups = new Map();
@@ -367,6 +395,16 @@ function createPlanner({
       sorted.length || agenda
         ? `<div class="${mode === "board" ? "board" : "planner-list"}">${blocks.map(([key, items]) => (agenda ? group(fullDate.format(new Date(key)) + (key === day ? " · 今日" : key === addDays(day, 1) ? " · 明日" : ""), items, key) : group(key, items, null, view === "today" && mode === "list" ? day : null))).join("")}</div>`
         : `<p class="empty">${value("task-search").trim() || value("role-filter") || value("category-filter") ? "条件に合うタスクがありません。" : view === "today" ? "今日の予定と期限超過のタスクはありません。" : view === "review" ? "この項目はすべて整理できています。" : "該当するタスクはありません。"}</p>`;
+    if (overdueTasks.length) {
+      if (!agenda && !sorted.length) $("tasks").replaceChildren();
+      $("tasks").insertAdjacentHTML("afterbegin", `<section class="overdue-section"><div class="group-heading"><h3>期限切れ</h3><button type="button" id="reschedule-open">リスケジュール</button><button type="button" id="overdue-toggle" aria-label="期限切れ一覧" aria-controls="overdue-list" aria-expanded="${showOverdue}">⌄</button></div><div id="overdue-list" ${showOverdue ? "" : "hidden"}>${group("", overdueTasks, null)}</div></section>`);
+      $("overdue-toggle").onclick = () => {
+        showOverdue = !showOverdue;
+        $("overdue-toggle").setAttribute("aria-expanded", String(showOverdue));
+        $("overdue-list").hidden = !showOverdue;
+      };
+      $("reschedule-open").onclick = () => openReschedule(today());
+    }
     if (agenda) {
       const nextDate = list
         .filter((t) => statusOf(t) !== "done" && t.plannedDay > week[6])
@@ -1266,7 +1304,11 @@ function createPlanner({
   };
   function initial() {
     if (s().tasks.some(t => t.plan?.students?.length)) picker.load().then(render);
-    setView("today");
+    let saved;
+    try { saved = localStorage.getItem("works_todo_view"); } catch {}
+    const valid = Object.hasOwn(views, saved) || ["project", "label", "filter"].some(kind =>
+      p()[kind + "s"].some(item => saved === kind + ":" + item.id));
+    setView(valid ? saved : "upcoming");
     preview();
     const task = new URLSearchParams(location.search).get("task");
     if (task && s().tasks.some((t) => t.id === task)) openDetail(task);

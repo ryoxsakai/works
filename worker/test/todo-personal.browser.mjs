@@ -248,6 +248,7 @@ try {
         await expect(menu.locator("#sidebar-search")).toHaveCSS("background-color", "rgb(255, 255, 255)");
         await page.locator("#mobile-nav").click();
       }
+      await nav(page,"today");
       await expect(page.locator("#today-label")).toHaveAttribute("title",new RegExp(base));
       const type = await page.evaluate(() => {
         const selectors = ["#today-label","#task-count","#display-button",".planner-row .task-name","#view-title",".works-header h1"];
@@ -801,6 +802,7 @@ async function verifyPlanner(page,db,origin,nav,rowMenu) {
   await expect(page.locator("#capture-source")).toBeEmpty();
   await closeCapture(page);
   assert.equal((await db()).tasks.at(-1).plan.source.name,"合成生徒");
+  await nav(page,"all");
   const parent=(await db()).tasks.at(-1);
   await page.locator('[data-task="'+parent.id+'"] [data-action=detail]').click();
   await page.getByText("説明・サブタスク",{exact:true}).click();
@@ -848,6 +850,7 @@ async function verifyPlanner(page,db,origin,nav,rowMenu) {
   await closeCapture(page);
   const linked = (await db()).tasks.at(-1);
   assert.equal(linked.plan.source.event,"test-event");
+  await nav(page,"all");
   await page.locator('[data-task="'+linked.id+'"] .task-name').click();
   const lessonLink = new URL(await page.locator("#origin-link a").getAttribute("href"),origin);
   assert.equal(lessonLink.searchParams.get("record_date"),planned);
