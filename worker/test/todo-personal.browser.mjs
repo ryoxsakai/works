@@ -850,6 +850,7 @@ async function verifyPlanner(page,db,origin,nav,rowMenu) {
   await closeCapture(page);
   const linked = (await db()).tasks.at(-1);
   assert.equal(linked.plan.source.event,"test-event");
+  await nav(page,"all");
   await page.locator('[data-task="'+linked.id+'"] .task-name').click();
   const lessonLink = new URL(await page.locator("#origin-link a").getAttribute("href"),origin);
   assert.equal(lessonLink.searchParams.get("record_date"),planned);
