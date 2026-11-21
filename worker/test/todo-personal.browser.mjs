@@ -802,6 +802,7 @@ async function verifyPlanner(page,db,origin,nav,rowMenu) {
   await expect(page.locator("#capture-source")).toBeEmpty();
   await closeCapture(page);
   assert.equal((await db()).tasks.at(-1).plan.source.name,"合成生徒");
+  await nav(page,"all");
   const parent=(await db()).tasks.at(-1);
   await page.locator('[data-task="'+parent.id+'"] [data-action=detail]').click();
   await page.getByText("説明・サブタスク",{exact:true}).click();
