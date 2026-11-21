@@ -140,6 +140,14 @@ async function assertLightOnly(page) {
             if (new URL(page.url()).pathname !== '/') await page.locator('.works-navigation summary').click();
             else await page.locator('#home-navigation').evaluate(el=>el.open=true);
           }
+          if (width === 375 && signedIn && path === '/todo/') {
+            const drawer = page.locator('.works-navigation');
+            assert.match(await drawer.evaluate(el => getComputedStyle(el, '::before').backdropFilter), /blur/);
+            assert.match(await drawer.locator('nav').evaluate(el => getComputedStyle(el).backgroundImage), /gradient/);
+            await page.mouse.click(width - 4, 320);
+            assert.equal(await drawer.evaluate(el => el.open), false, 'tap outside closes drawer');
+            await drawer.locator('summary').click();
+          }
           const nav = await page.locator(new URL(page.url()).pathname === '/' ? '#home-navigation nav' : '.works-navigation nav').boundingBox();
           assert(nav.x>=0 && nav.x+nav.width<=width+1,`${path} ${width} clipped menu`);
           await page.keyboard.press('Escape');
