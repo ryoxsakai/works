@@ -316,3 +316,36 @@ test('browser-session next-binding endpoint verifies origin and adopts the exact
  assert.equal(mcp.result.structuredContent.events.find(event=>event.id===candidate.id).lesson_plan,next.lesson_plan);
  assert.equal(control.patches.length,0);
 });
+
+test('actual Worker moves only source-authored later text to new empty next occurrence and both schedules read back',async t=>{
+ const {DB,events,control,call,put,bindings}=await setup(t,{historyMode:'active'}),env={DB,LESSON_HISTORY_MODE:'active'};
+ const headers={Authorization:'Bearer '+await token(bindings.SESSION_SECRET),'Content-Type':'application/json',Origin:origin};
+ const deps={settings:async()=>({selected_calendars:['synthetic-calendar']}),token:async()=>({access_token:'synthetic'}),event:async(token,cal,id)=>events.find(e=>e.id===id)};
+ const date=day=>new Date(Date.now()+day*86400000).toISOString().slice(0,10);
+ const at=(event,d)=>Object.assign(event,{created:'2026-01-01T00:00:00Z',iCalUID:event.id+'-uid',start:{dateTime:d+'T10:00:00+09:00'},end:{dateTime:d+'T11:00:00+09:00'}});
+ const [source,legacy,later]=events;at(source,date(2));at(later,date(6));legacy.status='cancelled';
+ const person=(await createLessonOwner(env,{request_id:crypto.randomUUID(),name:source.summary,kind:'student'})).owner;
+ for(const event of [source,later])await changeLessonBinding(env,{request_id:crypto.randomUUID(),target:lessonEventRef(event,'synthetic-calendar'),link_revision:0,decision:'new',owner_id:person.id,owner_revision:1},deps);
+ const nextURL='/api/next-lesson-plan?calendar_id=synthetic-calendar&event_id=a';
+ let next=await (await call(nextURL)).json();assert.equal(next.target.id,later.id);
+ const plan='元回の次回欄で入力した合成データ';
+ const set=await put('/api/lesson-plan',{source:next.source,target:next.target,expected_source_owner_id:person.id,expected_owner_id:person.id,
+  record_revision:next.record_revision,expected_lesson_plan:'',lesson_plan:plan,request_id:crypto.randomUUID()},headers);
+ assert.equal(set.status,200,await set.clone().text());
+ const earlier=at({id:'new-earlier',summary:source.summary,etag:'"new-slot"'},date(4));events.push(earlier);
+ next=await (await call(nextURL)).json();assert.equal(next.target.id,earlier.id);assert.equal(next.next_binding.automatic,true);
+ const bound=await call('/api/lesson-history/next-binding',{source:next.source,target:next.target,fingerprint:next.next_binding.fingerprint,
+   confirm:true,automatic:true,request_id:'auto-next-'+next.next_binding.fingerprint},headers);
+ assert.equal(bound.status,200,await bound.clone().text());assert.equal((await bound.json()).record.lesson_plan,'');
+ next=await (await call(nextURL)).json();const offer=next.next_plan_carry;assert.equal(offer.from.id,later.id);
+ const payload={source:next.source,target:next.target,from:offer.from,fingerprint:offer.fingerprint,confirm:true,request_id:'auto-carry-'+offer.fingerprint};
+ const url='/api/lesson-history/next-plan-carry';
+ assert.equal((await call(url,payload,{...headers,Origin:'https://other.example.test'})).status,403);
+ const moved=await call(url,payload,headers);assert.equal(moved.status,200,await moved.clone().text());
+ const result=await moved.json();assert.equal(result.record.lesson_plan,plan);assert.equal(result.previous.lesson_plan,'');
+ const mcpHeaders={Authorization:'Bearer '+await token(bindings.SESSION_SECRET,{aud:'works-mcp',scope:'schedule:read'}),'Content-Type':'application/json'};
+ const schedule=async day=>(await (await call('/mcp',{jsonrpc:'2.0',id:1,method:'tools/call',params:{name:'get_schedule',arguments:{date:date(day)}}},mcpHeaders)).json()).result.structuredContent.events;
+ assert.equal((await schedule(4)).find(event=>event.id===earlier.id).lesson_plan,plan);
+ assert.ok(!(await schedule(6)).find(event=>event.id===later.id).lesson_plan);
+ assert.equal(control.patches.length,0);
+});

@@ -67,7 +67,7 @@ export function lessonRecordRows(rows, { escapeHtml, formatTimeOrPeriod, lessonR
 
 export function renderPlanEditors(root, lessonPlans, { lessonPlanDate, resizeRecordInput, allowNextBinding = false }) {
   const states = { unsaved: "未保存・入力を終えると自動保存", saving: "保存中…", saved: "保存済み", error: "保存できませんでした。入力は残っています", conflict: "予定または内容が変更されています。入力を残して保存を停止しました" };
-  const reasons = { owner_confirmation_required: "次回候補は見つかりました。生徒・クラスの紐づけを確認してください", owner_unassigned: "この授業の生徒・クラスの紐づけを確認してください", attribution: "次回の記録は予定名の対応確認が必要です。次回授業の授業記録画面で確認してください", loading: "次回を確認中…", none: "366日先までに次回の授業が見つかりません", ineligible: "この予定は次回連動の対象外です", ambiguous: "同時刻に候補が複数あるため連動できません", error: "次回を取得できませんでした", conflict: states.conflict };
+  const reasons = { owner_confirmation_required: "次回候補は見つかりました。生徒・クラスの紐づけを確認してください", owner_unassigned: "この授業の生徒・クラスの紐づけを確認してください", attribution: "次回の記録は予定名の対応確認が必要です。次回授業の授業記録画面で確認してください", loading: "次回の授業を確認しています…", auto_binding: "次回の授業と紐づけています…", none: "366日先までに次回の授業が見つかりません", ineligible: "この予定は次回連動の対象外です", ambiguous: "同時刻に候補が複数あるため連動できません", error: "次回を取得できませんでした", conflict: states.conflict };
   root.querySelectorAll(".lesson-plan-editor").forEach((editor) => {
     const sourceKey = editor.dataset.sourceKey;
     const link = sourceKey ? lessonPlans.getLink(sourceKey) : null;
@@ -86,17 +86,20 @@ export function renderPlanEditors(root, lessonPlans, { lessonPlanDate, resizeRec
     const linkStatus = link?.status || "loading";
     const reviewRequired=['owner_confirmation_required','pending_owner'].includes(linkStatus);
     const pendingState=!!state?.pendingContext;
+    const quietCheck=!!(allowNextBinding&&sourceKey&&['loading','auto_binding'].includes(linkStatus)&&!state?.pendingUnknown);
     const conflict = state?.status === "conflict" || (sourceKey && linkStatus === "conflict");
     input.disabled = !state;
     input.readOnly = !!conflict || !!(sourceKey && !['ready','pending_owner'].includes(linkStatus));
-    input.hidden = !!sourceKey && !state;
+    input.hidden = !!sourceKey && (!state || (quietCheck&&linkStatus==='auto_binding'&&!sameLessonEvent(state.target,link?.current?.target)));
     if (input.value !== (state?.value || "")) input.value = state?.value || "";
     const pendingMessages={ready:'未紐づけの予定下書きです。入力後にD1へ保存します',unsaved:'下書き未保存・入力を終えるとD1へ保存',saving:'未紐づけ下書きをD1へ保存中…',saved:'未紐づけ下書きをD1へ保存しました。帰属は未確定です',error:'下書きをD1へ保存できませんでした。入力を保持しています',conflict:state?.pendingUnknown?'下書きの保存結果が不明です。再送せず操作IDで照合してください':'予定・紐づけ・下書きが変更されました。入力を保持して保存を停止しました'};
-    const message = state?.pendingUnknown&&!state.pending?'保存結果が不明です。再送せず操作IDで照合してください':pendingState?pendingMessages[state?.pending?'saving':state?.status]:sourceKey && linkStatus !== "ready" ? reasons[linkStatus] : states[state?.pending ? "saving" : state?.status];
+    const nextPendingMessages={ready:'同じ生徒・クラスか確認してください',unsaved:'次回の下書きはまだ保存されていません',saving:'次回の下書きを保存しています…',saved:'次回の下書きを保存しました。同じ生徒・クラスか確認してください',error:'下書きを保存できませんでした。入力は残っています',conflict:pendingMessages.conflict};
+    const activePending=allowNextBinding&&sourceKey?nextPendingMessages:pendingMessages;
+    const message = quietCheck?reasons[linkStatus]:state?.pendingUnknown&&!state.pending?'保存結果が不明です。再送せず操作IDで照合してください':pendingState?activePending[state?.pending?'saving':state?.status]:sourceKey && linkStatus !== "ready" ? reasons[linkStatus] : states[state?.pending ? "saving" : state?.status];
     status.textContent = (message || "")+(state?.operationId?' 操作ID: '+state.operationId:'')+(state?.message&&state.status==='conflict'?' '+state.message:'')+(state?.recoveryUnavailable?' この端末への復旧コピーを保存できません。D1保存を確認するまで画面を閉じないでください':'');
     status.dataset.error = String(!!conflict || state?.status === "error" || (sourceKey && linkStatus === "error"));
     if (sourceKey) {
-      const target = conflict ? link?.current?.target || link?.target : link?.target;
+      const target = conflict ? link?.current?.target || link?.target : quietCheck?(linkStatus==='auto_binding'?link?.current?.target:null):link?.target;
       editor.querySelector(".lesson-plan-target").dataset.conflict = String(!!conflict);
       editor.querySelector(".lesson-plan-target").dataset.review = String(reviewRequired);
       if(reviewRequired&&target){
@@ -110,9 +113,9 @@ export function renderPlanEditors(root, lessonPlans, { lessonPlanDate, resizeRec
         review.href='/tutor/history.html?'+new URLSearchParams({calendar_id:target.calendar_id,event_id:target.id,...(quick?{next_source_id:link.source.id}:{})});
         editor.append(review);
       }
-      editor.querySelector(".lesson-plan-target").textContent = target ? `${conflict ? "最新候補" : reviewRequired ? "次回候補" : "連動先"}: ${lessonPlanDate(target)}` : "";
+      editor.querySelector(".lesson-plan-target").textContent = target ? `${conflict ? "最新候補" : reviewRequired || quietCheck ? "次回候補" : "連動先"}: ${lessonPlanDate(target)}` : "";
     }
-    action.hidden = false; action.disabled = !!state?.pending || linkStatus === "loading" && !!sourceKey;
+    action.hidden = quietCheck; action.disabled = !!state?.pending || !!sourceKey&&["loading","auto_binding"].includes(linkStatus);
     if(state?.pendingUnknown){action.dataset.action='verify-pending';action.textContent='操作IDで保存結果だけを照合';}
     else if (conflict) { action.dataset.action = "reload"; action.textContent = state?.dirty ? "入力を破棄して予定を再確認" : "予定を再読み込み"; }
     else if (state?.status === "error") { action.dataset.action = "retry"; action.textContent = "再保存"; }

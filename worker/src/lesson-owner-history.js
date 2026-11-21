@@ -2,7 +2,7 @@ import {validCalendarDate,semesterForTarget,semesterCandidates} from '../../shar
 import {applicableSeriesRule,seriesRules,seriesParent,parentIdentity,originalTime,validSeriesParent,resolveSeriesOwner} from './lesson-series.js';
 import {lessonEventRef,sameLessonEvent,isScheduledLesson} from '../../shared/lesson-plan.js';
 import {calendarRecordValues,parseCalendarRecord,parsePlainCalendarRecord} from '../../shared/calendar-lesson-record.mjs';
-import {lessonTitleKey} from '../../shared/lesson-attribution.js';
+import {lessonTitleKey,lessonRecordHasContent} from '../../shared/lesson-attribution.js';
 
 export const ownerHistoryActive=env=>env.LESSON_HISTORY_MODE==='active';
 export const ownerHistoryFrozen=env=>['reconcile','active'].includes(env.LESSON_HISTORY_MODE);
@@ -85,22 +85,60 @@ export async function renameLessonOwner(env,ownerId,body){await policy(env);cons
  const after={...owner,name,revision:owner.revision+1};return {before:{owner},after:{owner:after},statements:[guard(env,'EXISTS(SELECT 1 FROM lesson_owners WHERE id=? AND revision=?)',[ownerId,body.revision]),statement(env,'UPDATE lesson_owners SET name=?,revision=revision+1 WHERE id=?',name,ownerId),statement(env,'INSERT OR IGNORE INTO lesson_owner_aliases VALUES (?,?)',ownerId,name)]};});}
 function newRecord(ownerId,body,source={}){
  const date=text(body.lesson_date,'授業日時',80);if(!Number.isFinite(Date.parse(date)))throw fail('授業日時が不正です',400);
- const now=new Date().toISOString();return {id:crypto.randomUUID(),owner_id:ownerId,lesson_date:new Date(date).toISOString(),title_snapshot:String(body.title_snapshot||''),...calendarRecordValues({}),completed:0,...patchValues(body),revision:1,source_json:encode(source),created_at:now,updated_at:now};
+ const planMeta={lesson_plan_touched:body.lesson_plan!==undefined,...source};
+ const now=new Date().toISOString();return {id:crypto.randomUUID(),owner_id:ownerId,lesson_date:new Date(date).toISOString(),title_snapshot:String(body.title_snapshot||''),...calendarRecordValues({}),completed:0,...patchValues(body),revision:1,source_json:encode(planMeta),created_at:now,updated_at:now};
 }
 // Explicit columns keep schema evolution and insertion order independent.
 function recordInsert(env,r){return statement(env,`INSERT INTO lesson_history_records(id,owner_id,lesson_date,title_snapshot,lesson_plan,confirmation_test,homework,lesson_memo,completed,revision,source_json,created_at,updated_at) VALUES (${Array(13).fill('?').join(',')})`,r.id,r.owner_id,r.lesson_date,r.title_snapshot,...fields.map(k=>r[k]),r.completed,r.revision,r.source_json,r.created_at,r.updated_at);}
 async function ownerGuard(env,body){const owner=await first(env,'SELECT * FROM lesson_owners WHERE id=?',body.owner_id);if(!owner||owner.revision!==body.owner_revision)throw fail('選択した生徒・クラスを再確認してください');return owner;}
 export async function createOwnerRecord(env,body){await policy(env);return transaction(env,body,'create_record',async()=>{
  const owner=await ownerGuard(env,body),record=newRecord(owner.id,body,{manual:true});return {before:null,after:{record},statements:[guard(env,'EXISTS(SELECT 1 FROM lesson_owners WHERE id=? AND revision=?)',[owner.id,owner.revision]),recordInsert(env,record)]};});}
-export async function editOwnerRecord(env,recordId,body){await policy(env,ownerHistoryActive(env));return transaction(env,body,'edit_record',async()=>{
+// Internal-only provenance. Names never identify the source of entered text.
+export function makeNextPlanIntent(source,event,ownerId,target,targetEvent){
+ if(!ownerId||source.calendar_id!==target.calendar_id||!validBindingIdentity(event)||!validBindingIdentity(targetEvent))return null;
+ return {calendar_id:source.calendar_id,source_id:source.id,owner_id:ownerId,source_identity:eventIdentity(event),target_id:target.id,target_identity:eventIdentity(targetEvent)};
+}
+const readSourceMeta=record=>JSON.parse(record.source_json||'{}');
+const samePlanIntent=(stored,expected)=>!!stored&&!!expected&&encode(stored)===encode(expected);
+const appliesPlanIntent=(intent,ref,event)=>!!intent&&intent.calendar_id===ref.calendar_id&&intent.target_id===ref.id
+ &&encode(intent.target_identity)===encode(eventIdentity(event));
+function ownedPlanIsUntouched(record,meta){
+ // Older untouched revision-one records may not have the explicit flag yet.
+ const initialBlank=record.revision===1&&!Object.hasOwn(meta,'lesson_plan_touched')
+  &&(['new','different_owner'].includes(meta.binding_decision)||meta.binding_decision==='next_confirmed'&&meta.draft_context===null);
+ return record.lesson_plan===''&&(meta.lesson_plan_touched===false||initialBlank);
+}
+function eligibleOwnedPlanIntent(record,meta,intent){
+ if(!intent||record.owner_id!==intent.owner_id||record.completed)return null;
+ // Existing text without exact provenance may include a directly authored or
+ // imported plan. A later next-editor save does not make that text movable.
+ if(record.lesson_plan!=='')return samePlanIntent(meta.next_plan_intent,intent)?intent:null;
+ return ownedPlanIsUntouched(record,meta)?intent:null;
+}
+function setPlanIntent(meta,intent){
+ const updated={...meta,lesson_plan_touched:true};
+ if(intent)updated.next_plan_intent=intent;else delete updated.next_plan_intent;
+ return updated;
+}
+export async function editOwnerRecord(env,recordId,body,nextPlanIntent=null){await policy(env,ownerHistoryActive(env));return transaction(env,nextPlanIntent?{...body,next_plan_intent:nextPlanIntent}:body,'edit_record',async()=>{
  const record=await first(env,'SELECT * FROM lesson_history_records WHERE id=?',recordId);if(!record||record.revision!==body.revision)throw fail('授業記録が更新されています');
  const patch=patchValues(body);if(!Object.keys(patch).length)throw fail('変更内容がありません',400);
+ if(Object.hasOwn(patch,'lesson_plan')){
+  const meta=readSourceMeta(record);
+  patch.source_json=encode(setPlanIntent(meta,patch.lesson_plan.trim()?eligibleOwnedPlanIntent(record,meta,nextPlanIntent):null));
+ }
  const after={...record,...patch,revision:record.revision+1,updated_at:new Date().toISOString()};
  const guards=[guard(env,'EXISTS(SELECT 1 FROM lesson_history_records WHERE id=? AND revision=?)',[recordId,body.revision])];
  if(body.expected_link)guards.push(guard(env,'EXISTS(SELECT 1 FROM lesson_event_links WHERE calendar_id=? AND event_id=? AND record_id=? AND revision=?)',[body.expected_link.calendar_id,body.expected_link.event_id,recordId,body.expected_link.revision]));
  return {before:{record},after:{record:after},statements:[...guards,statement(env,`UPDATE lesson_history_records SET ${Object.keys(patch).map(k=>k+'=?').join(',')},revision=revision+1,updated_at=? WHERE id=?`,...Object.values(patch),after.updated_at,recordId)]};});}
 // Pending plans are event-context drafts, never an inferred owner record.
 async function pendingContext(target,event){return historyDigest({target,event_identity:eventIdentity(event)});}
+const untouchedPendingSQL='NOT EXISTS(SELECT 1 FROM lesson_pending_plans WHERE calendar_id=? AND event_id=?)';
+async function recordedPendingIntent(env,context,revision,plan){
+ const proofs=await rows(env,`SELECT after_json FROM lesson_history_audit WHERE action='write_pending_plan'
+  AND json_extract(after_json,'$.pending_context')=? AND json_extract(after_json,'$.record_revision')=? AND json_extract(after_json,'$.lesson_plan')=? LIMIT 2`,context,revision,plan);
+ return proofs.length===1?JSON.parse(proofs[0].after_json).next_plan_intent:null;
+}
 export async function readPendingLessonPlan(env,target,event){
  if(!event)return {pending_allowed:false};
  const id=await pendingContext(target,event);let draft;
@@ -108,17 +146,24 @@ export async function readPendingLessonPlan(env,target,event){
  catch(error){if(!String(error.message).includes('no such table'))throw error;return {pending_allowed:true,pending_context:id,pending_storage_available:false,pending_exists:false,record_revision:0,lesson_plan:''};}
  return {pending_allowed:true,pending_context:id,pending_storage_available:true,pending_exists:!!draft,record_revision:draft?.revision||0,lesson_plan:draft?.lesson_plan||''};
 }
-export async function writePendingLessonPlan(env,body,deps){
+export async function writePendingLessonPlan(env,body,deps,nextPlanIntent=null){
  await policy(env,true);if(!ownerHistoryActive(env))throw fail('D1保存への切替後に下書きを保存してください');
- return transaction(env,body,'write_pending_plan',async()=>{
+ return transaction(env,nextPlanIntent?{...body,next_plan_intent:nextPlanIntent}:body,'write_pending_plan',async()=>{
   const {ref,event}=await liveHistoryTarget(env,body.target,deps);
   const link=await first(env,'SELECT record_id FROM lesson_event_links WHERE calendar_id=? AND event_id=?',ref.calendar_id,ref.id);if(link?.record_id)throw fail('紐づけが変更されました。下書きを保持して保存先を確認してください');
   const current=await readPendingLessonPlan(env,ref,event);if(!current.pending_storage_available)throw fail('未紐づけ下書きの保存機能が未準備です。入力を保持してください',503);
   if(body.pending_context!==current.pending_context||body.record_revision!==current.record_revision||body.expected_lesson_plan!==current.lesson_plan)throw fail('予定または下書きが変更されました。入力を保持して再確認してください');
   if(typeof body.lesson_plan!=='string'||body.lesson_plan.length>5000)throw fail('授業予定が不正です',400);
   const now=new Date().toISOString(),old=await first(env,'SELECT * FROM lesson_pending_plans WHERE id=?',current.pending_context),draft={id:current.pending_context,calendar_id:ref.calendar_id,event_id:ref.id,target_json:encode(ref),event_identity_json:encode(eventIdentity(event)),lesson_plan:body.lesson_plan,revision:current.record_revision+1,created_at:old?.created_at||now,updated_at:now};
-  const result={target:ref,lesson_plan:draft.lesson_plan,record_revision:draft.revision,record_storage:'d1_pending',attribution_status:'owner_unassigned',pending_context:draft.id,pending_allowed:true,pending_storage_available:true,pending_exists:true,pending_plan:draft};
-  return {before:{pending_plan:old||null},after:result,statements:[guard(env,'NOT EXISTS(SELECT 1 FROM lesson_event_links WHERE calendar_id=? AND event_id=? AND record_id IS NOT NULL)',[ref.calendar_id,ref.id]),guard(env,'COALESCE((SELECT revision FROM lesson_pending_plans WHERE id=?),0)=?',[draft.id,current.record_revision]),statement(env,'INSERT INTO lesson_pending_plans VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET lesson_plan=excluded.lesson_plan,revision=excluded.revision,updated_at=excluded.updated_at',draft.id,draft.calendar_id,draft.event_id,draft.target_json,draft.event_identity_json,draft.lesson_plan,draft.revision,draft.created_at,draft.updated_at)]};
+  const args=[ref.calendar_id,ref.id];
+  let intent=null;
+  if(draft.lesson_plan.trim()&&appliesPlanIntent(nextPlanIntent,ref,event)){
+   if(old){
+    if(old.lesson_plan.trim()&&samePlanIntent(await recordedPendingIntent(env,old.id,old.revision,old.lesson_plan),nextPlanIntent))intent=nextPlanIntent;
+   }else if((await first(env,`SELECT ${untouchedPendingSQL} AS ok`,...args))?.ok)intent=nextPlanIntent;
+  }
+  const result={target:ref,lesson_plan:draft.lesson_plan,record_revision:draft.revision,record_storage:'d1_pending',attribution_status:'owner_unassigned',pending_context:draft.id,pending_allowed:true,pending_storage_available:true,pending_exists:true,pending_plan:draft,...(intent?{next_plan_intent:intent}:{})};
+  return {before:{pending_plan:old||null},after:result,statements:[guard(env,'NOT EXISTS(SELECT 1 FROM lesson_event_links WHERE calendar_id=? AND event_id=? AND record_id IS NOT NULL)',args),guard(env,'COALESCE((SELECT revision FROM lesson_pending_plans WHERE id=?),0)=?',[draft.id,current.record_revision]),...(intent&&!old?[guard(env,untouchedPendingSQL,args)]:[]),statement(env,'INSERT INTO lesson_pending_plans VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET lesson_plan=excluded.lesson_plan,revision=excluded.revision,updated_at=excluded.updated_at',draft.id,draft.calendar_id,draft.event_id,draft.target_json,draft.event_identity_json,draft.lesson_plan,draft.revision,draft.created_at,draft.updated_at)]};
  });
 }
 export async function readEventOwnerRecord(env,target,event,deps){
@@ -131,22 +176,27 @@ export async function readEventOwnerRecord(env,target,event,deps){
  let record;try{record=await first(env,'SELECT r.*,EXISTS(SELECT 1 FROM lesson_owner_memos m WHERE m.owner_id=r.owner_id) AS fixed_memo FROM lesson_history_records r WHERE r.id=?',link.record_id);}catch(error){if(!String(error.message).includes('no such table'))throw error;record=await first(env,'SELECT * FROM lesson_history_records WHERE id=?',link.record_id);}const old=JSON.parse(link.target_json),source=JSON.parse(record.source_json||'{}');
  const changed=lessonTitleKey(old.title)!==lessonTitleKey(target.title);
  const recreated=event&&encode(eventIdentity(event))!==link.event_identity_json;
- return {...observation,record_exists:true,record_revision:record.revision,record_id:record.id,owner_id:record.owner_id,record_calendar_id:target.calendar_id,record_title:old.title,attribution_status:recreated?'event_recreated':changed?'title_changed':'confirmed',...(changed||recreated?{...calendarRecordValues({}),attribution_notice:'予定名または予定の生成情報が変わりました。同じ生徒か、別の生徒かを確認してください'}:{...calendarRecordValues(record),completed:record.completed}),link_revision:link.revision,...((record.fixed_memo||source.series_rule_id||['new','different_owner','next_confirmed'].includes(source.binding_decision))?{owner_memo_storage:'owner_id'}:{})};
+ return {...observation,record_exists:true,record_revision:record.revision,record_id:record.id,owner_id:record.owner_id,record_calendar_id:target.calendar_id,record_title:old.title,attribution_status:recreated?'event_recreated':changed?'title_changed':'confirmed',...(changed||recreated?{...calendarRecordValues({}),attribution_notice:'予定名または予定の生成情報が変わりました。同じ生徒か、別の生徒かを確認してください'}:{...calendarRecordValues(record),completed:record.completed,...(source.automatic_empty===true&&!lessonRecordHasContent(record)?{automatic_empty_source:true}:{})}),link_revision:link.revision,...((record.fixed_memo||source.series_rule_id||['new','different_owner','next_confirmed'].includes(source.binding_decision))?{owner_memo_storage:'owner_id'}:{})};
 }
 function currentSeriesGuard(env,shown,target){return guard(env,'EXISTS(SELECT 1 FROM lesson_series_owners WHERE id=? AND revision=?) AND NOT EXISTS(SELECT 1 FROM lesson_series_owners WHERE calendar_id=? AND series_id=? AND julianday(anchor_original)>julianday(?) AND julianday(anchor_original)<=julianday(?))',[shown.series_rule_id,shown.series_rule_revision,target.calendar_id,shown.series_id,shown.series_anchor_original,shown.series_original_time]);}
-export async function writeEventOwnerRecord(env,body,deps){
+export async function writeEventOwnerRecord(env,body,deps,nextPlanIntent=null){
  await policy(env,true);
- if(body.request_id){const old=await first(env,'SELECT q.*,a.action FROM lesson_history_requests q JOIN lesson_history_audit a ON a.id=q.id WHERE q.id=?',body.request_id);if(old?.action==='write_series_record'){if(old.digest!==await historyDigest({action:'write_series_record',body}))throw fail('操作IDの内容が一致しません');return JSON.parse(old.response_json);}}
+ const input=nextPlanIntent?{...body,next_plan_intent:nextPlanIntent}:body;
+ if(body.request_id){const old=await first(env,'SELECT q.*,a.action FROM lesson_history_requests q JOIN lesson_history_audit a ON a.id=q.id WHERE q.id=?',body.request_id);if(old?.action==='write_series_record'){if(old.digest!==await historyDigest({action:'write_series_record',body:input}))throw fail('操作IDの内容が一致しません');return JSON.parse(old.response_json);}}
  const {ref,event}=await liveHistoryTarget(env,body.target,deps),shown=await readEventOwnerRecord(env,ref,event,deps);
  if(shown.attribution_status!=='confirmed'||body.expected_owner_id&&body.expected_owner_id!==shown.owner_id)throw fail('生徒・クラスの紐づけを確認してください');
  if(body.record_revision!==shown.record_revision||body.expectedLessonPlan!==undefined&&shown.lesson_plan!==body.expectedLessonPlan)throw fail('授業内容が更新されています');
- if(shown.series_rule_id&&!shown.record_id)return transaction(env,{...body,request_id:body.request_id||crypto.randomUUID()},'write_series_record',async()=>{
+ const intent=appliesPlanIntent(nextPlanIntent,ref,event)&&shown.owner_id===nextPlanIntent.owner_id?nextPlanIntent:null;
+ if(shown.series_rule_id&&!shown.record_id)return transaction(env,{...input,request_id:body.request_id||crypto.randomUUID()},'write_series_record',async()=>{
   const fresh=await readEventOwnerRecord(env,ref,event,deps);if(fresh.series_rule_id!==shown.series_rule_id||fresh.owner_id!==shown.owner_id||fresh.record_id)throw fail('系列または紐づけが更新されました');
-  const record=newRecord(shown.owner_id,{lesson_date:ref.start,title_snapshot:ref.title,...patchValues(body.patch||{})},{series_rule_id:shown.series_rule_id});
+  const patch=patchValues(body.patch||{});
+  const source={series_rule_id:shown.series_rule_id};
+  const record=newRecord(shown.owner_id,{lesson_date:ref.start,title_snapshot:ref.title,...patch},
+   Object.hasOwn(patch,'lesson_plan')?setPlanIntent(source,patch.lesson_plan.trim()&&!patch.completed?intent:null):source);
   return {before:{record:null},after:{...shown,...calendarRecordValues(record),completed:record.completed,record_id:record.id,record_exists:true,record_revision:1,link_revision:1,target:ref},statements:[
    currentSeriesGuard(env,shown,ref),guard(env,'EXISTS(SELECT 1 FROM lesson_owners WHERE id=? AND revision=?)',[shown.owner_id,shown.owner_revision]),guard(env,'NOT EXISTS(SELECT 1 FROM lesson_event_links WHERE calendar_id=? AND event_id=?)',[ref.calendar_id,ref.id]),guard(env,'NOT EXISTS(SELECT 1 FROM lesson_history_exclusions WHERE calendar_id=? AND event_id=?)',[ref.calendar_id,ref.id]),guard(env,'NOT EXISTS(SELECT 1 FROM curriculum_entries WHERE calendar_event_id=?)',[ref.id]),recordInsert(env,record),statement(env,'INSERT INTO lesson_event_links VALUES(?,?,?,?,?,?)',ref.calendar_id,ref.id,record.id,1,encode(ref),encode(eventIdentity(event)))]};
  });
- const saved=await editOwnerRecord(env,shown.record_id,{...body.patch,revision:body.record_revision,request_id:body.request_id||crypto.randomUUID(),expected_link:{calendar_id:ref.calendar_id,event_id:ref.id,revision:shown.link_revision}});
+ const saved=await editOwnerRecord(env,shown.record_id,{...body.patch,revision:body.record_revision,request_id:body.request_id||crypto.randomUUID(),expected_link:{calendar_id:ref.calendar_id,event_id:ref.id,revision:shown.link_revision}},intent);
  return {...shown,...calendarRecordValues(saved.record),completed:saved.record.completed,record_revision:saved.record.revision,target:ref,operation_id:saved.operation_id};
 }
 export async function changeLessonBinding(env,body,deps){await policy(env);return transaction(env,body,'change_binding',async()=>{
@@ -219,9 +269,12 @@ async function prepareNextBinding(env,source,sourceEvent,sourceRecord,target,tar
    draft={context:old[0].id,revision:old[0].revision,exists:true,plan:old[0].lesson_plan,moved:true};
   }
  }
- const sourceBasis={record_id:sourceRecord.record_id||null,link_revision:sourceRecord.link_revision||null,series_rule_id:sourceRecord.series_rule_id||null,series_rule_revision:sourceRecord.series_rule_revision||null};
+ const sourceBasis={record_id:sourceRecord.record_id||null,record_revision:sourceRecord.record_revision,link_revision:sourceRecord.link_revision||null,series_rule_id:sourceRecord.series_rule_id||null,series_rule_revision:sourceRecord.series_rule_revision||null};
  const fingerprint=await historyDigest({source,sourceIdentity:eventIdentity(sourceEvent),sourceBasis,target,targetIdentity:eventIdentity(targetEvent),owner,draft,context});
- return {owner,directory,draft,context,fingerprint,automatic:!!draft.plan.trim()&&Date.parse(target.start)>Date.now()};
+ const hasPlan=!!draft.plan.trim();
+ // Empty records created by automatic linkage do not authorize another empty
+ // link. A verified, deliberately saved nonempty target draft still can.
+ return {owner,directory,draft,context,fingerprint,automatic:Date.parse(target.start)>Date.now()&&(hasPlan||!sourceRecord.automatic_empty_source)};
 }
 export async function nextBindingOffer(env,source,sourceEvent,sourceRecord,target,targetEvent,targetRecord){
  let shown;
@@ -247,9 +300,17 @@ export async function confirmNextLessonBinding(env,body,deps,findNext){
   const {owner,draft,context}=shown;
   const sourceGuard=sourceRecord.record_id
    ?guard(env,`EXISTS(SELECT 1 FROM lesson_event_links l JOIN lesson_history_records r ON r.id=l.record_id
-     WHERE l.calendar_id=? AND l.event_id=? AND l.record_id=? AND l.revision=? AND r.owner_id=?)`,[sourceLive.ref.calendar_id,sourceLive.ref.id,sourceRecord.record_id,sourceRecord.link_revision,owner.id])
+     WHERE l.calendar_id=? AND l.event_id=? AND l.record_id=? AND l.revision=? AND r.owner_id=? AND r.revision=?)`,[sourceLive.ref.calendar_id,sourceLive.ref.id,sourceRecord.record_id,sourceRecord.link_revision,owner.id,sourceRecord.record_revision])
    :currentSeriesGuard(env,sourceRecord,sourceLive.ref);
-  const record=newRecord(owner.id,{lesson_date:ref.start,title_snapshot:ref.title,lesson_plan:draft.plan},{binding_decision:'next_confirmed',source:sourceLive.ref,draft_context:draft.exists?draft.context:null,draft_revision:draft.revision,automatic:body.automatic===true});
+  let intent=null;
+  if(draft.exists&&draft.plan.trim()){
+   const observed=await recordedPendingIntent(env,draft.context,draft.revision,draft.plan);
+   const expected=makeNextPlanIntent(sourceLive.ref,sourceLive.event,owner.id,ref,event);
+   if(samePlanIntent(observed,expected))intent=observed;
+  }
+  const meta={binding_decision:'next_confirmed',source:sourceLive.ref,draft_context:draft.exists?draft.context:null,draft_revision:draft.revision,
+   automatic:body.automatic===true,...(body.automatic===true&&!draft.plan.trim()?{automatic_empty:true}:{})};
+  const record=newRecord(owner.id,{lesson_date:ref.start,title_snapshot:ref.title,...(draft.exists?{lesson_plan:draft.plan}:{})},draft.exists?setPlanIntent(meta,intent):meta);
   const eventLink={calendar_id:ref.calendar_id,event_id:ref.id,record_id:record.id,revision:1,target_json:encode(ref),event_identity_json:encode(eventIdentity(event))};
   return {before:{source:sourceLive.ref,owner_id:owner.id,draft},after:{target:ref,record,link:eventLink},statements:[
    sourceGuard,
@@ -264,6 +325,95 @@ export async function confirmNextLessonBinding(env,body,deps,findNext){
    ...(draft.moved?[guard(env,'NOT EXISTS(SELECT 1 FROM lesson_pending_plans WHERE id=?)',[context]),guard(env,otherPendingSQL,[ref.calendar_id,ref.id,draft.context])]:[]),
    recordInsert(env,record),
    statement(env,'INSERT INTO lesson_event_links VALUES(?,?,?,?,?,?)',...Object.values(eventLink)),
+  ]};
+ });
+}
+
+// A plan entered in the source card's next editor may follow that source's
+// next occurrence. Old plans without this server-authored marker are never moved.
+const markedNextRecordsSQL=`SELECT r.*,l.event_id,l.revision AS link_revision FROM lesson_event_links l
+ JOIN lesson_history_records r ON r.id=l.record_id WHERE l.calendar_id=? AND r.owner_id=? AND r.lesson_plan<>''
+ AND json_extract(CASE WHEN json_valid(r.source_json) THEN r.source_json END,'$.next_plan_intent.source_id')=? LIMIT 2`;
+const emptyConfirmedTargetSQL=`NOT EXISTS(SELECT 1 FROM lesson_history_exclusions WHERE calendar_id=? AND event_id=?)
+ AND NOT EXISTS(SELECT 1 FROM curriculum_entries WHERE calendar_event_id=?)
+ AND NOT EXISTS(SELECT 1 FROM lesson_record_hold WHERE event_id=? AND resolved_at IS NULL)
+ AND NOT EXISTS(SELECT 1 FROM calendar_lesson_migration WHERE calendar_id=? AND event_id=? AND status IN ('reserved','dispatching','unknown','verified'))
+ AND NOT EXISTS(SELECT 1 FROM lesson_pending_plans WHERE calendar_id=? AND event_id=? AND lesson_plan<>'')`;
+const clearConfirmedArgs=ref=>[ref.calendar_id,ref.id,ref.id,ref.id,ref.calendar_id,ref.id,ref.calendar_id,ref.id];
+const linkedRecordSQL=`EXISTS(SELECT 1 FROM lesson_event_links l JOIN lesson_history_records r ON r.id=l.record_id
+ WHERE l.calendar_id=? AND l.event_id=? AND l.record_id=? AND l.revision=? AND r.owner_id=? AND r.revision=?)`;
+const linkedRecordArgs=(ref,row)=>[ref.calendar_id,ref.id,row.record_id,row.link_revision,row.owner_id,row.record_revision];
+async function prepareNextPlanCarry(env,source,sourceEvent,sourceRecord,target,targetEvent,targetRecord,events,deps){
+ const ownerId=sourceRecord.owner_id,name=lessonTitleKey(source.title);
+ if(!ownerId||sourceRecord.attribution_status!=='confirmed'||targetRecord.attribution_status!=='confirmed'
+ ||targetRecord.owner_id!==ownerId||!targetRecord.record_id||targetRecord.completed||targetRecord.lesson_plan!==''||source.calendar_id!==target.calendar_id
+ ||!source.etag||!target.etag||!name||name!==lessonTitleKey(target.title)||!validBindingIdentity(sourceEvent)||!validBindingIdentity(targetEvent)
+ ||sourceEvent?.recurrence||targetEvent?.recurrence||String(targetEvent?.description||'').trim()
+ ||!(Date.parse(target.start)>Date.now())||!(Date.parse(target.start)>=Date.parse(source.end)))return null;
+ const found=await rows(env,markedNextRecordsSQL,source.calendar_id,ownerId,source.id);
+ if(found.length!==1||found[0].event_id===target.id||found[0].completed||!found[0].lesson_plan.trim())return null;
+ const fromRecord=found[0],rawMatches=events.filter(event=>event.id===fromRecord.event_id);
+ if(rawMatches.length!==1)return null;
+ const fromEvent=rawMatches[0],from=lessonEventRef(fromEvent,source.calendar_id);
+ if(!from.etag||!(Date.parse(from.start)>=Date.parse(target.end))||name!==lessonTitleKey(from.title)
+ ||!isScheduledLesson(from)||fromEvent.recurrence)return null;
+ const expected=makeNextPlanIntent(source,sourceEvent,ownerId,from,fromEvent);
+ if(!samePlanIntent(readSourceMeta(fromRecord).next_plan_intent,expected))return null;
+ const fromShown=await readEventOwnerRecord(env,from,fromEvent,deps);
+ if(fromShown.attribution_status!=='confirmed'||fromShown.owner_id!==ownerId||fromShown.record_id!==fromRecord.id
+ ||fromShown.record_revision!==fromRecord.revision||fromShown.link_revision!==fromRecord.link_revision)return null;
+ const targetRow=await first(env,'SELECT * FROM lesson_history_records WHERE id=? AND owner_id=?',targetRecord.record_id,ownerId);
+ if(!targetRow||targetRow.revision!==targetRecord.record_revision||targetRow.completed||!ownedPlanIsUntouched(targetRow,readSourceMeta(targetRow)))return null;
+ if(!(await first(env,`SELECT ${emptyConfirmedTargetSQL} AS ok`,...clearConfirmedArgs(target)))?.ok)return null;
+ const directory=(await first(env,bindingDirectorySQL)).names;
+ const names=new Set(JSON.parse(directory).filter(([,title])=>lessonTitleKey(title)===name).map(([id])=>id));
+ if(names.size!==1||!names.has(ownerId))return null;
+ const intent=makeNextPlanIntent(source,sourceEvent,ownerId,target,targetEvent);
+ const fingerprint=await historyDigest({source,target,from,intent,sourceGuard:linkedRecordArgs(source,sourceRecord),
+   sourceSeries:sourceRecord.series_rule_id?[sourceRecord.series_rule_id,sourceRecord.series_rule_revision]:null,
+   targetGuard:linkedRecordArgs(target,targetRecord),fromGuard:linkedRecordArgs(from,fromShown),lesson_plan:fromRecord.lesson_plan});
+ return {ownerId,from,fromRecord,fromShown,targetRow,directory,intent,fingerprint};
+}
+export async function nextPlanCarryOffer(env,source,sourceEvent,sourceRecord,target,targetEvent,targetRecord,events,deps){
+ let shown;
+ try{shown=await prepareNextPlanCarry(env,source,sourceEvent,sourceRecord,target,targetEvent,targetRecord,events,deps);}
+ catch(error){if(!String(error.message).includes('no such table'))throw error;}
+ return shown?{automatic:true,owner_id:shown.ownerId,from:shown.from,fingerprint:shown.fingerprint}:undefined;
+}
+export async function carryNextPlan(env,body,deps,findNext){
+ await policy(env,true);
+ if(!ownerHistoryActive(env)||body.confirm!==true||!/^[a-f0-9]{64}$/.test(body.fingerprint||'')
+ ||body.request_id!=='auto-carry-'+body.fingerprint)throw fail('引き継ぐ今の予定と元の予定を確認してください',400);
+ return transaction(env,body,'carry_next_plan',async()=>{
+  const changed=()=>fail('次回の予定・所属・授業予定が変わりました。現在の情報を再確認してください');
+  const current=await findNext(body.source?.calendar_id,body.source?.id);
+  if(current.next_plan_carry?.fingerprint!==body.fingerprint||!sameLessonEvent(current.source,body.source)
+   ||!sameLessonEvent(current.target,body.target)||!sameLessonEvent(current.next_plan_carry?.from,body.from))throw changed();
+  const from=await liveHistoryTarget(env,body.from,deps);
+  const source=await liveHistoryTarget(env,body.source,deps),target=await liveHistoryTarget(env,body.target,deps);
+  if(!sameLessonEvent(source.ref,body.source)||!sameLessonEvent(target.ref,body.target)||!sameLessonEvent(from.ref,body.from))throw changed();
+  const sourceShown=await readEventOwnerRecord(env,source.ref,source.event,deps),targetShown=await readEventOwnerRecord(env,target.ref,target.event,deps);
+  const next=await prepareNextPlanCarry(env,source.ref,source.event,sourceShown,target.ref,target.event,targetShown,[from.event],deps);
+  if(!next||next.fingerprint!==body.fingerprint)throw changed();
+  const now=new Date().toISOString();
+  const previousMeta=setPlanIntent(readSourceMeta(next.fromRecord),null);
+  const targetMeta=setPlanIntent(readSourceMeta(next.targetRow),next.intent);
+  const old={...next.fromRecord,lesson_plan:'',source_json:encode(previousMeta),revision:next.fromRecord.revision+1,updated_at:now};
+  const record={...next.targetRow,lesson_plan:next.fromRecord.lesson_plan,source_json:encode(targetMeta),revision:next.targetRow.revision+1,updated_at:now};
+  const sourceGuard=sourceShown.record_id?guard(env,linkedRecordSQL,linkedRecordArgs(source.ref,sourceShown)):currentSeriesGuard(env,sourceShown,source.ref);
+  return {before:{source:source.ref,from:next.fromRecord,target:next.targetRow},after:{target:target.ref,from:from.ref,record,previous:old},statements:[
+   sourceGuard,
+   ...(!sourceShown.record_id?[guard(env,'NOT EXISTS(SELECT 1 FROM lesson_event_links WHERE calendar_id=? AND event_id=?)',[source.ref.calendar_id,source.ref.id])]:[]),
+   guard(env,linkedRecordSQL,linkedRecordArgs(target.ref,targetShown)),
+   guard(env,linkedRecordSQL,linkedRecordArgs(from.ref,next.fromShown)),
+   guard(env,`(SELECT names FROM (${bindingDirectorySQL}))=?`,[next.directory]),
+   guard(env,`(SELECT COUNT(*) FROM (${markedNextRecordsSQL}))=1`,[source.ref.calendar_id,next.ownerId,source.ref.id]),
+   guard(env,emptyConfirmedTargetSQL,clearConfirmedArgs(target.ref)),
+   ...[source.ref,from.ref].map(ref=>guard(env,'NOT EXISTS(SELECT 1 FROM lesson_history_exclusions WHERE calendar_id=? AND event_id=?)',[ref.calendar_id,ref.id])),
+   statement(env,'UPDATE lesson_history_records SET lesson_plan=?,source_json=?,revision=?,updated_at=? WHERE id=? AND revision=?',
+    old.lesson_plan,old.source_json,old.revision,now,old.id,next.fromRecord.revision),
+   statement(env,'UPDATE lesson_history_records SET lesson_plan=?,source_json=?,revision=?,updated_at=? WHERE id=? AND revision=?',
+    record.lesson_plan,record.source_json,record.revision,now,record.id,next.targetRow.revision),
   ]};
  });
 }
@@ -474,6 +624,7 @@ export async function handleOwnerHistory(env,request,url,deps){
  if(path==='/target'&&method==='POST'){const {ref}=await liveHistoryTarget(env,(await input()).target,deps);return {target:ref,link:await first(env,'SELECT * FROM lesson_event_links WHERE calendar_id=? AND event_id=?',ref.calendar_id,ref.id)};}
  if(path==='/binding'&&method==='POST')return changeLessonBinding(env,await input(),deps);
  if(path==='/next-binding'&&method==='POST'){const {readNextLessonPlan}=await import('./lesson-plan.js');return confirmNextLessonBinding(env,await input(),deps,(calendar,id)=>readNextLessonPlan(env,calendar,id,deps));}
+ if(path==='/next-plan-carry'&&method==='POST'){const {readNextLessonPlan}=await import('./lesson-plan.js');return carryNextPlan(env,await input(),deps,(calendar,id)=>readNextLessonPlan(env,calendar,id,deps));}
  if(path==='/import/preview'&&method==='POST')return previewOwnerImport(env,(await input()).target,deps);
  if(path==='/import'&&method==='POST')return importOwnerRecord(env,await input(),deps);
  throw fail('not found',404);

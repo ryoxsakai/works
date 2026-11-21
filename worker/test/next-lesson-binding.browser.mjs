@@ -32,13 +32,15 @@ try{
  await bind(previous,person);await bind(later,person);await bind(ambiguousSource,duplicate);await draft(ambiguousTarget,'紐づけを要確認');
  browser=await chromium.launch({headless:true,executablePath:process.env.BROWSER_EXECUTABLE||undefined});
  const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,reducedMotion:'reduce'});
- let writes=0;
+ const writes=[];
+ let releaseBinding;const holdBinding=new Promise(resolve=>{releaseBinding=resolve;});
  await context.route('**/api/**',async route=>{
   const req=route.request(),url=new URL(req.url()),body=req.method()==='GET'?null:req.postDataJSON();
   try{
    let value;
    if(url.pathname.startsWith('/api/lesson-history/')){
-    if(url.pathname.endsWith('/next-binding'))writes++;
+    if(url.pathname.endsWith('/next-binding')){writes.push('bind');await holdBinding;}
+    if(url.pathname.endsWith('/next-plan-carry'))writes.push('carry');
     value=await handleOwnerHistory(f.env,new Request(req.url(),{method:req.method(),headers:{'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})}),url,f.deps);
    }else if(url.pathname==='/api/terms') value=(await f.DB.prepare('SELECT *,1 AS year_id FROM terms').all()).results;
    else if(url.pathname==='/api/lesson-records') value=await Promise.all(body.targets.map(target=>readEventOwnerRecord(f.env,target,f.events.find(e=>e.id===target.id),f.deps)));
@@ -52,20 +54,29 @@ try{
  await page.goto(f.base+'/tutor/?record_date='+day(0));
  const editor=page.locator('.record-next-plan'),link=editor.locator('.next-owner-review');
  await expect(editor.locator('.lesson-plan-target')).toContainText(day(4).replaceAll('-','/'));
- assert.equal(writes,0);
+ await expect(editor.locator('textarea')).toHaveValue('');
+ await editor.locator('textarea').fill(plan);
+ await editor.locator('textarea').press('Tab');
+ await expect(editor.locator('.lesson-plan-status')).toContainText('保存済み');
+ assert.deepEqual(writes,[]);
  Object.assign(next,{summary:name,etag:'"renamed"'});
- await draft(next,plan);
  await page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));
+ await expect(editor.locator('.lesson-plan-status')).toHaveText('次回の授業と紐づけています…');
+ await expect(link).toHaveCount(0);
+ await expect(editor.locator('.lesson-plan-action')).toBeHidden();
+ assert.deepEqual(writes,['bind']);
+ releaseBinding();
  await expect(editor.locator('textarea')).toHaveValue(plan);
  await expect(editor.locator('.lesson-plan-target')).toContainText('連動先');
  await expect(editor.locator('.lesson-plan-target')).toContainText(day(2).replaceAll('-','/'));
  await expect(link).toHaveCount(0);
- assert.equal(writes,1);
+ assert.deepEqual(writes,['bind','carry']);
  await page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));
  await expect(editor.locator('textarea')).toHaveValue(plan);
- assert.equal(writes,1);
+ assert.deepEqual(writes,['bind','carry']);
  assert.equal((await f.DB.prepare("SELECT r.lesson_plan FROM lesson_event_links l JOIN lesson_history_records r ON r.id=l.record_id WHERE l.event_id='old-next'").first()).lesson_plan,'');
- assert.equal((await f.DB.prepare('SELECT count(*) n FROM lesson_pending_plans').first()).n,2);
+ assert.equal((await f.DB.prepare("SELECT r.lesson_plan FROM lesson_event_links l JOIN lesson_history_records r ON r.id=l.record_id WHERE l.event_id='changed-vacancy'").first()).lesson_plan,plan);
+ assert.equal((await f.DB.prepare('SELECT count(*) n FROM lesson_pending_plans').first()).n,1);
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth));
  await page.goto(f.base+'/tutor/?record_date='+day(6));
  await expect(editor.locator('textarea')).toHaveValue('紐づけを要確認');
@@ -74,9 +85,9 @@ try{
  await link.click();
  await expect(page.locator('#next-binding-review')).toBeHidden();
  await expect(page.locator('#pending-plan-list')).toContainText('紐づけを要確認');
- assert.equal(writes,1);
+ assert.deepEqual(writes,['bind','carry']);
  assert.deepEqual(errors,[]);
- console.log('PASS mobile Tutor automatically follows a safely retargeted plan and retains manual review for ambiguous owners');
+ console.log('PASS mobile Tutor quietly binds a blank future occurrence and moves only the previous source-authored plan; ambiguous owners stay manual');
 }finally{
  await browser?.close();
  await f.close();

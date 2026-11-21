@@ -3,7 +3,7 @@ import { lessonEventKey, sameLessonEvent } from "../shared/lesson-plan.js";
 
 // All editors of one event share one draft and one write queue. Nothing is copied
 // into the preceding event's record, and responses never use the later selection.
-export function createLessonPlanController({ readNext, write, readCurrent, readOperation, confirmBinding, canAutoBind = () => true, onChange = () => {} }) {
+export function createLessonPlanController({ readNext, write, readCurrent, readOperation, confirmBinding, carryNextPlan, canAutoBind = () => true, onChange = () => {} }) {
   const plans = new Map(), links = new Map();
   const ownTargets=new Map(), attemptedBindings=new Set(), autoBindingReads=new Map();
   const hasEdit=state=>!!(state?.dirty||state?.pending||state?.pendingUnknown);
@@ -65,36 +65,51 @@ export function createLessonPlanController({ readNext, write, readCurrent, readO
         };
         link.current=result;
         if(changed()){link.status="conflict";notify();return;}
-        const offer=result.next_binding,sourceState=plans.get(key),candidate=result.target;
-        const candidateKey=candidate?lessonEventKey(candidate):null;
-        const targetState=()=>candidateKey?plans.get(candidateKey):null;
-        if(confirmBinding&&offer?.automatic&&result.owner_confirmation_required&&candidate
-          &&sourceState?.ownerId===offer.owner_id&&result.source_owner_id===offer.owner_id
-          &&sourceState?.attributionStatus==="confirmed"&&sameLessonEvent(sourceState.target,source)
-          &&!hasEdit(sourceState)&&!hasEdit(plans.get(link.targetKey))&&!hasEdit(targetState())&&!savedRecoveryFor(candidate)
-          &&canAutoBind(source)&&(autoBindingReads.has(offer.fingerprint)||!attemptedBindings.has(offer.fingerprint))){
-          const fingerprint=offer.fingerprint;
-          let pending=autoBindingReads.get(fingerprint);
+        // A new blank occurrence may first need its own association, then
+        // the source-authored plan can move atomically between the two records.
+        for(let step=0;step<2;step++){
+          const carrying=!!result.next_plan_carry,offer=carrying?result.next_plan_carry:result.next_binding;
+          const submit=carrying?carryNextPlan:confirmBinding;
+          const sourceState=plans.get(key),candidate=result.target;
+          const candidateKey=candidate?lessonEventKey(candidate):null,fromKey=offer?.from?lessonEventKey(offer.from):null;
+          const targetState=()=>candidateKey?plans.get(candidateKey):null;
+          const fromState=()=>fromKey?plans.get(fromKey):null;
+          const held=()=>hasEdit(plans.get(key))||hasEdit(plans.get(link.targetKey))||hasEdit(targetState())||hasEdit(fromState())
+            ||savedRecoveryFor(candidate)||(offer.from&&savedRecoveryFor(offer.from));
+          if(!submit||!offer?.automatic||(!carrying&&!result.owner_confirmation_required)||!candidate
+           ||sourceState?.ownerId!==offer.owner_id||result.source_owner_id!==offer.owner_id
+           ||sourceState?.attributionStatus!=="confirmed"||!sameLessonEvent(sourceState.target,source)
+           ||!canAutoBind(source)||held())break;
+          const fingerprint=offer.fingerprint,request_id=(carrying?"auto-carry-":"auto-next-")+fingerprint;
+          let pending=autoBindingReads.get(request_id);
           if(!pending){
+            if(attemptedBindings.has(request_id)){
+              if(carrying){link.status='conflict';notify();return;}
+              break;
+            }
             if(attemptedBindings.size>=128)attemptedBindings.delete(attemptedBindings.values().next().value);
-            attemptedBindings.add(fingerprint);
+            attemptedBindings.add(request_id);
             const confirmed={source:structuredClone(result.source),target:structuredClone(candidate),fingerprint,
-              request_id:"auto-next-"+fingerprint,confirm:true,automatic:true};
+              request_id,confirm:true,...(carrying?{from:structuredClone(offer.from)}:{automatic:true})};
             // A lost POST response is not replayed. Re-read the actual association.
             pending=(async()=>{
-              try{await confirmBinding(confirmed);}catch{}
+              try{await submit(confirmed);}catch{}
               try{return withLatest(await readNext(source));}catch{return null;}
             })();
-            autoBindingReads.set(fingerprint,pending);
-            void pending.finally(()=>autoBindingReads.delete(fingerprint));
+            autoBindingReads.set(request_id,pending);
+            void pending.finally(()=>autoBindingReads.delete(request_id));
           }
+          link.status='auto_binding';notify();
           const fresh=await pending;
           if(link.generation!==generation)return;
-          if(hasEdit(targetState())||hasEdit(plans.get(link.targetKey))||hasEdit(plans.get(key))||savedRecoveryFor(candidate)
-            ||targetState()?.changedAt>readVersion){
+          if(held()||targetState()?.changedAt>readVersion||fromState()?.changedAt>readVersion){
             link.current=fresh||result;link.status="conflict";
             if(hasEdit(targetState())&&(!link.targetKey||link.targetKey===candidateKey)){link.target=candidate;link.targetKey=candidateKey;}
             notify();return;
+          }
+          if(carrying&&(!fresh||fresh.next_plan_carry?.fingerprint===fingerprint)){
+            link.current=fresh||result;
+            link.status="conflict";notify();return;
           }
           result=fresh||{...result,pending_allowed:false,next_binding:undefined};
           link.current=result;

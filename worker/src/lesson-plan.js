@@ -4,7 +4,7 @@ import { NEXT_LESSON_DAYS, lessonEventRef, sameLessonEvent, findNextLesson, isSc
 import {calendarRecordEligible,overlayCalendarLessonRecord,writeCalendarLessonRecord,calendarRecordsEnabled,loadCalendarStorageState} from './calendar-lesson-records.js';
 import {lessonTitleKey} from '../../shared/lesson-attribution.js';
 import {calendarRecordValues} from '../../shared/calendar-lesson-record.mjs';
-import {ownerHistoryActive,readEventOwnerRecord,writeEventOwnerRecord,writePendingLessonPlan,nextBindingOffer} from './lesson-owner-history.js';
+import {ownerHistoryActive,readEventOwnerRecord,writeEventOwnerRecord,writePendingLessonPlan,nextBindingOffer,makeNextPlanIntent,nextPlanCarryOffer} from './lesson-owner-history.js';
 
 // A stale write may refer to a different ownership generation, even with an identical title.
 // Conflict responses identify the fresh target but never return another generation's plan.
@@ -77,7 +77,10 @@ export async function readNextLessonPlan(env, calendarId, eventId, deps) {
     // Link the actual next card by exact title within this calendar, without
     // changing either owner or copying any record. Writes still verify both
     // source ownership and the target's own revision/owner independently.
-    if(next.attribution_status==='confirmed'&&(next.owner_id===record.owner_id||lessonTitleKey(chosen.ref.title)===lessonTitleKey(source.title)))return {...base,target:chosen.ref,...next};
+    if(next.attribution_status==='confirmed'&&(next.owner_id===record.owner_id||lessonTitleKey(chosen.ref.title)===lessonTitleKey(source.title))){
+      const next_plan_carry=await nextPlanCarryOffer(env,source,context.event,record,chosen.ref,chosen.event,next,events.filter(event=>isScheduledLesson(lessonEventRef(event,calendarId),context.settings.excluded_titles||[])),deps);
+      return {...base,target:chosen.ref,...next,...(next_plan_carry?{next_plan_carry}:{})};
+    }
     // Schedule discovery is not an ownership decision. Never expose/copy a candidate's record.
     const next_binding=owners.has(chosen.ref.id)?undefined:await nextBindingOffer(env,source,context.event,record,chosen.ref,chosen.event,next);
     return {...base,target:chosen.ref,reason:'owner_confirmation_required',owner_confirmation_required:true,owner_id:null,attribution_status:next.attribution_status,lesson_plan:next.pending_allowed?next.lesson_plan||'':'',record_revision:next.record_revision,pending_context:next.pending_context,pending_allowed:next.pending_allowed,pending_storage_available:next.pending_storage_available,...(next_binding?{next_binding}:{})};
@@ -101,7 +104,7 @@ export async function writeLessonPlan(env, body, deps) {
     || !body.target || typeof body.target !== "object") throw failure(400, "授業予定と取得時の内容が必要です");
   const { calendar_id: calendarId, id: eventId } = body.target;
   identifiers(calendarId, eventId);
-  let current;
+  let current,nextPlanIntent=null;
   if (body.source) {
     identifiers(body.source.calendar_id, body.source.id);
     if (body.source.calendar_id !== calendarId) throw failure(400, "異なるカレンダーには連動できません");
@@ -119,14 +122,19 @@ export async function writeLessonPlan(env, body, deps) {
     if (!sameLessonEvent(verifiedSource.ref, current.source)) {
       throw failure(409, "元の授業が変更されました。予定を再確認してください", "LESSON_TARGET_CHANGED");
     }
+    if(ownerHistoryActive(env)&&current.source_owner_id===(current.owner_id||current.next_binding?.owner_id)){
+      const shownSource=await readEventOwnerRecord(env,verifiedSource.ref,verifiedSource.event,deps);
+      if(shownSource.attribution_status==='confirmed'&&shownSource.owner_id===current.source_owner_id)
+        nextPlanIntent=makeNextPlanIntent(verifiedSource.ref,verifiedSource.event,current.source_owner_id,verified.ref,verified.event);
+    }
   } else {
     current = await readLessonPlan(env, calendarId, eventId, deps);
     if (!sameLessonEvent(current.target, body.target)) {
       throw failure(409, "授業日時や予定名が変更されました。再読み込みしてください", "LESSON_TARGET_CHANGED", current);
     }
   }
-  if(ownerHistoryActive(env)&&body.pending_context)return writePendingLessonPlan(env,body,deps);
-  if(ownerHistoryActive(env))return writeEventOwnerRecord(env,{target:body.target,patch:{lesson_plan:body.lesson_plan},record_revision:body.record_revision,expectedLessonPlan:body.expected_lesson_plan,request_id:body.request_id,expected_owner_id:body.expected_owner_id},deps);
+  if(ownerHistoryActive(env)&&body.pending_context)return writePendingLessonPlan(env,body,deps,nextPlanIntent);
+  if(ownerHistoryActive(env))return writeEventOwnerRecord(env,{target:body.target,patch:{lesson_plan:body.lesson_plan},record_revision:body.record_revision,expectedLessonPlan:body.expected_lesson_plan,request_id:body.request_id,expected_owner_id:body.expected_owner_id},deps,nextPlanIntent);
   if(calendarRecordsEnabled(env))return writeCalendarLessonRecord(env,{target:body.target,patch:{lesson_plan:body.lesson_plan},recordRevision:body.record_revision,expectedLessonPlan:body.expected_lesson_plan},deps);
   const row = await rawRecord(env, eventId);
   requireCurrent(row, body.target);
