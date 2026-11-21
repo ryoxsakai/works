@@ -171,3 +171,18 @@ test('a new ambiguous owner keeps its specific manual review link without moving
  assert.equal(store.get(lessonEventKey(later)).value,'old later plan');
  assert.equal(f.attempts.length,0);
 });
+test('one refresh links the new blank and then carries verified source text from the later slot',async()=>{
+ const f=automaticFixture(),{source,target,later,owner}=f,posts=[];
+ let response=f.confirmed(later,'next text');
+ const store=createLessonPlanController({readNext:async()=>response,write:async()=>{throw Error('no regular save')},
+  confirmBinding:async body=>{posts.push(body);response={...f.confirmed(target,''),next_plan_carry:{automatic:true,owner_id:owner,from:later,fingerprint:'e'.repeat(64)}};},
+  carryNextPlan:async body=>{posts.push(body);response=f.confirmed(target,'next text');}});
+ store.seed(source,'',0,1,'confirmed',owner);
+ await store.loadNext(source);
+ response=f.offer('');response.next_binding.automatic=true;
+ await store.loadNext(source);
+ assert.deepEqual(posts.map(x=>x.request_id),['auto-next-'+'f'.repeat(64),'auto-carry-'+'e'.repeat(64)]);
+ assert.deepEqual(posts[1].from,later);assert.deepEqual(posts[1].target,target);
+ assert.equal(store.get(lessonEventKey(target)).value,'next text');
+ assert.equal(store.getLink(lessonEventKey(source)).status,'ready');
+});

@@ -4,8 +4,8 @@ import {readFile} from 'node:fs/promises';
 import {Miniflare} from 'miniflare';
 import {ensureAttribution} from '../src/lesson-attribution.js';
 import {lessonEventRef} from '../../shared/lesson-plan.js';
-import {createLessonOwner,renameLessonOwner,createOwnerRecord,editOwnerRecord,listLessonOwners,listOwnerRecords,changeLessonBinding,readEventOwnerRecord,previewOwnerImport,importOwnerRecord,writeEventOwnerRecord,writePendingLessonPlan,confirmNextLessonBinding} from '../src/lesson-owner-history.js';
-import {readNextLessonPlan} from '../src/lesson-plan.js';
+import {createLessonOwner,renameLessonOwner,createOwnerRecord,editOwnerRecord,listLessonOwners,listOwnerRecords,changeLessonBinding,readEventOwnerRecord,previewOwnerImport,importOwnerRecord,writeEventOwnerRecord,writePendingLessonPlan,confirmNextLessonBinding,carryNextPlan} from '../src/lesson-owner-history.js';
+import {readNextLessonPlan,writeLessonPlan} from '../src/lesson-plan.js';
 import {plainCalendarRecordLayout} from '../../shared/calendar-lesson-record.mjs';
 const request=()=>crypto.randomUUID();
 async function setup(t){
@@ -271,8 +271,7 @@ test('automatic binding follows an earlier renamed slot, never moving the prior 
  events[1].summary='甲';events[1].etag='new-earlier-slot';
  let current=await find();
  assert.equal(current.target.id,events[1].id);
- assert.equal(current.next_binding.automatic,undefined,'never auto-creates an empty record');
- await assert.rejects(confirm(automaticPayload(current)),e=>e.status===409);
+ assert.equal(current.next_binding.automatic,true,'safe empty occurrence may link');
  const text='この予定に保存した下書き';
  await pending(text);
  current=await find();
@@ -295,18 +294,188 @@ test('unique pending draft follows the same immutable Calendar event across time
  assert.equal(result.record.lesson_plan,'既存の下書き\n保持');assert.equal(result.target.start,moved.target.start);
  assert.equal((await env.DB.prepare('SELECT count(*) n FROM lesson_pending_plans').first()).n,1);
 });
-test('a saved current blank is authoritative and multiple older contexts are never chosen automatically',async t=>{
+test('a saved current blank remains authoritative during automatic association',async t=>{
  const {events,find,pending,confirm}=await nextBindingFixture(t,{future:true});
  await pending('古い記述');events[1].etag='second-version';
- await pending('');let current=await find();
- assert.equal(current.next_binding.has_draft,true);assert.equal(current.next_binding.moved_draft,undefined);assert.equal(current.next_binding.automatic,undefined);
- await assert.rejects(confirm(automaticPayload(current)),e=>e.status===409);
- await pending('別の記述');events[1].etag='third-version';current=await find();
- assert.equal(current.next_binding,undefined,'multiple old drafts require manual selection');
+ await pending('');const current=await find();
+ assert.equal(current.next_binding.has_draft,true);assert.equal(current.next_binding.moved_draft,undefined);assert.equal(current.next_binding.automatic,true);
+ const result=await confirm(automaticPayload(current));assert.equal(result.record.lesson_plan,'');
+ assert.equal(JSON.parse(result.record.source_json).lesson_plan_touched,true);
+});
+test('multiple older contexts are never chosen automatically',async t=>{
+ const {events,find,pending}=await nextBindingFixture(t,{future:true});
+ await pending('古い記述');events[1].etag='second-version';
+ await pending('別の記述');events[1].etag='third-version';
+ assert.equal((await find()).next_binding,undefined,'multiple old drafts require manual selection');
 });
 test('the automatic endpoint refuses past starts even when a valid saved draft exists',async t=>{
  const {find,pending,confirm}=await nextBindingFixture(t,{past:true});
  await pending('歴史的な下書き');const shown=await find();
  assert.equal(shown.next_binding.has_draft,true);assert.equal(shown.next_binding.automatic,undefined);
  await assert.rejects(confirm(automaticPayload(shown)),e=>e.status===409);
+});
+test('auto-created empty link never cascades to another blank, but permits its own verified nonempty target draft',async t=>{
+ const {env,events,deps,owner,find,confirm,ref}=await nextBindingFixture(t,{future:true});
+ events[2].summary='甲';
+ const first=await confirm(automaticPayload(await find()));
+ assert.equal(first.record.lesson_plan,'');assert.equal(JSON.parse(first.record.source_json).automatic_empty,true);
+ const fromNew=()=>find('a',events[1].id),next=await fromNew();assert.equal(next.target.id,events[2].id);
+ assert.equal(next.next_binding.automatic,undefined);
+ await assert.rejects(confirm(automaticPayload(next)),e=>e.status===409);
+ await writePendingLessonPlan(env,{target:ref(2),pending_context:next.pending_context,record_revision:0,expected_lesson_plan:'',lesson_plan:'次の枠の入力',request_id:request()},deps);
+ const withDraft=await fromNew();assert.equal(withDraft.next_binding.automatic,true);
+ const owned=await confirm(automaticPayload(withDraft));assert.equal(owned.record.lesson_plan,'次の枠の入力');assert.equal(owned.record.owner_id,owner.id);
+});
+
+const carryPayload=offer=>({source:offer.source,target:offer.target,from:offer.next_plan_carry.from,fingerprint:offer.next_plan_carry.fingerprint,
+ confirm:true,request_id:'auto-carry-'+offer.next_plan_carry.fingerprint});
+const saveFromNext=(env,deps,offer,plan)=>writeLessonPlan(env,{source:offer.source,target:offer.target,
+ expected_source_owner_id:offer.source_owner_id,expected_owner_id:offer.owner_id,pending_context:offer.pending_context,
+ record_revision:offer.record_revision,expected_lesson_plan:offer.lesson_plan,lesson_plan:plan,request_id:request()},deps);
+async function carryFixture(t,{direct=false,retainedDraft=false}={}){
+ const f=await nextBindingFixture(t,{future:true}),{env,events,deps,owner,ref,find,confirm}=f;
+ events[1].summary='○';events[2].summary='甲';
+ const later=(await bind(env,owner,ref(2),deps)).record;
+ await editOwnerRecord(env,later.id,{request_id:request(),revision:1,homework:'旧枠の宿題を残す',lesson_memo:'旧枠の独立メモ'});
+ const old=await find(),plan='元のカードの次回欄で入力\n原文  ';
+ const saved=await writeLessonPlan(env,{...(direct?{}:{source:old.source,expected_source_owner_id:owner.id}),target:old.target,
+  expected_owner_id:owner.id,record_revision:old.record_revision,expected_lesson_plan:'',lesson_plan:plan,request_id:request()},deps);
+ Object.assign(events[1],{summary:'甲',etag:'earlier-inserted-slot'});
+ if(retainedDraft)await f.pending('ここに直接保存された未処理の下書き');
+ const earlier=(retainedDraft?await bind(env,owner,ref(1),deps):await confirm(automaticPayload(await find()))).record;
+ const carry=payload=>carryNextPlan(env,payload,deps,find);
+ return {...f,later,earlier,carry,saved,plan};
+}
+test('the confirmed source next-editor provenance follows to an earlier newly bound blank without altering other fields',async t=>{
+ const {env,events,owner,find,later,earlier,carry,plan}=await carryFixture(t);
+ const savedLater=(await listOwnerRecords(env,owner.id)).find(r=>r.id===later.id);
+ assert.equal(JSON.parse(savedLater.source_json).next_plan_intent.source_id,events[0].id);
+ assert.equal(savedLater.lesson_plan,plan);
+ const preimage=(await env.DB.prepare('SELECT * FROM lesson_history_records ORDER BY id').all()).results;
+ const shown=await find();assert.equal(shown.target.id,events[1].id);assert.equal(shown.lesson_plan,'');assert.equal(shown.next_plan_carry.from.id,events[2].id);
+ assert.deepEqual((await env.DB.prepare('SELECT * FROM lesson_history_records ORDER BY id').all()).results,preimage,'offer is read only');
+ const payload=carryPayload(shown),result=await carry(payload);
+ assert.equal(result.record.id,earlier.id);assert.equal(result.record.lesson_plan,plan);assert.equal(result.previous.lesson_plan,'');
+ assert.equal(result.previous.homework,'旧枠の宿題を残す');assert.equal(result.previous.lesson_memo,'旧枠の独立メモ');
+ assert.deepEqual(await carry(payload),result);
+ const recorded=await find();assert.equal(recorded.lesson_plan,plan);assert.equal(recorded.next_plan_carry,undefined);
+ const original=await env.DB.prepare("SELECT before_json FROM lesson_history_audit WHERE action='carry_next_plan'").first();
+ assert.equal(JSON.parse(original.before_json).from.lesson_plan,plan,'audit preserves the original plan');
+ assert.equal((await env.DB.prepare('SELECT count(*) n FROM lesson_event_links').first()).n,3);
+});
+test('directly authored later plan, touched blank, and completed source/target remain untouched',async t=>{
+ const direct=await carryFixture(t,{direct:true});assert.equal((await direct.find()).next_plan_carry,undefined);
+ assert.equal((await listOwnerRecords(direct.env,direct.owner.id)).find(r=>r.id===direct.later.id).lesson_plan,direct.plan);
+ const {env,owner,find,later,earlier,carry}=await carryFixture(t);
+ const payload=carryPayload(await find());
+ for(const [record,revision]of [[later,3],[earlier,1]]){
+  await env.DB.prepare('UPDATE lesson_history_records SET completed=1 WHERE id=?').bind(record.id).run();
+  assert.equal((await find()).next_plan_carry,undefined);await assert.rejects(carry(payload),e=>e.status===409);
+  await env.DB.prepare('UPDATE lesson_history_records SET completed=0 WHERE id=?').bind(record.id).run();
+ }
+ await editOwnerRecord(env,earlier.id,{request_id:request(),revision:1,lesson_plan:''});
+ assert.equal((await find()).next_plan_carry,undefined,'current explicit blank never resurrects an earlier assignment');
+ await assert.rejects(carry(payload),e=>e.status===409);assert.equal((await listOwnerRecords(env,owner.id)).find(r=>r.id===earlier.id).lesson_plan,'');
+});
+test('a next-editor append cannot make directly written, legacy unmarked, or explicitly cleared owned text movable',async t=>{
+ const {env,events,deps,owner,find,later,plan}=await carryFixture(t,{direct:true});
+ const readLater=async()=> (await listOwnerRecords(env,owner.id)).find(r=>r.id===later.id);
+ events[1].summary='○';
+ const directAppend=plan+'\n次回欄から追記';
+ await saveFromNext(env,deps,await find(),directAppend);
+ let stored=await readLater();assert.equal(stored.lesson_plan,directAppend);assert.equal(JSON.parse(stored.source_json).next_plan_intent,undefined);
+ // A historical record with content but no new metadata is equally unproven.
+ const legacyMeta={binding_decision:'new'};
+ await env.DB.prepare('UPDATE lesson_history_records SET source_json=? WHERE id=?').bind(JSON.stringify(legacyMeta),later.id).run();
+ await saveFromNext(env,deps,await find(),'旧記録の全体を編集しても起源不明');
+ stored=await readLater();assert.equal(JSON.parse(stored.source_json).next_plan_intent,undefined);
+ await editOwnerRecord(env,later.id,{request_id:request(),revision:stored.revision,lesson_plan:''});
+ await saveFromNext(env,deps,await find(),'明示的に空欄にした欄への再入力');
+ stored=await readLater();assert.equal(JSON.parse(stored.source_json).next_plan_intent,undefined);
+ events[1].summary='甲';assert.equal((await find()).next_plan_carry,undefined);
+ assert.equal(stored.lesson_plan,'明示的に空欄にした欄への再入力');
+});
+test('the exact same source intent survives rescheduling and later edits; a recreated source with the same ID cannot re-mark',async t=>{
+ const {env,events,deps,owner,find,ref,record,later,plan}=await carryFixture(t);
+ const readLater=async()=> (await listOwnerRecords(env,owner.id)).find(r=>r.id===later.id);
+ const originalIntent=JSON.parse((await readLater()).source_json).next_plan_intent;
+ events[1].summary='○';events[0].etag='moved-same-source';events[2].etag='moved-same-target';
+ events[2].start.dateTime=events[2].start.dateTime.replace('T10:00','T13:00');events[2].end.dateTime=events[2].end.dateTime.replace('T11:00','T14:00');
+ await saveFromNext(env,deps,await find(),plan+'\n同じ元の授業から続けて入力');
+ assert.deepEqual(JSON.parse((await readLater()).source_json).next_plan_intent,originalIntent);
+ events[1].summary='甲';assert.ok((await find()).next_plan_carry);
+ events[1].summary='○';Object.assign(events[0],{etag:'recreated-source',iCalUID:'new-source-identity'});
+ await changeLessonBinding(env,{request_id:request(),target:ref(),link_revision:1,decision:'same_owner',record_id:record.id,owner_id:owner.id},deps);
+ await saveFromNext(env,deps,await find(),'同じ予定IDでも生成元の異なるフォームから編集');
+ assert.equal(JSON.parse((await readLater()).source_json).next_plan_intent,undefined);
+ events[1].summary='甲';assert.equal((await find()).next_plan_carry,undefined);
+});
+test('first entry in a known untouched legacy linked blank can earn provenance',async t=>{
+ const {env,events,deps,owner,find,ref}=await nextBindingFixture(t,{future:true});
+ events[1].summary='○';events[2].summary='甲';
+ const later=(await bind(env,owner,ref(2),deps)).record;
+ await env.DB.prepare('UPDATE lesson_history_records SET source_json=? WHERE id=?').bind(JSON.stringify({binding_decision:'new'}),later.id).run();
+ await saveFromNext(env,deps,await find(),'旧方式で紐づけた未入力欄への初回入力');
+ const stored=(await listOwnerRecords(env,owner.id)).find(r=>r.id===later.id);
+ assert.equal(JSON.parse(stored.source_json).next_plan_intent.target_id,events[2].id);
+});
+test('a retained draft prevents carry even when a manually linked destination is blank',async t=>{
+ const {env,owner,find,later,earlier,plan}=await carryFixture(t,{retainedDraft:true});
+ const next=await find();assert.equal(next.lesson_plan,'');assert.equal(next.next_plan_carry,undefined);
+ const records=await listOwnerRecords(env,owner.id);
+ assert.equal(records.find(r=>r.id===earlier.id).lesson_plan,'');
+ assert.equal(records.find(r=>r.id===later.id).lesson_plan,plan);
+ assert.equal((await env.DB.prepare('SELECT lesson_plan FROM lesson_pending_plans').first()).lesson_plan,'ここに直接保存された未処理の下書き');
+});
+test('changed source date, a later direct edit, and a concurrent destination write block the carry atomically',async t=>{
+ const {env,events,owner,find,later,earlier,carry,plan}=await carryFixture(t);
+ const payload=carryPayload(await find()),sourceTime=events[0].end.dateTime;
+ events[0].end.dateTime=events[1].end.dateTime;assert.equal((await find()).target.id,events[2].id);
+ await assert.rejects(carry(payload),e=>e.status===409);events[0].end.dateTime=sourceTime;
+ const db=env.DB,sourceMeta=(await db.prepare('SELECT source_json FROM lesson_history_records WHERE id=?').bind(later.id).first()).source_json;
+ env.DB={prepare:sql=>db.prepare(sql),async batch(statements){
+  await db.prepare("UPDATE lesson_history_records SET lesson_plan='新しい予定',revision=revision+1 WHERE id=?").bind(earlier.id).run();
+  return db.batch(statements);
+ }};
+ await assert.rejects(carry(payload),e=>e.code==='LESSON_HISTORY_RELOAD');env.DB=db;
+ const records=await listOwnerRecords(env,owner.id);
+ assert.equal(records.find(r=>r.id===later.id).lesson_plan,plan);assert.equal(records.find(r=>r.id===later.id).source_json,sourceMeta);
+ assert.equal(records.find(r=>r.id===earlier.id).lesson_plan,'新しい予定');
+ await db.prepare('UPDATE lesson_history_records SET lesson_plan=?,revision=1 WHERE id=?').bind('',earlier.id).run();
+ await editOwnerRecord(env,later.id,{request_id:request(),revision:3,lesson_plan:plan,lesson_memo:'直接編集へ改めた'});
+ assert.equal((await find()).next_plan_carry,undefined,'even same text changed from a later direct form is not moved');
+});
+test('next-editor provenance survives a precise pending-draft promotion but is not invented for old drafts',async t=>{
+ const {env,events,deps,owner,find,confirm}=await nextBindingFixture(t,{future:true});
+ events[1].summary='○';events[2].summary='甲';
+ const first=await saveFromNext(env,deps,await find(),'次回欄で保存した下書き');
+ const plan='次回欄で保存した下書き\n同じ元の授業から追記';
+ const continued=await saveFromNext(env,deps,await find(),plan);
+ assert.deepEqual(continued.next_plan_intent,first.next_plan_intent);
+ const promoted=await confirm(automaticPayload(await find()));
+ assert.equal(JSON.parse(promoted.record.source_json).next_plan_intent.source_id,events[0].id);
+ Object.assign(events[1],{summary:'甲',etag:'earlier-after-promotion'});
+ await confirm(automaticPayload(await find()));
+ const next=await find();assert.equal(next.next_plan_carry.from.id,events[2].id);
+ const moved=await carryNextPlan(env,carryPayload(next),deps,find);
+ assert.equal(moved.record.lesson_plan,plan);
+ assert.equal((await env.DB.prepare('SELECT lesson_plan FROM lesson_pending_plans').first()).lesson_plan,plan);
+});
+test('a next-editor append cannot re-mark a direct or unknown pending draft, even across a new ETag',async t=>{
+ const {env,events,deps,find,pending,confirm}=await nextBindingFixture(t,{future:true});
+ events[1].summary='○';events[2].summary='甲';
+ await pending('直接作った保留中の下書き');
+ const sameContext=await saveFromNext(env,deps,await find(),'直接作った保留中の下書き\n次回欄から追記');
+ assert.equal(sameContext.next_plan_intent,undefined);
+ events[2].etag='new-context';
+ const newContext=await find();assert.equal(newContext.lesson_plan,'');assert.equal(newContext.next_binding.moved_draft,sameContext.lesson_plan);
+ const replaced=await saveFromNext(env,deps,newContext,sameContext.lesson_plan+'\n新しい版で追記');
+ assert.equal(replaced.next_plan_intent,undefined);
+ const promoted=await confirm(automaticPayload(await find()));
+ assert.equal(JSON.parse(promoted.record.source_json).next_plan_intent,undefined);
+ assert.equal(promoted.record.lesson_plan,replaced.lesson_plan);
+ assert.equal((await env.DB.prepare('SELECT COUNT(*) n FROM lesson_pending_plans').first()).n,2);
+ Object.assign(events[1],{summary:'甲',etag:'inserted-after-promotion'});
+ await confirm(automaticPayload(await find()));
+ assert.equal((await find()).next_plan_carry,undefined);
 });
