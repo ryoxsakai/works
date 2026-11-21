@@ -144,6 +144,12 @@ export async function watchAuth({ onSignedIn, onSignedOut: pageSignedOut }) {
     announceUser({ picture: info.picture || "" });
     onSignedIn({ email: info.email, picture: info.picture });
   } catch (err) {
+    // A speculative request can fail offline. Retry from a fresh frame if the
+    // teacher actually opens it, without signing the foreground service out.
+    if (window.frameElement?.hasAttribute('data-preloading')) {
+      parent.dispatchEvent(new CustomEvent('works-preload-failed', {detail:window.frameElement}));
+      return;
+    }
     sessionToken = null;
     cachedGoogleToken = null;
     clearStoredSession();

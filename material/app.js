@@ -1047,8 +1047,10 @@ watchAuth({
     els.userBar.hidden = false;
     els.signOut.title = `${email} (クリックでログアウト)`;
     setUserAvatar(els.userAvatar, els.userAvatarFallback, picture);
-    await loadLibrary();
-    if ([...els.tabPanels].some((panel) => panel.dataset.materialTabPanel !== "library" && !panel.hidden)) await loadTreeFiles();
+    try {
+      await loadLibrary();
+      if ([...els.tabPanels].some((panel) => panel.dataset.materialTabPanel !== "library" && !panel.hidden)) await loadTreeFiles();
+    } finally { document.body.dataset.serviceReady = "true"; }
   },
   onSignedOut: () => {
     window.location.replace("/");

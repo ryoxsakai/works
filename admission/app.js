@@ -826,7 +826,7 @@ watchAuth({
       await loadEvents();
     } catch (error) {
       showError(error);
-    }
+    } finally { document.body.dataset.serviceReady = "true"; }
   },
   onSignedOut: () => {
     window.location.replace("/");
