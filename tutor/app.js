@@ -490,6 +490,7 @@ function activateTutorSettingsTab(tab) {
     button.tabIndex = button === tab ? 0 : -1;
   }
   for (const panel of els.tabPanels) panel.hidden = panel.dataset.tabPanel !== tab.dataset.tab;
+  if (tab.dataset.tab === "periods") periodEditor.renderCalendars();
 }
 for (const [index, tab] of tutorSettingsTabs.entries()) {
   tab.addEventListener("click", () => activateTutorSettingsTab(tab));
@@ -1141,7 +1142,6 @@ els.calendarChecklist.addEventListener("change", async (e) => {
   } else {
     selectedCalendarIds.delete(checkbox.value);
   }
-  periodEditor.renderCalendars();
   clearStudentDetails();
   renderCurriculumNameSuggestions();
   setStudentBusy(true);
