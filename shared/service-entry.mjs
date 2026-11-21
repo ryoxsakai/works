@@ -18,13 +18,6 @@ if (!embedded && window === top && mobile && hasSession() &&
     !address.searchParams.has('code') && !address.searchParams.has('error')) {
   startHost();
 } else {
-  if (embedded && frameElement.hasAttribute('data-standby')) {
-    const hint = document.createElement('link');
-    hint.rel = 'modulepreload';
-    hint.href = app;
-    document.head.append(hint);
-    await new Promise(resolve => window.addEventListener('works-activate', resolve, {once:true}));
-  }
   if (embedded) connectView();
   await import('/shared/header.js?v=menu-swipe-1');
   await import(app);
@@ -40,6 +33,7 @@ if (!embedded && window === top && mobile && hasSession() &&
       if (location.pathname === '/memo/')
         return !document.querySelector('.memo-main').hidden ||
           document.querySelector('#login-loading').textContent.includes('失敗');
+      if (['/', '/tutor/', '/admission/', '/material/'].includes(location.pathname)) return document.body.dataset.serviceReady === 'true';
       const signedIn = document.querySelector('#signed-in');
       return !signedIn || !signedIn.hidden;
     };
@@ -79,77 +73,86 @@ function startHost() {
   document.body.replaceChildren();
   let visible, pending, timer;
   let activeAddress;
-  function cancelPending() {
-    clearTimeout(timer);
-    pending?.frame.remove();
-    pending = null;
-  }
-  const standby = new Map();
-  const hinted = new Set();
-  function createFrame(path, dormant = false) {
+  const sessions = new Map();
+  const ready = new WeakSet();
+  const priority = ['/tutor/', ...[...destinations].filter(path => path !== '/tutor/')];
+  const skipped = new Set();
+  let warming, warmTimer, scheduled = false;
+
+  function createFrame(path, background) {
     const frame = document.createElement('iframe');
     frame.className = 'works-service-frame';
     frame.title = 'Works';
-    if (dormant) frame.dataset.standby = '';
-    if (visible || dormant) {
+    if (background || visible) {
       frame.inert = true;
       frame.setAttribute('aria-hidden', 'true');
     }
+    if (background) frame.dataset.preloading = '';
     const target = new URL(path, location.origin);
     target.searchParams.set('works-view', '1');
     frame.src = target.href;
+    if (destinations.has(path)) sessions.set(path, frame);
+    document.body.append(frame);
     return frame;
   }
-  async function warmAssets(path) {
-    // Only public, same-origin page assets enter the HTTP cache. App data is
-    // requested by the active service using its normal authentication flow.
-    const url = new URL(path + '?works-view=1', location.origin);
-    const response = await fetch(url, {priority:'low'});
-    if (!response.ok) return;
-    const template = document.createElement('template');
-    template.innerHTML = await response.text();
-    const appPath = template.content.querySelector('[data-service-app]')?.dataset.serviceApp;
-    if (!appPath || document.hidden) return;
-    for (const source of [appPath, ...Array.from(template.content.querySelectorAll('link[rel="stylesheet"]'), link => link.getAttribute('href'))]) {
-      const asset = new URL(source, url);
-      if (asset.origin !== location.origin || hinted.has(asset.href)) continue;
-      hinted.add(asset.href);
-      await (await fetch(asset, {priority:'low'})).arrayBuffer();
-      if (document.hidden) return;
+
+  function prepareNext() {
+    scheduled = false;
+    const connection = navigator.connection;
+    if (!visible || warming || pending || document.hidden || !hasSession() ||
+        connection?.saveData || /^(slow-)?2g$/.test(connection?.effectiveType)) return;
+    const path = priority.find(path => !sessions.has(path) && !skipped.has(path) && path !== new URL(activeAddress, location.origin).pathname);
+    if (path) {
+      warming = createFrame(path, true);
+      const frame = warming;
+      warmTimer = setTimeout(() => abandonWarmup(frame), 30000);
     }
   }
-  function prepareServices() {
-    const connection = navigator.connection;
-    if (document.hidden || pending || !hasSession() || connection?.saveData ||
-        /^(slow-)?2g$/.test(connection?.effectiveType)) return;
-    for (const path of destinations) {
-      if (path === new URL(activeAddress, location.origin).pathname) continue;
-      if (path === '/todo/' || path === '/memo/') {
-        if (standby.has(path)) continue;
-        const frame = createFrame(path, true);
-        standby.set(path, frame);
-        document.body.append(frame);
-      } else if (!hinted.has(path)) {
-        hinted.add(path);
-        warmAssets(path).catch(() => hinted.delete(path));
-      }
+  function abandonWarmup(frame) {
+    if (warming !== frame) return;
+    clearTimeout(warmTimer);
+    warming = null;
+    if (frame.hasAttribute('data-preloading')) {
+      const path = new URL(frame.src).pathname;
+      sessions.delete(path);
+      skipped.add(path);
+      frame.remove();
     }
+    schedulePreparation();
+  }
+  window.addEventListener('works-preload-failed', event => abandonWarmup(event.detail));
+  function schedulePreparation() {
+    if (scheduled) return;
+    scheduled = true;
+    if (window.requestIdleCallback) requestIdleCallback(prepareNext, {timeout:1500});
+    else setTimeout(prepareNext, 250);
+  }
+  function park(frame) {
+    if (frame === visible) return;
+    frame.inert = true;
+    frame.setAttribute('aria-hidden', 'true');
+    frame.style.zIndex = '0';
+    if (![...sessions.values()].includes(frame)) frame.remove();
   }
   function visit(url, push, step = 0) {
     const path = canonical(url);
-    cancelPending();
-    if (visible && path === activeAddress) return;
-    const frame = standby.get(path) || createFrame(path);
+    if (pending?.path === path) return;
+    clearTimeout(timer);
+    if (pending) park(pending.frame);
+    pending = null;
+    if (visible && path === activeAddress) {
+      schedulePreparation();
+      return;
+    }
+    // An explicit task, student or quick-add URL must run its own route handler.
+    const frame = sessions.get(path) || createFrame(path, false);
+    delete frame.dataset.preloading;
     pending = {frame, path, push, step};
-    if (standby.delete(path)) {
-      frame.removeAttribute('data-standby');
-      frame.contentWindow.dispatchEvent(new Event('works-activate'));
-    } else document.body.append(frame);
-    // A stalled service must eventually expose its own error or sign-in UI.
-    timer = setTimeout(() => reveal(frame), 20000);
+    if (ready.has(frame)) reveal(frame);
+    else timer = setTimeout(() => reveal(frame), 20000);
   }
   function reveal(frame) {
-    if (!pending || frame !== pending.frame) return;
+    if (frame !== pending?.frame) return;
     clearTimeout(timer);
     const {path, push, step} = pending;
     pending = null;
@@ -165,16 +168,22 @@ function startHost() {
     if (old) {
       old.inert = true;
       old.style.zIndex = '1';
+      if (motion()) {
+        const fade = frame.animate([{opacity:0, translate:`${step * 22}px 0`},{opacity:1, translate:"0 0"}], {duration:210,easing:'ease-out'});
+        fade.finished.then(() => park(old), () => park(old));
+      } else park(old);
+      frame.focus({preventScroll:true});
     }
-    if (window.requestIdleCallback) requestIdleCallback(prepareServices, {timeout:2500});
-    else setTimeout(prepareServices, 350);
-    if (old && motion()) {
-      const fade = frame.animate([{opacity:0, translate:`${step * 22}px 0`},{opacity:1, translate:"0 0"}], {duration:210,easing:'ease-out'});
-      fade.finished.then(() => old.remove(), () => old.remove());
-    } else old?.remove();
-    if (old) frame.focus({preventScroll:true});
+    schedulePreparation();
   }
-  window.addEventListener('works-view-ready', event => reveal(event.detail));
+  window.addEventListener('works-view-ready', event => {
+    const frame = event.detail;
+    ready.add(frame);
+    if (warming === frame) { clearTimeout(warmTimer); warming = null; }
+    reveal(frame);
+    schedulePreparation();
+  });
+  document.addEventListener('visibilitychange', schedulePreparation);
   window.addEventListener('works-service-visit', event => {
     const {frame, url, step} = event.detail;
     const next = new URL(url);
@@ -183,7 +192,7 @@ function startHost() {
   });
   window.addEventListener('popstate', () => visit(location.href, false));
   window.addEventListener('storage', event => {
-    if ((!event.key || event.key === 'works_session_token') && !hasSession()) location.reload();
+    if ((event.key === 'works_session_token' && event.oldValue !== event.newValue) || !hasSession()) location.reload();
   });
   visit(location.href, false);
 }

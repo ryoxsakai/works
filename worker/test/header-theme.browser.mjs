@@ -99,12 +99,12 @@ async function assertLightOnly(page) {
   });
   await page.reload();
   await page.evaluate(() => window.qaShell = true);
-  const warmTodo = page.locator('iframe[data-standby][src*="/todo/"]');
-  await warmTodo.waitFor({state:'attached'});
-  const warmView = await warmTodo.elementHandle();
-  const todoFrame = await warmView.contentFrame();
-  await todoFrame.locator('link[rel="modulepreload"]').waitFor({state:'attached'});
-  assert.equal(await todoFrame.evaluate(()=>Boolean(window.qaAuth)),false);
+  // All six service documents start before their first menu tap.
+  await page.waitForFunction(() => [...document.querySelectorAll('iframe')].length === 6 &&
+    [...document.querySelectorAll('iframe')].every(frame => frame.contentWindow.qaAuth));
+  const residentTutor = page.frameLocator('iframe[src*="/tutor/"]');
+  await residentTutor.locator('body[data-service-ready="true"]').waitFor({state:'attached'});
+  const residentFrames = await page.evaluateHandle(() => [...document.querySelectorAll('iframe')].map(frame => frame.contentDocument));
   for (const [from,to] of [['/','/todo/'],['/todo/','/memo/'],['/memo/','/tutor/'],['/tutor/','/admission/'],['/admission/','/material/'],['/material/','/']]) {
     const frame = page.frameLocator('iframe:not([inert])');
     const bar = frame.locator('.works-service-bar');
@@ -114,7 +114,7 @@ async function assertLightOnly(page) {
     await bar.locator('a[href="'+to+'"]').click();
     await page.waitForURL(base + to, {timeout:12000});
     assert.equal(await page.evaluate(()=>window.qaShell),true);
-    if (to === '/todo/') assert.equal(await warmView.evaluate(el=>el.isConnected && !el.inert),true);
+    assert.equal(await residentFrames.evaluate(docs => docs.includes(document.querySelector('iframe:not([inert])').contentDocument)),true);
   }
   await page.goBack();
   await page.frameLocator('iframe:not([inert])').locator('.works-service-bar [aria-current][href="/material/"]').waitFor();
@@ -136,6 +136,11 @@ async function assertLightOnly(page) {
   await page.waitForURL(base+'/tutor/');
   const local = visibleView.locator('.page-tabs');
   await swipeBar(local,-75);
+  await local.locator('[data-page-tab="schedule"][aria-selected="true"]').waitFor();
+  await swipeBar(bottom,-75);
+  await page.waitForURL(base+'/material/');
+  await swipeBar(bottom,75);
+  await page.waitForURL(base+'/tutor/');
   await local.locator('[data-page-tab="schedule"][aria-selected="true"]').waitFor();
   await swipeBar(local,75);
   await local.locator('[data-page-tab="record"][aria-selected="true"]').waitFor();

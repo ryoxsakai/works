@@ -105,14 +105,14 @@ function showSignedOut(message = "") {
 }
 
 function showSignedIn(user) {
-  dashboard.signedIn(user);
+  dashboard.signedIn(user).finally(() => { document.body.dataset.serviceReady = "true"; });
   settleAuthState("signed-in");
   els.authError.textContent = "";
   els.authAction.setAttribute("aria-label", "ログアウト");
   els.authAction.title = `${user.email} (クリックでログアウト)`;
   setUserAvatar(els.userAvatar, els.userAvatarFallback, user.picture);
 
-  const pendingDestination = consumePendingDestination();
+  const pendingDestination = window.frameElement?.hasAttribute('data-preloading') ? '' : consumePendingDestination();
   if (pendingDestination) window.location.assign(pendingDestination);
 }
 

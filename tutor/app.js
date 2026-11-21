@@ -253,7 +253,7 @@ const lessonPlans = createLessonPlanController({
   readOperation:id=>apiFetch('/lesson-history/audit?operation_id='+encodeURIComponent(id),{},null),
   confirmBinding:body=>apiFetch('/lesson-history/next-binding',{method:'POST',body:JSON.stringify(body),signal:AbortSignal.timeout(15000)},null),
   carryNextPlan:body=>apiFetch('/lesson-history/next-plan-carry',{method:'POST',body:JSON.stringify(body),signal:AbortSignal.timeout(15000)},null),
-  canAutoBind:source=>document.visibilityState==='visible'&&!!getSessionToken()
+  canAutoBind:source=>!window.frameElement?.inert&&document.visibilityState==='visible'&&!!getSessionToken()
     &&[...els.recordTbody.querySelectorAll('tr[data-event-id][data-card-key]')].some(row=>row.dataset.cardKey===lessonEventKey(source)&&!row.closest('[hidden]')),
   readNext: (source) => readNextLessonWithTemplate(source,(path,opts={})=>apiFetch(path,opts,null),(before,after,revision)=>applyCalendarTarget(before,after,revision),getSessionToken(),getSessionToken),
   write: async (body) => {
@@ -719,7 +719,7 @@ function lessonPlanDate(ref) {
   return `${start}–${end}`;
 }
 function refreshVisibleNextLessons(){
-  if(document.visibilityState!=='visible'||!getSessionToken()||els.recordTbody.closest('[hidden]'))return;
+  if(window.frameElement?.inert||document.visibilityState!=='visible'||!getSessionToken()||els.recordTbody.closest('[hidden]'))return;
   for(const row of els.recordTbody.querySelectorAll('tr[data-event-id][data-card-key]')){
     const link=lessonPlans.getLink(row.dataset.cardKey),states=[lessonPlans.get(row.dataset.cardKey),lessonPlans.get(link?.targetKey)];
     if(link?.source&&!['loading','auto_binding'].includes(link.status)&&!states.some(s=>s?.dirty||s?.pending||s?.pendingUnknown))void lessonPlans.loadNext(link.source);
@@ -948,7 +948,7 @@ els.recordTbody.innerHTML='<tr><td colspan="7" role="status">ログイン状態�
 
 watchAuth({
   onSignedIn: async (user) => {
-    const pendingDestination = consumePendingDestination();
+    const pendingDestination = window.frameElement?.hasAttribute('data-preloading') ? '' : consumePendingDestination();
     if (pendingDestination && pendingDestination !== window.location.pathname) {
       window.location.replace(pendingDestination);
       return;
@@ -960,7 +960,7 @@ watchAuth({
     setUserAvatar(els.userAvatar, els.userAvatarFallback, user.picture);
     els.actionError.textContent = "";
     if (studentTodos.requested) linkedStudentReady = studentTodos.openFixed();
-    await loadSignedInTutor();
+    try { await loadSignedInTutor(); } finally { document.body.dataset.serviceReady = "true"; }
   },
   onSignedOut: () => {
     window.location.replace("/");
