@@ -370,3 +370,41 @@ html body .works-header :is(#user-avatar, .works-avatar-photo) {
   object-fit: cover;
 }
 html body .works-header #auth.works-account.has-photo::before { flex: 0 0 32px; min-width: 32px; }
+
+/* Service destinations sit above the current service's own controls on phones. */
+.works-service-bar { display: none; }
+@media screen and (max-width: 730px) {
+  body.works-shell::after { content: ""; display: block; height: calc(62px + env(safe-area-inset-bottom)); }
+  body.works-shell .todo-page #notice:not(:empty),
+  body.works-shell.tutor-bootstrap .record-save-toasts {
+    bottom: calc(var(--works-service-bar-bottom, 10px + env(safe-area-inset-bottom)) + 58px);
+  }
+  nav.works-service-bar {
+    position: fixed;
+    z-index: 36;
+    bottom: var(--works-service-bar-bottom, calc(10px + env(safe-area-inset-bottom)));
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    width: min(calc(100% - 32px), 352px);
+    box-sizing: border-box;
+    padding: 3px 5px;
+    border-radius: 16px;
+    background: rgb(255 255 255 / .97);
+    box-shadow: var(--works-shadow-lg, 0 3px 16px #181a2326);
+  }
+  .works-service-bar a {
+    display: grid;
+    place-items: center;
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 44px;
+    color: #737985;
+    border-radius: 12px;
+    text-decoration: none;
+  }
+  .works-service-bar a[aria-current] { color: #202127; background: #e8eaee; }
+  .works-service-bar a[aria-current] svg { stroke-width: 2.4; }
+  .works-service-bar a:focus-visible { outline: 2px solid var(--works-accent); outline-offset: -2px; }
+  body:has(.works-navigation[open], dialog[open], input:focus:not([type="checkbox"],[type="radio"]), textarea:focus, [contenteditable="true"]:focus) .works-service-bar { display: none; }
+}

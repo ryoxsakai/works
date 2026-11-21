@@ -135,6 +135,23 @@ async function assertLightOnly(page) {
           assert.equal(geometry.menuBorder, '0px', `${path} menu top border`);
           assert.ok(Math.abs(geometry.menuCenter - geometry.themeCenter) < 2, `${path} menu and quick add alignment`);
           assert.deepEqual(geometry.clipped,[],`${path} ${width} clipped controls`);
+          const serviceBar = page.getByRole('navigation', {name:'サービス切り替え',includeHidden:true});
+          assert.equal(await serviceBar.isVisible(), width <= 730);
+          if (width <= 730) {
+            const links = serviceBar.locator('a');
+            assert.deepEqual(await links.evaluateAll(nodes => nodes.map(n => n.pathname)),
+              ['/', '/tutor/', '/material/', '/admission/', '/todo/', '/memo/']);
+            const activePath = new URL(page.url()).pathname.replace('/material-print/', '/material/');
+            if (await serviceBar.locator(`a[href="${activePath}"]`).count())
+              assert.equal(await serviceBar.locator('[aria-current]').getAttribute('href'), activePath);
+            const bounds = await serviceBar.boundingBox();
+            const local = page.locator('.todo-page .bottom-tabs, .memo-menu, .admission-view-tabs, .material-page-tabs, .tutor-bootstrap .page-tabs').first();
+            if (await local.isVisible() && await local.evaluate(el => getComputedStyle(el).position === 'fixed')) {
+              const localBounds = await local.boundingBox();
+              assert.ok(bounds.y + bounds.height <= localBounds.y - 4, path + ' local toolbar overlap');
+            }
+            assert.ok(bounds.x >= 0 && bounds.x + bounds.width <= width);
+          }
           // PC shows a permanent sidebar; phones and tablets open the drawer.
           if (width < 1024) {
             if (new URL(page.url()).pathname !== '/') await page.locator('.works-navigation summary').click();
