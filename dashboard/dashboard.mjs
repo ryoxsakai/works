@@ -587,7 +587,16 @@ export function createDashboard({
   $("dashboard-widgets").addEventListener('home-lesson-discard-reload',()=>{
     lessonCards?.destroy();lessonCards=null;cache.delete('lessons');load('lessons',true);
   });
-  $("dashboard-widgets").addEventListener("home-lesson-navigate",(event)=>{const {calendarId,eventId,day}=event.detail||{};if(!calendarId||!eventId||!day||!dismiss())return;location.assign("/tutor/?"+new URLSearchParams({record_date:day,student_calendar:calendarId,student_event:eventId}));});
+  $("dashboard-widgets").addEventListener("home-lesson-navigate", (event) => {
+    const {calendarId, eventId, day} = event.detail || {};
+    if (!calendarId || !eventId || !day || !dismiss()) return;
+    const link = document.createElement("a");
+    link.href = "/tutor/?" + new URLSearchParams({record_date:day, student_calendar:calendarId, student_event:eventId});
+    link.hidden = true;
+    document.body.append(link);
+    link.click();
+    link.remove();
+  });
   window.addEventListener("beforeunload", (e) => {
     if (changed() || lessonCards?.hasEdits()) {
       e.preventDefault();

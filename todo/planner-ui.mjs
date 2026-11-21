@@ -65,6 +65,9 @@ function createPlanner({
     $("mobile-nav").setAttribute("aria-expanded", String(open));
     $("planner-menu").classList.toggle("is-open", open);
     $("app").classList.toggle("browsing", open);
+    const panel = open ? $("planner-menu") : document.querySelector(".planner-content");
+    if (!matchMedia("(prefers-reduced-motion: reduce)").matches)
+      panel?.animate([{ opacity: .5 }, { opacity: 1 }], { duration: 175 });
   }
   function setDisplay(open) {
     $("display-panel").hidden = !open;

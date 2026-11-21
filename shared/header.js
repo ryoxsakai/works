@@ -78,7 +78,7 @@ if (actions) {
       link.href = href;
       link.setAttribute("aria-label", label);
       link.title = label;
-      link.innerHTML = svg(icon, 22);
+      link.innerHTML = appIcon(icon);
       if (currentPath === href || (href === "/material/" && currentPath === "/material-print/"))
         link.setAttribute("aria-current", "page");
       guard(link);
@@ -86,23 +86,6 @@ if (actions) {
     }
   }
   document.body.append(serviceBar);
-
-  // Each service owns its local toolbar and its responsive breakpoint.
-  const localBar = document.querySelector(".todo-page .bottom-tabs, .memo-menu, .admission-view-tabs, .material-page-tabs, .tutor-bootstrap .page-tabs");
-  if (localBar) {
-    const positionBar = () => {
-      const style = getComputedStyle(localBar);
-      const stacked = localBar.getClientRects().length && style.position === "fixed";
-      if (stacked) {
-        const bottom = (parseFloat(style.bottom) || 0) + localBar.getBoundingClientRect().height + 6;
-        document.body.style.setProperty("--works-service-bar-bottom", bottom + "px");
-      } else document.body.style.removeProperty("--works-service-bar-bottom");
-    };
-    new ResizeObserver(positionBar).observe(localBar);
-    window.addEventListener("resize", positionBar);
-    window.addEventListener("pageshow", positionBar);
-    positionBar();
-  }
 
   // Older engines without ::details-content keep the PC sidebar open with JS.
   const desktop = window.matchMedia("(min-width: 1024px)");

@@ -15,9 +15,8 @@
     <link rel="manifest" href="/todo/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/logo.png" />
     <link rel="stylesheet" href="/todo/planner.css?v=browse-bg-1" />
-    <link rel="stylesheet" href="/shared/header.css?v=service-bar-1" /><link rel="preconnect" href="https://fonts.googleapis.com" /><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin /><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+2:wght@300;400;500;700;800&display=swap" /><link rel="stylesheet" href="/shared/works-design.css?v=4" />
+    <link rel="stylesheet" href="/shared/header.css?v=service-shell-1" /><link rel="preconnect" href="https://fonts.googleapis.com" /><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin /><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+2:wght@300;400;500;700;800&display=swap" /><link rel="stylesheet" href="/shared/works-design.css?v=4" />
     <script defer src="/dashboard/vendor/Sortable-1.15.6.min.js"></script>
-    <script type="module" src="/shared/header.js?v=service-bar-1"></script>
     <link rel="stylesheet" href="/todo/todo-v2.css?v=dialog-layout-2" />
 
     <link rel="stylesheet" href="/shared/works-dialogs.css?v=fb98327c" />
@@ -142,7 +141,7 @@
         <button id="capture-submit" class="primary" type="submit" disabled>追加する</button>
       </form>
     </dialog>
-    <div id="login-screen" class="login panel">
+    <div id="login-screen" hidden class="login panel">
       <h2>Works ToDo管理</h2>
       <p id="login-message">読み込み中…</p>
       <button id="sign-in" hidden>Googleでサインイン</button>
@@ -415,6 +414,6 @@
       </form>
     </dialog>
     </div>
-    <script type="module" src="/todo/todo.js?v=color-picker-1"></script>
+    <script type="module" src="/shared/service-entry.mjs?v=1" data-service-app="/todo/todo.js?v=service-shell-1"></script>
   </body>
 </html>

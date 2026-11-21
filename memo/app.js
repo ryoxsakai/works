@@ -281,7 +281,16 @@ import { watchAuth, signIn, signOutUser as worksSignOut, getSessionToken } from 
     }
 
     // ─── Tabs ─────────────────────────────────────────────────
-    function setTab(tab) { activeTab = tab; activeTag = null; try { localStorage.setItem(TAB_KEY, tab); } catch {} renderTabs(); renderTagFilter(); renderMemoGrid(); }
+    function setTab(tab) {
+      activeTab = tab;
+      activeTag = null;
+      try { localStorage.setItem(TAB_KEY, tab); } catch {}
+      renderTabs();
+      renderTagFilter();
+      renderMemoGrid();
+      if (!matchMedia('(prefers-reduced-motion: reduce)').matches)
+        document.querySelector('#memo-grid')?.animate([{opacity:.5}, {opacity:1}], {duration:175});
+    }
 
     function showAllMemos() {
       setTab('すべて');
@@ -671,11 +680,13 @@ import { watchAuth, signIn, signOutUser as worksSignOut, getSessionToken } from 
       onSignedIn: async () => {
         try {
           await loadData();
+          document.querySelector('.memo-main').hidden = false;
           document.querySelector('#login-screen').classList.add('hidden');
           document.querySelector('#memo-user-bar').hidden = false;
-        } catch (error) { document.querySelector('#login-loading').textContent = '読み込みに失敗しました: ' + error.message; }
+        } catch (error) { document.querySelector('#login-screen').classList.remove('hidden'); document.querySelector('#login-loading').textContent = '読み込みに失敗しました: ' + error.message; }
       },
       onSignedOut: message => {
+        document.querySelector('#login-screen').classList.remove('hidden');
         document.querySelector('#login-loading').classList.add('hidden');
         document.querySelector('#login-form').classList.remove('hidden');
         if (message) document.querySelector('#login-form p').textContent = message;

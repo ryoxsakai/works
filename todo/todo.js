@@ -1,5 +1,5 @@
 import {colorValue, isHexColor} from "./model.mjs?v=color-picker-1";
-import {createPlanner} from "./planner-ui.mjs?v=color-picker-1";
+import {createPlanner} from "./planner-ui.mjs?v=service-shell-1";
 import { startTodoPresentation } from "../shared/ui/todo-presentation.mjs?v=2";
 startTodoPresentation();
 import {
@@ -987,11 +987,13 @@ watchAuth({
       $("app").hidden = false;
       planner.initial();
     } catch (e) {
+      $("login-screen").hidden = false;
       $("login-message").textContent = "読み込みに失敗しました：" + e.message;
     }
   },
   onSignedOut: (msg) => {
     plannerReady = false;
+    $("login-screen").hidden = false;
     $("sign-out").hidden = true;
     $("app").hidden = true;
     $("login-message").textContent =
