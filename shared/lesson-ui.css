@@ -54,21 +54,16 @@
 .record-panel .record-recheck:hover,
 .record-panel .record-card-meta button:hover { background: var(--works-hover); color: var(--works-ink); }
 .record-panel .record-todo-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  justify-self: start;
-  min-height: 28px;
-  margin: 2px 0 0;
-  padding: 2px 10px;
-  border-radius: 999px;
-  background: var(--works-accent-soft);
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--works-radius);
   color: var(--works-accent-strong);
-  font-size: .78rem;
-  font-weight: 700;
-  text-decoration: none;
 }
-.record-panel .record-todo-link:hover { background: #e3e6fb; }
+.record-panel .record-todo-link:hover { background: var(--works-accent-soft); }
+.record-panel .record-card-heading .record-student-link { flex-basis: 5rem; }
+.record-panel .record-card-meta { gap: 2px; }
 
 /* Field labels: small, quiet and consistent. */
 .record-panel #record-table td:nth-child(n+4)::before,

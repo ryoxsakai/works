@@ -3,6 +3,12 @@
 .record-carousel-controls span { color: var(--fg); font-size: .8rem; }
 .record-carousel-controls[hidden] { display: none; }
 @media screen and (max-width:640px) {
+ /* Keep position announcements available to assistive technology. */
+ .tutor-bootstrap .record-carousel-controls {
+   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+   overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+ }
+ .tutor-bootstrap .record-carousel-controls button { display: none; }
  .record-panel #record-table tbody.carousel-inner { display: flex; align-items: flex-start; gap: .5rem; }
  .record-panel #record-table tbody.carousel-inner > tr.carousel-item { flex: 0 0 100%; min-width: 0; box-sizing: border-box; }
  /* Input editing/selection retains vertical page scroll; swipe on card surfaces. */

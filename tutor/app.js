@@ -9,7 +9,7 @@ import {readPendingRecovery,persistPendingRecovery,clearPendingRecovery,pendingR
 import {createOwnerMemoEditors} from '../shared/owner-memo.mjs?v=2-autosave';
 import {boundedRead,precedingLegacyEvents,precedingOwnerEvents,recordTermScope,studentNavigationEvent} from './record-read.mjs?v=3-navigation';
 import {readNextLessonWithTemplate} from "../shared/next-lesson-read.mjs?v=1";
-import { lessonRecordRows, renderPlanEditors, renderMemoEditors, previousOwnerRecord } from "../shared/lesson-record-view.mjs?v=12-auto-empty-next";
+import { lessonRecordRows, renderPlanEditors, renderMemoEditors, previousOwnerRecord } from "../shared/lesson-record-view.mjs?v=card-actions";
 import { setUserAvatar } from "../shared/avatar.mjs?v=1";
 import { attachRecordCarousel } from "./record-carousel.mjs?v=4";
 import { attachRecordToasts } from "./record-toasts.mjs?v=3-name";
