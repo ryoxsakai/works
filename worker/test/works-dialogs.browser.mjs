@@ -56,7 +56,7 @@ try {
       assert.equal(result.open, 'hidden');
       assert.equal(result.backdrop, 'rgba(16, 18, 24, 0.36)', `${path} shared backdrop`);
       assert.equal(result.overscroll, 'contain');
-      assert.equal(result.blur, 'none');
+      assert.equal(result.blur, path === '/memo/' ? 'blur(3px)' : 'none');
       await page.keyboard.press('Escape');
       assert.equal(await d.evaluate(el => el.open), false, `${path} closes with Escape`);
       assert.equal(await page.evaluate(() => getComputedStyle(document.documentElement).overflowY), result.before);

@@ -34,6 +34,7 @@ try {
    },id);
    const box=await page.locator(`#${id}`).boundingBox();
    assert(box.x>=-1&&box.x+box.width<=width+1,`${id} overflows at ${width}`);
+   if(width<=730) assert(box.x>=12 && box.y>=12 && box.y+box.height<=689, id+" floating margins");
    const footer=await page.locator(`#${id} .memo-dialog-footer`).boundingBox();
    assert(footer.y>=0&&footer.y+footer.height<=701,`${id} footer offscreen at ${width}`);
    assert(await page.locator(`#${id} .memo-dialog-body`).evaluate(el=>el.scrollHeight>el.clientHeight),'long content should scroll');
