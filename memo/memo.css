@@ -237,19 +237,43 @@
 .memo-page :is(#view-dates, #modal-dates) { color: var(--works-ink-3); }
 .memo-page #modal-dates { flex-wrap: wrap; gap: 4px 16px; }
 .memo-page .memo-dialog :is(input, select, textarea) { min-width: 0; }
-@media (max-width: 730px) {
-  .memo-page .memo-dialog {
-    inset: auto 0 0;
-    margin: 0;
-    width: 100%;
-    max-height: calc(100dvh - max(24px, env(safe-area-inset-top)));
-    border-radius: 16px 16px 0 0;
-  }
-  .memo-page .memo-dialog .todo-modal {
-    max-height: calc(100dvh - max(24px, env(safe-area-inset-top)));
-    border-radius: 16px 16px 0 0;
-  }
-  .memo-page :is(.memo-dialog-header, .memo-dialog-body, .memo-dialog-footer) { padding-inline: 16px; }
-  .memo-page .memo-dialog-footer { padding-bottom: max(16px, env(safe-area-inset-bottom)); }
-  .memo-page .memo-dialog :is(input, select, textarea) { font-size: 16px; }
+/* Memo reading and editing share a floating paper card. */
+.memo-page .memo-card-content { position:relative; }
+.memo-page .memo-title::after { content:""; position:absolute; inset:0; }
+.memo-page dialog.memo-dialog:modal::backdrop {
+  -webkit-backdrop-filter:blur(3px) !important;
+  backdrop-filter:blur(3px) !important;
+}
+.memo-page dialog.memo-dialog {
+  --memo-card-height:calc(100dvh - max(24px, env(safe-area-inset-top)) - max(24px, env(safe-area-inset-bottom)));
+  inset:0;
+  margin:auto;
+  width:min(36rem, calc(100% - 32px));
+  max-height:var(--memo-card-height);
+  border-radius:16px;
+  background:white;
+  box-shadow:0 12px 40px rgb(20 24 32 / .18);
+}
+.memo-page .memo-dialog .todo-modal.card {
+  max-height:var(--memo-card-height);
+  border-radius:inherit;
+  background:white;
+}
+.memo-page .memo-dialog-header, .memo-page .memo-dialog-footer {
+  padding:12px 20px;
+  border-color:transparent;
+}
+.memo-page .memo-dialog-body { padding:4px 20px 12px; }
+.memo-page #view-body-container { line-height:1.75; }
+.memo-page #memo-modal .memo-dialog-body { gap:14px; }
+.memo-page #memo-modal .form-control { border-radius:8px; }
+.memo-page #memo-modal .memo-dialog-footer button.bg-slate-700 {
+  background:#242933 !important; border-radius:9px !important; min-height:44px;
+}
+@media (max-width:730px) {
+  .memo-page .memo-dialog :is(input, select, textarea) { font-size:16px; }
+}
+@media (prefers-reduced-motion:no-preference) {
+  .memo-page .memo-dialog[open] .todo-modal { animation:memo-card-in .16s ease-out; }
+  @keyframes memo-card-in { from { opacity:.55; transform:translateY(5px); } }
 }
