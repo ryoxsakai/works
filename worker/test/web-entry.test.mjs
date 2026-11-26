@@ -169,7 +169,7 @@ test('reject unverified Google claim, wrong JWT key/issuer/audience/nonce, and t
 
 test('safe forward target and all legacy contracts excluded regardless of missing entry config', async () => {
   for (const bad of ['https://elsewhere.test/','//elsewhere.test/','/\\elsewhere.test/','/x/%252Fother.test','/%2Felsewhere.test/','/%2e%2e//elsewhere.test/','/foo/../auth/callback','/api/google-token','/mcp','/oauth/token','/.well-known/token','/a#hash','/a\n','/auth']) assert.equal(safeWorksNext(bad),'/tutor/');
-  assert.equal(safeWorksNext('/'),'/tutor/');
+  assert.equal(safeWorksNext('/'),'/'); // A signed-in root resumes the last service.
   assert.equal(safeWorksNext('/memo/?x=%E3%83%A1&y=10'),'/memo/?x=%E3%83%A1&y=10');
   const f = fixture();
   assert.equal((await f.app(new Request('https://other.example/todo/',{headers:{Accept:'text/html'}}))).status,404);
