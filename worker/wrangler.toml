@@ -52,3 +52,16 @@ migrations_dir = "wiki-migrations"
 
 [triggers]
 crons = ["* * * * *"]
+
+# Off until the new OAuth client and production route are validated. Existing
+# GitHub Pages and the four API/MCP routes are unchanged by this staging config.
+[build]
+command = "node ../scripts/stage-works-entry.mjs"
+cwd = "."
+
+[assets]
+directory = "./web-assets"
+binding = "WORKS_WEB_ASSETS"
+run_worker_first = true
+html_handling = "auto-trailing-slash"
+not_found_handling = "none"
