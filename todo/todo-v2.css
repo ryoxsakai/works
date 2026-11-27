@@ -72,21 +72,21 @@ body .todo-page .todo-main { background: var(--works-page); color: var(--works-i
 .todo-page .planner-settings > summary { padding-inline: 12px; color: var(--works-ink-2); font-size: .9rem; }
 
 /* ---------- Page heading ---------- */
-.todo-page .planner-content { padding: 20px var(--works-gutter) 48px; }
+.todo-page .planner-content { padding: var(--works-service-top) var(--works-service-gutter) 48px; }
 .todo-page .planner-content .heading {
-  margin: 0 0 12px;
+  margin: 0 0 var(--works-service-heading-gap);
   padding: 0;
   border: 0;
   background: transparent;
-  align-items: flex-end;
+  align-items: flex-start;
 }
 .todo-page .planner-content .heading h2,
 .todo-page #view-title {
   margin: 0;
   color: var(--works-ink);
-  font-size: 20px;
+  font-size: var(--works-service-title-size);
   font-weight: 700;
-  line-height: 1.4;
+  line-height: var(--works-service-title-height);
   letter-spacing: .01em;
 }
 .todo-page #today-label, .todo-page .planner-content #today-label { margin: 2px 0 0; color: var(--works-ink-3); font-size: .82rem; font-weight: 400; }
@@ -288,8 +288,9 @@ body .todo-page .todo-main { background: var(--works-page); color: var(--works-i
 /* ---------- Phones ---------- */
 @media (max-width: 730px) {
   /* Phones keep the edge-to-edge list (decided for ToDo; see DESIGN.md). */
-  .todo-page .planner-content { padding: 16px 0 calc(96px + env(safe-area-inset-bottom)); }
-  .todo-page .planner-content .heading { padding: 0 16px; background: transparent; }
+  .todo-page .planner-sidebar { padding: 0; }
+  .todo-page .planner-content { padding: var(--works-service-top) 0 calc(96px + env(safe-area-inset-bottom)); }
+  .todo-page .planner-content .heading { padding: 0 var(--works-service-gutter); background: transparent; }
   .todo-page .planner-content #task-count,
   .todo-page .deadline-panel > summary { padding-inline: 16px; }
   .todo-page #tasks,

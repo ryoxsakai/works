@@ -52,6 +52,11 @@ html:root[data-theme] {
   --works-header-h: 60px;
   --works-sidebar-w: 240px;
   --works-gutter: clamp(16px, 2vw, 28px);
+  --works-service-top: 16px;
+  --works-service-gutter: var(--works-gutter);
+  --works-service-title-size: 20px;
+  --works-service-title-height: 1.3;
+  --works-service-heading-gap: 10px;
 
   /* Map the legacy tokens every module already reads onto the new palette. */
   --bg: var(--works-page);
@@ -94,4 +99,16 @@ body {
 :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
   outline: 2px solid var(--works-accent);
   outline-offset: 2px;
+}
+
+/* In-service headings: match Homes without changing the shared masthead. */
+:is(.tutor-bootstrap, .material-bootstrap, .admission-bootstrap) #signed-in > .error:empty {
+  display: none;
+}
+@media screen and (max-width: 730px) {
+  html:root[data-theme] {
+    --works-service-top: 10px;
+    --works-service-gutter: 16px;
+    --works-service-title-size: 17px;
+  }
 }

@@ -148,9 +148,16 @@ body.tutor-bootstrap { background: var(--works-page); }
 body.tutor-bootstrap > main {
   max-width: none;
   margin: 0;
-  padding: 24px var(--works-gutter) 48px;
+  padding: var(--works-service-top) var(--works-service-gutter) 48px;
 }
 body.tutor-bootstrap [data-page-tab-panel] > .panel { max-width: none; margin: 0; }
+body.tutor-bootstrap .curriculum-panel > .page-tabs { justify-self: start; }
+@media screen and (max-width: 640px) {
+  /* Preserve the carousel’s established scroll/snap gutter, not the heading gutter. */
+  body.tutor-bootstrap .record-panel > .table-scroll {
+    margin-inline: calc(1.5rem - var(--works-service-gutter));
+  }
+}
 
 /* Section tabs: grey track with the selected tab as a white face (PC);
  * a bottom bar on phones. */
@@ -195,11 +202,11 @@ body.tutor-bootstrap .page-tabs .page-tab-btn .works-icon { font-size: 1.1rem; }
 body.tutor-bootstrap [data-page-tab-panel] > .panel > .panel-header:first-child {
   display: flex;
   flex-wrap: nowrap;
-  align-items: flex-end;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px 16px;
-  min-height: 48px;
-  margin: 0 0 16px;
+  min-height: 0;
+  margin: 0 0 var(--works-service-heading-gap);
   padding: 0;
 }
 body.tutor-bootstrap [data-page-tab-panel] > .panel > .panel-header:first-child > div:first-child { min-width: 0; }
@@ -218,9 +225,9 @@ body.tutor-bootstrap [data-page-tab-panel] > .panel > .panel-header h2 {
   gap: 8px;
   margin: 0;
   color: var(--works-ink);
-  font-size: 20px;
+  font-size: var(--works-service-title-size);
   font-weight: 700;
-  line-height: 1.4;
+  line-height: var(--works-service-title-height);
   letter-spacing: .01em;
   white-space: nowrap;
 }
@@ -422,7 +429,7 @@ body.tutor-bootstrap .curriculum-panel #student-memo:focus {
 /* Phones: tabs become a bottom navigation bar within thumb reach. */
 @media screen and (max-width: 640px) {
   /* Keep the original 1.5rem side gutter: the card carousel snaps against it. */
-  body.tutor-bootstrap > main { padding: 16px 1.5rem calc(96px + env(safe-area-inset-bottom)); }
+  body.tutor-bootstrap > main { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
   /* Floating, rounded bar lifted off the screen edge. */
   body.tutor-bootstrap .page-tabs {
     position: fixed;
@@ -482,8 +489,7 @@ body.tutor-bootstrap .curriculum-panel #student-memo:focus {
     background: transparent;
     color: #fff;
   }
-  body.tutor-bootstrap [data-page-tab-panel] > .panel > .panel-header:first-child { gap: 8px; margin-bottom: 14px; }
-  body.tutor-bootstrap [data-page-tab-panel] > .panel > .panel-header h2 { font-size: 18px; }
+  body.tutor-bootstrap [data-page-tab-panel] > .panel > .panel-header:first-child { gap: 8px; }
   body.tutor-bootstrap [data-page-tab-panel] > .panel > .panel-header :is(.record-day-btn, .print-btn) { padding: 0 10px; font-size: .82rem; }
   body.tutor-bootstrap [data-page-tab-panel] > .panel > .panel-header .print-btn:has(> :is(i, svg):only-child) { padding: 0; }
   /* The history link shows its icon only (label stays for screen readers). */
@@ -491,9 +497,6 @@ body.tutor-bootstrap .curriculum-panel #student-memo:focus {
   body.tutor-bootstrap .panel-header-link .panel-action-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   body.tutor-bootstrap .record-save-toasts { bottom: calc(84px + env(safe-area-inset-bottom)); }
   .record-panel #record-table tr[data-event-id] { padding: 14px; }
-}
-@media screen and (max-width: 360px) {
-  body.tutor-bootstrap [data-page-tab-panel] > .panel > .panel-header h2 { font-size: 16px; }
 }
 
 @media print {
