@@ -6,7 +6,7 @@ import {fileURLToPath, pathToFileURL} from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const sensitiveFixture = 'tutor/test/student-selector.test.mjs';
-const safeFixtureDigest = '71957b13cac043b49ca996b657aa5cea1d0a5ada118a63a1efbe3088bfb3b6e4';
+const safeFixtureDigest = 'ee21b5e9d0cf84de03ec24000f3b9d27039f5717514ad4a0f28f38b44e254d42';
 const excludedDirs = new Set(['.git', '.github', 'node_modules', 'test', 'tests', '__tests__', 'fixtures', '__fixtures__', 'test-artifacts']);
 const stop = () => { throw new Error('Pages staging safety check failed.'); };
 export function isExcluded(path) {
