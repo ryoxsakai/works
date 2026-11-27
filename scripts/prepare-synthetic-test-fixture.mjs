@@ -15,7 +15,7 @@ try {
   const synthetic = source.replaceAll(selected, '高2合成生徒');
   // Stop CI if the fixture changes, rather than risk sanitizing the wrong item.
   const digest = createHash('sha256').update(synthetic).digest('hex');
-  if (digest !== '71957b13cac043b49ca996b657aa5cea1d0a5ada118a63a1efbe3088bfb3b6e4') throw new Error();
+  if (digest !== 'ee21b5e9d0cf84de03ec24000f3b9d27039f5717514ad4a0f28f38b44e254d42') throw new Error();
   await writeFile(path, synthetic);
 } catch {
   console.error('Synthetic test fixture preparation failed.');
