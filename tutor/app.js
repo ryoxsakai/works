@@ -3278,14 +3278,18 @@ function loadAdmissionEvents() {
   return admissionEventsPromise;
 }
 
+// 校名変更などで受験校リストと入試管理の表記が異なる大学(比較キー同士の対応)。
+const ADMISSION_SCHOOL_ALIASES = { 昭和: "昭和医科", 東京医科歯科: "東京科学" };
+
 // 「関西医科大学医学部（前期）」と「関西医科大学」を同じ大学として扱うための比較キー。
 function admissionSchoolKey(value) {
-  return String(value || "")
+  const key = String(value || "")
     .normalize("NFKC")
     .replace(/\([^)]*\)/g, "")
     .replace(/\s+/g, "")
     .replace(/(医学部医学科|医学部|医学科)$/, "")
     .replace(/大学$/, "");
+  return ADMISSION_SCHOOL_ALIASES[key] || key;
 }
 
 // 入試年度(4月〜翌3月を1シーズンとし、翌年の年を返す)。
@@ -3351,6 +3355,10 @@ function renderSchoolsSummary() {
     }</p>`;
     return;
   }
+  // 受験校を初めて登録した直後など、どの経路で表示しても日程の読み込みを始める。
+  if (!admissionEventsState.loaded && !admissionEventsPromise) {
+    loadAdmissionEvents().then(() => renderSchoolsSummary());
+  }
   const ordered = [
     ...[1, 2, 3].map((rank) => candidateSchools.find((s) => s.rank === rank)).filter(Boolean),
     ...candidateSchools.filter((s) => ![1, 2, 3].includes(s.rank)),
@@ -3403,11 +3411,6 @@ async function loadCandidateSchools(context = captureStudentContext()) {
   assertStudentContext(context);
   candidateSchools = result;
   renderSchoolsSummary();
-  if (!admissionEventsState.loaded && candidateSchools.length) {
-    loadAdmissionEvents().then(() => {
-      if (els.curriculumName.value.trim() === name) renderSchoolsSummary();
-    });
-  }
 }
 
 function renderRankSelects() {
