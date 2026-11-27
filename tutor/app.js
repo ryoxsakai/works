@@ -1,3 +1,4 @@
+import { placeServiceTabs } from "../shared/service-heading-tabs.mjs?v=1";
 import {termLessonPositions,termPosition,termUsesNumberedPlans} from '../shared/term-lesson-plan.mjs';
 import {createTermPlanEditors} from './term-lesson-editors.mjs?v=compact-card-1';
 import { createPeriodSettings } from "./period-settings.mjs";
@@ -526,9 +527,14 @@ const studentTodos = createStudentTodos(path => apiFetch(path,{},null));
 function setActivePageTab(tab) {
   const target = [...els.pageTabBtns].some((btn) => btn.dataset.pageTab === tab) ? tab : "record";
   els.pageTabBtns.forEach((btn) => btn.setAttribute("aria-selected", String(btn.dataset.pageTab === target)));
+  const activePanel = [...els.pageTabPanels].find((panel) => panel.dataset.pageTabPanel === target);
+  // Reveal the destination before reparenting the single tablist; restore keyboard focus.
+  if (activePanel) activePanel.hidden = false;
+  const focusedTab = placeServiceTabs(els.pageTabBtns[0]?.closest(".page-tabs"), activePanel?.querySelector(".panel > .panel-header"));
   els.pageTabPanels.forEach((panel) => {
     panel.hidden = panel.dataset.pageTabPanel !== target;
   });
+  focusedTab?.focus({preventScroll: true});
   localStorage.setItem(ACTIVE_PAGE_TAB_KEY, target);
   requestAnimationFrame(() => { resizeRecordInputs(); renderStudentMemos(); renderLessonPlans(); termPlans.repaint(); });
 }

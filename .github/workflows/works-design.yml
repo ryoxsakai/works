@@ -6,6 +6,9 @@ on:
     paths:
       - '.github/workflows/works-design.yml'
       - 'shared/works-dialogs.css'
+      - 'shared/works-design.css'
+      - 'shared/service-heading-tabs.mjs'
+      - 'worker/test/service-heading-spacing.browser.mjs'
       - 'worker/test/works-dialogs.browser.mjs'
       - 'worker/test/next-lesson-binding.browser.mjs'
       - 'worker/test/tutor-period-profiles*'
@@ -44,6 +47,8 @@ jobs:
       - name: Check school period settings in Chromium
         if: ${{ !cancelled() && steps.chromium.outcome == 'success' }}
         run: node worker/test/tutor-period-profiles.browser.mjs
+      - name: Verify shared service title alignment and margins
+        run: node worker/test/service-heading-spacing.browser.mjs
       - name: Check dialog foundation across six services
         run: node worker/test/works-dialogs.browser.mjs
       - name: Check ToDo and Memo long dialog layout

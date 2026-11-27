@@ -4,7 +4,7 @@
  * icon-only bottom bar as 授業管理 on phones. Loaded last; visual layer only.
  */
 body.admission-bootstrap { background: var(--works-page); }
-body.admission-bootstrap > main.admission-main { max-width: none; margin: 0; padding: 24px var(--works-gutter) 48px; }
+body.admission-bootstrap > main.admission-main { max-width: none; margin: 0; padding: var(--works-service-top) var(--works-service-gutter) 48px; }
 
 /* Panel sits directly on the grey page. */
 body.admission-bootstrap .admission-panel {
@@ -18,7 +18,7 @@ body.admission-bootstrap .admission-panel {
 }
 
 /* Heading: grey eyebrow, quiet 20px title, white secondary print button. */
-body.admission-bootstrap .admission-heading { align-items: flex-end; min-height: 48px; margin: 0 0 16px; }
+body.admission-bootstrap .admission-heading { align-items: flex-start; min-height: 0; margin: 0 0 var(--works-service-heading-gap); }
 body.admission-bootstrap .admission-heading .eyebrow {
   margin: 0 0 2px;
   background: none;
@@ -33,9 +33,9 @@ body.admission-bootstrap .admission-heading h2 {
   gap: 8px;
   margin: 0;
   color: var(--works-ink);
-  font-size: 20px;
+  font-size: var(--works-service-title-size);
   font-weight: 700;
-  line-height: 1.4;
+  line-height: var(--works-service-title-height);
 }
 body.admission-bootstrap .admission-heading h2 :is(svg, .works-icon) { color: var(--works-ink-3); }
 body.admission-bootstrap :is(.admission-print, .admission-filter-open) {
@@ -346,8 +346,7 @@ body.admission-bootstrap .admission-filter-actions button[type="submit"]:hover {
 
 /* Phones: view tabs become the floating icon-only bar used by 授業管理. */
 @media (max-width: 640px) {
-  body.admission-bootstrap > main.admission-main { padding: 16px 12px calc(96px + env(safe-area-inset-bottom)); }
-  body.admission-bootstrap .admission-heading h2 { font-size: 18px; }
+  body.admission-bootstrap > main.admission-main { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
   body.admission-bootstrap .admission-filter-tabs {
     grid-template-columns: repeat(2, minmax(0, 1fr)) minmax(0, 1.45fr);
   }

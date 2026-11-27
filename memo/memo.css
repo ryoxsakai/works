@@ -1,5 +1,7 @@
 .memo-main {
-  padding: 20px var(--works-gutter);
+  max-width: none;
+  margin: 0;
+  padding: var(--works-service-top) var(--works-service-gutter) 20px;
   min-width: 0;
 }
 .memo-heading, .memo-menu, .memo-card-actions {
@@ -8,9 +10,8 @@
   gap: 8px;
 }
 .memo-heading, .memo-card-actions { justify-content: space-between; }
-.memo-heading { margin-bottom: 16px; }
-.memo-heading .eyebrow { margin: 0 0 2px; color: var(--works-ink-3); }
-.memo-heading h2 { margin: 0; font-size: 20px; font-weight: 700; }
+.memo-heading { align-items: flex-start; margin-bottom: var(--works-service-heading-gap); }
+.memo-heading h2 { margin: 0; font-size: var(--works-service-title-size); line-height: var(--works-service-title-height); font-weight: 700; }
 .memo-page .memo-menu button, .memo-page #empty-state button {
   display: inline-flex;
   align-items: center;
@@ -177,8 +178,7 @@
 .memo-page:has(.memo-dialog[open]) { overflow: hidden; }
 
 @media (max-width: 730px) {
-  .memo-main { padding: 16px 12px calc(96px + env(safe-area-inset-bottom)); }
-  .memo-heading h2 { font-size: 18px; }
+  .memo-main { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
   .memo-page #tab-list .tab-btn, .memo-page #tag-filter button { min-height: 44px; }
   .memo-page .memo-menu {
     position: fixed;

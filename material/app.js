@@ -1,3 +1,4 @@
+import { placeServiceTabs } from "../shared/service-heading-tabs.mjs?v=1";
 import { setUserAvatar } from "../shared/avatar.mjs?v=1";
 import { startMaterialPresentation } from "../shared/ui/material-presentation.mjs?v=2";
 startMaterialPresentation();
@@ -101,9 +102,14 @@ function switchTab(name) {
   els.tabButtons.forEach((button) => {
     button.setAttribute("aria-selected", String(button.dataset.materialTab === next));
   });
+  const activePanel = [...els.tabPanels].find((panel) => panel.dataset.materialTabPanel === next);
+  // Reveal the destination before reparenting the single tablist; restore keyboard focus.
+  if (activePanel) activePanel.hidden = false;
+  const focusedTab = placeServiceTabs(els.tabButtons[0]?.closest(".material-page-tabs"), activePanel?.querySelector(".material-heading"));
   els.tabPanels.forEach((panel) => {
     panel.hidden = panel.dataset.materialTabPanel !== next;
   });
+  focusedTab?.focus({preventScroll: true});
   if (next !== "library" && getSessionToken()) loadTreeFiles();
 }
 
