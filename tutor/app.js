@@ -357,13 +357,13 @@ function restoreRecordDraftRows(root){for(const row of root.querySelectorAll('tr
  if(!draft&&row.dataset.recordOwner){const cached=readPendingRecovery('owner-record:'+row.dataset.recordOwner+':'+key);if(cached){draft=restoredRecordDraft(cached);if(draft)recordDrafts.set(key,draft);}}
  if(!draft)continue;const prefix=recordFieldPrefix(row),sameTarget=JSON.stringify(ref)===JSON.stringify(draft.ref)&&(row.dataset.recordOwner||null)===draft.ownerId;
  const copy=!draft.view||draft.view===prefix?draft:(draft.alternatives||[]).find(copy=>copy.view===prefix);
- if(sameTarget&&copy){for(const [field,value]of Object.entries(copy.values))row.querySelector('.'+prefix+'-'+field).value=value;if(prefix==='curriculum'&&copy.completed!==undefined)row.querySelector('.curriculum-completed').checked=copy.completed;}
+ if(sameTarget&&copy){for(const [field,value]of Object.entries(copy.values))row.querySelector('.'+prefix+'-'+field).value=value;if(prefix==='curriculum'&&copy.completed!==undefined){const box=row.querySelector('.curriculum-completed');if(box)box.checked=copy.completed;else row.dataset.completed=copy.completed?'1':'0';}}
  const changed=!sameTarget||Number(row.dataset.recordRevision)!==draft.revision;
  if(changed&&!draft.unknown&&!draft.busy){draft.conflict=true;persistRecordDraft(draft);}
  if(draft.unknown||draft.busy||draft.conflict||changed){recordControls(row).forEach(el=>el.disabled=true);showRowRecordRecovery(row,draft);}
 }}
 async function saveRecordFields(row){
- const ref=JSON.parse(row.dataset.recordRef),key=lessonEventKey(ref),existing=recordDrafts.get(key);if(existing?.unknown||existing?.busy||existing?.conflict)return;rememberRecordDraft(row);const sentDraft=recordDrafts.get(key),prefix=recordFieldPrefix(row),completed=prefix==='curriculum'?row.querySelector('.curriculum-completed').checked:row.dataset.completed==='1';
+ const ref=JSON.parse(row.dataset.recordRef),key=lessonEventKey(ref),existing=recordDrafts.get(key);if(existing?.unknown||existing?.busy||existing?.conflict)return;rememberRecordDraft(row);const sentDraft=recordDrafts.get(key),prefix=recordFieldPrefix(row),completed=row.querySelector('.curriculum-completed')?.checked??row.dataset.completed==='1';
  sentDraft.alternatives=independentRecordRows(matchingRecordRows(sentDraft),{values:sentDraft.values,completed},row);sentDraft.operationId=crypto.randomUUID();sentDraft.unknown=true;sentDraft.busy=true;sentDraft.completed=completed;sentDraft.sentValues={...sentDraft.values};if(!persistRecordDraft(sentDraft)){sentDraft.busy=false;sentDraft.unknown=false;showActionError(Error('復旧コピーを保持できないため保存を停止しました'));return;}showRetainedRecordDrafts();matchingRecordRows(sentDraft).forEach(current=>recordControls(current).forEach(el=>el.disabled=true));
  try{const saved=await apiFetch('/curriculum/'+encodeURIComponent(ref.id),{method:'PUT',body:JSON.stringify({target:ref,record_revision:sentDraft.revision,expected_owner_id:sentDraft.ownerId,request_id:sentDraft.operationId,completed,confirmation_test:sentDraft.values.test,homework:sentDraft.values.homework,lesson_memo:sentDraft.values.memo})},null);
   if(sentDraft.ownerId&&saved.owner_id!==sentDraft.ownerId)throw Object.assign(Error('保存応答の共有先を確認できません'),{unknown:true});
@@ -1106,6 +1106,8 @@ async function loadSettings() {
   selectedTermIds = new Set((settings.selected_term_ids || []).map(Number));
   termPlanModes = settings.term_plan_modes || {};
   excludedTitles = new Set(settings.excluded_titles || []);
+  groupLessonKeywords = Array.isArray(settings.group_lesson_keywords) ? settings.group_lesson_keywords : [...DEFAULT_GROUP_LESSON_KEYWORDS];
+  renderGroupKeywordTags();
   periodProfiles = readPeriodProfiles(settings.lesson_period_profiles);
   periodEditor.receive(settings.lesson_period_profiles);
   refreshPeriodLabels();
@@ -2506,10 +2508,82 @@ document.querySelector("#student-lesson-kind").addEventListener("change", (event
 
 els.curriculumSearchModalCloseBtn.addEventListener("click", () => els.curriculumSearchModal.close());
 
-// A/M codes and the explicitly designated courses identify group classes.
+// --- 設定: 代官山の集団授業として扱う文字列(タグ入力) ---
+const groupKeywordEditor = document.querySelector("#group-keyword-editor");
+function renderGroupKeywordTags() {
+  if (!groupKeywordEditor) return;
+  groupKeywordEditor.querySelector("[data-keyword-list]").innerHTML = groupLessonKeywords
+    .map((keyword) => `<li class="keyword-tag"><span>${escapeHtml(keyword)}</span><button type="button" data-remove-keyword="${escapeHtml(keyword)}" aria-label="${escapeHtml(keyword)}を削除"><i class="bx bx-x"></i></button></li>`)
+    .join("");
+}
+// 保存は1件ずつ順番に行い、保存中の追加・削除は最後の状態を続けて保存する(応答の前後で編集が消えないようにする)。
+let groupKeywordSaving = false;
+let groupKeywordSaved = null;
+async function saveGroupKeywords(next) {
+  const status = groupKeywordEditor.querySelector("[role=status]");
+  if (groupKeywordSaved === null) groupKeywordSaved = [...groupLessonKeywords];
+  groupLessonKeywords = next;
+  renderGroupKeywordTags();
+  studentGroup = "";
+  renderCurriculumNameSuggestions();
+  if (groupKeywordSaving) return;
+  groupKeywordSaving = true;
+  status.textContent = "保存中…";
+  try {
+    while (JSON.stringify(groupLessonKeywords) !== JSON.stringify(groupKeywordSaved)) {
+      const sending = [...groupLessonKeywords];
+      await apiFetch("/settings", { method: "PUT", body: JSON.stringify({ group_lesson_keywords: sending }) }, null);
+      groupKeywordSaved = sending;
+    }
+    status.textContent = "保存しました";
+  } catch (err) {
+    // 失敗したら最後に保存できた状態に戻す。
+    groupLessonKeywords = [...groupKeywordSaved];
+    status.textContent = "";
+    showActionError(err);
+    renderGroupKeywordTags();
+    studentGroup = "";
+    renderCurriculumNameSuggestions();
+  } finally {
+    groupKeywordSaving = false;
+  }
+}
+function addGroupKeywords(raw) {
+  const additions = String(raw || "").split(/[,、，\n]/).map((item) => item.trim()).filter(Boolean);
+  const next = [...groupLessonKeywords];
+  additions.forEach((item) => { if (item.length <= 40 && !next.includes(item)) next.push(item); });
+  if (next.length !== groupLessonKeywords.length) void saveGroupKeywords(next.slice(0, 50));
+}
+groupKeywordEditor?.addEventListener("click", (event) => {
+  const remove = event.target.closest("[data-remove-keyword]");
+  if (remove) void saveGroupKeywords(groupLessonKeywords.filter((item) => item !== remove.dataset.removeKeyword));
+  else if (event.target.closest("[data-keyword-list]") || event.target === groupKeywordEditor.querySelector(".keyword-input-box")) groupKeywordEditor.querySelector("input").focus();
+});
+groupKeywordEditor?.querySelector("input").addEventListener("keydown", (event) => {
+  const input = event.target;
+  if (event.isComposing) return;
+  if (event.key === "Enter" || event.key === "," || event.key === "、") {
+    event.preventDefault();
+    addGroupKeywords(input.value);
+    input.value = "";
+  } else if (event.key === "Backspace" && !input.value && groupLessonKeywords.length) {
+    void saveGroupKeywords(groupLessonKeywords.slice(0, -1));
+  }
+});
+groupKeywordEditor?.querySelector("input").addEventListener("blur", (event) => {
+  if (!event.target.value.trim()) return;
+  addGroupKeywords(event.target.value);
+  event.target.value = "";
+});
+
+// A/M codes and the configured keywords (設定 › カレンダー) identify group classes.
+const DEFAULT_GROUP_LESSON_KEYWORDS = ["集団", "グループ"];
+let groupLessonKeywords = [...DEFAULT_GROUP_LESSON_KEYWORDS];
 function isGroupLessonTitle(title) {
   const name = selectionTitleWithoutAnnotation(title).normalize("NFKC");
-  return /[AM]/.test(name) || /集団|グループ/.test(title)
+  const compact = (text) => String(text || "").normalize("NFKC").replace(/\s+/g, "");
+  const keywords = typeof groupLessonKeywords === "undefined" ? ["集団", "グループ"] : groupLessonKeywords;
+  return /[AM]/.test(name) || keywords.some((keyword) => keyword && compact(title).includes(compact(keyword)))
     || /^(?:中堅大英語|英語中堅大|高1長文読解)$/.test(name.replace(/\s/g, ""));
 }
 
@@ -2630,13 +2704,67 @@ function renderStudentSelector() {
   els.studentSelector.style.setProperty("--student-color", studentGroupColor(studentGroup));
   els.studentSelector.innerHTML = studentChoices.map((item, index) => ({ ...item, index }))
     .filter((item) => item.group === studentGroup)
-    .map((item) => `<button type="button" data-student-index="${item.index}" data-initial="${escapeHtml(Array.from(String(item.label || "").replace(/^[\s(（]+/, ""))[0] || "")}" aria-pressed="${item.name === els.curriculumName.value}">${escapeHtml(item.label)}${item.label !== item.name ? `<small>${escapeHtml(item.name)}</small>` : ""}</button>`).join("") || '<p class="hint">表示できる生徒・授業がありません。設定のカレンダー・期間を確認してください。</p>';
+    .map((item) => `<button type="button" data-student-index="${item.index}" style="--student-color:${(item.calendarIds || []).map((id) => calendarColors.get(id)?.raw).find((value) => /^#[0-9a-f]{6}$/i.test(value || "")) || studentGroupColor(item.group)}" aria-pressed="${item.name === els.curriculumName.value}">${escapeHtml(item.label)}${item.label !== item.name ? `<small>${escapeHtml(item.name)}</small>` : ""}</button>`).join("") || '<p class="hint">表示できる生徒・授業がありません。設定のカレンダー・期間を確認してください。</p>';
   els.studentSelector.querySelector('[aria-pressed="true"]')?.scrollIntoView({ block: "nearest", inline: "nearest" });
-  const activeTerms = terms.filter((term) => selectedTermIds.has(term.id));
-  document.querySelector("#student-selector-context").textContent = activeTerms.length
-    ? activeTerms.map((term) => [years.find((year) => year.id === term.year_id)?.label, term.label].filter(Boolean).join(" ")).join("・")
-    : "直近の予定";
+  // 生徒・カレンダーの上に、年度の切り替えと、その年度の学期チップ(タップで表示オン・オフ)を置く。
+  // 表示中の年度: 選んだ年度、なければ選択中の学期のうち最も新しいものの年度、今日を含む学期、最後の年度の順。
+  const byStart = (a, b) => String(a.start_date).localeCompare(String(b.start_date));
+  const chosenYear = typeof studentPickerYearId === "undefined" ? null : studentPickerYearId;
+  const todayKey = formatDateOnly(new Date());
+  const yearId = (chosenYear != null && years.some((year) => year.id === chosenYear) ? chosenYear : null)
+    ?? terms.filter((term) => selectedTermIds.has(term.id)).sort(byStart).at(-1)?.year_id
+    ?? terms.find((term) => todayKey >= term.start_date && todayKey <= term.end_date)?.year_id
+    ?? years.at(-1)?.id ?? null;
+  const yearSelect = document.querySelector("#student-year-select");
+  if (yearSelect) {
+    yearSelect.innerHTML = years.map((year) => `<option value="${year.id}">${escapeHtml(year.label)}</option>`).join("");
+    yearSelect.value = String(yearId ?? "");
+  }
+  const yearTerms = terms.filter((term) => term.year_id === yearId).sort(byStart);
+  document.querySelector("#student-selector-context").innerHTML = yearTerms.length
+    ? yearTerms.map((term) => `<button type="button" class="student-term-chip" data-term-id="${term.id}" aria-pressed="${selectedTermIds.has(term.id)}">${escapeHtml(term.label)}</button>`).join("")
+    : `<span class="student-term-empty">学期が未登録です(設定 › 学期)</span>`;
 }
+
+let studentPickerYearId = null;
+
+// 学期チップ・年度の変更は、設定の「学期」のチェックと同じく全デバイス共通の選択として保存する。
+async function applyStudentTermSelection(nextIds) {
+  selectedTermIds = new Set(nextIds);
+  renderYearGroups();
+  clearStudentDetails();
+  renderCurriculumNameSuggestions();
+  setStudentBusy(true);
+  const generation = studentGeneration;
+  try {
+    await saveSelectedTerms();
+    await loadCalendarEvents();
+    await loadRecordTable();
+  } catch (err) {
+    if (generation === studentGeneration) setStudentBusy(false);
+    showActionError(err);
+  }
+}
+
+document.querySelector("#student-selector-context")?.addEventListener("click", (event) => {
+  const chip = event.target.closest("[data-term-id]");
+  if (!chip) return;
+  const id = Number(chip.dataset.termId);
+  const next = new Set(selectedTermIds);
+  if (next.has(id)) next.delete(id); else next.add(id);
+  void applyStudentTermSelection(next);
+});
+
+document.querySelector("#student-year-select")?.addEventListener("change", (event) => {
+  const yearId = Number(event.target.value);
+  studentPickerYearId = yearId;
+  const yearTerms = terms.filter((term) => term.year_id === yearId);
+  const keep = yearTerms.filter((term) => selectedTermIds.has(term.id));
+  const today = formatDateOnly(new Date());
+  const fallback = yearTerms.find((term) => today >= term.start_date && today <= term.end_date)
+    || [...yearTerms].sort((a, b) => String(a.start_date).localeCompare(String(b.start_date))).at(-1);
+  void applyStudentTermSelection((keep.length ? keep : fallback ? [fallback] : []).map((term) => term.id));
+});
 
 // The shared term settings also own the curriculum period, including restored selections.
 function alignCurriculumTermWithSettings() {
@@ -2750,34 +2878,54 @@ async function loadCurriculumEvents(context = captureStudentContext()) {
   const token = getSessionToken();
   const name = els.curriculumName.value.trim();
   const term = terms.find((t) => t.id === Number(els.curriculumTermSelect.value));
-  if (!token || !name || !term || selectedCalendarIds.size === 0) {
+  // 設定で複数の学期(例: 後期と冬期)を選んでいるときは、そのすべての期間の授業を表示する。
+  const displayTerms = curriculumDisplayTerms(term);
+  if (!token || !name || !displayTerms.length || selectedCalendarIds.size === 0) {
     els.curriculumTbody.innerHTML = "";
     updateCurriculumProgressSummary();
-  updateCurriculumProgressSummary();
     return;
   }
 
-  const [timeMin, timeMax] = recordDateRange(term.start_date, term.end_date);
+  const rangeStart = displayTerms.map((t) => t.start_date).sort()[0];
+  const rangeEnd = displayTerms.map((t) => t.end_date).sort().at(-1);
+  const [timeMin, timeMax] = recordDateRange(rangeStart, rangeEnd);
   const events = await fetchCalendarEvents(timeMin, timeMax, { withCalendarId: true });
   assertStudentContext(context);
   const choice = studentChoices.find((item) => item.name === name && item.group === studentGroup);
 
   const matched = events
-    .filter((ev) => choice?.calendarIds?.includes(ev._calendarId) && eventMatchesCurriculumName(ev, name))
+    .filter((ev) => choice?.calendarIds?.includes(ev._calendarId) && eventMatchesCurriculumName(ev, name)
+      && displayTerms.some((t) => eventInTerm(ev, t)))
     .sort((a, b) => {
       const aStart = a.start?.dateTime || a.start?.date || "";
       const bStart = b.start?.dateTime || b.start?.date || "";
       return aStart.localeCompare(bStart);
     });
 
-  await renderCurriculumTable(matched, context, events, termUsesNumberedPlans(term,termPlanModes)?term:null);
+  await renderCurriculumTable(matched, context, events, displayTerms.filter((t) => termUsesNumberedPlans(t, termPlanModes)), displayTerms);
 }
 
-async function renderCurriculumTable(events, context = captureStudentContext(), countEvents = events, term = null) {
+function curriculumDisplayTerms(selectedTerm) {
+  const active = terms.filter((t) => selectedTermIds.has(t.id));
+  const list = active.length ? active : selectedTerm ? [selectedTerm] : [];
+  if (selectedTerm && active.length && !active.some((t) => t.id === selectedTerm.id)) list.push(selectedTerm);
+  return [...list].sort((a, b) => a.start_date.localeCompare(b.start_date));
+}
+
+function eventInTerm(ev, term) {
+  // 学期の開始日0時〜終了日の翌日0時(日本時間)に始まる予定を、その学期の授業とする。
+  const lower = Date.parse(`${term.start_date}T00:00:00+09:00`);
+  const upper = Date.parse(`${term.end_date}T00:00:00+09:00`) + 86400000;
+  const start = Date.parse(ev.start?.dateTime || `${ev.start?.date || ""}T00:00:00+09:00`);
+  return Number.isFinite(start) && start >= lower && start < upper;
+}
+
+async function renderCurriculumTable(events, context = captureStudentContext(), countEvents = events, term = null, displayTerms = []) {
+  const numberedTerms = Array.isArray(term) ? term : term ? [term] : [];
   assertStudentContext(context);
   if (events.length === 0) {
     studentTodos.reset();
-    els.curriculumTbody.innerHTML = `<tr><td colspan="7">該当する予定がありません</td></tr>`;
+    els.curriculumTbody.innerHTML = `<tr><td colspan="6">該当する予定がありません</td></tr>`;
     updateCurriculumProgressSummary();
     return;
   }
@@ -2790,18 +2938,32 @@ async function renderCurriculumTable(events, context = captureStudentContext(), 
     .filter(record => record.attribution_status === 'confirmed' && record.owner_id).map(record => record.owner_id);
   void studentTodos.showRelated(confirmedStudents);
   const retainedCopies = pendingRecoveryCopies();
-  const termPositions = term ? termLessonPositions(term,countEvents,[...excludedTitles]) : null;
+  // 回数は学期ごとに数える(学期の期間が重なっても、各行は自分の学期の回数だけを使う)。
+  const termPositionsById = new Map(numberedTerms.map((t) => [t.id, termLessonPositions(t,countEvents,[...excludedTitles])]));
   const termSlots = [];
+  let previousTermId = null;
 
   els.curriculumTbody.innerHTML = events
     .map((ev) => {
+      const term = numberedTerms.find((t) => eventInTerm(ev, t)) || null;
+      const displayTerm = displayTerms.length > 1 ? displayTerms.find((t) => eventInTerm(ev, t)) : null;
+      const termHeading = displayTerm && displayTerm.id !== previousTermId
+        ? `<tr class="curriculum-term-heading"><th colspan="6" scope="rowgroup">${escapeHtml(displayTerm.label)}</th></tr>` : "";
+      if (displayTerm) previousTermId = displayTerm.id;
+      const ownTerm = displayTerms.find((t) => eventInTerm(ev, t));
+      const termCountEvents = ownTerm && displayTerms.length > 1 ? countEvents.filter((item) => eventInTerm(item, ownTerm)) : countEvents;
+      return termHeading + curriculumRowMarkup(ev, term, termCountEvents);
+    })
+    .join("");
+  function curriculumRowMarkup(ev, term, termCountEvents) {
       const saved = attributedLessonRecord(entryMap.get(ev.id), lessonEventRef(ev));
       const start = ev.start?.dateTime || ev.start?.date || "";
-      const count = sameNameLessonCount(ev, countEvents, [...excludedTitles]);
+      const count = sameNameLessonCount(ev, termCountEvents, [...excludedTitles]);
       const ref = lessonEventRef(ev), key = lessonEventKey(ref), unassigned = unassignedLessonDisplay(saved, ref);
       const plan = lessonPlans.get(key);
       const retained = recordDrafts.has(key) || plan?.dirty || plan?.pending || plan?.status === 'conflict' ||
         retainedCopies.some(copy => copy.target && lessonEventKey(copy.target) === key);
+      const termPositions = term ? termPositionsById.get(term.id) : null;
       const position = termPositions ? termPosition(termPositions,ev) : null;
       const slot = position && canUseTermPlan(saved) ? position.current : null;
       if(slot)termSlots.push(slot);
@@ -2811,40 +2973,38 @@ async function renderCurriculumTable(events, context = captureStudentContext(), 
       if (unassigned && (!retained || numberedUnassigned)) {
         const label = escapeHtml(ev.summary || '授業');
         const legacyHooks = numberedUnassigned ? '' : ` data-pending-key="${escapeHtml(key)}" data-pending-target="${escapeHtml(JSON.stringify(ref))}" data-pending-context="${escapeHtml(unassigned.pendingContext)}"`;
-        return `<tr data-unassigned-progress${legacyHooks}><td><input type="checkbox" disabled aria-label="${label}の完了（未紐付けのため編集不可）"></td>
+        return `<tr data-unassigned-progress${legacyHooks}>
           <td>${position?.current.ordinal ?? count.n}/${position?.total ?? count.m}回</td><td data-lesson-period="curriculum" data-period-start="${escapeHtml(start)}" data-period-calendar="${escapeHtml(ev._calendarId || "")}">${escapeHtml(formatCurriculumDate(start, ev._calendarId))}</td>
           <td>${numberedUnassigned ? numberedEditor : `<textarea data-legacy-pending-plan rows="2" disabled aria-label="${label}の授業予定（未紐付けのため編集不可）">${escapeHtml(unassigned.lessonPlan)}</textarea>`}</td>
-          ${['確認テスト','宿題','授業メモ'].map(field=>`<td><textarea rows="2" disabled aria-label="${label}の${field}（未紐付けのため編集不可）"></textarea></td>`).join('')}</tr>`;
+          ${['確認テスト','宿題','授業メモ'].map(field=>`<td><textarea rows="1" disabled aria-label="${label}の${field}（未紐付けのため編集不可）"></textarea></td>`).join('')}</tr>`;
       }
       if (lessonRecordNeedsReview(saved)) return lessonReviewRow(lessonEventRef(ev),saved,ev.summary || "授業",formatCurriculumDate(start, ev._calendarId), "curriculum",numberedUnassigned)
         .replace('</strong>', `</strong> <small class="semester-candidate-count">${position?.current.ordinal ?? count.n}/${position?.total ?? count.m}回（同名予定・所属未確定）</small>`)
         .replace('</td>',(numberedUnassigned ? numberedEditor : slotEditor)+'</td>');
-      const checked = saved.completed ? "checked" : "";
       lessonPlans.seed(ref, saved.lesson_plan || "", planReadVersion, saved.record_revision,saved.attribution_status,saved.owner_id||null);
       return `<tr data-event-id="${escapeHtml(ev.id)}" data-record-ref="${escapeHtml(JSON.stringify(ref))}" data-record-revision="${saved.record_revision}" data-record-owner="${escapeHtml(saved.owner_id||'')}" data-completed="${saved.completed ? 1 : 0}">
-        <td><input type="checkbox" class="curriculum-completed" ${checked} /></td>
         <td>${position?.current.ordinal ?? (term?'—':count.n)}/${position?.total ?? (term?'—':count.m)}回${lessonAttributionNotice(saved)}</td>
         <td data-lesson-period="curriculum" data-period-start="${escapeHtml(start)}" data-period-calendar="${escapeHtml(ev._calendarId || "")}">${escapeHtml(formatCurriculumDate(start, ev._calendarId))}</td>
         <td>${slotEditor || (term ? '<small role="status">学期内の予定を再確認してください。</small>' : lessonPlanEditor(ref, ev.summary || "授業", "curriculum-plan",saved.owner_id||""))}</td>
-        <td><textarea class="curriculum-test" rows="2">${escapeHtml(saved.confirmation_test || "")}</textarea></td>
-        <td><textarea class="curriculum-homework" rows="2">${escapeHtml(saved.homework || "")}</textarea></td>
-        <td><textarea class="curriculum-memo" rows="2">${escapeHtml(saved.lesson_memo || "")}</textarea></td>
+        <td><textarea class="curriculum-test" rows="1" aria-label="確認テスト">${escapeHtml(saved.confirmation_test || "")}</textarea></td>
+        <td><textarea class="curriculum-homework" rows="1" aria-label="宿題">${escapeHtml(saved.homework || "")}</textarea></td>
+        <td><textarea class="curriculum-memo" rows="1" aria-label="授業メモ">${escapeHtml(saved.lesson_memo || "")}</textarea></td>
       </tr>`;
-    })
-    .join("");
+  }
   restoreRecordDraftRows(els.curriculumTbody);showRetainedRecordDrafts();
   renderLessonPlans();
   updateCurriculumProgressSummary();
   if(termSlots.length)void termPlans.load(termSlots);
 }
 
-// 授業進行の上部に「完了数・次回」を表示し、次回の行を強調する(表示のみ。保存処理には関与しない)。
+// 授業進行の上部に「実施済みの回数・次回」を表示し、次回の行を強調する(表示のみ。保存処理には関与しない)。
 function updateCurriculumProgressSummary() {
   if (typeof document === "undefined" || typeof els.curriculumTbody?.querySelectorAll !== "function") return;
   const host = document.querySelector("#curriculum-progress-summary");
   const rows = [...els.curriculumTbody.querySelectorAll("tr[data-event-id], tr[data-unassigned-progress]")];
   rows.forEach((row) => row.classList.remove("is-next-lesson"));
   if (!host) return;
+  requestAnimationFrame(resizeCurriculumInputs);
   if (!rows.length) {
     host.hidden = true;
     return;
@@ -2853,28 +3013,114 @@ function updateCurriculumProgressSummary() {
   let done = 0;
   let next = null;
   rows.forEach((row) => {
-    const box = row.querySelector(".curriculum-completed");
-    const completed = box ? box.checked : row.dataset.completed === "1";
-    if (completed) done += 1;
     const start = row.querySelector("[data-period-start]")?.dataset.periodStart;
     const time = start ? new Date(start).getTime() : NaN;
-    if (!next && !completed && Number.isFinite(time) && time >= now - 3 * 3600000) next = { row, start };
+    if (!Number.isFinite(time)) return;
+    if (time < now - 3 * 3600000) done += 1;
+    else if (!next) next = row;
   });
-  if (next) next.row.classList.add("is-next-lesson");
+  if (next) next.classList.add("is-next-lesson");
   const percent = Math.round((done / rows.length) * 100);
-  const nextCell = next?.row.querySelector("[data-period-start]");
+  const nextCell = next?.querySelector("[data-period-start]");
   host.hidden = false;
-  host.innerHTML = `<div class="curriculum-progress-meter" role="img" aria-label="完了 ${done} / ${rows.length}回">
+  host.innerHTML = `<div class="curriculum-progress-meter" role="img" aria-label="実施済み ${done} / ${rows.length}回">
       <span style="width:${percent}%"></span>
     </div>
-    <p><strong>${done}</strong> / ${rows.length}回 完了${
+    <p><strong>${done}</strong> / ${rows.length}回 実施${
       nextCell ? `<span class="curriculum-progress-next">次回 ${escapeHtml(nextCell.textContent.trim())}</span>` : ""
     }</p>`;
+  scrollCurriculumToNext();
 }
 
+// スマホのカード表示(横スクロール)では、次回のカードを最初に見せる。
+function scrollCurriculumToNext() {
+  const scroller = els.curriculumTbody;
+  const next = scroller.querySelector("tr.is-next-lesson");
+  if (!next) return requestAnimationFrame(updateCurriculumCarouselNav);
+  requestAnimationFrame(() => {
+    if (scroller.scrollWidth <= scroller.clientWidth) return updateCurriculumCarouselNav();
+    scroller.scrollTo({ left: scroller.scrollLeft + next.getBoundingClientRect().left - scroller.getBoundingClientRect().left - 8, behavior: "auto" });
+    updateCurriculumCarouselNav();
+  });
+}
+
+function curriculumCards() {
+  return [...els.curriculumTbody.querySelectorAll("tr:not(.curriculum-term-heading)")].filter((row) => row.getClientRects().length);
+}
+
+function currentCurriculumCardIndex(cards) {
+  const left = els.curriculumTbody.getBoundingClientRect().left;
+  let best = 0;
+  let bestDistance = Infinity;
+  cards.forEach((card, index) => {
+    const distance = Math.abs(card.getBoundingClientRect().left - left);
+    if (distance < bestDistance) {
+      best = index;
+      bestDistance = distance;
+    }
+  });
+  return best;
+}
+
+function updateCurriculumCarouselNav() {
+  const nav = document.querySelector("#curriculum-carousel-nav");
+  if (!nav) return;
+  const scroller = els.curriculumTbody;
+  const cards = curriculumCards();
+  const scrollable = scroller.scrollWidth > scroller.clientWidth + 4 && cards.length > 1;
+  nav.hidden = !scrollable;
+  if (!scrollable) return;
+  const index = currentCurriculumCardIndex(cards);
+  nav.querySelector("[data-carousel-position]").textContent = `${index + 1} / ${cards.length}`;
+  nav.querySelector("[data-carousel-prev]").disabled = index === 0;
+  nav.querySelector("[data-carousel-next]").disabled = index === cards.length - 1;
+  const nextIndex = cards.findIndex((card) => card.classList.contains("is-next-lesson"));
+  const jump = nav.querySelector("[data-carousel-next-lesson]");
+  jump.hidden = nextIndex < 0 || nextIndex === index;
+}
+
+function moveCurriculumCarousel(step) {
+  const cards = curriculumCards();
+  if (!cards.length) return;
+  const index = typeof step === "number"
+    ? Math.min(cards.length - 1, Math.max(0, currentCurriculumCardIndex(cards) + step))
+    : Math.max(0, cards.findIndex((card) => card.classList.contains("is-next-lesson")));
+  const scroller = els.curriculumTbody;
+  const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  scroller.scrollTo({ left: scroller.scrollLeft + cards[index].getBoundingClientRect().left - scroller.getBoundingClientRect().left - 8, behavior: reduce ? "auto" : "smooth" });
+}
+
+
+function resizeCurriculumInputs() {
+  els.curriculumTbody.querySelectorAll("textarea").forEach(resizeRecordInput);
+}
+
+els.curriculumTbody.addEventListener("input",e=>{if(e.target.matches("textarea"))resizeRecordInput(e.target);});
 els.curriculumTbody.addEventListener("input",e=>{if(e.target.matches('.curriculum-test,.curriculum-homework,.curriculum-memo')){rememberRecordDraft(e.target.closest('tr[data-event-id]'));showRetainedRecordDrafts();}});
-els.curriculumTbody.addEventListener("change",e=>{if(e.target.matches('.curriculum-completed'))updateCurriculumProgressSummary();},true);
 els.curriculumTbody.addEventListener("change",e=>{if(e.target.matches('.linked-lesson-plan')||e.target.closest('.owner-memo-editor'))return;const row=e.target.closest('tr[data-event-id]');if(row)saveRecordFields(row);});
+document.querySelector("#curriculum-carousel-nav")?.addEventListener("click", (event) => {
+  if (event.target.closest("[data-carousel-prev]")) moveCurriculumCarousel(-1);
+  else if (event.target.closest("[data-carousel-next]")) moveCurriculumCarousel(1);
+  else if (event.target.closest("[data-carousel-next-lesson]")) moveCurriculumCarousel("next");
+});
+let curriculumScrollFrame = 0;
+els.curriculumTbody.addEventListener("scroll", () => {
+  cancelAnimationFrame(curriculumScrollFrame);
+  curriculumScrollFrame = requestAnimationFrame(updateCurriculumCarouselNav);
+}, { passive: true });
+// タブ切り替えで表示されたとき(幅0→表示)や画面幅が変わったときに、高さ・カルーセル位置を整える。
+let curriculumTbodyWidth = 0;
+new ResizeObserver(([entry]) => {
+  const width = entry.contentRect.width;
+  if (width === curriculumTbodyWidth) return;
+  const becameVisible = curriculumTbodyWidth === 0 && width > 0;
+  curriculumTbodyWidth = width;
+  requestAnimationFrame(() => {
+    resizeCurriculumInputs();
+    if (becameVisible) scrollCurriculumToNext();
+    else updateCurriculumCarouselNav();
+  });
+}).observe(els.curriculumTbody);
 
 // --- 目標(短期・中期・長期)。名前ごとにD1へ保存し、並べ替えはsort_orderの入れ替えで行う。
 // ページ上のカラムでは完了チェックのみ操作でき、追加・編集・削除・並べ替えは目標モーダル(設定モーダルと同じ
@@ -3345,6 +3591,18 @@ function renderAdmissionStageCell(dates, today) {
   return items.join("");
 }
 
+// スマホでは大学名だけを並べ、タップした学校の日程を開く(開閉状態は画面内で保持)。
+const openSchoolIds = new Set();
+els.schoolsSummary.addEventListener("click", (event) => {
+  const toggle = event.target.closest("[data-school-toggle]");
+  if (!toggle) return;
+  const id = toggle.dataset.schoolToggle;
+  const open = !openSchoolIds.has(id);
+  if (open) openSchoolIds.add(id); else openSchoolIds.delete(id);
+  toggle.setAttribute("aria-expanded", String(open));
+  toggle.closest(".school-schedule-group").dataset.open = String(open);
+});
+
 function renderSchoolsSummary() {
   const name = els.curriculumName.value.trim();
   if (candidateSchools.length === 0) {
@@ -3374,16 +3632,17 @@ function renderSchoolsSummary() {
         : "";
       const typeLabel = school.school_type === "national" ? "国公立" : "私立";
       const programs = admissionEventsState.loaded ? admissionProgramsFor(school.school_name) : [];
-      const nameCell = `<div class="school-name">${rankBadge}<strong>${escapeHtml(school.school_name)}</strong><span class="school-type">${typeLabel}</span></div>`;
+      const open = openSchoolIds.has(String(school.id));
+      const nameCell = `<button type="button" class="school-name" data-school-toggle="${escapeHtml(String(school.id))}" aria-expanded="${open}">${rankBadge}<strong>${escapeHtml(school.school_name)}</strong><span class="school-type">${typeLabel}</span><i class="bx bx-chevron-down school-chevron" aria-hidden="true"></i></button>`;
       if (!programs.length) {
         const note = !admissionEventsState.loaded
           ? "日程を読み込み中…"
           : admissionEventsState.failed
             ? "入試日程を読み込めませんでした"
             : "入試管理に日程が登録されていません";
-        return `<div class="school-schedule-group">${nameCell}<p class="school-schedule-note">${note}</p></div>`;
+        return `<div class="school-schedule-group" data-open="${open}">${nameCell}<p class="school-schedule-note">${note}</p></div>`;
       }
-      return `<div class="school-schedule-group">${nameCell}${programs
+      return `<div class="school-schedule-group" data-open="${open}">${nameCell}${programs
         .map(
           (program) => `<div class="school-schedule-row">
             <span class="school-program">${escapeHtml(program.label)}</span>

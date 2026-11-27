@@ -37,7 +37,7 @@ test('curriculum keeps displayed records but counts each calendar and exact norm
 test('student list reads the entire selected term using JST bounds and supplies unfiltered candidates to counts',async()=>{
  const term={id:7,start_date:'2026-10-01',end_date:'2026-10-31'},a=event('a','2026-10-01','one'),b=event('b','2026-10-31','one'),other=event('other','2026-10-31','two');
  let range,rendered;
- const state=vm.createContext({termUsesNumberedPlans,termPlanModes:{},recordDateRange,terms:[term],selectedCalendarIds:new Set(['one','two']),studentGroup:'G',studentChoices:[{name:'A',group:'G',calendarIds:['one']}],
+ const state=vm.createContext({termUsesNumberedPlans,termPlanModes:{},recordDateRange,terms:[term],selectedTermIds:new Set(),selectedCalendarIds:new Set(['one','two']),studentGroup:'G',studentChoices:[{name:'A',group:'G',calendarIds:['one']}],
   els:{curriculumName:{value:'A'},curriculumTermSelect:{value:'7'},curriculumTbody:{innerHTML:''}},
   captureStudentContext:()=>({}),assertStudentContext(){},getSessionToken:()=> 'synthetic',
   eventMatchesCurriculumName:()=>true,fetchCalendarEvents:async(min,max,options)=>{range={min,max,options};return [other,b,a];},

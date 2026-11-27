@@ -6183,6 +6183,13 @@ export default {
         if (Array.isArray(body.excluded_titles)) {
           await writeSetting(env, "excluded_titles", body.excluded_titles);
         }
+        if (body.group_lesson_keywords !== undefined) {
+          // 代官山の予定名にこの文字列が含まれていれば集団授業として扱う(授業管理の設定)。
+          const list = body.group_lesson_keywords;
+          if (!Array.isArray(list) || list.length > 50 || list.some((item) => typeof item !== "string" || !item.trim() || item.trim().length > 40))
+            throw httpError(400, "集団授業の判定文字列を確認してください");
+          await writeSetting(env, "group_lesson_keywords", [...new Set(list.map((item) => item.trim()))]);
+        }
         return json(await readSettings(env), headers);
       }
 

@@ -58,20 +58,21 @@ try{
  await expect(curr(page).locator('.curriculum-test')).toHaveValue('日別の確認テスト');
  await tab(page,'curriculum');await edit(page,'curriculum','memo','共有する授業メモ');
  await expect(daily(page).locator('.record-memo')).toHaveValue('共有する授業メモ');
- await curr(page).locator('.curriculum-completed').check();await expect.poll(async()=>(await stored()).completed).toBe(1);await expect(daily(page)).toHaveAttribute('data-completed','1');
- await tab(page,'record');await edit(page,'record','homework','日別で追記した宿題');assert.equal((await stored()).completed,1);await expect(curr(page).locator('.curriculum-completed')).toBeChecked();
+ // The curriculum view has no completion checkbox; saves from either view keep the stored completion.
+ assert.equal(await curr(page).locator('.curriculum-completed').count(),0);assert.equal((await stored()).completed,0);await expect(curr(page)).toHaveAttribute('data-completed','0');
+ await tab(page,'record');await edit(page,'record','homework','日別で追記した宿題');assert.equal((await stored()).completed,0);await expect(daily(page)).toHaveAttribute('data-completed','0');
  await daily(page).locator('.record-plan').fill('同期する授業予定');await daily(page).locator('.record-plan').press('Tab');await expect(curr(page).locator('.curriculum-plan')).toHaveValue('同期する授業予定');
  // Mirroring a draft is immediate; wait for its save to finish before a separate record write.
  await expect(daily(page).locator('.lesson-plan-editor').filter({has:page.locator('.record-plan')}).locator('.lesson-plan-status')).toHaveText('保存済み');
  await expect.poll(async()=>(await stored()).lesson_plan).toBe('同期する授業予定');
- await tab(page,'curriculum');await curr(page).locator('.curriculum-completed').uncheck();await expect.poll(async()=>(await stored()).completed).toBe(0);await expect(daily(page)).toHaveAttribute('data-completed','0');
+ await tab(page,'curriculum');assert.equal((await stored()).completed,0);await expect(daily(page)).toHaveAttribute('data-completed','0');
  const saved=await stored();assert.equal(saved.confirmation_test,'日別の確認テスト');assert.equal(saved.homework,'日別で追記した宿題');assert.equal(saved.lesson_memo,'共有する授業メモ');assert.equal(saved.lesson_plan,'同期する授業予定');
  assert.deepEqual(await page.locator('#identity-fixtures tr').evaluateAll(rows=>rows.map(r=>r.dataset.recordRevision)),['77','77']);
 
- // A pending request locks both views, including the completion checkbox.
+ // A pending request locks both views.
  let release;hold={promise:new Promise(r=>release=r)};
  await input(curr(page),'curriculum','homework','応答待ちの宿題',true);
- await expect(curr(page).locator('.curriculum-homework')).toBeDisabled();await expect(daily(page).locator('.record-test')).toBeDisabled();await expect(curr(page).locator('.curriculum-completed')).toBeDisabled();
+ await expect(curr(page).locator('.curriculum-homework')).toBeDisabled();await expect(daily(page).locator('.record-test')).toBeDisabled();
  release();hold=null;await expect.poll(async()=>(await stored()).homework).toBe('応答待ちの宿題');await expect(daily(page).locator('.record-homework')).toHaveValue('応答待ちの宿題');await expect(curr(page).locator('.curriculum-homework')).toBeEnabled();
 
  // An independently dirty sibling keeps all its values and original revision.
@@ -84,12 +85,10 @@ try{
  await expect(daily(page)).toHaveAttribute('data-record-revision',beforeDraftRevision);await expect(daily(page).locator('.record-homework')).toBeDisabled();await expect(curr(page).locator('.curriculum-homework')).toBeDisabled();
  const beforeReloadWrites=writes;await page.reload();await page.getByRole('button',{name:'授業記録',exact:true}).click();await expect(page.locator('#retained-record-drafts')).toContainText('日別の保持入力-test');await expect(daily(page).locator('.record-memo')).toHaveValue('日別の保持入力-memo');assert.equal(writes,beforeReloadWrites);
 
- // Completion is an independent draft too, and survives a reload without being sent.
- page=await freshPage();await curr(page).locator('.curriculum-completed').evaluate(el=>{el.checked=true;el.dispatchEvent(new Event('input',{bubbles:true}));});
+ // A save from the daily view after a reload keeps the stored completion unchanged.
+ page=await freshPage();
  await input(daily(page),'record','memo','日別で確定したメモ',true);
  await expect.poll(async()=>(await stored()).lesson_memo).toBe('日別で確定したメモ');assert.equal((await stored()).completed,0);
- await expect(curr(page).locator('.curriculum-completed')).toBeChecked();await expect(curr(page).locator('.curriculum-completed')).toBeDisabled();await expect(page.locator('#retained-record-drafts')).toContainText('完了：完了');
- await page.reload();await page.getByRole('button',{name:'授業記録',exact:true}).click();await page.locator('[data-page-tab=curriculum]').click();await page.locator('#student-selector button').filter({hasText:title}).click();await expect(curr(page).locator('.curriculum-completed')).toBeChecked();await expect(curr(page).locator('.curriculum-completed')).toBeDisabled();
 
  // Unknown outcome verification acknowledges the committed snapshot, but does not
  // discard another view's pending input or resend the write after reload.

@@ -2,7 +2,9 @@
 
 export function isGroupLessonTitle(title) {
   const name = selectionTitleWithoutAnnotation(title).normalize("NFKC");
-  return /[AM]/.test(name) || /集団|グループ/.test(title)
+  const compact = (text) => String(text || "").normalize("NFKC").replace(/\s+/g, "");
+  const keywords = typeof groupLessonKeywords === "undefined" ? ["集団", "グループ"] : groupLessonKeywords;
+  return /[AM]/.test(name) || keywords.some((keyword) => keyword && compact(title).includes(compact(keyword)))
     || /^(?:中堅大英語|英語中堅大|高1長文読解)$/.test(name.replace(/\s/g, ""));
 }
 
