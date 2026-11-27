@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFileSync} from 'node:fs';
 import {lessonEventRef,lessonEventKey,sameLessonEvent} from '../../shared/lesson-plan.js';
+import {termLessonPositions,termPosition} from '../../shared/term-lesson-plan.mjs';
 import {unassignedLessonDisplay} from '../../shared/unassigned-lesson.mjs';
 
 const event={id:'synthetic',_calendarId:'calendar',summary:'合成授業',etag:'v1',start:{dateTime:'2026-11-04T10:00:00+09:00'},end:{dateTime:'2026-11-04T11:00:00+09:00'}};
@@ -18,19 +19,24 @@ test('only a verified, readable unassigned occurrence can be rendered read-only'
 test('student progress keeps seven normal cells and does not create a save target',async()=>{
  const source=readFileSync(new URL('../app.js',import.meta.url),'utf8'),start=source.indexOf('async function renderCurriculumTable('),end=source.indexOf('\nels.curriculumTbody.addEventListener("input"',start);
  const els={curriculumTbody:{innerHTML:''}},plans=new Map(),drafts=new Map(),copies=[];let saved=row();
- const state=vm.createContext({studentTodos:{showRelated(){}},els,excludedTitles:new Set(),sameNameLessonCount:()=>({n:1,m:1}),lessonEventRef,lessonEventKey,unassignedLessonDisplay,recordDrafts:drafts,pendingRecoveryCopies:()=>copies,assertStudentContext(){},readRecordEntries:async()=>[saved],attributedLessonRecord:value=>value,lessonRecordNeedsReview:()=>true,lessonReviewRow:()=>'<tr><td>保持・確認</td></tr>',formatCurriculumDate:()=> '11/04',lessonPlans:{version:0,get:key=>plans.get(key),seed(){throw Error('unassigned must not be seeded');}},escapeHtml:s=>String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;'),restoreRecordDraftRows(){},showRetainedRecordDrafts(){},renderLessonPlans(){},captureStudentContext:()=>({})});
+ const state=vm.createContext({studentTodos:{showRelated(){}},els,excludedTitles:new Set(),sameNameLessonCount:()=>({n:1,m:1}),lessonEventRef,lessonEventKey,unassignedLessonDisplay,termLessonPositions,termPosition,canUseTermPlan:()=>true,termPlans:{load(){},markup(_slot,label,old){return '<textarea class="term-plan-input" aria-label="'+label+'"></textarea><details>'+old+'</details>';}},recordDrafts:drafts,pendingRecoveryCopies:()=>copies,assertStudentContext(){},readRecordEntries:async()=>[saved],attributedLessonRecord:value=>value,lessonRecordNeedsReview:()=>true,lessonReviewRow:()=>'<tr><td>保持・確認</td></tr>',formatCurriculumDate:()=> '11/04',lessonPlans:{version:0,get:key=>plans.get(key),seed(){throw Error('unassigned must not be seeded');}},escapeHtml:s=>String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;'),restoreRecordDraftRows(){},showRetainedRecordDrafts(){},renderLessonPlans(){},captureStudentContext:()=>({})});
  vm.runInContext(source.slice(start,end),state);
  await state.renderCurriculumTable([event],{},[event]);
  assert.match(els.curriculumTbody.innerHTML,/data-unassigned-progress/);assert.equal((els.curriculumTbody.innerHTML.match(/<td/g)||[]).length,7);assert.equal((els.curriculumTbody.innerHTML.match(/disabled/g)||[]).length,5);assert.doesNotMatch(els.curriculumTbody.innerHTML,/data-record-ref|data-event-id|保持・確認/);
  saved=row({pending_exists:true,record_revision:1,lesson_plan:'<下書き>'});await state.renderCurriculumTable([event],{},[event]);assert.match(els.curriculumTbody.innerHTML,/&lt;下書き&gt;/);
  plans.set(lessonEventKey(target),{dirty:true});await state.renderCurriculumTable([event],{},[event]);assert.match(els.curriculumTbody.innerHTML,/保持・確認/);
  plans.clear();copies.push({target,value:'保持入力'});await state.renderCurriculumTable([event],{},[event]);assert.match(els.curriculumTbody.innerHTML,/保持・確認/);copies.length=0;drafts.set(lessonEventKey(target),{});await state.renderCurriculumTable([event],{},[event]);assert.match(els.curriculumTbody.innerHTML,/保持・確認/);drafts.clear();saved=row({pending_storage_available:false});await state.renderCurriculumTable([event],{},[event]);assert.match(els.curriculumTbody.innerHTML,/保持・確認/);
+ saved=row({pending_exists:true,record_revision:1,lesson_plan:'旧イベントの下書き'});
+ plans.set(lessonEventKey(target),{dirty:true});await state.renderCurriculumTable([event],{},[event],{id:1,start_date:'2026-11-01',end_date:'2026-12-01'});
+ assert.match(els.curriculumTbody.innerHTML,/term-plan-input.*第1回の授業予定/);
+ assert.match(els.curriculumTbody.innerHTML,/旧イベントの下書き/);
+ assert.doesNotMatch(els.curriculumTbody.innerHTML,/data-pending-key|data-legacy-pending-plan|data-event-id/);
 });
 
 test('read-only pending display follows only a confirmed save for the same occurrence',()=>{
  const source=readFileSync(new URL('../app.js',import.meta.url),'utf8'),start=source.indexOf('function renderLessonPlans() {'),end=source.indexOf('\ndocument.addEventListener("click"',start);
- const input={value:'以前の保存値'},node={dataset:{pendingKey:lessonEventKey(target),pendingTarget:JSON.stringify(target),pendingContext:'synthetic-context'},querySelector:()=>input};let plan={target,pendingContext:'synthetic-context',ownerId:null,base:'保存後',dirty:false,pending:0,status:'saved'};
- const state=vm.createContext({document:{querySelectorAll:()=>[node]},lessonPlans:{get:()=>plan},renderPlanEditors(){},lessonPlanDate(){},resizeRecordInput(){},sameLessonEvent});vm.runInContext(source.slice(start,end),state);
- state.renderLessonPlans();assert.equal(input.value,'保存後');plan={...plan,base:'未保存値',dirty:true};state.renderLessonPlans();assert.equal(input.value,'保存後');
+ const input={value:'以前の保存値'},node={dataset:{pendingKey:lessonEventKey(target),pendingTarget:JSON.stringify(target),pendingContext:'synthetic-context'},querySelector:selector=>selector==='[data-legacy-pending-plan]'?input:null};const numbered={value:'回数別の保存値'},staleRow={dataset:node.dataset,querySelector:selector=>selector==='textarea'?numbered:null};let plan={target,pendingContext:'synthetic-context',ownerId:null,base:'保存後',dirty:false,pending:0,status:'saved'};
+ const state=vm.createContext({document:{querySelectorAll:()=>[node,staleRow]},lessonPlans:{get:()=>plan},renderPlanEditors(){},lessonPlanDate(){},resizeRecordInput(){},sameLessonEvent});vm.runInContext(source.slice(start,end),state);
+ state.renderLessonPlans();assert.equal(input.value,'保存後');assert.equal(numbered.value,'回数別の保存値');plan={...plan,base:'未保存値',dirty:true};state.renderLessonPlans();assert.equal(input.value,'保存後');
  plan={...plan,dirty:false,status:'conflict'};state.renderLessonPlans();assert.equal(input.value,'');input.value='以前の保存値';plan={...plan,status:'ready',pendingContext:'different'};state.renderLessonPlans();assert.equal(input.value,'');
 });

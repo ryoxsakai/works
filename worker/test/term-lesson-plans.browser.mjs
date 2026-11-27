@@ -14,9 +14,20 @@ try{
  browser=await chromium.launch({headless:true,executablePath:process.env.BROWSER_EXECUTABLE||undefined,args:['--no-sandbox']});
  const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,reducedMotion:'reduce'});
  const writes=[], legacyPlanRequests=[];
+ const previousEventDraft='以前の予定別に保存していた下書き';
+ let unassignedEventId;
  await context.route('**/api/**',async route=>{
    const req=route.request(),url=new URL(req.url());
    if(url.pathname==='/api/terms')return route.fulfill({json:[term]});
+   if(url.pathname==='/api/lesson-records'&&unassignedEventId){
+     const target=req.postDataJSON().targets[0];
+     if(target.id===unassignedEventId)return route.fulfill({json:[{
+       calendar_event_id:target.id,record_storage:'d1_owner',attribution_status:'owner_unassigned',
+       record_exists:false,record_read_target:target,record_revision:4,completed:0,
+       pending_allowed:true,pending_storage_available:true,pending_exists:true,pending_context:'qa-old-draft',
+       lesson_plan:previousEventDraft,
+     }]});
+   }
    if(url.pathname==='/api/lesson-plan'||url.pathname==='/api/next-lesson-plan')legacyPlanRequests.push(url.pathname);
    if(url.pathname!=='/api/term-lesson-plans')return route.continue();
    const body=req.postDataJSON();
@@ -64,7 +75,50 @@ try{
  assert.deepEqual(legacyPlanRequests,[]);
  assert.equal(writes.length,1);
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth));
- console.log('PASS /tutor/ 390px: numbered plan survives a moved/recreated event, follows reordering, has a next slot before Google dates, and is shared with student curriculum.');
+ // Make the next occurrence a distinct, pending-eligible, unassigned lesson
+ // with an old draft unrelated to the currently saved numbered plan.
+ const pending=make('pending-lesson',1);
+ unassignedEventId=pending.id;
+ f.events.splice(0,f.events.length,a,pending);
+ await open(1);
+ await page.locator('[data-page-tab="record"]').click();
+ const pendingCard=page.locator('tr[data-record-card]').filter({hasText:name});
+ const pendingNumber=pendingCard.getByRole('textbox',{name:'第2回の授業予定'});
+ await expect(pendingNumber).toHaveValue('回数と一緒に残る次回計画');
+ await expect(pendingCard.locator('.linked-lesson-plan')).toHaveCount(0);
+ await expect(pendingCard.locator('[data-term-slot]')).toHaveCount(2);
+ await expect(pendingCard.locator('.pending-bind-link')).toHaveCount(1);
+ await pendingCard.locator('[data-term-previous] summary').click();
+ await expect(pendingCard.getByText(previousEventDraft,{exact:true})).toBeVisible();
+ // Keep the same app instance when moving to the student's curriculum.
+ await page.locator('.record-day-btn[data-day="prev"]').click();
+ await page.getByRole('button',{name:name+'の生徒情報を開く'}).click();
+ const curriculum=page.locator('#curriculum-tbody tr[data-unassigned-progress]');
+ const numbered=curriculum.getByRole('textbox',{name:'第2回の授業予定'});
+ await expect(numbered).toHaveValue('回数と一緒に残る次回計画');
+ await expect(curriculum.locator('[data-term-previous] summary')).toHaveText('以前の予定別の記録');
+ await curriculum.locator('[data-term-previous] summary').click();
+ await expect(curriculum.getByText(previousEventDraft,{exact:true})).toBeVisible();
+ assert.equal(await curriculum.getAttribute('data-pending-key'),null,'numbered curriculum must not be routed to the legacy repaint');
+ await page.locator('[data-page-tab="curriculum"]').click();
+ await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+ await expect(numbered).toHaveValue('回数と一緒に残る次回計画');
+ await numbered.fill('未紐づけでも回数に保存');
+ await numbered.press('Tab');
+ await expect(curriculum.locator('[data-term-slot] [role=status]')).toHaveText('保存済み');
+ assert.equal(writes.length,2);
+ assert.deepEqual(writes[1].slot,{term_id:2,calendar_id:'qa',title:name,ordinal:2});
+ f.events.push({...make('pending-inserted',0),start:{dateTime:day(0)+'T12:00:00+09:00'},end:{dateTime:day(0)+'T13:00:00+09:00'}});
+ await open(1);
+ await page.locator('[data-page-tab="record"]').click();
+ await expect(pendingCard.getByRole('textbox',{name:'第3回の授業予定'})).toHaveValue('');
+ await expect(pendingCard.getByText(previousEventDraft,{exact:true})).toBeVisible();
+ await open(0);
+ await page.locator('[data-page-tab="record"]').click();
+ await expect(page.locator('#record-tbody').getByRole('textbox',{name:'第2回の授業予定',exact:true})).toHaveValue('未紐づけでも回数に保存');
+ assert.deepEqual(legacyPlanRequests,[]);
+ assert.deepEqual(errors,[]);
+ console.log('PASS /tutor/ 390px: numbered plans survive reordered dates and IDs, including unassigned lessons with independent legacy drafts.');
 } finally{
  await browser?.close();
  await f.close();
