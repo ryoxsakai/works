@@ -459,10 +459,13 @@ try {
     .getByRole("button", { name: "全体停止を解除", exact: true })
     .click();
   await expect(page.locator("#patrol-status")).not.toContainText("全体停止中");
+  await page.evaluate(()=>{localStorage.works_session_token='qa';localStorage.works_last_service='/todo/';});
   await page.goto(origin + "/");
-  await expect(page.locator('#home-navigation a[href="/todo/"]')).toHaveCount(1);
-  await expect(page.locator('#home-navigation a[href="/wiki/"]')).toHaveCount(0);
-  await expect(page.locator('#home-navigation a[href="/workflow/"]')).toHaveCount(0);
+  await expect(page).toHaveURL(origin + "/todo/");
+  const nav=page.frameLocator('iframe.works-service-frame:not([aria-hidden])').locator('.works-navigation');
+  await expect(nav.locator('a[href="/todo/"]')).toHaveCount(1);
+  await expect(nav.locator('a[href="/wiki/"]')).toHaveCount(0);
+  await expect(nav.locator('a[href="/workflow/"]')).toHaveCount(0);
   // Regression: repeated explicit closes consume the history entry; no phantom Back stops.
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto(origin + "/workflow/roles.html");
@@ -475,7 +478,7 @@ try {
     await page.waitForFunction(() => !history.state?.workflowModal);
   }
   await page.goBack();
-  await expect(page).toHaveURL(origin + "/");
+  await expect(page).toHaveURL(origin + "/todo/");
   const base = await env.DB.prepare(
     "SELECT * FROM wf_definitions LIMIT 1",
   ).first();
@@ -707,7 +710,7 @@ try {
   );
   assert.deepEqual(errors, []);
   console.log(
-    "Workflow desktop/mobile, dark theme, XSS, owner publish, stop/resume, verification gate, schedule status, home navigation passed; synthetic writes=" +
+    "Workflow desktop/mobile, dark theme, XSS, owner publish, stop/resume, verification gate, schedule status, service navigation passed; synthetic writes=" +
       writes,
   );
 } finally {

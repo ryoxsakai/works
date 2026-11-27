@@ -23,7 +23,17 @@ await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:box
 for(let i=1;i<=12;i++){await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:box.x+box.width-95-(box.width-110)*i/12,y}]});await p.waitForTimeout(20);}
 await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await expect(p.locator('.record-carousel-controls span')).toHaveText('2 / 4件');
 await turn('ArrowRight');await expect(p.locator('.record-carousel-controls span')).toHaveText('3 / 4件');await turn('ArrowRight');await expect(p.locator('.record-carousel-controls span')).toHaveText('4 / 4件');await expect(next).toBeHidden();assert.equal(await root.locator('.carousel-item').count(),4);assert.equal(await root.locator('[data-event-id=a]').count(),1);
-await p.emulateMedia({reducedMotion:'reduce'});assert.equal(await root.evaluate(el=>getComputedStyle(el).scrollBehavior),'auto');await turn('ArrowLeft');await expect(p.locator('.record-carousel-controls span')).toHaveText('3 / 4件');
+// Changing media rebuilds the carousel in a matchMedia change listener.
+await p.evaluate(()=>{window.fixtureReducedMotionReady=new Promise(resolve=>{
+  const query=matchMedia('(prefers-reduced-motion: reduce)');
+  if(query.matches) resolve(); else query.addEventListener('change',()=>requestAnimationFrame(resolve),{once:true});
+});});
+await p.emulateMedia({reducedMotion:'reduce'});
+await p.evaluate(()=>window.fixtureReducedMotionReady);
+await expect(p.locator('.record-carousel-controls span')).toHaveText('4 / 4件');
+await expect.poll(()=>root.locator('tr.active').evaluate(row=>Math.abs(row.getBoundingClientRect().left-row.parentElement.getBoundingClientRect().left))).toBeLessThan(4);
+assert.equal(await root.evaluate(el=>getComputedStyle(el).scrollBehavior),'auto');
+await turn('ArrowLeft');await expect(p.locator('.record-carousel-controls span')).toHaveText('3 / 4件');
 for(const theme of ['light','dark']){await p.evaluate(async t=>(await import('/shared/theme.js?v=6')).setTheme(t),theme);await p.screenshot({path:new URL(`390-${theme}.png`,out).pathname});}
 await p.setViewportSize({width:1440,height:900});await expect(root).not.toHaveClass(/carousel-inner/);await expect(next).toBeHidden();for(const row of await root.locator('tr[data-event-id]').all())await expect(row).toBeVisible();
 await p.setViewportSize({width:390,height:900});await expect(root).toHaveClass(/carousel-inner/);await p.evaluate(()=>dispatchEvent(new Event('beforeprint')));await expect(root).not.toHaveClass(/carousel-inner/);await p.emulateMedia({media:'print'});await p.pdf({path:new URL('all-records.pdf',out).pathname});await p.emulateMedia({media:'screen'});await p.evaluate(()=>dispatchEvent(new Event('afterprint')));await expect(root).toHaveClass(/carousel-inner/);
