@@ -5,7 +5,7 @@ const base='http://127.0.0.1:4173',browser=await chromium.launch({headless:true,
 const artifact=new URL('../test-artifacts/production/',import.meta.url);await mkdir(artifact,{recursive:true});
 const rows=[{id:'real-shaped-1',name:'Synthetic English <img src=x onerror=alert(1)>',status:'問題作成中',deadline:'2026-11-01',memo:'Synthetic current SS memo',remaining_days:4},{id:'real-shaped-2',name:'Synthetic Complete',status:'完了',deadline:'2026-10-20',memo:null,remaining_days:-8}];
 let signedIn=true,status=200,reads=0,authInitializations=0,logoutCalls=0,release=null,held=false;
-const methods=[],errors=[];const context=await browser.newContext({viewport:{width:1440,height:1000}});const page=await context.newPage();page.on('pageerror',error=>errors.push(error.message));
+const methods=[],errors=[];const context=await browser.newContext({viewport:{width:1440,height:1000},colorScheme:'dark'});const page=await context.newPage();page.on('pageerror',error=>errors.push(error.message));
 await context.route('**/*',async route=>{
  const url=new URL(route.request().url());if(url.origin!==base)return route.abort();
  if(url.pathname==='/shared/auth.js')return route.fulfill({contentType:'text/javascript',body:`export const getSessionToken=()=>"synthetic-browser-token";export function watchAuth(o){window.fixtureAuthInitializations=(window.fixtureAuthInitializations||0)+1;queueMicrotask(()=>${signedIn}?o.onSignedIn({email:'synthetic@example.test'}):o.onSignedOut());}export function signIn(path){window.fixtureLoginPath=path;window.fixturePending=localStorage.works_pending_destination;}export async function signOutUser(){await fetch('/fixture-logout',{method:'POST'});}`});
@@ -30,7 +30,11 @@ try {
  assert.equal(await page.evaluate(()=>fixtureAuthInitializations),1);assert.ok(methods.every(method=>method==='GET'));
  await current().locator('#show-completed').check();await expect(current().locator('.ss-project-row')).toHaveCount(2);await current().locator('[data-sort-key=name]').click();await current().locator('[data-sort-key=name]').click();assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.works_ss_sort)),{key:'name',direction:'desc'});
  await current().locator('[href="/ss/real-shaped-1/"]').click();await expect(current().locator('.project-memo')).toHaveText(rows[0].memo);await page.goBack();await expect(current().locator('#show-completed')).toBeChecked();await page.goForward();await expect(current().locator('.project-memo')).toHaveText(rows[0].memo);
- await page.getByRole('button',{name:'テーマ',exact:true}).click();await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
+ // The current Works theme stays light, even with dark OS preference and a stale request.
+ await expect(page.locator('html')).toHaveAttribute('data-theme','light');
+ await page.evaluate(async()=>{const theme=await import('/shared/theme.js?v=6');theme.setTheme('dark');});
+ await expect(page.locator('html')).toHaveAttribute('data-theme','light');
+ await expect.poll(()=>page.evaluate(()=>getComputedStyle(document.documentElement).colorScheme)).toBe('light');
  await page.setViewportSize({width:390,height:844});await expect(page.locator('.app-tabs')).toBeVisible();assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:new URL('mobile-ss.png',artifact).pathname,fullPage:true});await page.emulateMedia({media:'print'});await expect(page.locator('.app-tabs')).toBeHidden();await expect(current().locator('.project-detail')).toBeVisible();await page.pdf({path:new URL('ss.pdf',artifact).pathname,format:'A4'});await page.emulateMedia({media:'screen'});
  // An expired response clears both the current and retained route DOM; Back cannot recover it.
  status=401;await page.getByRole('button',{name:'更新',exact:true}).click();await expect(page.locator('#app')).toBeHidden();await expect(page.locator('#app-sign-in')).toBeVisible();assert.ok(!(await page.content()).includes('Synthetic current SS memo'));await page.goBack();await expect(page.locator('#app')).toBeHidden();assert.ok(!(await page.content()).includes('Synthetic current SS memo'));
@@ -40,5 +44,5 @@ try {
  signedIn=true;
  for(const responseStatus of [403,409,503]){status=responseStatus;await fresh('/ss/');if(responseStatus===403){await expect(page.locator('#app-sign-in')).toBeVisible();await expect(page.locator('#app')).toBeHidden();}else {await expect(current().getByRole('alert')).toContainText('表示できません');const before=reads;status=200;await current().getByRole('button',{name:'再試行'}).click();await expect(current().locator('.ss-project-row')).toHaveCount(1);assert.equal(reads,before+1);}}
  status=200;rows.length=0;await fresh('/ss/');await expect(current()).toContainText('登録中のプロジェクトはありません');assert.deepEqual(errors,[]);assert.ok(methods.every(method=>method==='GET'));
- console.log('PASS production built app: real-shaped API GET/auth headers, registered callback, no sample/write controls, sort parity, repeated navigation, direct URL, logout/401/403/cross-tab/late response fencing, 409/5xx, empty, XSS, dark/mobile and print.');
+ console.log('PASS production built app: real-shaped API GET/auth headers, registered callback, no sample/write controls, sort parity, repeated navigation, direct URL, logout/401/403/cross-tab/late response fencing, 409/5xx, empty, XSS, light-only theme, mobile and print.');
 }finally{await context.close();await browser.close();}
