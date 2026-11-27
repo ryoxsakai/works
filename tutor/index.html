@@ -24,6 +24,7 @@
   <link rel="stylesheet" href="/tutor/student-todos.css?v=1">
   <link rel="stylesheet" href="/tutor/dialogs.css?v=term-plan-mode">
     <link rel="stylesheet" href="/shared/works-dialogs.css?v=fb98327c" />
+  <link rel="stylesheet" href="/tutor/refresh.css?v=1" />
   </head>
 <body class="tutor-bootstrap">
   <header class="page-header works-header">
@@ -135,9 +136,11 @@
             </div>
           </div>
           <p id="curriculum-search-summary" class="sr-only" aria-live="polite">横にスライドして生徒・授業を選択してください。</p>
+          <div class="student-picker">
           <nav id="student-groups" class="student-slider" aria-label="教室・授業区分"></nav>
           <div class="student-slider-heading"><span id="student-selector-context"></span><small>名前順 · 横にスライド</small></div>
           <div id="student-selector" class="student-slider" aria-label="生徒・授業の選択" aria-busy="false"></div>
+          </div>
           <section id="student-related-todos" class="student-todos" hidden></section>
           <input id="curriculum-name" type="hidden" />
           <p id="curriculum-print-header" class="print-only"></p>
@@ -199,7 +202,7 @@
               <button type="button" id="open-schools-modal" aria-label="設定"><i class="bx bx-cog"></i></button>
             </div>
             <div class="accordion-body" data-section-body="schools">
-              <p id="schools-summary" class="hint">名前を入力して「表示」を押すと設定できます。</p>
+              <div id="schools-summary" class="schools-summary"><p class="hint">生徒・授業を選択すると設定できます。</p></div>
             </div>
           </div>
 
@@ -214,6 +217,7 @@
               </div>
             </div>
             <div class="accordion-body" data-section-body="progress">
+              <div id="curriculum-progress-summary" class="curriculum-progress-summary" hidden></div>
               <div class="table-scroll">
                 <table id="curriculum-table" class="curriculum-table">
                   <thead>
@@ -265,8 +269,8 @@
     </div>
     <div class="modal-tabs" role="tablist" aria-label="授業管理の設定項目">
       <button type="button" id="settings-tab-calendar" class="tab-btn" data-tab="calendar" role="tab" aria-selected="true" aria-controls="settings-panel-calendar"><i class="bx bx-calendar"></i><span>カレンダー</span></button>
-      <button type="button" id="settings-tab-periods" class="tab-btn" data-tab="periods" role="tab" aria-selected="false" aria-controls="settings-panel-periods" tabindex="-1"><i class="bx bx-time-five"></i><span>時限</span></button>
       <button type="button" id="settings-tab-terms" class="tab-btn" data-tab="terms" role="tab" aria-selected="false" aria-controls="settings-panel-terms" tabindex="-1"><i class="bx bx-layer"></i><span>学期</span></button>
+      <button type="button" id="settings-tab-periods" class="tab-btn" data-tab="periods" role="tab" aria-selected="false" aria-controls="settings-panel-periods" tabindex="-1"><i class="bx bx-time-five"></i><span>時限</span></button>
       <button type="button" id="settings-tab-excluded" class="tab-btn" data-tab="excluded" role="tab" aria-selected="false" aria-controls="settings-panel-excluded" tabindex="-1"><i class="bx bx-block"></i><span>空き枠</span></button>
       <button type="button" id="settings-tab-materials" class="tab-btn" data-tab="materials" role="tab" aria-selected="false" aria-controls="settings-panel-materials" tabindex="-1"><i class="bx bx-book"></i><span>教材</span></button>
     </div>
@@ -307,8 +311,8 @@
       <h3 class="tutor-settings-panel-title">表示するカレンダー</h3>
       <p class="hint">授業予定が入っているカレンダーにチェックを入れてください(全デバイス共通の設定です)。色はGoogleカレンダー側の設定がそのまま使われます。</p>
       <div id="calendar-checklist"></div>
-      <section class="tutor-settings-section">
-        <h3>授業記録の名前変更検出</h3>
+      <section class="tutor-settings-section tutor-settings-maintenance">
+        <h3><i class="bx bx-cog"></i> メンテナンス: 授業記録の名前変更検出</h3>
         <p class="hint">開始日以降の既存授業について、現在の予定名を比較用に観測します。旧記録の生徒の所属が確認済みになることはありません。既に変更された枠は個別確認のまま残します。</p>
         <button type="button" id="initialize-lesson-baselines" class="btn-primary" style="min-height:44px">初回の比較用予定名を準備</button>
         <p id="lesson-baseline-progress" role="status" aria-live="polite"></p>
@@ -325,12 +329,15 @@
     </div>
     <div id="settings-panel-terms" class="modal-tab-panel" data-tab-panel="terms" role="tabpanel" aria-labelledby="settings-tab-terms" tabindex="0" hidden>
       <h3 class="tutor-settings-panel-title">年度・学期</h3>
-      <p class="hint">年度ごとに学期(期間)を登録します。学期にチェックを入れると、複数またいでも予定を絞り込めます(全デバイス共通)。</p>
+      <p class="hint">チェックを入れた学期の授業だけを、授業予定・授業記録・生徒情報に表示します(複数選択可・全デバイス共通)。「回数別の授業予定」をオンにすると、授業予定が学期内の第N回に紐付き、予定を移動・追加しても回数で対応します。</p>
       <div id="year-groups"></div>
-      <form id="add-year-form" class="term-form">
-        <input id="new-year-label" type="text" placeholder="例: 2026年度" required />
-        <button type="submit" class="btn-add" aria-label="年度を追加"><i class="bx bx-plus"></i></button>
-      </form>
+      <section class="tutor-settings-section add-year-section" aria-labelledby="add-year-heading">
+        <h4 id="add-year-heading">年度を追加</h4>
+        <form id="add-year-form" class="term-form">
+          <input id="new-year-label" type="text" placeholder="例: 2027年度" aria-labelledby="add-year-heading" required />
+          <button type="submit" class="btn-add settings-add-btn" aria-label="年度を追加"><i class="bx bx-plus"></i><span>追加</span></button>
+        </form>
+      </section>
     </div>
     <div id="settings-panel-periods" class="modal-tab-panel" data-tab-panel="periods" role="tabpanel" aria-labelledby="settings-tab-periods" tabindex="0" hidden>
       <h3 class="tutor-settings-panel-title">時限の表示</h3>
@@ -524,7 +531,7 @@
     </div>
   </dialog>
 
-  <script type="module" src="/shared/service-entry.mjs?v=5" data-service-app="/tutor/app.js?v=term-plan-2"></script>
+  <script type="module" src="/shared/service-entry.mjs?v=5" data-service-app="/tutor/app.js?v=student-info-1"></script>
 </body>
 </html>
 

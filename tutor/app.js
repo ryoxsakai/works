@@ -2147,15 +2147,20 @@ function renderYearGroups() {
       return `<div class="year-group">
         ${headerHtml}
         <div class="term-items">${termsHtml}</div>
-        <form class="add-term-form" data-year-id="${y.id}">
-          <input type="text" class="new-term-label" placeholder="例: 前期" required />
-          <div class="term-dates">
-            <input type="date" class="new-term-start" required />
-            <span>〜</span>
-            <input type="date" class="new-term-end" required />
-          </div>
-          <button type="submit" class="btn-add" aria-label="学期を追加"><i class="bx bx-plus"></i></button>
-        </form>
+        <details class="add-term-details"${yearTerms.length ? "" : " open"}>
+          <summary><i class="bx bx-plus"></i> ${escapeHtml(y.label)}に学期を追加</summary>
+          <form class="add-term-form" data-year-id="${y.id}">
+            <label class="settings-field">学期名
+              <input type="text" class="new-term-label" placeholder="例: 冬期" required />
+            </label>
+            <div class="term-dates">
+              <label class="settings-field">開始日<input type="date" class="new-term-start" required /></label>
+              <span aria-hidden="true">〜</span>
+              <label class="settings-field">終了日<input type="date" class="new-term-end" required /></label>
+            </div>
+            <button type="submit" class="btn-add settings-add-btn" aria-label="学期を追加"><i class="bx bx-plus"></i><span>追加</span></button>
+          </form>
+        </details>
       </div>`;
     })
     .join("");
@@ -2177,11 +2182,16 @@ function renderTermRow(t) {
       </div>
     </form>`;
   }
+  const today = formatDateOnly(new Date());
+  const status = today < t.start_date ? "これから" : today > t.end_date ? "終了" : "期間中";
   return `<div class="term-item">
-    <input type="checkbox" class="term-checkbox" value="${t.id}" ${checked} />
-    <span class="term-item-label">${escapeHtml(t.label)}</span>
-    <span class="term-item-dates">${t.start_date} 〜 ${t.end_date}</span>
-    <label class="term-plan-setting"><input type="checkbox" class="term-plan-mode" value="${t.id}" ${termUsesNumberedPlans(t,termPlanModes)?"checked":""}> 回数別の授業予定</label>
+    <label class="term-select" title="チェックした学期の予定を表示します">
+      <input type="checkbox" class="term-checkbox" value="${t.id}" ${checked} aria-label="${escapeHtml(t.label)}を表示対象にする" />
+      <span class="term-item-label">${escapeHtml(t.label)}</span>
+      <span class="term-status term-status-${status === "期間中" ? "now" : status === "終了" ? "past" : "future"}">${status}</span>
+    </label>
+    <span class="term-item-dates">${t.start_date.replaceAll("-", "/")} 〜 ${t.end_date.replaceAll("-", "/")}</span>
+    <label class="term-plan-setting" title="授業予定を予定IDではなく学期内の第N回に紐付けます"><input type="checkbox" class="term-plan-mode" value="${t.id}" ${termUsesNumberedPlans(t,termPlanModes)?"checked":""}> 回数別の授業予定</label>
     <button type="button" class="term-edit" data-id="${t.id}" aria-label="編集"><i class="bx bx-pencil"></i></button>
     <button type="button" class="term-delete" data-id="${t.id}" aria-label="削除"><i class="bx bx-trash"></i></button>
   </div>`;
@@ -2530,6 +2540,7 @@ function clearStudentDetails() {
   invalidateStudentPref();
   document.querySelectorAll("[data-page-tab-panel=curriculum] .collapsible-section").forEach((section) => { section.inert = true; });
   els.curriculumTbody.innerHTML = "";
+  updateCurriculumProgressSummary();
   goals = [];
   candidateSchools = [];
   studentMaterials = [];
@@ -2619,7 +2630,7 @@ function renderStudentSelector() {
   els.studentSelector.style.setProperty("--student-color", studentGroupColor(studentGroup));
   els.studentSelector.innerHTML = studentChoices.map((item, index) => ({ ...item, index }))
     .filter((item) => item.group === studentGroup)
-    .map((item) => `<button type="button" data-student-index="${item.index}" aria-pressed="${item.name === els.curriculumName.value}">${escapeHtml(item.label)}${item.label !== item.name ? `<small>${escapeHtml(item.name)}</small>` : ""}</button>`).join("") || '<p class="hint">表示できる生徒・授業がありません。設定のカレンダー・期間を確認してください。</p>';
+    .map((item) => `<button type="button" data-student-index="${item.index}" data-initial="${escapeHtml(Array.from(String(item.label || "").replace(/^[\s(（]+/, ""))[0] || "")}" aria-pressed="${item.name === els.curriculumName.value}">${escapeHtml(item.label)}${item.label !== item.name ? `<small>${escapeHtml(item.name)}</small>` : ""}</button>`).join("") || '<p class="hint">表示できる生徒・授業がありません。設定のカレンダー・期間を確認してください。</p>';
   els.studentSelector.querySelector('[aria-pressed="true"]')?.scrollIntoView({ block: "nearest", inline: "nearest" });
   const activeTerms = terms.filter((term) => selectedTermIds.has(term.id));
   document.querySelector("#student-selector-context").textContent = activeTerms.length
@@ -2741,6 +2752,8 @@ async function loadCurriculumEvents(context = captureStudentContext()) {
   const term = terms.find((t) => t.id === Number(els.curriculumTermSelect.value));
   if (!token || !name || !term || selectedCalendarIds.size === 0) {
     els.curriculumTbody.innerHTML = "";
+    updateCurriculumProgressSummary();
+  updateCurriculumProgressSummary();
     return;
   }
 
@@ -2765,6 +2778,7 @@ async function renderCurriculumTable(events, context = captureStudentContext(), 
   if (events.length === 0) {
     studentTodos.reset();
     els.curriculumTbody.innerHTML = `<tr><td colspan="7">該当する予定がありません</td></tr>`;
+    updateCurriculumProgressSummary();
     return;
   }
 
@@ -2820,10 +2834,46 @@ async function renderCurriculumTable(events, context = captureStudentContext(), 
     .join("");
   restoreRecordDraftRows(els.curriculumTbody);showRetainedRecordDrafts();
   renderLessonPlans();
+  updateCurriculumProgressSummary();
   if(termSlots.length)void termPlans.load(termSlots);
 }
 
+// 授業進行の上部に「完了数・次回」を表示し、次回の行を強調する(表示のみ。保存処理には関与しない)。
+function updateCurriculumProgressSummary() {
+  if (typeof document === "undefined" || typeof els.curriculumTbody?.querySelectorAll !== "function") return;
+  const host = document.querySelector("#curriculum-progress-summary");
+  const rows = [...els.curriculumTbody.querySelectorAll("tr[data-event-id], tr[data-unassigned-progress]")];
+  rows.forEach((row) => row.classList.remove("is-next-lesson"));
+  if (!host) return;
+  if (!rows.length) {
+    host.hidden = true;
+    return;
+  }
+  const now = Date.now();
+  let done = 0;
+  let next = null;
+  rows.forEach((row) => {
+    const box = row.querySelector(".curriculum-completed");
+    const completed = box ? box.checked : row.dataset.completed === "1";
+    if (completed) done += 1;
+    const start = row.querySelector("[data-period-start]")?.dataset.periodStart;
+    const time = start ? new Date(start).getTime() : NaN;
+    if (!next && !completed && Number.isFinite(time) && time >= now - 3 * 3600000) next = { row, start };
+  });
+  if (next) next.row.classList.add("is-next-lesson");
+  const percent = Math.round((done / rows.length) * 100);
+  const nextCell = next?.row.querySelector("[data-period-start]");
+  host.hidden = false;
+  host.innerHTML = `<div class="curriculum-progress-meter" role="img" aria-label="完了 ${done} / ${rows.length}回">
+      <span style="width:${percent}%"></span>
+    </div>
+    <p><strong>${done}</strong> / ${rows.length}回 完了${
+      nextCell ? `<span class="curriculum-progress-next">次回 ${escapeHtml(nextCell.textContent.trim())}</span>` : ""
+    }</p>`;
+}
+
 els.curriculumTbody.addEventListener("input",e=>{if(e.target.matches('.curriculum-test,.curriculum-homework,.curriculum-memo')){rememberRecordDraft(e.target.closest('tr[data-event-id]'));showRetainedRecordDrafts();}});
+els.curriculumTbody.addEventListener("change",e=>{if(e.target.matches('.curriculum-completed'))updateCurriculumProgressSummary();},true);
 els.curriculumTbody.addEventListener("change",e=>{if(e.target.matches('.linked-lesson-plan')||e.target.closest('.owner-memo-editor'))return;const row=e.target.closest('tr[data-event-id]');if(row)saveRecordFields(row);});
 
 // --- 目標(短期・中期・長期)。名前ごとにD1へ保存し、並べ替えはsort_orderの入れ替えで行う。
@@ -3203,23 +3253,142 @@ els.goalTemplateLists.forEach((container) => {
 
 // --- 受験校・志望校。私立医学部リストからの選択+国公立の自由入力、第1〜第3志望の設定 ---
 
+const ADMISSION_STAGES = [
+  ["primary", "一次試験"],
+  ["first_result", "一次発表"],
+  ["secondary", "二次試験"],
+  ["final_result", "合格発表"],
+];
+const ADMISSION_TYPE_LABELS = { ct: "共テ利用", recommendation: "推薦", regional: "地域枠", comprehensive: "総合型" };
+let admissionEventsPromise = null;
+let admissionEventsState = { events: [], failed: false, loaded: false };
+
+// 入試管理(/api/admissions)の日程は生徒に依存しないため、一度だけ読み込んで使い回す。
+function loadAdmissionEvents() {
+  if (!admissionEventsPromise) {
+    admissionEventsPromise = apiFetch("/admissions", {}, null)
+      .then((rows) => {
+        admissionEventsState = { events: Array.isArray(rows) ? rows : [], failed: false, loaded: true };
+      })
+      .catch(() => {
+        admissionEventsPromise = null;
+        admissionEventsState = { events: [], failed: true, loaded: true };
+      });
+  }
+  return admissionEventsPromise;
+}
+
+// 「関西医科大学医学部（前期）」と「関西医科大学」を同じ大学として扱うための比較キー。
+function admissionSchoolKey(value) {
+  return String(value || "")
+    .normalize("NFKC")
+    .replace(/\([^)]*\)/g, "")
+    .replace(/\s+/g, "")
+    .replace(/(医学部医学科|医学部|医学科)$/, "")
+    .replace(/大学$/, "");
+}
+
+// 入試年度(4月〜翌3月を1シーズンとし、翌年の年を返す)。
+function admissionSeason(dateStr) {
+  const [y, m] = String(dateStr).split("-").map(Number);
+  return m >= 4 ? y + 1 : y;
+}
+
+function admissionProgramsFor(schoolName) {
+  const key = admissionSchoolKey(schoolName);
+  if (!key) return [];
+  const programs = new Map();
+  admissionEventsState.events.forEach((ev) => {
+    if (!ev?.schedule_date || admissionSchoolKey(ev.university) !== key) return;
+    const id = `${ev.university}\u0000${ev.selection_type || "general"}`;
+    if (!programs.has(id)) programs.set(id, { university: ev.university, type: ev.selection_type || "general", events: [] });
+    programs.get(id).events.push(ev);
+  });
+  const todaySeason = admissionSeason(formatDateOnly(new Date()));
+  return [...programs.values()]
+    .map((program) => {
+      const seasons = [...new Set(program.events.map((ev) => admissionSeason(ev.schedule_date)))];
+      const season = seasons.includes(todaySeason) ? todaySeason : Math.max(...seasons);
+      const stages = {};
+      program.events
+        .filter((ev) => admissionSeason(ev.schedule_date) === season)
+        .forEach((ev) => {
+          (stages[ev.stage] ||= []).push(ev.schedule_date);
+        });
+      Object.values(stages).forEach((dates) => dates.sort());
+      const qualifiers = [...String(program.university).normalize("NFKC").matchAll(/\(([^)]*)\)/g)].map((m) => m[1]);
+      const typeLabel = ADMISSION_TYPE_LABELS[program.type];
+      if (typeLabel && !qualifiers.some((q) => q.includes(typeLabel))) qualifiers.unshift(typeLabel);
+      const first = Object.values(stages).flat().sort()[0] || "";
+      return { label: qualifiers.join("・") || "一般", stages, first };
+    })
+    .sort((a, b) => a.first.localeCompare(b.first));
+}
+
+function formatAdmissionDate(dateStr) {
+  const d = new Date(`${dateStr}T00:00:00`);
+  return `${d.getMonth() + 1}/${d.getDate()}(${WEEKDAY_LABELS[d.getDay()]})`;
+}
+
+function renderAdmissionStageCell(dates, today) {
+  if (!dates?.length) return `<span class="school-date is-empty">—</span>`;
+  const items = dates.map((date) => {
+    const diff = Math.round((new Date(`${date}T00:00:00`) - new Date(`${today}T00:00:00`)) / 86400000);
+    const state = diff < 0 ? "is-past" : diff === 0 ? "is-today" : diff <= 14 ? "is-soon" : "";
+    const badge = diff === 0 ? `<small>今日</small>` : diff > 0 && diff <= 14 ? `<small>あと${diff}日</small>` : "";
+    return `<span class="school-date ${state}"><time datetime="${date}">${formatAdmissionDate(date)}</time>${badge}</span>`;
+  });
+  return items.join("");
+}
+
 function renderSchoolsSummary() {
   const name = els.curriculumName.value.trim();
   if (candidateSchools.length === 0) {
-    els.schoolsSummary.textContent = name
-      ? "まだ受験校が設定されていません。「設定」から登録してください。"
-      : "生徒・授業を選択すると設定できます。";
+    els.schoolsSummary.innerHTML = `<p class="hint">${
+      name
+        ? "まだ受験校が設定されていません。右上の歯車から登録すると、入試管理の日程が自動で表示されます。"
+        : "生徒・授業を選択すると設定できます。"
+    }</p>`;
     return;
   }
-  const ranked = [1, 2, 3]
-    .map((rank) => candidateSchools.find((s) => s.rank === rank))
-    .filter(Boolean)
-    .map((s) => `第${s.rank}志望: ${s.school_name}`);
-  const others = candidateSchools.filter((s) => !s.rank).map((s) => s.school_name);
-  const parts = [];
-  if (ranked.length) parts.push(ranked.join(" / "));
-  if (others.length) parts.push(`その他: ${others.join("、")}`);
-  els.schoolsSummary.textContent = parts.join("　|　") || "受験校が設定されています。";
+  const ordered = [
+    ...[1, 2, 3].map((rank) => candidateSchools.find((s) => s.rank === rank)).filter(Boolean),
+    ...candidateSchools.filter((s) => ![1, 2, 3].includes(s.rank)),
+  ];
+  const today = formatDateOnly(new Date());
+  const head = `<div class="school-schedule-row school-schedule-head" aria-hidden="true">
+      <span>方式</span>${ADMISSION_STAGES.map(([, label]) => `<span>${label}</span>`).join("")}
+    </div>`;
+  const rows = ordered
+    .map((school) => {
+      const rankBadge = school.rank
+        ? `<span class="school-rank school-rank-${school.rank}">第${school.rank}志望</span>`
+        : "";
+      const typeLabel = school.school_type === "national" ? "国公立" : "私立";
+      const programs = admissionEventsState.loaded ? admissionProgramsFor(school.school_name) : [];
+      const nameCell = `<div class="school-name">${rankBadge}<strong>${escapeHtml(school.school_name)}</strong><span class="school-type">${typeLabel}</span></div>`;
+      if (!programs.length) {
+        const note = !admissionEventsState.loaded
+          ? "日程を読み込み中…"
+          : admissionEventsState.failed
+            ? "入試日程を読み込めませんでした"
+            : "入試管理に日程が登録されていません";
+        return `<div class="school-schedule-group">${nameCell}<p class="school-schedule-note">${note}</p></div>`;
+      }
+      return `<div class="school-schedule-group">${nameCell}${programs
+        .map(
+          (program) => `<div class="school-schedule-row">
+            <span class="school-program">${escapeHtml(program.label)}</span>
+            ${ADMISSION_STAGES.map(
+              ([stage, label]) =>
+                `<div class="school-stage" data-stage="${stage}"><span class="school-stage-label">${label}</span><div class="school-stage-dates">${renderAdmissionStageCell(program.stages[stage], today)}</div></div>`
+            ).join("")}
+          </div>`
+        )
+        .join("")}</div>`;
+    })
+    .join("");
+  els.schoolsSummary.innerHTML = `<div class="school-schedule">${head}${rows}</div>`;
 }
 
 async function loadCandidateSchools(context = captureStudentContext()) {
@@ -3234,6 +3403,11 @@ async function loadCandidateSchools(context = captureStudentContext()) {
   assertStudentContext(context);
   candidateSchools = result;
   renderSchoolsSummary();
+  if (!admissionEventsState.loaded && candidateSchools.length) {
+    loadAdmissionEvents().then(() => {
+      if (els.curriculumName.value.trim() === name) renderSchoolsSummary();
+    });
+  }
 }
 
 function renderRankSelects() {
@@ -3586,7 +3760,7 @@ function formatWeekLabel(d) {
   return `${d.getMonth() + 1}/${d.getDate()}(${WEEKDAY_LABELS[d.getDay()]})`;
 }
 
-function renderScheduleWeekDays(weekStart) {
+function renderScheduleWeekDays(weekStart, events = []) {
   const weekEnd = new Date(weekStart.getTime() + 6 * 86400000);
   els.listWeekLabel.textContent = `${formatWeekLabel(weekStart)} 〜 ${formatWeekLabel(weekEnd)}`;
   if (!selectedScheduleDate || selectedScheduleDate < formatDateOnly(weekStart) || selectedScheduleDate > formatDateOnly(weekEnd)) {
@@ -3595,12 +3769,24 @@ function renderScheduleWeekDays(weekStart) {
       ? today
       : formatDateOnly(weekStart);
   }
+  // 曜日ボタンに「今日」と授業数(最大3つの点)を添え、月が切り替わる日には月を表示する。
+  const lessonCounts = new Map();
+  events.forEach((ev) => {
+    if (isExcludedScheduleEvent(ev)) return;
+    const day = (ev.start?.dateTime || ev.start?.date || "").slice(0, 10);
+    if (day) lessonCounts.set(day, (lessonCounts.get(day) || 0) + 1);
+  });
+  const todayValue = formatDateOnly(new Date());
   els.scheduleWeekDays.innerHTML = Array.from({ length: 7 }, (_, i) => {
     const date = new Date(weekStart.getTime() + i * 86400000);
     const value = formatDateOnly(date);
     const selected = value === selectedScheduleDate;
-    return `<button type="button" class="schedule-day-btn" aria-pressed="${selected}" data-date="${value}" aria-label="${formatWeekLabel(date)}">
-      <span>${WEEKDAY_LABELS[date.getDay()]}</span><strong>${date.getDate()}</strong>
+    const count = lessonCounts.get(value) || 0;
+    const month = `<em${i === 0 || date.getDate() === 1 ? "" : ' aria-hidden="true" class="is-blank"'}>${date.getMonth() + 1}月</em>`;
+    const dots = count ? `<i class="schedule-day-dots" aria-hidden="true">${"<b></b>".repeat(Math.min(count, 3))}</i>` : `<i class="schedule-day-dots" aria-hidden="true"></i>`;
+    const classes = ["schedule-day-btn", value === todayValue ? "is-today" : "", date.getDay() === 0 ? "is-sun" : "", date.getDay() === 6 ? "is-sat" : ""].filter(Boolean).join(" ");
+    return `<button type="button" class="${classes}" aria-pressed="${selected}" data-date="${value}" aria-label="${formatWeekLabel(date)}${value === todayValue ? "(今日)" : ""}${count ? ` 授業${count}件` : ""}">
+      <span>${month}${WEEKDAY_LABELS[date.getDay()]}</span><strong>${date.getDate()}</strong>${dots}
     </button>`;
   }).join("");
 }
@@ -3611,7 +3797,7 @@ function renderListView(events) {
   els.listWeekNav.hidden = false;
 
   const weekStart = listWeekCursor;
-  renderScheduleWeekDays(weekStart);
+  renderScheduleWeekDays(weekStart, events);
   const dayEvents = events
     .filter((ev) => {
       const start = ev.start?.dateTime || ev.start?.date || "";
@@ -3685,7 +3871,7 @@ function renderCalendarView(events) {
   for (let i = 0; i < startOffset; i++) cells.push(null);
   for (let day = 1; day <= daysInMonth; day++) cells.push(day);
 
-  let html = WEEKDAY_LABELS.map((w) => `<div class="cal-weekday">${w}</div>`).join("");
+  let html = WEEKDAY_LABELS.map((w, i) => `<div class="cal-weekday${i === 0 ? " is-sun" : i === 6 ? " is-sat" : ""}">${w}</div>`).join("");
 
   html += cells
     .map((day) => {
@@ -3703,7 +3889,8 @@ function renderCalendarView(events) {
           </button>`;
         })
         .join("");
-      return `<div class="cal-cell${isToday ? " cal-cell-today" : ""}">
+      const weekday = new Date(year, month, day).getDay();
+      return `<div class="cal-cell${isToday ? " cal-cell-today" : ""}${weekday === 0 ? " is-sun" : weekday === 6 ? " is-sat" : ""}${dayEvents.length ? " has-events" : ""}">
         <div class="cal-day-num">${day}</div>
         ${eventsHtml}
       </div>`;
