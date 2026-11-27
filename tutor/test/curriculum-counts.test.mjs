@@ -7,6 +7,7 @@ import {lessonEventRef,lessonEventKey} from '../../shared/lesson-plan.js';
 import {unassignedLessonDisplay} from '../../shared/unassigned-lesson.mjs';
 import {recordDateRange} from '../record-date.js';
 
+import {termUsesNumberedPlans} from "../../shared/term-lesson-plan.mjs";
 const source=readFileSync(new URL('../app.js',import.meta.url),'utf8');
 const extract=(start,end)=>source.slice(source.indexOf(start),source.indexOf(end));
 const event=(id,day,calendar,title='Ａ 英語')=>({id,_calendarId:calendar,summary:title,etag:'v1',start:{dateTime:day+'T10:00:00+09:00'},end:{dateTime:day+'T11:00:00+09:00'}});
@@ -36,7 +37,7 @@ test('curriculum keeps displayed records but counts each calendar and exact norm
 test('student list reads the entire selected term using JST bounds and supplies unfiltered candidates to counts',async()=>{
  const term={id:7,start_date:'2026-10-01',end_date:'2026-10-31'},a=event('a','2026-10-01','one'),b=event('b','2026-10-31','one'),other=event('other','2026-10-31','two');
  let range,rendered;
- const state=vm.createContext({recordDateRange,terms:[term],selectedCalendarIds:new Set(['one','two']),studentGroup:'G',studentChoices:[{name:'A',group:'G',calendarIds:['one']}],
+ const state=vm.createContext({termUsesNumberedPlans,termPlanModes:{},recordDateRange,terms:[term],selectedCalendarIds:new Set(['one','two']),studentGroup:'G',studentChoices:[{name:'A',group:'G',calendarIds:['one']}],
   els:{curriculumName:{value:'A'},curriculumTermSelect:{value:'7'},curriculumTbody:{innerHTML:''}},
   captureStudentContext:()=>({}),assertStudentContext(){},getSessionToken:()=> 'synthetic',
   eventMatchesCurriculumName:()=>true,fetchCalendarEvents:async(min,max,options)=>{range={min,max,options};return [other,b,a];},
