@@ -66,7 +66,7 @@ test('circle-marked choices, restored selections and source records stay hidden 
 test('schedule and record navigation filters the original title before annotation removal', async () => {
   const state=setup({studentGroup:'代官山 · 個別',studentChoices:[{name:'山田',label:'山田',group:'代官山 · 個別',calendarIds:['daikanyama']}]});
   state.els.curriculumName.value='山田';
-  state.tabClicks=0;state.refreshes=0;
+  state.tabClicks=0;state.refreshes=0;state.studentTodos={leaveFixed(){},clearHint(){}};
   state.els.pageTabBtns=[{dataset:{pageTab:'curriculum'},click(){state.tabClicks++;}}];
   state.els.actionError={textContent:''};
   state.refreshStudentDetails=async()=>{state.refreshes++;};

@@ -241,3 +241,13 @@ body.tutor-bootstrap #settings-modal :is(#period-common-fields, #period-school-f
   }
   body.tutor-bootstrap #settings-modal :is(.period-school-row, #add-period-form) > button { grid-column: 2; }
 }
+
+#year-groups .term-item { flex-wrap: wrap; }
+#year-groups .term-plan-setting {
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  min-height: 32px;
+  margin: 0;
+  font-size: .75rem;
+}

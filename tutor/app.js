@@ -1,3 +1,5 @@
+import {termLessonPositions,termPosition,termUsesNumberedPlans} from '../shared/term-lesson-plan.mjs';
+import {createTermPlanEditors} from './term-lesson-editors.mjs';
 import { createPeriodSettings } from "./period-settings.mjs";
 import { defaultPeriodProfiles, lessonPeriodDisplay, lessonPeriodText, readPeriodProfiles } from "../shared/tutor-period-display.mjs";
 import {createStudentTodos} from './student-todos.mjs?v=1';
@@ -9,7 +11,7 @@ import {readPendingRecovery,persistPendingRecovery,clearPendingRecovery,pendingR
 import {createOwnerMemoEditors} from '../shared/owner-memo.mjs?v=2-autosave';
 import {boundedRead,precedingLegacyEvents,precedingOwnerEvents,recordTermScope,studentNavigationEvent} from './record-read.mjs?v=3-navigation';
 import {readNextLessonWithTemplate} from "../shared/next-lesson-read.mjs?v=1";
-import { lessonRecordRows, renderPlanEditors, renderMemoEditors, previousOwnerRecord } from "../shared/lesson-record-view.mjs?v=card-actions";
+import { lessonRecordRows, renderPlanEditors, renderMemoEditors, previousOwnerRecord } from "../shared/lesson-record-view.mjs?v=term-plan-1";
 import { setUserAvatar } from "../shared/avatar.mjs?v=1";
 import { attachRecordCarousel } from "./record-carousel.mjs?v=4";
 import { attachRecordToasts } from "./record-toasts.mjs?v=3-name";
@@ -247,6 +249,7 @@ const studentMemos = createStudentMemoStore({
   onChange: () => renderStudentMemos(),
 });
 
+const termPlans=createTermPlanEditors(document,{request:(path,options)=>apiFetch(path,options,null),escapeHtml,resize:resizeRecordInput});
 const ownerMemos=createOwnerMemoEditors({request:(path,opts)=>apiFetch(path,opts||{},null)});
 const lessonPlans = createLessonPlanController({
   readCurrent:target=>apiFetch('/lesson-plan?'+new URLSearchParams({calendar_id:target.calendar_id,event_id:target.id}),{},null),
@@ -276,6 +279,7 @@ let calendarColors = new Map(); // calendarId -> { raw, bg, fg }
 let years = [];
 let terms = [];
 let selectedTermIds = new Set();
+let termPlanModes = {};
 let excludedTitles = new Set();
 let periods = [];
 let periodProfiles = defaultPeriodProfiles();
@@ -526,7 +530,7 @@ function setActivePageTab(tab) {
     panel.hidden = panel.dataset.pageTabPanel !== target;
   });
   localStorage.setItem(ACTIVE_PAGE_TAB_KEY, target);
-  requestAnimationFrame(() => { resizeRecordInputs(); renderStudentMemos(); renderLessonPlans(); });
+  requestAnimationFrame(() => { resizeRecordInputs(); renderStudentMemos(); renderLessonPlans(); termPlans.repaint(); });
 }
 
 setActivePageTab(studentTodos.requested ? "curriculum" : new URLSearchParams(location.search).has("todo_event") ? "record" : localStorage.getItem(ACTIVE_PAGE_TAB_KEY) || "record");
@@ -592,9 +596,12 @@ async function loadRecordTable() {
       return;
     }
 
-    const coveringTerm = terms.find(
+    const coveringTerms = terms.filter(
       (t) => selectedTermIds.has(t.id) && dayStr >= t.start_date && dayStr <= t.end_date
     );
+    const numberedTerms = coveringTerms.filter(term=>termUsesNumberedPlans(term,termPlanModes));
+    const termMode = numberedTerms.length>0;
+    const coveringTerm = termMode ? (numberedTerms.length===1?numberedTerms[0]:null) : coveringTerms[0];
     let rangeStart, rangeEnd;
     if (coveringTerm) {
       rangeStart = coveringTerm.start_date;
@@ -620,6 +627,7 @@ async function loadRecordTable() {
     if (!isCurrent()) return;
     const entryMap = new Map(entries.map((entry) => [entry.calendar_event_id, entry]));
 
+    const termPositions = termMode && coveringTerm ? termLessonPositions(coveringTerm, rangeEvents, [...excludedTitles]) : null;
     const rows = dayEvents.map((ev) => {
       const label = (ev.summary || "(無題)").trim();
       const start = ev.start?.dateTime || ev.start?.date || "";
@@ -645,6 +653,8 @@ async function loadRecordTable() {
       const n = sameLabelEvents.findIndex((e) => e.id === ev.id) + 1;
       const count = sameNameLessonCount(ev, rangeEvents, [...excludedTitles]);
       const saved = attributedLessonRecord(entryMap.get(ev.id), lessonEventRef(ev));
+      const position = termPositions ? termPosition(termPositions,ev) : null;
+      const usableTermPosition = position && canUseTermPlan(saved) ? position : null;
       const previous=saved.record_storage==='d1_owner'?previousOwnerRecord(saved,ev,rangeEvents,e=>attributedLessonRecord(entryMap.get(e.id),lessonEventRef(e))):null;
       const prevEvent = saved.record_storage==='d1_owner'?previous?.event:n > 1 ? sameLabelEvents[n - 2] : null;
       const prevSaved = previous?.record||(prevEvent ? attributedLessonRecord(entryMap.get(prevEvent.id),lessonEventRef(prevEvent)) : {});
@@ -655,8 +665,11 @@ async function loadRecordTable() {
         calendarId: ev._calendarId,
         label,
         termId: coveringTerm ? coveringTerm.id : "",
-        n: count.n,
-        m: count.m,
+        n: position?.current.ordinal ?? (termMode ? '—' : count.n),
+        m: position?.total ?? (termMode ? '—' : count.m),
+        termPosition: usableTermPosition,
+        termMode,
+        termNotice: numberedTerms.length > 1 ? '対象の学期が重なっています。設定で学期を一つ選んでください。' : '学期内の予定が一致しません。予定・時刻を再確認してください。',
         start,
         iconColor: calendar?.raw || "",
         record: saved,
@@ -684,7 +697,7 @@ async function loadRecordTable() {
 
 function renderRecordTable(rows) {
   rows.filter((row) => !row.emptySlot && (!lessonRecordNeedsReview(row.record)||row.record.pending_allowed)).forEach((row) => lessonPlans.seed(row.ref, row.lessonPlan, row.planReadVersion, row.record.record_revision,row.record.attribution_status,row.record.owner_id||null,row.record.pending_context||null));
-  els.recordTbody.innerHTML = lessonRecordRows(rows, { escapeHtml, formatTimeOrPeriod, lessonRecordNeedsReview, lessonReviewRow, lightenHexColor, calendarName: id => calendarColors.get(id)?.name, lessonAttributionNotice, lessonPlanEditor, lessonPlanFeedback, recordStudentPrefName, lessonEventKey });
+  els.recordTbody.innerHTML = lessonRecordRows(rows, { escapeHtml, formatTimeOrPeriod, lessonRecordNeedsReview, lessonReviewRow, lightenHexColor, calendarName: id => calendarColors.get(id)?.name, lessonAttributionNotice, lessonPlanEditor, lessonPlanFeedback, recordStudentPrefName, lessonEventKey, termEditorsForRow });
   if (linkedRecordId && linkedCalendarId && selectedRecordDate === requestedRecordDate) {
     const key = lessonEventKey({calendar_id:linkedCalendarId, id:linkedRecordId});
     const row = [...els.recordTbody.querySelectorAll("[data-card-key]")].find(el => el.dataset.cardKey === key);
@@ -700,10 +713,21 @@ function renderRecordTable(rows) {
   renderLessonPlans();
   restoreRecordDraftRows(els.recordTbody);
   showRetainedRecordDrafts();
-  rows.filter((row) => !row.emptySlot&&!lessonRecordNeedsReview(row.record)).forEach((row) => lessonPlans.loadNext(row.ref));
+  rows.filter((row) => !row.emptySlot&&!row.termMode&&!lessonRecordNeedsReview(row.record)).forEach((row) => lessonPlans.loadNext(row.ref));
+  void termPlans.load(rows.flatMap(row=>row.termPosition?[row.termPosition.current,row.termPosition.next]:[]));
   const names = new Set([...els.recordTbody.querySelectorAll(".student-memo-editor")].map((editor) => editor.dataset.studentName));
   names.forEach((name) => studentMemos.load(name).catch(() => {}));
   requestAnimationFrame(resizeRecordInputs);
+}
+
+function canUseTermPlan(record) {
+  return !lessonRecordNeedsReview(record) || record.attribution_status==='owner_unassigned';
+}
+function termEditorsForRow(row) {
+  if (!row.termPosition) return {current:'<small role="status">'+escapeHtml(row.termNotice || '')+'</small>',next:''};
+  const {current,next,nextRef}=row.termPosition;
+  return {current:termPlans.markup(current,`第${current.ordinal}回の授業予定`,row.lessonPlan),
+    next:termPlans.markup(next,`次回授業予定（第${next.ordinal}回${nextRef ? '・'+lessonPlanDate(nextRef) : '・日程未定'}）`)};
 }
 
 function lessonPlanFeedback() {
@@ -720,11 +744,19 @@ function lessonPlanDate(ref) {
 }
 function refreshVisibleNextLessons(){
   if(window.frameElement?.inert||document.visibilityState!=='visible'||!getSessionToken()||els.recordTbody.closest('[hidden]'))return;
+  if(els.recordTbody.querySelector('[data-term-record]') && !termPlans.hasEdits()
+    && recordDrafts.size===0
+    && !els.recordTbody.contains(document.activeElement) && els.recordTbody.getAttribute('aria-busy')!=='true'){
+    void loadRecordTable().catch(showActionError);
+  }
   for(const row of els.recordTbody.querySelectorAll('tr[data-event-id][data-card-key]')){
     const link=lessonPlans.getLink(row.dataset.cardKey),states=[lessonPlans.get(row.dataset.cardKey),lessonPlans.get(link?.targetKey)];
     if(link?.source&&!['loading','auto_binding'].includes(link.status)&&!states.some(s=>s?.dirty||s?.pending||s?.pendingUnknown))void lessonPlans.loadNext(link.source);
   }
 }
+window.addEventListener('beforeunload',event=>{
+  if(termPlans.hasEdits()){event.preventDefault();event.returnValue='';}
+});
 document.addEventListener('visibilitychange',refreshVisibleNextLessons);
 window.addEventListener('focus',refreshVisibleNextLessons);
 
@@ -743,7 +775,11 @@ function renderLessonPlans() {
 document.addEventListener("click", (event) => {
   const refresh = event.target.closest(".record-recheck");
   if (!refresh || refresh.disabled) return;
-  refresh.closest("tr[data-event-id]").querySelector(".record-next-plan .lesson-plan-action").click();
+  if (refresh.closest("[data-term-record]")) {
+    if (!termPlans.hasEdits()) void loadRecordTable().catch(showActionError);
+    return;
+  }
+  refresh.closest("tr[data-event-id]")?.querySelector(".record-next-plan .lesson-plan-action")?.click();
 });
 
 document.addEventListener("input", (event) => {
@@ -1064,6 +1100,7 @@ async function loadSettings() {
   const settings = await apiFetch("/settings");
   selectedCalendarIds = new Set(settings.selected_calendars || []);
   selectedTermIds = new Set((settings.selected_term_ids || []).map(Number));
+  termPlanModes = settings.term_plan_modes || {};
   excludedTitles = new Set(settings.excluded_titles || []);
   periodProfiles = readPeriodProfiles(settings.lesson_period_profiles);
   periodEditor.receive(settings.lesson_period_profiles);
@@ -2140,6 +2177,7 @@ function renderTermRow(t) {
     <input type="checkbox" class="term-checkbox" value="${t.id}" ${checked} />
     <span class="term-item-label">${escapeHtml(t.label)}</span>
     <span class="term-item-dates">${t.start_date} 〜 ${t.end_date}</span>
+    <label class="term-plan-setting"><input type="checkbox" class="term-plan-mode" value="${t.id}" ${termUsesNumberedPlans(t,termPlanModes)?"checked":""}> 回数別の授業予定</label>
     <button type="button" class="term-edit" data-id="${t.id}" aria-label="編集"><i class="bx bx-pencil"></i></button>
     <button type="button" class="term-delete" data-id="${t.id}" aria-label="削除"><i class="bx bx-trash"></i></button>
   </div>`;
@@ -2161,6 +2199,19 @@ els.addYearForm.addEventListener("submit", async (e) => {
 });
 
 els.yearGroups.addEventListener("change", async (e) => {
+  const mode=e.target.closest('.term-plan-mode');
+  if(mode){
+    const checked=mode.checked;
+    mode.disabled=true;
+    try{
+      const settings=await apiFetch('/settings',{method:'PUT',body:JSON.stringify({term_plan_mode:{id:Number(mode.value),enabled:checked}})});
+      termPlanModes={...termPlanModes,[mode.value]:settings.term_plan_modes?.[mode.value]??checked};
+    }catch(error){mode.checked=!checked;showActionError(error);return;}
+    finally{mode.disabled=false;}
+    const context=captureStudentContext();
+    await Promise.allSettled([loadRecordTable(), loadCurriculumEvents(context)]);
+    return;
+  }
   const checkbox = e.target.closest(".term-checkbox");
   if (!checkbox) return;
   const id = Number(checkbox.value);
@@ -2702,10 +2753,10 @@ async function loadCurriculumEvents(context = captureStudentContext()) {
       return aStart.localeCompare(bStart);
     });
 
-  await renderCurriculumTable(matched, context, events);
+  await renderCurriculumTable(matched, context, events, termUsesNumberedPlans(term,termPlanModes)?term:null);
 }
 
-async function renderCurriculumTable(events, context = captureStudentContext(), countEvents = events) {
+async function renderCurriculumTable(events, context = captureStudentContext(), countEvents = events, term = null) {
   assertStudentContext(context);
   if (events.length === 0) {
     studentTodos.reset();
@@ -2721,6 +2772,8 @@ async function renderCurriculumTable(events, context = captureStudentContext(), 
     .filter(record => record.attribution_status === 'confirmed' && record.owner_id).map(record => record.owner_id);
   void studentTodos.showRelated(confirmedStudents);
   const retainedCopies = pendingRecoveryCopies();
+  const termPositions = term ? termLessonPositions(term,countEvents,[...excludedTitles]) : null;
+  const termSlots = [];
 
   els.curriculumTbody.innerHTML = events
     .map((ev) => {
@@ -2731,21 +2784,27 @@ async function renderCurriculumTable(events, context = captureStudentContext(), 
       const plan = lessonPlans.get(key);
       const retained = recordDrafts.has(key) || plan?.dirty || plan?.pending || plan?.status === 'conflict' ||
         retainedCopies.some(copy => copy.target && lessonEventKey(copy.target) === key);
-      if (unassigned && !retained) {
+      const position = termPositions ? termPosition(termPositions,ev) : null;
+      const slot = position && canUseTermPlan(saved) ? position.current : null;
+      if(slot)termSlots.push(slot);
+      const slotEditor = slot ? termPlans.markup(slot,`第${slot.ordinal}回の授業予定`,saved.lesson_plan || '') : '';
+      if (unassigned && (!retained || slot)) {
         const label = escapeHtml(ev.summary || '授業');
         return `<tr data-unassigned-progress data-pending-key="${escapeHtml(key)}" data-pending-target="${escapeHtml(JSON.stringify(ref))}" data-pending-context="${escapeHtml(unassigned.pendingContext)}"><td><input type="checkbox" disabled aria-label="${label}の完了（未紐付けのため編集不可）"></td>
-          <td>${count.n}/${count.m}回</td><td data-lesson-period="curriculum" data-period-start="${escapeHtml(start)}" data-period-calendar="${escapeHtml(ev._calendarId || "")}">${escapeHtml(formatCurriculumDate(start, ev._calendarId))}</td>
-          <td><textarea rows="2" disabled aria-label="${label}の授業予定（未紐付けのため編集不可）">${escapeHtml(unassigned.lessonPlan)}</textarea></td>
+          <td>${position?.current.ordinal ?? count.n}/${position?.total ?? count.m}回</td><td data-lesson-period="curriculum" data-period-start="${escapeHtml(start)}" data-period-calendar="${escapeHtml(ev._calendarId || "")}">${escapeHtml(formatCurriculumDate(start, ev._calendarId))}</td>
+          <td>${slotEditor || `<textarea rows="2" disabled aria-label="${label}の授業予定（未紐付けのため編集不可）">${escapeHtml(unassigned.lessonPlan)}</textarea>`}</td>
           ${['確認テスト','宿題','授業メモ'].map(field=>`<td><textarea rows="2" disabled aria-label="${label}の${field}（未紐付けのため編集不可）"></textarea></td>`).join('')}</tr>`;
       }
-      if (lessonRecordNeedsReview(saved)) return lessonReviewRow(lessonEventRef(ev),saved,ev.summary || "授業",formatCurriculumDate(start, ev._calendarId), "curriculum").replace('</strong>', `</strong> <small class="semester-candidate-count">${count.n}/${count.m}回（同名予定・所属未確定）</small>`);
+      if (lessonRecordNeedsReview(saved)) return lessonReviewRow(lessonEventRef(ev),saved,ev.summary || "授業",formatCurriculumDate(start, ev._calendarId), "curriculum")
+        .replace('</strong>', `</strong> <small class="semester-candidate-count">${position?.current.ordinal ?? count.n}/${position?.total ?? count.m}回（同名予定・所属未確定）</small>`)
+        .replace('</td>',slotEditor+'</td>');
       const checked = saved.completed ? "checked" : "";
       lessonPlans.seed(ref, saved.lesson_plan || "", planReadVersion, saved.record_revision,saved.attribution_status,saved.owner_id||null);
       return `<tr data-event-id="${escapeHtml(ev.id)}" data-record-ref="${escapeHtml(JSON.stringify(ref))}" data-record-revision="${saved.record_revision}" data-record-owner="${escapeHtml(saved.owner_id||'')}" data-completed="${saved.completed ? 1 : 0}">
         <td><input type="checkbox" class="curriculum-completed" ${checked} /></td>
-        <td>${count.n}/${count.m}回${lessonAttributionNotice(saved)}</td>
+        <td>${position?.current.ordinal ?? (term?'—':count.n)}/${position?.total ?? (term?'—':count.m)}回${lessonAttributionNotice(saved)}</td>
         <td data-lesson-period="curriculum" data-period-start="${escapeHtml(start)}" data-period-calendar="${escapeHtml(ev._calendarId || "")}">${escapeHtml(formatCurriculumDate(start, ev._calendarId))}</td>
-        <td>${lessonPlanEditor(ref, ev.summary || "授業", "curriculum-plan",saved.owner_id||"")}</td>
+        <td>${slotEditor || (term ? '<small role="status">学期内の予定を再確認してください。</small>' : lessonPlanEditor(ref, ev.summary || "授業", "curriculum-plan",saved.owner_id||""))}</td>
         <td><textarea class="curriculum-test" rows="2">${escapeHtml(saved.confirmation_test || "")}</textarea></td>
         <td><textarea class="curriculum-homework" rows="2">${escapeHtml(saved.homework || "")}</textarea></td>
         <td><textarea class="curriculum-memo" rows="2">${escapeHtml(saved.lesson_memo || "")}</textarea></td>
@@ -2754,6 +2813,7 @@ async function renderCurriculumTable(events, context = captureStudentContext(), 
     .join("");
   restoreRecordDraftRows(els.curriculumTbody);showRetainedRecordDrafts();
   renderLessonPlans();
+  if(termSlots.length)void termPlans.load(termSlots);
 }
 
 els.curriculumTbody.addEventListener("input",e=>{if(e.target.matches('.curriculum-test,.curriculum-homework,.curriculum-memo')){rememberRecordDraft(e.target.closest('tr[data-event-id]'));showRetainedRecordDrafts();}});

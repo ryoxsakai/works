@@ -8,6 +8,7 @@ import {readFileSync} from 'node:fs';
 import {tokyoDateKey,shiftRecordDate,recordDateRange} from '../record-date.js';
 import {attributedLessonRecord} from '../../shared/lesson-attribution.js';
 import {isScheduledLesson,lessonEventRef} from '../../shared/lesson-plan.js';
+import {termLessonPositions,termPosition,termUsesNumberedPlans} from "../../shared/term-lesson-plan.mjs";
 const source=readFileSync(new URL('../app.js',import.meta.url),'utf8');
 test('student navigation re-reads the exact day when it is outside the loaded term',async()=>{
  const event={id:'extra',_calendarId:'c1',start:{dateTime:'2026-11-03T08:50:00+09:00'}};
@@ -36,7 +37,7 @@ test('two date buttons accumulate days from the displayed date',async()=>{
   assert.deepEqual(loaded,['2026-12-31','2026-12-30','2026-12-31']);
 });
 function setup(overrides={}){
-  const state=vm.createContext({cardLoading,isScheduledLesson,excludedTitles:new Set(),sameNameLessonCount,recordTermScope,lessonPlans:{version:0},lessonEventRef,attributedLessonRecord,recordTableRequest:0,selectedRecordDate:'2026-10-17',selectedCalendarIds:new Set(['qa']),selectedTermIds:new Set(),terms:[],calendarColors:new Map(),
+  const state=vm.createContext({termPlanModes:{},termLessonPositions,termPosition,termUsesNumberedPlans,cardLoading,isScheduledLesson,excludedTitles:new Set(),sameNameLessonCount,recordTermScope,lessonPlans:{version:0},lessonEventRef,attributedLessonRecord,recordTableRequest:0,selectedRecordDate:'2026-10-17',selectedCalendarIds:new Set(['qa']),selectedTermIds:new Set(),terms:[],calendarColors:new Map(),
     els:{recordTbody:{innerHTML:'',attributes:{},setAttribute(name,value){this.attributes[name]=value;},querySelector:()=>({textContent:''}),querySelectorAll:()=>[]}},getSessionToken:()=>true,renderRecordDateLabel(){},recordDateRange,shiftRecordDate,isExcludedScheduleEvent:()=>false,
     readPreviousEntries:async()=>[],readRecordEntries:async()=>state.apiFetch(),fetchCalendarEvents:async()=>[],apiFetch:async()=>[],renderRecordTable:rows=>{state.rendered=rows;},...overrides});
   vm.runInContext(fn('loadRecordTable'),state);return state;
