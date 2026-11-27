@@ -19,7 +19,7 @@ export function createTermPlanEditors(root,{request,escapeHtml,resize=()=>{}}) {
       action.textContent=state.conflict||state.unknown||state.unavailable?'保存内容を再確認': '再保存';
       const legacy=editor.querySelector('[data-term-previous]');
       if(legacy&&!legacy.dataset.initialized&&!state.loading){
-        legacy.open=!state.value;legacy.dataset.initialized='true';
+        legacy.open=!legacy.hasAttribute('data-compact')&&!state.value;legacy.dataset.initialized='true';
       }
       const previous=editor.querySelector('[data-saved-version]');
       previous.hidden=!state.conflict||!state.remote;
@@ -137,12 +137,12 @@ export function createTermPlanEditors(root,{request,escapeHtml,resize=()=>{}}) {
     state.failed=state.dirty;
     renderKey(target.dataset.termSlot);
   });
-  function markup(slot,label,legacy='') {
+  function markup(slot,label,legacy='',{compact=false}={}) {
     return `<div data-term-slot="${escapeHtml(termPlanKey(slot))}" class="term-plan-editor"><label>${escapeHtml(label)}
       <textarea class="term-plan-input" rows="1" maxlength="5000" aria-label="${escapeHtml(label)}" disabled></textarea></label>
       <div class="lesson-plan-feedback"><small role="status" aria-live="polite"></small><button type="button" data-term-action hidden></button></div>
       <div data-saved-version hidden><small>現在の保存内容</small><pre></pre><button type="button" data-term-use-saved>保存内容を使う</button> <button type="button" data-term-keep>自分の入力を保持</button></div>
-      ${legacy?`<details data-term-previous><summary>以前の予定別の記録</summary><p>${escapeHtml(legacy)}</p></details>`:''}</div>`;
+      ${legacy?`<details data-term-previous${compact?' data-compact':''}><summary>以前の予定別の記録</summary><p>${escapeHtml(legacy)}</p></details>`:''}</div>`;
   }
   return {markup,load,hasEdits:()=>[...states.values()].some(s=>s.dirty||s.saving||s.unknown),
     repaint:()=>{for(const key of states.keys())renderKey(key);}};

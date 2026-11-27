@@ -31,9 +31,24 @@ export function lessonRecordRows(rows, { escapeHtml, formatTimeOrPeriod, lessonR
       }
       const record=r.record?.record_storage==='d1_owner'?attributedLessonRecord(r.record,r.ref):r.record;
       const term = r.termMode && termEditorsForRow ? termEditorsForRow(r) : null;
+      if (term && record.attribution_status==='owner_unassigned') {
+        const binding=escapeHtml('/tutor/history.html?'+new URLSearchParams({calendar_id:r.ref.calendar_id,event_id:r.ref.id}));
+        const unavailable=(label)=>`<label>${label}<textarea rows="1" disabled></textarea></label>`;
+        return card(`<tr class="lesson-review-row record-numbered-unassigned" data-term-record>
+          <td colspan="7">
+            <div class="record-card-heading"><strong class="record-student-name">${escapeHtml(r.label)}</strong><div class="record-card-meta"><span>${r.n}/${r.m}回</span>${time(r)}</div></div>
+            <div class="record-numbered-current">${r.termPosition ? term.current : unavailable('授業予定')+term.current}</div>
+            <div class="record-next-plan">${term.next || unavailable('次回授業予定')}</div>
+            <div class="record-student-memo">
+              <label>生徒メモ<textarea rows="1" disabled placeholder="紐づけ後に編集できます"></textarea></label>
+              <a class="pending-bind-link record-memo-lookup" href="${binding}">生徒・クラスの紐づけを確認</a>
+            </div>
+          </td>
+        </tr>`,r);
+      }
       if (lessonRecordNeedsReview(record)) {
         const review=lessonReviewRow(r.ref,record,r.label,period(r),"record",Boolean(term)).replace('</strong>','</strong> <small class="semester-candidate-count">'+escapeHtml(String(r.n))+'/'+escapeHtml(String(r.m))+'回（同名の予定候補・所属未確定）</small>');
-        return card(term&&record.attribution_status==='owner_unassigned'?review.replace('<tr>','<tr data-term-record>').replace('</td>',term.current+term.next+'</td>'):review,r);
+        return card(review,r);
       }
       return card(`<tr${term?" data-term-record":""} data-event-id="${escapeHtml(r.eventId)}" data-record-ref="${escapeHtml(JSON.stringify(r.ref))}" data-record-revision="${r.record.record_revision}" data-record-owner="${escapeHtml(r.record.owner_id||'')}" data-completed="${r.completed ? 1 : 0}" data-calendar-name="${escapeHtml(calendarName(r.calendarId) || "カレンダー")}">
         <td>
