@@ -28,6 +28,7 @@
     "wrangler": "^3.90.0"
   },
   "dependencies": {
-    "@block65/webcrypto-web-push": "2.0.0"
+    "@block65/webcrypto-web-push": "2.0.0",
+    "jose": "6.2.18"
   }
 }

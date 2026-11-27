@@ -18,7 +18,7 @@
     import { signIn } from '/shared/auth.js?v=14';
     let session;
     try { session = localStorage.getItem('works_session_token'); } catch {}
-    if (session) location.replace(lastService());
+    if (document.querySelector('meta[name="works-entry-auth"][content="cookie"]') || session) location.replace(lastService());
     else {
       document.querySelector('main').hidden = false;
       document.querySelector('button').onclick = () => {

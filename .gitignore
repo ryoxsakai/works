@@ -3,3 +3,5 @@ node_modules/
 .dev.vars
 .DS_Store
 test-artifacts/
+/worker/web-assets/
+/worker/.entry-stage-*/

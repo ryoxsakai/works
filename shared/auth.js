@@ -8,6 +8,12 @@ const SCOPES = "openid email profile https://www.googleapis.com/auth/calendar.re
 const SESSION_STORAGE_KEY = "works_session_token";
 
 const API_BASE = "/api";
+const ENTRY_TOKEN = "cookie-session";
+const ENTRY_SIGNOUT = "works_entry_signout";
+export function isServerEntry() {
+  return document.querySelector('meta[name="works-entry-auth"][content="cookie"]') !== null;
+}
+
 
 let sessionToken = null;
 let cachedGoogleToken = null; // { access_token, expires_at }
@@ -103,6 +109,33 @@ function announceUser(user) {
 }
 
 export async function watchAuth({ onSignedIn, onSignedOut: pageSignedOut }) {
+  if (isServerEntry()) {
+    try {
+      const response = await fetch(`${API_BASE}/web-session`, { cache: "no-store", credentials: "same-origin" });
+      if (!response.ok) throw new Error("ログイン状態を確認できませんでした。");
+      const data = await response.json();
+      if (data.session_token !== ENTRY_TOKEN || typeof data.user?.email !== "string" || !data.user.email) throw new Error("ログイン状態を確認できませんでした。");
+      sessionToken = ENTRY_TOKEN;
+      const user = { email: data.user.email, name: data.user.name || "", picture: "" };
+      announceUser(user);
+      // An expired or disconnected Calendar grant must not sign the user out of
+      // unrelated services. Enrich the header opportunistically, not as a login check.
+      void getGoogleAccessToken().then(token => token && fetchUserInfo(token)).then(info => {
+        if (sessionToken === ENTRY_TOKEN && info?.email?.toLowerCase() === user.email.toLowerCase() &&
+            typeof info.picture === "string" && /^https:\/\/lh3\.googleusercontent\.com\//.test(info.picture)) {
+          announceUser({ ...user, picture: info.picture });
+        }
+      }).catch(() => {});
+      return onSignedIn(user);
+    } catch (error) {
+      sessionToken = null;
+      cachedGoogleToken = null;
+      const preloading = window.frameElement?.hasAttribute('data-preloading');
+      if (preloading) parent.dispatchEvent(new CustomEvent('works-preload-failed', {detail:window.frameElement}));
+      else { announceUser(null); pageSignedOut(error.message); }
+      return;
+    }
+  }
   const onSignedOut = (...args) => { announceUser(null); return pageSignedOut(...args); };
   const params = new URLSearchParams(window.location.search);
   const code = params.get("code");
@@ -166,6 +199,11 @@ export function isStandaloneHomeScreenApp() {
 }
 
 export function signIn(redirectPath) {
+  if (isServerEntry()) {
+    const next = typeof redirectPath === "string" ? redirectPath : location.pathname;
+    window.top.location.assign("/auth/start?" + new URLSearchParams({ next }));
+    return;
+  }
   const params = new URLSearchParams({
     client_id: GOOGLE_CLIENT_ID,
     redirect_uri: redirectUri(redirectPath),
@@ -192,6 +230,19 @@ export function signIn(redirectPath) {
 }
 
 export async function signOutUser() {
+  if (isServerEntry()) {
+    const response = await fetch("/auth/logout", { method: "POST", credentials: "same-origin" });
+    if (!response.ok) throw Error("ログアウトに失敗しました。もう一度お試しください。");
+    sessionToken = null;
+    cachedGoogleToken = null;
+    try {
+      clearStoredSession(); // Retire a legacy UI token on this device if one remains.
+      localStorage.setItem(ENTRY_SIGNOUT, String(Date.now()));
+    } catch {}
+    announceUser(null);
+    window.top.location.replace("/");
+    return;
+  }
   try {
     if (sessionToken) {
       await fetch(`${API_BASE}/auth/logout`, {

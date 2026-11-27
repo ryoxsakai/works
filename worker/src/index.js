@@ -3756,6 +3756,22 @@ async function verifySession(request, env) {
   const authHeader = request.headers.get("Authorization") || "";
   const match = authHeader.match(/^Bearer (.+)$/);
   if (!match) throw new Error("missing bearer token");
+  if (match[1] === "cookie-session") {
+    const url = new URL(request.url);
+    const origin = request.headers.get("Origin");
+    const site = request.headers.get("Sec-Fetch-Site");
+    if (env.WORKS_ENTRY_ENABLED !== "true" || url.origin !== env.ALLOWED_ORIGIN ||
+        url.pathname === "/api/auth/logout" ||
+        (origin !== null && origin !== url.origin) ||
+        (site !== null && site !== "same-origin" && site !== "none") ||
+        (!["GET", "HEAD"].includes(request.method) && origin !== url.origin)) {
+      throw httpError(401, "browser session required");
+    }
+    const { readWorksEntrySession } = await import("./web-entry.js");
+    const session = await readWorksEntrySession(request, env);
+    if (!session) throw httpError(401, "browser session required");
+    return session;
+  }
 
   const [payloadB64, sig] = match[1].split(".");
   if (!payloadB64 || !sig) throw new Error("invalid session");
@@ -6000,6 +6016,36 @@ async function callTodoTool(env, name, args = {}) {
   throw todoError("unknown tool");
 }
 
+async function servePrivateWorksAsset(request, assets, url) {
+  const baseHeaders = {
+    'Cache-Control': 'private, no-store',
+    'Cross-Origin-Resource-Policy': 'same-origin',
+    'X-Content-Type-Options': 'nosniff',
+    'X-Robots-Tag': 'noindex, nofollow'
+  };
+  // Asset binding receives the normalized path only, never browser credentials or queries.
+  const target = new URL(url.origin);
+  target.pathname = url.pathname;
+  const asset = await assets.fetch(new Request(target, {method: request.method, redirect:'manual'}));
+  if ([301,302,303,307,308].includes(asset.status)) {
+    const location = asset.headers.get('Location');
+    if (!location) return new Response(null, {status:404, headers:baseHeaders});
+    const next = new URL(location, target);
+    if (next.origin !== target.origin || next.username || next.password || next.pathname.startsWith('//') ||
+        /^\/(?:api|auth|mcp|oauth|\.well-known)(?:\/|$)/.test(next.pathname)) {
+      return new Response(null, {status:404, headers:baseHeaders});
+    }
+    return new Response(null, {status:asset.status, headers:{...baseHeaders,
+      Location: next.pathname + (next.search || url.search) + next.hash}});
+  }
+  const type = asset.headers.get('Content-Type');
+  if (asset.status !== 200 || !type) return new Response(null, {status:404, headers:baseHeaders});
+  return new Response(request.method === 'HEAD' ? null : asset.body, {
+    status:200, headers:{...baseHeaders, 'Content-Type':type,
+      ...(type.startsWith('text/html') && {'Referrer-Policy':'same-origin', 'X-Frame-Options':'SAMEORIGIN'})}
+  });
+}
+
 export default {
   async scheduled(event, env, ctx) {
     const {deliverTodoWork} = await import("./todo-delivery.js");
@@ -6009,11 +6055,34 @@ export default {
     const origin = env.ALLOWED_ORIGIN;
     const headers = corsHeaders(origin);
 
+    const url = new URL(request.url);
+    const path = url.pathname;
+    const entryEndpoint = path === '/auth' || path.startsWith('/auth/') || path === '/api/web-session';
+    const entryEnabled = env.WORKS_ENTRY_ENABLED === 'true';
+    const legacyEndpoint = /^\/(?:api|mcp|oauth|\.well-known)(?:\/|$)/.test(path);
+    if (entryEndpoint && !entryEnabled) {
+      return new Response(null, {status: 404, headers: {'Cache-Control':'no-store'}});
+    }
+    if (entryEnabled && (entryEndpoint || !legacyEndpoint)) {
+      // No errors or unresolved assets fall through to a public Pages origin.
+      try {
+        if (entryEndpoint && new TextEncoder().encode(url.search).byteLength > AUTH_QUERY_BYTES)
+          return new Response(null, {status: 413, headers: {'Cache-Control':'no-store'}});
+        if (entryEndpoint && path !== '/api/web-session' && !consumeAuthBudget(request, path))
+          return new Response(null, {status: 429, headers: {'Cache-Control':'no-store', 'Retry-After':'1'}});
+        const {handleWorksWebEntry} = await import('./web-entry.js');
+        const entry = await handleWorksWebEntry(request, env);
+        if (entry) return entry;
+        // Only a checked entry cookie allows the explicit static-assets package.
+        if (entryEndpoint || !env.WORKS_WEB_ASSETS) return new Response(null, {status:404, headers:{'Cache-Control':'no-store'}});
+        return await servePrivateWorksAsset(request, env.WORKS_WEB_ASSETS, url);
+      } catch {
+        return new Response(null, {status: 503, headers: {'Cache-Control':'no-store'}});
+      }
+    }
     if (request.method === "OPTIONS") {
       return new Response(null, { headers });
     }
-
-    const url = new URL(request.url);
 
     try {
       if (authEndpoint(url.pathname)) {

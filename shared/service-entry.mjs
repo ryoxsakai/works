@@ -6,7 +6,9 @@ const motion = () => !matchMedia('(prefers-reduced-motion: reduce)').matches;
 const embedded = window.frameElement?.classList.contains('works-service-frame');
 const app = document.querySelector('script[data-service-app]').dataset.serviceApp;
 const address = new URL(location.href);
+const serverEntry = document.querySelector('meta[name="works-entry-auth"][content="cookie"]') !== null;
 const hasSession = () => {
+  if (serverEntry) return true; // The Worker authenticates these documents before serving them.
   try { return !!localStorage.getItem('works_session_token'); } catch { return false; }
 };
 const canonical = url => {
@@ -200,7 +202,7 @@ function startHost() {
   });
   window.addEventListener('popstate', () => visit(location.href, false));
   window.addEventListener('storage', event => {
-    if ((event.key === 'works_session_token' && event.oldValue !== event.newValue) || !hasSession()) location.reload();
+    if (event.key === 'works_entry_signout' || (event.key === 'works_session_token' && event.oldValue !== event.newValue) || !hasSession()) location.reload();
   });
   visit(location.href, false);
 }
