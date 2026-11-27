@@ -24,7 +24,7 @@
   <link rel="stylesheet" href="/tutor/student-todos.css?v=1">
   <link rel="stylesheet" href="/tutor/dialogs.css?v=term-plan-mode">
     <link rel="stylesheet" href="/shared/works-dialogs.css?v=fb98327c" />
-  <link rel="stylesheet" href="/tutor/refresh.css?v=1" />
+  <link rel="stylesheet" href="/tutor/refresh.css?v=2" />
   </head>
 <body class="tutor-bootstrap">
   <header class="page-header works-header">
@@ -137,8 +137,12 @@
           </div>
           <p id="curriculum-search-summary" class="sr-only" aria-live="polite">横にスライドして生徒・授業を選択してください。</p>
           <div class="student-picker">
+          <div class="student-term-row">
+            <select id="student-year-select" class="student-year-select" aria-label="年度"></select>
+            <span id="student-selector-context" class="student-term-chips" role="group" aria-label="表示する学期(タップでオン・オフ)"></span>
+          </div>
           <nav id="student-groups" class="student-slider" aria-label="教室・授業区分"></nav>
-          <div class="student-slider-heading"><span id="student-selector-context"></span><small>名前順 · 横にスライド</small></div>
+          <div class="student-slider-heading"><span>生徒・授業</span><small>名前順 · 横にスライド</small></div>
           <div id="student-selector" class="student-slider" aria-label="生徒・授業の選択" aria-busy="false"></div>
           </div>
           <section id="student-related-todos" class="student-todos" hidden></section>
@@ -218,11 +222,16 @@
             </div>
             <div class="accordion-body" data-section-body="progress">
               <div id="curriculum-progress-summary" class="curriculum-progress-summary" hidden></div>
+              <div id="curriculum-carousel-nav" class="curriculum-carousel-nav" hidden>
+                <button type="button" data-carousel-prev aria-label="前の回"><i class="bx bx-chevron-left"></i></button>
+                <span data-carousel-position aria-live="polite"></span>
+                <button type="button" data-carousel-next-lesson hidden>次回へ</button>
+                <button type="button" data-carousel-next aria-label="次の回"><i class="bx bx-chevron-right"></i></button>
+              </div>
               <div class="table-scroll">
                 <table id="curriculum-table" class="curriculum-table">
                   <thead>
                     <tr>
-                      <th>完了</th>
                       <th>回数</th>
                       <th>日付</th>
                       <th>授業予定</th>
@@ -311,6 +320,17 @@
       <h3 class="tutor-settings-panel-title">表示するカレンダー</h3>
       <p class="hint">授業予定が入っているカレンダーにチェックを入れてください(全デバイス共通の設定です)。色はGoogleカレンダー側の設定がそのまま使われます。</p>
       <div id="calendar-checklist"></div>
+      <section class="tutor-settings-section group-keyword-section" aria-labelledby="group-keyword-heading">
+        <h3 id="group-keyword-heading">代官山の集団授業の判定</h3>
+        <p class="hint">代官山の予定名にここの文字列が含まれていると「集団」に分類します(A・Mを含む授業名と、中堅大英語・英語中堅大・高1長文読解は常に集団)。Enter または「、」で追加、× で削除。全デバイス共通です。</p>
+        <div id="group-keyword-editor" class="keyword-editor">
+          <div class="keyword-input-box">
+            <ul data-keyword-list class="keyword-tags" aria-label="集団授業として扱う文字列"></ul>
+            <input type="text" placeholder="例: 集団" aria-label="集団授業として扱う文字列を追加" enterkeyhint="done" />
+          </div>
+          <small role="status" aria-live="polite"></small>
+        </div>
+      </section>
       <section class="tutor-settings-section tutor-settings-maintenance">
         <h3><i class="bx bx-cog"></i> メンテナンス: 授業記録の名前変更検出</h3>
         <p class="hint">開始日以降の既存授業について、現在の予定名を比較用に観測します。旧記録の生徒の所属が確認済みになることはありません。既に変更された枠は個別確認のまま残します。</p>
@@ -425,7 +445,7 @@
       <p class="hint">設定の「学期」で選んだ期間に授業がある生徒・授業だけを表示します。</p>
       <label for="student-lesson-kind">代官山の授業区分</label>
       <select id="student-lesson-kind"><option value="">予定名から自動判定</option><option value="individual">個別</option><option value="group">集団</option></select>
-      <p class="hint">名前に A・M がある授業、中堅大英語（英語中堅大）、高1長文読解は集団です。それ以外の区分変更はこの端末に保存されます。</p>
+      <p class="hint">名前に A・M がある授業と、設定(カレンダー › 代官山の集団授業の判定)の文字列を含む授業は集団です。ここでの個別の変更はこの端末に保存されます。</p>
       <label for="curriculum-print-name">印刷氏名（変更すると自動保存）</label>
       <input id="curriculum-print-name" type="text" placeholder="未設定の場合は選択名を使用" />
       <label for="curriculum-year-select">年度</label>
@@ -531,7 +551,7 @@
     </div>
   </dialog>
 
-  <script type="module" src="/shared/service-entry.mjs?v=5" data-service-app="/tutor/app.js?v=student-info-2"></script>
+  <script type="module" src="/shared/service-entry.mjs?v=5" data-service-app="/tutor/app.js?v=student-info-3"></script>
 </body>
 </html>
 

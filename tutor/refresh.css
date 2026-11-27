@@ -11,10 +11,19 @@
   overflow: hidden;
 }
 .school-name {
-  display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
-  padding: 10px 12px;
-  background: var(--works-surface-sunken);
-  border-bottom: 1px solid var(--works-line);
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px; width: 100%;
+  min-height: 48px; padding: 10px 12px; margin: 0; border: 0; border-radius: 0;
+  background: var(--works-surface-sunken); color: inherit; font: inherit; text-align: left; box-shadow: none;
+  cursor: pointer;
+}
+.school-chevron { margin-left: 4px; color: var(--works-ink-3); transition: transform .15s ease; }
+.school-schedule-group[data-open="true"] .school-chevron { transform: rotate(180deg); }
+.school-schedule-group[data-open="true"] .school-name { border-bottom: 1px solid var(--works-line); }
+/* スマホ: 既定は大学名だけ。タップで日程を開く。 */
+@media screen and (max-width: 719px) {
+  .school-schedule { gap: 8px; }
+  .school-schedule-group[data-open="false"] > :not(.school-name) { display: none; }
+  .school-schedule-group[data-open="false"] .school-name { background: var(--works-surface); }
 }
 .school-name strong { font-size: 1rem; font-weight: 700; color: var(--works-ink); }
 .school-rank {
@@ -57,7 +66,8 @@
     font-size: .72rem; font-weight: 700; letter-spacing: .04em; color: var(--works-ink-3);
     background: var(--works-surface);
   }
-  .school-name { padding: 8px 12px; border-bottom: 0; }
+  .school-name { padding: 8px 12px; min-height: 0; border-bottom: 0 !important; cursor: default; pointer-events: none; }
+  .school-chevron { display: none; }
   .school-stage-dates { flex-direction: row; flex-wrap: wrap; gap: 0 10px; }
   .school-schedule-row { align-items: start; }
   .school-program { grid-column: auto; padding-top: 1px; }
@@ -72,7 +82,11 @@
   .school-schedule-row.school-schedule-head { display: grid; grid-template-columns: 1.1fr repeat(4, 1fr); gap: 8px; padding: 4px 8px; }
   .school-stage-dates { flex-direction: row; flex-wrap: wrap; gap: 0 8px; }
   .school-schedule-head { font-size: 9pt; color: #333; }
-  .school-name { padding: 4px 8px; background: #f2f2f2; border: 0; }
+  .school-name { padding: 4px 8px; background: #f2f2f2; border: 0; min-height: 0; }
+  .school-chevron { display: none; }
+  .school-schedule-group > * { display: grid !important; }
+  .school-schedule-group > .school-name { display: flex !important; }
+  .school-schedule-group > .school-schedule-note { display: block !important; }
   .school-rank, .school-rank-1 { background: none; color: #000; border: 1px solid #000; }
   .school-program { grid-column: auto; }
   .school-stage-label { display: none; }
@@ -88,57 +102,84 @@
 .curriculum-progress-summary p { margin: 0; font-size: .82rem; color: var(--works-ink-3); display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; }
 .curriculum-progress-summary strong { font-size: 1rem; color: var(--works-ink); }
 .curriculum-progress-next { color: var(--works-accent-strong); font-weight: 700; }
+.curriculum-carousel-nav[hidden] { display: none !important; }
 
-body.tutor-bootstrap .curriculum-panel #curriculum-table td:nth-child(2) { font-weight: 700; font-variant-numeric: tabular-nums; }
-body.tutor-bootstrap .curriculum-panel #curriculum-table td:nth-child(3) { font-variant-numeric: tabular-nums; color: var(--works-ink-2); }
+/* 列: 1 回数 / 2 日付 / 3 授業予定 / 4 確認テスト / 5 宿題 / 6 授業メモ */
+body.tutor-bootstrap .curriculum-panel #curriculum-table { table-layout: fixed; min-width: 760px; }
+body.tutor-bootstrap .curriculum-panel #curriculum-table th:nth-child(1) { width: 68px; }
+body.tutor-bootstrap .curriculum-panel #curriculum-table th:nth-child(2) { width: 120px; }
+body.tutor-bootstrap .curriculum-panel #curriculum-table td { vertical-align: top; }
+body.tutor-bootstrap .curriculum-panel #curriculum-table td:nth-child(1) { text-align: left; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+body.tutor-bootstrap .curriculum-panel #curriculum-table td:nth-child(2) { font-variant-numeric: tabular-nums; color: var(--works-ink-2); white-space: normal; }
+body.tutor-bootstrap .curriculum-panel #curriculum-table td:nth-child(3) { white-space: normal; text-align: left; }
+/* テキスト欄は1行から始まり、入力に合わせて伸びる(高さはスクリプトで調整)。 */
+body.tutor-bootstrap .curriculum-panel #curriculum-table textarea {
+  display: block; width: 100%; min-width: 0; min-height: 34px; padding: 6px 8px;
+  resize: none; overflow: hidden; line-height: 1.5; font-size: .84rem;
+}
 /* 列見出しが「授業予定」なので、各セルの「第N回の授業予定」ラベルは画面上では省く(読み上げは aria-label で維持)。 */
-body.tutor-bootstrap .curriculum-panel #curriculum-table .term-plan-editor > label { display: block; font-size: 0; }
-body.tutor-bootstrap .curriculum-panel #curriculum-table .term-plan-editor > label textarea { display: block; font-size: .84rem; }
-body.tutor-bootstrap .curriculum-panel #curriculum-table tr[data-completed="1"] td { background: color-mix(in srgb, var(--works-success-soft, #e4f5ec) 45%, transparent); }
-body.tutor-bootstrap .curriculum-panel #curriculum-table tr[data-completed="1"] td:nth-child(2),
-body.tutor-bootstrap .curriculum-panel #curriculum-table tr[data-completed="1"] td:nth-child(3) { color: var(--works-ink-3); }
+body.tutor-bootstrap .curriculum-panel #curriculum-table .term-plan-editor { margin: 0; }
+body.tutor-bootstrap .curriculum-panel #curriculum-table .term-plan-editor > label { display: block; margin: 0; font-size: 0; line-height: 0; }
+body.tutor-bootstrap .curriculum-panel #curriculum-table .term-plan-editor > label textarea { line-height: 1.5; }
 body.tutor-bootstrap .curriculum-panel #curriculum-table tr.is-next-lesson td { background: var(--works-accent-soft); }
 body.tutor-bootstrap .curriculum-panel #curriculum-table tr.is-next-lesson td:first-child { box-shadow: inset 3px 0 0 var(--works-accent); }
+body.tutor-bootstrap .curriculum-panel #curriculum-table tr.curriculum-term-heading th {
+  padding: 10px 10px 6px; background: var(--works-surface-sunken); color: var(--works-ink-2);
+  font-size: .78rem; font-weight: 700; letter-spacing: .06em; text-align: left; position: static;
+}
 
 @media screen and (max-width: 719px) {
-  /* スマホでは横スクロールの表をやめ、1回ごとのカードにする。 */
+  /* スマホでは1回ごとのカードを左右にスワイプして選ぶ。最初は次回のカードを表示する。 */
   body.tutor-bootstrap .curriculum-panel .progress-section .table-scroll { overflow: visible; border: 0; box-shadow: none; background: transparent; border-radius: 0; }
-  body.tutor-bootstrap .curriculum-panel #curriculum-table { display: block; min-width: 0; }
-  body.tutor-bootstrap .curriculum-panel #curriculum-table thead { display: none; }
-  body.tutor-bootstrap .curriculum-panel #curriculum-table tbody { display: grid; gap: 10px; }
-  body.tutor-bootstrap .curriculum-panel #curriculum-table tbody tr {
-    display: grid; grid-template-columns: auto auto 1fr; align-items: center; gap: 8px 10px;
-    padding: 12px; border: 1px solid var(--works-line); border-radius: var(--works-radius, 8px);
-    background: var(--works-surface);
+  body.tutor-bootstrap .curriculum-panel #curriculum-table { display: block; min-width: 0; table-layout: auto; }
+  body.tutor-bootstrap .curriculum-panel #curriculum-table thead,
+  body.tutor-bootstrap .curriculum-panel #curriculum-table tr.curriculum-term-heading { display: none; }
+  body.tutor-bootstrap .curriculum-panel #curriculum-table tbody {
+    display: flex; gap: 10px; overflow-x: auto; overscroll-behavior-x: contain;
+    scroll-snap-type: x mandatory; scroll-padding-inline: 8px; padding: 2px 8px 8px; margin: 0 -8px;
+    scrollbar-width: none; -webkit-overflow-scrolling: touch;
   }
+  body.tutor-bootstrap .curriculum-panel #curriculum-table tbody::-webkit-scrollbar { display: none; }
+  body.tutor-bootstrap .curriculum-panel #curriculum-table tbody tr {
+    flex: 0 0 calc(100% - 28px); scroll-snap-align: start;
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; align-content: start; align-items: center; gap: 10px;
+    padding: 14px; border: 1px solid var(--works-line); border-radius: var(--works-radius-lg, 12px);
+    background: var(--works-surface); box-shadow: var(--works-shadow-sm, none);
+  }
+  body.tutor-bootstrap .curriculum-panel #curriculum-table tbody tr:only-child { flex-basis: 100%; }
   body.tutor-bootstrap .curriculum-panel #curriculum-table tbody tr:hover { background: var(--works-surface); }
   body.tutor-bootstrap .curriculum-panel #curriculum-table tbody td { display: block; padding: 0; border: 0; background: transparent !important; box-shadow: none !important; min-width: 0; text-align: left; white-space: normal; }
   body.tutor-bootstrap .curriculum-panel #curriculum-table tbody td[colspan] { grid-column: 1 / -1; }
-  body.tutor-bootstrap .curriculum-panel #curriculum-table tbody tr { grid-template-columns: 24px minmax(0, 1fr) minmax(0, 1.3fr); }
-  body.tutor-bootstrap .curriculum-panel #curriculum-table tbody tr > td:nth-child(3) { text-align: right; white-space: nowrap; }
-  body.tutor-bootstrap .curriculum-panel #curriculum-table tbody tr > td:nth-child(4),
-  body.tutor-bootstrap .curriculum-panel #curriculum-table tbody tr > td:nth-child(7) { grid-column: 1 / -1; }
-  body.tutor-bootstrap .curriculum-panel #curriculum-table tbody tr > td:nth-child(5) { grid-column: 1 / 3; }
-  body.tutor-bootstrap .curriculum-panel #curriculum-table tbody tr > td:nth-child(6) { grid-column: 3 / -1; }
-  body.tutor-bootstrap .curriculum-panel #curriculum-table tbody tr > td:nth-child(n+4)::before {
+  body.tutor-bootstrap .curriculum-panel #curriculum-table tbody tr > td:nth-child(1) { font-size: 1rem; }
+  body.tutor-bootstrap .curriculum-panel #curriculum-table tbody tr > td:nth-child(2) { text-align: right; white-space: nowrap; font-size: .84rem; }
+  body.tutor-bootstrap .curriculum-panel #curriculum-table tbody tr > td:nth-child(n+3) { grid-column: 1 / -1; }
+  body.tutor-bootstrap .curriculum-panel #curriculum-table tbody tr > td:nth-child(n+3)::before {
     display: block; margin-bottom: 4px;
     font-size: .72rem; font-weight: 700; letter-spacing: .04em; color: var(--works-ink-3);
   }
-  body.tutor-bootstrap .curriculum-panel #curriculum-table tbody tr[data-event-id] > td:nth-child(4)::before,
-  body.tutor-bootstrap .curriculum-panel #curriculum-table tbody tr[data-unassigned-progress] > td:nth-child(4)::before { content: "授業予定"; }
-  body.tutor-bootstrap .curriculum-panel #curriculum-table tbody tr > td:nth-child(5)::before { content: "確認テスト"; }
-  body.tutor-bootstrap .curriculum-panel #curriculum-table tbody tr > td:nth-child(6)::before { content: "宿題"; }
-  body.tutor-bootstrap .curriculum-panel #curriculum-table tbody tr > td:nth-child(7)::before { content: "授業メモ"; }
-  body.tutor-bootstrap .curriculum-panel #curriculum-table textarea { min-width: 0; width: 100%; font-size: 16px; min-height: 40px; height: auto; padding: 8px 10px; resize: vertical; }
-  body.tutor-bootstrap .curriculum-panel #curriculum-table tbody tr[data-completed="1"] { background: color-mix(in srgb, var(--works-success-soft, #e4f5ec) 55%, var(--works-surface)); }
+  body.tutor-bootstrap .curriculum-panel #curriculum-table tbody tr[data-event-id] > td:nth-child(3)::before,
+  body.tutor-bootstrap .curriculum-panel #curriculum-table tbody tr[data-unassigned-progress] > td:nth-child(3)::before { content: "授業予定"; }
+  body.tutor-bootstrap .curriculum-panel #curriculum-table tbody tr > td:nth-child(4)::before { content: "確認テスト"; }
+  body.tutor-bootstrap .curriculum-panel #curriculum-table tbody tr > td:nth-child(5)::before { content: "宿題"; }
+  body.tutor-bootstrap .curriculum-panel #curriculum-table tbody tr > td:nth-child(6)::before { content: "授業メモ"; }
+  body.tutor-bootstrap .curriculum-panel #curriculum-table textarea { font-size: 16px; min-height: 42px; padding: 8px 10px; }
   body.tutor-bootstrap .curriculum-panel #curriculum-table tbody tr.is-next-lesson { border-color: var(--works-accent); box-shadow: 0 0 0 1px var(--works-accent) inset; }
-  body.tutor-bootstrap .curriculum-panel #curriculum-table tbody tr.is-next-lesson > td:nth-child(3)::after {
-    content: "次回"; margin-left: 8px; padding: 1px 8px; border-radius: 999px;
+  body.tutor-bootstrap .curriculum-panel #curriculum-table tbody tr.is-next-lesson > td:nth-child(1)::after {
+    content: "次回"; margin-left: 8px; padding: 1px 8px; border-radius: 999px; vertical-align: 2px;
     font-size: .7rem; font-weight: 700; background: var(--works-accent); color: #fff;
   }
+  .curriculum-carousel-nav { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; }
+  .curriculum-carousel-nav [data-carousel-position] { flex: 1; text-align: center; font-size: .84rem; font-weight: 700; color: var(--works-ink-2); font-variant-numeric: tabular-nums; }
+  .curriculum-carousel-nav button {
+    display: inline-grid; place-items: center; min-width: 44px; min-height: 40px; padding: 0 12px;
+    border: 1px solid var(--works-line); border-radius: 999px; background: var(--works-surface); color: var(--works-ink);
+  }
+  .curriculum-carousel-nav button:disabled { opacity: .4; }
+  .curriculum-carousel-nav [data-carousel-next-lesson] { font-size: .78rem; font-weight: 700; color: var(--works-accent-strong); border-color: var(--works-accent-line, #c9cffa); }
 }
+@media screen and (min-width: 720px) { .curriculum-carousel-nav { display: none !important; } }
 
-/* --- 生徒・授業の選択 --- */
+/* --- 生徒・授業の選択: カレンダー(教室・区分)名と生徒名をカレンダーの色で表示 --- */
 body.tutor-bootstrap .curriculum-panel .student-picker {
   margin: 4px 0 16px;
   padding: 10px 12px 6px;
@@ -147,45 +188,42 @@ body.tutor-bootstrap .curriculum-panel .student-picker {
   box-shadow: var(--works-shadow, 0 1px 2px rgb(16 18 24 / .06), 0 4px 12px rgb(16 18 24 / .05));
 }
 body.tutor-bootstrap .curriculum-panel .student-picker #student-groups {
-  gap: 4px; padding: 0 0 8px; border-bottom: 1px solid var(--works-line);
+  gap: 6px; padding: 0 0 8px; border-bottom: 1px solid var(--works-line);
 }
 body.tutor-bootstrap .curriculum-panel .student-picker #student-groups button {
-  min-height: 34px; padding: 4px 12px; border: 0; border-radius: 999px;
-  background: transparent; color: var(--works-ink-2); font-size: .82rem; font-weight: 500;
+  min-height: 34px; padding: 4px 12px; border: 1px solid transparent; border-radius: 999px;
+  background: color-mix(in srgb, var(--student-color) 8%, var(--works-surface));
+  color: color-mix(in srgb, var(--student-color) 72%, #000); font-size: .82rem; font-weight: 700;
   box-shadow: none;
 }
-body.tutor-bootstrap .curriculum-panel .student-picker #student-groups button:hover { background: var(--works-hover); }
+body.tutor-bootstrap .curriculum-panel .student-picker #student-groups button:hover { background: color-mix(in srgb, var(--student-color) 16%, var(--works-surface)); }
 body.tutor-bootstrap .curriculum-panel .student-picker #student-groups button[aria-pressed="true"] {
-  background: var(--works-ink); color: #fff; font-weight: 700;
+  background: var(--student-color); border-color: var(--student-color); color: #fff;
+  text-shadow: 0 1px 1px rgb(0 0 0 / .25);
 }
 body.tutor-bootstrap .curriculum-panel .student-picker .student-group-count {
   display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px;
-  border-radius: 999px; background: var(--works-track); color: var(--works-ink-2); opacity: 1; font-size: .66rem; font-weight: 700;
+  border-radius: 999px; background: color-mix(in srgb, var(--student-color) 16%, var(--works-surface)); color: inherit; opacity: 1; font-size: .66rem; font-weight: 700;
+  text-shadow: none;
 }
-body.tutor-bootstrap .curriculum-panel .student-picker #student-groups button[aria-pressed="true"] .student-group-count { background: rgb(255 255 255 / .2); color: #fff; }
+body.tutor-bootstrap .curriculum-panel .student-picker #student-groups button[aria-pressed="true"] .student-group-count { background: rgb(255 255 255 / .25); color: #fff; }
 body.tutor-bootstrap .curriculum-panel .student-picker .student-slider-heading { margin: 8px 2px 0; font-size: .72rem; font-weight: 700; letter-spacing: .04em; color: var(--works-ink-3); }
 body.tutor-bootstrap .curriculum-panel .student-picker .student-slider-heading small { font-weight: 400; letter-spacing: 0; }
 body.tutor-bootstrap .curriculum-panel .student-picker #student-selector { gap: 6px; padding: 6px 2px 8px; }
 body.tutor-bootstrap .curriculum-panel .student-picker #student-selector button {
-  display: inline-flex; align-items: center; gap: 8px;
-  min-height: 40px; padding: 4px 14px 4px 5px; border: 1px solid var(--works-line); border-radius: 999px;
-  background: var(--works-surface); font-size: .86rem; font-weight: 500; text-align: left; box-shadow: none;
+  display: inline-flex; align-items: baseline; gap: 6px;
+  min-height: 40px; padding: 8px 14px; border: 1px solid color-mix(in srgb, var(--student-color) 30%, var(--works-line));
+  border-left: 4px solid var(--student-color); border-radius: 8px;
+  background: var(--works-surface); color: color-mix(in srgb, var(--student-color) 72%, #000);
+  font-size: .88rem; font-weight: 700; text-align: left; box-shadow: none;
 }
-body.tutor-bootstrap .curriculum-panel .student-picker #student-selector button::before {
-  content: attr(data-initial);
-  content: attr(data-initial) / "";
-  display: inline-grid; place-items: center; flex: 0 0 30px; width: 30px; height: 30px; border-radius: 50%;
-  background: color-mix(in srgb, var(--student-color, var(--works-accent)) 14%, var(--works-surface));
-  color: color-mix(in srgb, var(--student-color, var(--works-accent)) 80%, var(--works-ink));
-  font-size: .8rem; font-weight: 700;
-}
-body.tutor-bootstrap .curriculum-panel .student-picker #student-selector button small { margin: 0 0 0 -2px; font-size: .68rem; }
-body.tutor-bootstrap .curriculum-panel .student-picker #student-selector button:hover { border-color: var(--works-line-strong); background: var(--works-hover); }
+body.tutor-bootstrap .curriculum-panel .student-picker #student-selector button small { margin: 0; font-size: .68rem; font-weight: 400; color: var(--works-ink-3); }
+body.tutor-bootstrap .curriculum-panel .student-picker #student-selector button:hover { background: color-mix(in srgb, var(--student-color) 8%, var(--works-surface)); }
 body.tutor-bootstrap .curriculum-panel .student-picker #student-selector button[aria-pressed="true"] {
-  border-color: var(--works-accent); background: var(--works-accent-soft); color: var(--works-ink); font-weight: 700;
-  box-shadow: 0 0 0 1px var(--works-accent) inset;
+  background: color-mix(in srgb, var(--student-color) 16%, var(--works-surface));
+  border-color: var(--student-color); box-shadow: 0 0 0 1px var(--student-color) inset;
+  color: color-mix(in srgb, var(--student-color) 60%, #000);
 }
-body.tutor-bootstrap .curriculum-panel .student-picker #student-selector button[aria-pressed="true"]::before { background: var(--works-accent); color: #fff; }
 body.tutor-bootstrap .curriculum-panel .student-picker #student-selector[aria-busy="true"] { opacity: .6; }
 @media print { .student-picker { display: none !important; } }
 
@@ -335,7 +373,64 @@ body.tutor-bootstrap #settings-modal .add-year-section .term-form { display: gri
 
 @media print {
   .curriculum-progress-summary { display: none !important; }
-  body.tutor-bootstrap .curriculum-panel #curriculum-table tr.is-next-lesson td,
-  body.tutor-bootstrap .curriculum-panel #curriculum-table tr[data-completed="1"] td { background: none !important; box-shadow: none !important; }
+  .curriculum-carousel-nav { display: none !important; }
+  body.tutor-bootstrap .curriculum-panel #curriculum-table { min-width: 0; table-layout: fixed; }
+  body.tutor-bootstrap .curriculum-panel #curriculum-table th,
+  body.tutor-bootstrap .curriculum-panel #curriculum-table td { width: auto !important; }
+  body.tutor-bootstrap .curriculum-panel #curriculum-table th:nth-child(1) { width: 8% !important; }
+  body.tutor-bootstrap .curriculum-panel #curriculum-table th:nth-child(2) { width: 14% !important; }
+  body.tutor-bootstrap .curriculum-panel #curriculum-table tr.is-next-lesson td { background: none !important; box-shadow: none !important; }
   .school-date.is-today { color: #000; }
 }
+
+/* --- 設定: 集団授業の判定文字列(タグ入力) --- */
+body.tutor-bootstrap #settings-modal .keyword-input-box {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  min-height: 46px; padding: 6px 8px; border: 1px solid var(--works-input-line); border-radius: var(--works-radius, 8px);
+  background: var(--works-surface); cursor: text;
+}
+body.tutor-bootstrap #settings-modal .keyword-input-box:focus-within { border-color: var(--works-accent); box-shadow: var(--works-focus); }
+body.tutor-bootstrap #settings-modal .keyword-tags { display: contents; list-style: none; margin: 0; padding: 0; }
+body.tutor-bootstrap #settings-modal .keyword-tag {
+  display: inline-flex; align-items: center; gap: 2px; height: 30px; padding: 0 4px 0 10px; margin: 0;
+  border-radius: 999px; background: var(--works-accent-soft); color: var(--works-accent-strong);
+  font-size: .84rem; font-weight: 700; list-style: none;
+}
+body.tutor-bootstrap #settings-modal .keyword-tag::marker { content: none; }
+body.tutor-bootstrap #settings-modal .keyword-tag button {
+  display: inline-grid; place-items: center; width: 24px; height: 24px; min-height: 0; min-width: 0; padding: 0;
+  border: 0; border-radius: 50%; background: transparent; color: inherit; box-shadow: none;
+}
+body.tutor-bootstrap #settings-modal .keyword-tag button:hover { background: rgb(77 91 216 / .15); }
+body.tutor-bootstrap #settings-modal .keyword-tag button svg { width: 14px; height: 14px; }
+body.tutor-bootstrap #settings-modal .keyword-input-box input {
+  flex: 1 1 120px; min-width: 100px; min-height: 30px; padding: 2px 4px; border: 0 !important; box-shadow: none !important; background: transparent; outline: none;
+}
+body.tutor-bootstrap #settings-modal .keyword-editor [role=status] { display: block; min-height: 1.2em; margin-top: 4px; font-size: .74rem; color: var(--works-ink-3); }
+body.tutor-bootstrap .schools-summary .school-name { border: 0; border-radius: 0; box-shadow: none; min-width: 0; background: var(--works-surface-sunken); color: var(--works-ink); }
+@media screen and (max-width: 719px) { body.tutor-bootstrap .schools-summary .school-schedule-group[data-open="false"] .school-name { background: var(--works-surface); } }
+body.tutor-bootstrap .schools-summary .school-name:focus-visible { outline: 2px solid var(--works-accent); outline-offset: -2px; }
+@media screen and (max-width: 719px) {
+  body.tutor-bootstrap .schools-summary .school-schedule-group[data-open="true"] .school-name { border-bottom: 1px solid var(--works-line); }
+}
+
+/* --- 生徒選択の最上段: 年度の切り替えと学期チップ(タップでオン・オフ) --- */
+body.tutor-bootstrap .curriculum-panel .student-term-row {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 0 0 10px; margin-bottom: 8px; border-bottom: 1px solid var(--works-line);
+}
+body.tutor-bootstrap .curriculum-panel .student-year-select {
+  width: auto; min-width: 0; min-height: 36px; height: 36px; padding: 0 30px 0 12px;
+  border: 1px solid var(--works-input-line); border-radius: 999px; background-color: var(--works-surface);
+  font-size: .84rem; font-weight: 700; color: var(--works-ink);
+}
+body.tutor-bootstrap .curriculum-panel .student-term-chips { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; min-width: 0; }
+body.tutor-bootstrap .curriculum-panel .student-term-chip {
+  display: inline-flex; align-items: center; gap: 4px; min-height: 36px; padding: 0 14px;
+  border: 1px solid var(--works-line-strong); border-radius: 999px; background: var(--works-surface);
+  color: var(--works-ink-2); font-size: .84rem; font-weight: 700; box-shadow: none;
+}
+body.tutor-bootstrap .curriculum-panel .student-term-chip[aria-pressed="true"] { border-color: var(--works-ink); background: var(--works-ink); color: #fff; }
+body.tutor-bootstrap .curriculum-panel .student-term-chip[aria-pressed="true"]::before { content: "✓"; font-size: .76rem; }
+body.tutor-bootstrap .curriculum-panel .student-term-empty { font-size: .78rem; color: var(--works-ink-3); }
+body.tutor-bootstrap .curriculum-panel .student-picker #student-groups { border-bottom: 0; padding-bottom: 4px; }
