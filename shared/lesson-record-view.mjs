@@ -32,8 +32,8 @@ export function lessonRecordRows(rows, { escapeHtml, formatTimeOrPeriod, lessonR
       const record=r.record?.record_storage==='d1_owner'?attributedLessonRecord(r.record,r.ref):r.record;
       const term = r.termMode && termEditorsForRow ? termEditorsForRow(r) : null;
       if (lessonRecordNeedsReview(record)) {
-        const review=lessonReviewRow(r.ref,record,r.label,period(r),"record").replace('</strong>','</strong> <small class="semester-candidate-count">'+escapeHtml(String(r.n))+'/'+escapeHtml(String(r.m))+'回（同名の予定候補・所属未確定）</small>');
-        return card(term&&r.termPosition?review.replace('<tr>','<tr data-term-record>').replace('</td>',term.current+term.next+'</td>'):review,r);
+        const review=lessonReviewRow(r.ref,record,r.label,period(r),"record",Boolean(term)).replace('</strong>','</strong> <small class="semester-candidate-count">'+escapeHtml(String(r.n))+'/'+escapeHtml(String(r.m))+'回（同名の予定候補・所属未確定）</small>');
+        return card(term&&record.attribution_status==='owner_unassigned'?review.replace('<tr>','<tr data-term-record>').replace('</td>',term.current+term.next+'</td>'):review,r);
       }
       return card(`<tr${term?" data-term-record":""} data-event-id="${escapeHtml(r.eventId)}" data-record-ref="${escapeHtml(JSON.stringify(r.ref))}" data-record-revision="${r.record.record_revision}" data-record-owner="${escapeHtml(r.record.owner_id||'')}" data-completed="${r.completed ? 1 : 0}" data-calendar-name="${escapeHtml(calendarName(r.calendarId) || "カレンダー")}">
         <td>

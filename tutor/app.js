@@ -11,7 +11,7 @@ import {readPendingRecovery,persistPendingRecovery,clearPendingRecovery,pendingR
 import {createOwnerMemoEditors} from '../shared/owner-memo.mjs?v=2-autosave';
 import {boundedRead,precedingLegacyEvents,precedingOwnerEvents,recordTermScope,studentNavigationEvent} from './record-read.mjs?v=3-navigation';
 import {readNextLessonWithTemplate} from "../shared/next-lesson-read.mjs?v=1";
-import { lessonRecordRows, renderPlanEditors, renderMemoEditors, previousOwnerRecord } from "../shared/lesson-record-view.mjs?v=term-plan-1";
+import { lessonRecordRows, renderPlanEditors, renderMemoEditors, previousOwnerRecord } from "../shared/lesson-record-view.mjs?v=term-plan-2";
 import { setUserAvatar } from "../shared/avatar.mjs?v=1";
 import { attachRecordCarousel } from "./record-carousel.mjs?v=4";
 import { attachRecordToasts } from "./record-toasts.mjs?v=3-name";
@@ -696,7 +696,7 @@ async function loadRecordTable() {
 }
 
 function renderRecordTable(rows) {
-  rows.filter((row) => !row.emptySlot && (!lessonRecordNeedsReview(row.record)||row.record.pending_allowed)).forEach((row) => lessonPlans.seed(row.ref, row.lessonPlan, row.planReadVersion, row.record.record_revision,row.record.attribution_status,row.record.owner_id||null,row.record.pending_context||null));
+  rows.filter((row) => !row.emptySlot && (!lessonRecordNeedsReview(row.record)||(!row.termMode&&row.record.pending_allowed))).forEach((row) => lessonPlans.seed(row.ref, row.lessonPlan, row.planReadVersion, row.record.record_revision,row.record.attribution_status,row.record.owner_id||null,row.record.pending_context||null));
   els.recordTbody.innerHTML = lessonRecordRows(rows, { escapeHtml, formatTimeOrPeriod, lessonRecordNeedsReview, lessonReviewRow, lightenHexColor, calendarName: id => calendarColors.get(id)?.name, lessonAttributionNotice, lessonPlanEditor, lessonPlanFeedback, recordStudentPrefName, lessonEventKey, termEditorsForRow });
   if (linkedRecordId && linkedCalendarId && selectedRecordDate === requestedRecordDate) {
     const key = lessonEventKey({calendar_id:linkedCalendarId, id:linkedRecordId});
@@ -723,10 +723,14 @@ function renderRecordTable(rows) {
 function canUseTermPlan(record) {
   return !lessonRecordNeedsReview(record) || record.attribution_status==='owner_unassigned';
 }
+function previousEventPlan(record,ref) {
+  const previous = record.attribution_status==='owner_unassigned' ? unassignedLessonDisplay(record,ref)?.lessonPlan : '';
+  return previous ? '<details><summary>以前の予定別の記録</summary><p>'+escapeHtml(previous)+'</p></details>' : '';
+}
 function termEditorsForRow(row) {
-  if (!row.termPosition) return {current:'<small role="status">'+escapeHtml(row.termNotice || '')+'</small>',next:''};
+  if (!row.termPosition) return {current:'<small role="status">'+escapeHtml(row.termNotice || '')+'</small>'+previousEventPlan(row.record,row.ref),next:''};
   const {current,next,nextRef}=row.termPosition;
-  return {current:termPlans.markup(current,`第${current.ordinal}回の授業予定`,row.lessonPlan),
+  return {current:termPlans.markup(current,`第${current.ordinal}回の授業予定`,row.record.attribution_status==='owner_unassigned' ? unassignedLessonDisplay(row.record,row.ref)?.lessonPlan : row.lessonPlan),
     next:termPlans.markup(next,`次回授業予定（第${next.ordinal}回${nextRef ? '・'+lessonPlanDate(nextRef) : '・日程未定'}）`)};
 }
 
@@ -763,7 +767,7 @@ window.addEventListener('focus',refreshVisibleNextLessons);
 function renderLessonPlans() {
   renderPlanEditors(document, lessonPlans, { lessonPlanDate, resizeRecordInput, allowNextBinding: true });
   for (const row of document.querySelectorAll('[data-unassigned-progress][data-pending-key]')) {
-    const state=lessonPlans.get(row.dataset.pendingKey),input=row.querySelector('textarea');
+    const state=lessonPlans.get(row.dataset.pendingKey),input=row.querySelector('[data-legacy-pending-plan]');
     if(!state || !input)continue;
     const show=value=>{input.value=value;input.defaultValue=value;};
     let observed;try{observed=JSON.parse(row.dataset.pendingTarget);}catch{show('');continue;}
@@ -2787,17 +2791,20 @@ async function renderCurriculumTable(events, context = captureStudentContext(), 
       const position = termPositions ? termPosition(termPositions,ev) : null;
       const slot = position && canUseTermPlan(saved) ? position.current : null;
       if(slot)termSlots.push(slot);
-      const slotEditor = slot ? termPlans.markup(slot,`第${slot.ordinal}回の授業予定`,saved.lesson_plan || '') : '';
-      if (unassigned && (!retained || slot)) {
+      const numberedUnassigned = !!term && saved.attribution_status==='owner_unassigned';
+      const slotEditor = slot ? termPlans.markup(slot,`第${slot.ordinal}回の授業予定`,numberedUnassigned ? unassigned?.lessonPlan : saved.lesson_plan || '') : '';
+      const numberedEditor = numberedUnassigned ? slotEditor || '<small role="status">学期内の予定を再確認してください。</small>'+previousEventPlan(saved,ref) : '';
+      if (unassigned && (!retained || numberedUnassigned)) {
         const label = escapeHtml(ev.summary || '授業');
-        return `<tr data-unassigned-progress data-pending-key="${escapeHtml(key)}" data-pending-target="${escapeHtml(JSON.stringify(ref))}" data-pending-context="${escapeHtml(unassigned.pendingContext)}"><td><input type="checkbox" disabled aria-label="${label}の完了（未紐付けのため編集不可）"></td>
+        const legacyHooks = numberedUnassigned ? '' : ` data-pending-key="${escapeHtml(key)}" data-pending-target="${escapeHtml(JSON.stringify(ref))}" data-pending-context="${escapeHtml(unassigned.pendingContext)}"`;
+        return `<tr data-unassigned-progress${legacyHooks}><td><input type="checkbox" disabled aria-label="${label}の完了（未紐付けのため編集不可）"></td>
           <td>${position?.current.ordinal ?? count.n}/${position?.total ?? count.m}回</td><td data-lesson-period="curriculum" data-period-start="${escapeHtml(start)}" data-period-calendar="${escapeHtml(ev._calendarId || "")}">${escapeHtml(formatCurriculumDate(start, ev._calendarId))}</td>
-          <td>${slotEditor || `<textarea rows="2" disabled aria-label="${label}の授業予定（未紐付けのため編集不可）">${escapeHtml(unassigned.lessonPlan)}</textarea>`}</td>
+          <td>${numberedUnassigned ? numberedEditor : `<textarea data-legacy-pending-plan rows="2" disabled aria-label="${label}の授業予定（未紐付けのため編集不可）">${escapeHtml(unassigned.lessonPlan)}</textarea>`}</td>
           ${['確認テスト','宿題','授業メモ'].map(field=>`<td><textarea rows="2" disabled aria-label="${label}の${field}（未紐付けのため編集不可）"></textarea></td>`).join('')}</tr>`;
       }
-      if (lessonRecordNeedsReview(saved)) return lessonReviewRow(lessonEventRef(ev),saved,ev.summary || "授業",formatCurriculumDate(start, ev._calendarId), "curriculum")
+      if (lessonRecordNeedsReview(saved)) return lessonReviewRow(lessonEventRef(ev),saved,ev.summary || "授業",formatCurriculumDate(start, ev._calendarId), "curriculum",numberedUnassigned)
         .replace('</strong>', `</strong> <small class="semester-candidate-count">${position?.current.ordinal ?? count.n}/${position?.total ?? count.m}回（同名予定・所属未確定）</small>`)
-        .replace('</td>',slotEditor+'</td>');
+        .replace('</td>',(numberedUnassigned ? numberedEditor : slotEditor)+'</td>');
       const checked = saved.completed ? "checked" : "";
       lessonPlans.seed(ref, saved.lesson_plan || "", planReadVersion, saved.record_revision,saved.attribution_status,saved.owner_id||null);
       return `<tr data-event-id="${escapeHtml(ev.id)}" data-record-ref="${escapeHtml(JSON.stringify(ref))}" data-record-revision="${saved.record_revision}" data-record-owner="${escapeHtml(saved.owner_id||'')}" data-completed="${saved.completed ? 1 : 0}">
@@ -3785,10 +3792,10 @@ function escapeHtml(str) {
 }
 
 
-function lessonReviewRow(ref,record,label,date,view) {
+function lessonReviewRow(ref,record,label,date,view,numbered=false) {
   const time = view ? `<span data-lesson-period="${escapeHtml(view)}" data-period-start="${escapeHtml(ref.start || "")}" data-period-calendar="${escapeHtml(ref.calendar_id || "")}">${escapeHtml(date)}</span>` : escapeHtml(date);
   if(record.attribution_status==='excluded')return `<tr><td colspan="7">${escapeHtml(label)} ${time}：授業履歴への取り込み・編集の対象外です。</td></tr>`;
-  if(record.attribution_status==='owner_unassigned'&&record.pending_allowed)return `<tr><td colspan="7"><strong>${escapeHtml(label)}</strong> ${time}<div class="pending-plan-label"><span>授業予定</span>${lessonPlanEditor(ref,label,'pending-record-plan','')}</div><p>未紐づけのため予定単位のD1下書きとして保存します。生徒の履歴へは自動で移しません。</p><a class="pending-bind-link" href="/tutor/history.html?calendar_id=${encodeURIComponent(ref.calendar_id)}&event_id=${encodeURIComponent(ref.id)}">下書きと紐づけを確認</a><p><a class="series-start-link" href="/tutor/history.html?calendar_id=${encodeURIComponent(ref.calendar_id)}&event_id=${encodeURIComponent(ref.id)}&series_start=1">この授業から次回・共有メモの連動を開始</a></p></td></tr>`;
+  if(record.attribution_status==='owner_unassigned'&&record.pending_allowed)return `<tr><td colspan="7"><strong>${escapeHtml(label)}</strong> ${time}${numbered ? '<p>生徒・クラスは未紐づけですが、授業予定は学期の回数別に管理します。</p>' : `<div class="pending-plan-label"><span>授業予定</span>${lessonPlanEditor(ref,label,'pending-record-plan','')}</div><p>未紐づけのため予定単位のD1下書きとして保存します。生徒の履歴へは自動で移しません。</p>`}<a class="pending-bind-link" href="/tutor/history.html?calendar_id=${encodeURIComponent(ref.calendar_id)}&event_id=${encodeURIComponent(ref.id)}">下書きと紐づけを確認</a><p><a class="series-start-link" href="/tutor/history.html?calendar_id=${encodeURIComponent(ref.calendar_id)}&event_id=${encodeURIComponent(ref.id)}&series_start=1">この授業から次回・共有メモの連動を開始</a></p></td></tr>`;
   if(record.record_storage==='d1_owner'||record.attribution_status==='owner_unassigned')return `<tr><td colspan="7"><strong>${escapeHtml(label)}</strong> ${time}<p>生徒・クラスの紐づけを確認してください。保存済みの授業履歴は保持されています。</p><a href="/tutor/history.html?calendar_id=${encodeURIComponent(ref.calendar_id)}&event_id=${encodeURIComponent(ref.id)}">授業履歴で紐づけを確認</a></td></tr>`;
   if(record.record_pending_operation)return `<tr><td colspan="7"><strong>${escapeHtml(label)}</strong> ${time}<p role="status">カレンダー保存の結果確認が必要です。再送は停止しています。</p><button type="button" class="calendar-record-reconcile" data-ref="${escapeHtml(JSON.stringify(ref))}">保存結果を照合する</button><small role="status"></small></td></tr>`;
   return `<tr><td colspan="7"><strong>${escapeHtml(label)}</strong> ${time}
