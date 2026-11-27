@@ -2516,24 +2516,37 @@ function renderGroupKeywordTags() {
     .map((keyword) => `<li class="keyword-tag"><span>${escapeHtml(keyword)}</span><button type="button" data-remove-keyword="${escapeHtml(keyword)}" aria-label="${escapeHtml(keyword)}を削除"><i class="bx bx-x"></i></button></li>`)
     .join("");
 }
+// 保存は1件ずつ順番に行い、保存中の追加・削除は最後の状態を続けて保存する(応答の前後で編集が消えないようにする)。
+let groupKeywordSaving = false;
+let groupKeywordSaved = null;
 async function saveGroupKeywords(next) {
   const status = groupKeywordEditor.querySelector("[role=status]");
-  const previous = groupLessonKeywords;
+  if (groupKeywordSaved === null) groupKeywordSaved = [...groupLessonKeywords];
   groupLessonKeywords = next;
-  renderGroupKeywordTags();
-  status.textContent = "保存中…";
-  try {
-    const saved = await apiFetch("/settings", { method: "PUT", body: JSON.stringify({ group_lesson_keywords: next }) }, null);
-    groupLessonKeywords = Array.isArray(saved?.group_lesson_keywords) ? saved.group_lesson_keywords : next;
-    status.textContent = "保存しました";
-  } catch (err) {
-    groupLessonKeywords = previous;
-    status.textContent = "";
-    showActionError(err);
-  }
   renderGroupKeywordTags();
   studentGroup = "";
   renderCurriculumNameSuggestions();
+  if (groupKeywordSaving) return;
+  groupKeywordSaving = true;
+  status.textContent = "保存中…";
+  try {
+    while (JSON.stringify(groupLessonKeywords) !== JSON.stringify(groupKeywordSaved)) {
+      const sending = [...groupLessonKeywords];
+      await apiFetch("/settings", { method: "PUT", body: JSON.stringify({ group_lesson_keywords: sending }) }, null);
+      groupKeywordSaved = sending;
+    }
+    status.textContent = "保存しました";
+  } catch (err) {
+    // 失敗したら最後に保存できた状態に戻す。
+    groupLessonKeywords = [...groupKeywordSaved];
+    status.textContent = "";
+    showActionError(err);
+    renderGroupKeywordTags();
+    studentGroup = "";
+    renderCurriculumNameSuggestions();
+  } finally {
+    groupKeywordSaving = false;
+  }
 }
 function addGroupKeywords(raw) {
   const additions = String(raw || "").split(/[,、，\n]/).map((item) => item.trim()).filter(Boolean);
@@ -2925,7 +2938,8 @@ async function renderCurriculumTable(events, context = captureStudentContext(), 
     .filter(record => record.attribution_status === 'confirmed' && record.owner_id).map(record => record.owner_id);
   void studentTodos.showRelated(confirmedStudents);
   const retainedCopies = pendingRecoveryCopies();
-  const termPositions = numberedTerms.length ? new Map(numberedTerms.flatMap((t) => [...termLessonPositions(t,countEvents,[...excludedTitles])])) : null;
+  // 回数は学期ごとに数える(学期の期間が重なっても、各行は自分の学期の回数だけを使う)。
+  const termPositionsById = new Map(numberedTerms.map((t) => [t.id, termLessonPositions(t,countEvents,[...excludedTitles])]));
   const termSlots = [];
   let previousTermId = null;
 
@@ -2949,6 +2963,7 @@ async function renderCurriculumTable(events, context = captureStudentContext(), 
       const plan = lessonPlans.get(key);
       const retained = recordDrafts.has(key) || plan?.dirty || plan?.pending || plan?.status === 'conflict' ||
         retainedCopies.some(copy => copy.target && lessonEventKey(copy.target) === key);
+      const termPositions = term ? termPositionsById.get(term.id) : null;
       const position = termPositions ? termPosition(termPositions,ev) : null;
       const slot = position && canUseTermPlan(saved) ? position.current : null;
       if(slot)termSlots.push(slot);
