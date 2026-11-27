@@ -256,3 +256,10 @@ CREATE TABLE IF NOT EXISTS todo_state (
   data TEXT NOT NULL,
   revision INTEGER NOT NULL DEFAULT 1
 );
+
+-- Plans are independent of event IDs. Existing actual lesson records are unchanged.
+CREATE TABLE IF NOT EXISTS term_lesson_plans (
+  term_id INTEGER NOT NULL, calendar_id TEXT NOT NULL, title TEXT NOT NULL,
+  ordinal INTEGER NOT NULL, value TEXT NOT NULL, revision INTEGER NOT NULL,
+  PRIMARY KEY (term_id, calendar_id, title, ordinal)
+);

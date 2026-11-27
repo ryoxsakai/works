@@ -6137,6 +6137,23 @@ export default {
         return json(await createLesson(env, body), headers, 201);
       }
 
+      if (url.pathname === "/api/term-lesson-plans") {
+        if (browserSession.aud || browserSession.scope || browserSession.fid) throw httpError(401, "browser session required");
+        if (!["POST","PUT"].includes(request.method)) throw httpError(405, "method not allowed");
+        const {handleTermLessonPlans}=await import("./term-lesson-plans.js");
+        const {termUsesNumberedPlans}=await import("../../shared/term-lesson-plan.mjs");
+        const settings=await readSettings(env);
+        try {
+          return json(await handleTermLessonPlans(request,env.DB,{
+            calendars:Array.isArray(settings.selected_calendars)?settings.selected_calendars:[],
+            terms:(await readTerms(env)).filter(term=>termUsesNumberedPlans(term,settings.term_plan_modes)),
+          }),{...headers,"Cache-Control":"no-store"});
+        } catch (error) {
+          if(Number.isInteger(error.status)) throw error;
+          throw httpError(503,"回数別の授業予定を確認できませんでした");
+        }
+      }
+
       if (url.pathname === "/api/tutor-period-profiles") {
         const { handlePeriodProfiles } = await import("./tutor-period-profiles.js");
         return json(await handlePeriodProfiles(request, env, browserSession), {...headers, "Cache-Control": "no-store"});
@@ -6153,6 +6170,15 @@ export default {
         }
         if (Array.isArray(body.selected_term_ids)) {
           await writeSetting(env, "selected_term_ids", body.selected_term_ids);
+        }
+        if (body.term_plan_mode !== undefined) {
+          const {id,enabled}=body.term_plan_mode||{};
+          if (browserSession.aud || browserSession.scope || browserSession.fid) throw httpError(401, "browser session required");
+          if (!Number.isSafeInteger(id)||typeof enabled!=="boolean"||!(await readTerms(env)).some(term=>term.id===id))
+            throw httpError(400,"学期の設定を確認してください");
+          // Update just this term's preference; concurrent changes for other terms survive.
+          await env.DB.prepare("INSERT INTO settings(key,value) VALUES('term_plan_modes',json_object(?,json(?))) ON CONFLICT(key) DO UPDATE SET value=json_set(settings.value,?,json(?))")
+            .bind(String(id),String(enabled),'$."'+id+'"',String(enabled)).run();
         }
         if (Array.isArray(body.excluded_titles)) {
           await writeSetting(env, "excluded_titles", body.excluded_titles);
