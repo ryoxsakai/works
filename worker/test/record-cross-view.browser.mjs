@@ -61,6 +61,9 @@ try{
  await curr(page).locator('.curriculum-completed').check();await expect.poll(async()=>(await stored()).completed).toBe(1);await expect(daily(page)).toHaveAttribute('data-completed','1');
  await tab(page,'record');await edit(page,'record','homework','日別で追記した宿題');assert.equal((await stored()).completed,1);await expect(curr(page).locator('.curriculum-completed')).toBeChecked();
  await daily(page).locator('.record-plan').fill('同期する授業予定');await daily(page).locator('.record-plan').press('Tab');await expect(curr(page).locator('.curriculum-plan')).toHaveValue('同期する授業予定');
+ // Mirroring a draft is immediate; wait for its save to finish before a separate record write.
+ await expect(daily(page).locator('.lesson-plan-editor').filter({has:page.locator('.record-plan')}).locator('.lesson-plan-status')).toHaveText('保存済み');
+ await expect.poll(async()=>(await stored()).lesson_plan).toBe('同期する授業予定');
  await tab(page,'curriculum');await curr(page).locator('.curriculum-completed').uncheck();await expect.poll(async()=>(await stored()).completed).toBe(0);await expect(daily(page)).toHaveAttribute('data-completed','0');
  const saved=await stored();assert.equal(saved.confirmation_test,'日別の確認テスト');assert.equal(saved.homework,'日別で追記した宿題');assert.equal(saved.lesson_memo,'共有する授業メモ');assert.equal(saved.lesson_plan,'同期する授業予定');
  assert.deepEqual(await page.locator('#identity-fixtures tr').evaluateAll(rows=>rows.map(r=>r.dataset.recordRevision)),['77','77']);
