@@ -195,14 +195,23 @@ try {
     await open.click();
     await modal.getByRole('tab',{name:'時限',exact:true}).click();
     await expect(mode).toHaveValue('both');
+    // The public entry now resumes the teaching service, not the retired home cards.
+    await page.evaluate(() => {
+      localStorage.setItem('works_session_token', 'synthetic');
+      localStorage.setItem('works_last_service', '/tutor/');
+    });
     await page.goto(origin+'/');
-    await expect(page.locator('.home-lesson-cards tr[data-event-id="schedule-a"] [data-label="時刻"]')).toHaveText('S限（09:45）');
-    await expect(page.locator('.home-lesson-cards tr[data-event-id="schedule-ad-hoc"] [data-label="時刻"]')).toHaveText('11:11');
+    await expect(page).toHaveURL(origin+'/tutor/');
+    const service=viewport.width<=730 ? page.frameLocator('iframe.works-service-frame:not([aria-hidden])') : page;
+    await service.locator('[data-page-tab="record"]').click();
+    await expect(service.locator('#record-tbody tr[data-event-id="schedule-a"] [data-label="時刻"]')).toHaveText('S限（09:45）');
+    await expect(service.locator('#record-tbody tr[data-event-id="schedule-ad-hoc"] [data-label="時刻"]')).toHaveText('11:11');
+    assert.equal(writes.length,4);
     assert.deepEqual(errors,[]);
     assert.deepEqual(unexpected,[]);
     await context.close();
   }
-  console.log('School-specific periods: desktop/mobile settings, secure persistence, exclusive calendars, validation, failure/conflict retention, record/schedule/Home display PASS');
+  console.log('School-specific periods: desktop/mobile settings, secure persistence, exclusive calendars, validation, failure/conflict retention, record/schedule display after entry resume PASS');
 } finally {
   await browser.close();
 }

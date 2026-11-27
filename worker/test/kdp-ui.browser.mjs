@@ -158,15 +158,6 @@ try {
       await page.locator("#dialog-form button[type=submit]").click();
       await page.locator("#modal").waitFor({ state: "hidden" });
     };
-    await page.goto(origin + "/");
-    assert.equal(await page.locator('#home-navigation a[href="/kdp/"]').count(), 0);
-    await page.locator("#dashboard-widgets .dashboard-widget").first().waitFor();
-    assert.equal(await page.locator("#dashboard-widgets .dashboard-widget").count(), 3);
-    await width();
-    await page.screenshot({
-      path: `test-artifacts/menu-${name}.png`,
-      fullPage: true,
-    });
     await page.goto(origin + "/kdp/");
     await page.locator("#new-book").waitFor();
     await expect(page.locator('#new-book')).toBeVisible();
@@ -434,29 +425,29 @@ try {
     await page.emulateMedia({reducedMotion:'reduce'});
     assert.equal(await page.locator('#section-title').evaluate(el=>getComputedStyle(el).transitionDuration),'0s');
     await page.evaluate(()=>scrollTo(0,0));
-    await page.screenshot({path:`test-artifacts/kdp-${name}-dark.png`,fullPage:true});
+    await page.screenshot({path:`test-artifacts/kdp-${name}-light.png`,fullPage:true});
     await page.emulateMedia({media:'print'});
     await page.pdf({path:`test-artifacts/kdp-${name}-print.pdf`,format:'A4'});
     await page.emulateMedia({media:'screen',reducedMotion:'no-preference'});
-    await page.goto(origin + "/");
     await page.evaluate(() => {
       localStorage.fixtureSignedOut = "1";
+      localStorage.removeItem("works_session_token");
     });
-    await page.reload();
-    await page.locator('#home-navigation').evaluate(el=>el.open=true);
-    await page.locator('#home-navigation a[href="/memo/"]').click();
-    assert.equal(
-      await page.evaluate(() => localStorage.fixtureDestination),
-      "/memo/",
-    );
-    await page.locator('#home-navigation').evaluate(el=>el.open=true);
-    // A sign-in redirect is coalesced briefly to ignore accidental double taps.
-    await page.waitForTimeout(1550);
-    await page.locator('#home-navigation a[href="/todo/"]').click();
-    assert.equal(
-      await page.evaluate(() => localStorage.fixtureDestination),
-      "/todo/",
-    );
+    for (const [last, destination] of [
+      ["/memo/", "/memo/"],
+      ["/todo/", "/todo/"],
+      ["/kdp/", "/tutor/"], // Hidden tools are not eligible as the saved entry service.
+    ]) {
+      await page.evaluate(path => {
+        localStorage.works_last_service = path;
+        delete localStorage.fixtureDestination;
+      }, last);
+      await page.goto(origin + "/");
+      await expect(page.locator('a[href="/kdp/"]')).toHaveCount(0);
+      await page.getByRole("button", { name: "Googleでログイン", exact: true }).click();
+      assert.equal(await page.evaluate(() => localStorage.fixtureDestination), destination);
+      assert.equal(await page.evaluate(() => localStorage.fixtureSignInPath), "/tutor/");
+    }
     await page.goto(origin + "/kdp/");
     await page.locator("#sign-in").click();
     assert.equal(
