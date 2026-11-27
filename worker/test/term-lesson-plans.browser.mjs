@@ -12,7 +12,8 @@ try{
  const a=make('ordinal-first',0), b=make('ordinal-second',3), other=make('other-calendar',1,name,'qa-tomas'), x=make('ordinal-inserted',1);
  f.events.splice(0,f.events.length,a,b,other);
  browser=await chromium.launch({headless:true,executablePath:process.env.BROWSER_EXECUTABLE||undefined,args:['--no-sandbox']});
- const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,reducedMotion:'reduce'});
+ const width=Number(process.env.TEST_VIEWPORT_WIDTH||390);
+ const context=await browser.newContext({viewport:{width,height:844},isMobile:width<700,hasTouch:width<700,reducedMotion:'reduce'});
  const writes=[], legacyPlanRequests=[];
  const previousEventDraft='以前の予定別に保存していた下書き';
  let unassignedEventId;
@@ -45,6 +46,8 @@ try{
  await open(0);
  const card=page.locator('tr[data-term-record]');
  await expect(card).toContainText('1/2回');
+ await expect(card.getByRole('textbox',{name:/生徒メモ/})).toBeVisible();
+ assert.equal(await card.getByRole('textbox').filter({visible:true}).count(),3);
  const next=card.getByRole('textbox',{name:/次回授業予定（第2回/});
  await expect(next).toBeEnabled();
  await next.fill('回数と一緒に残る次回計画');
@@ -88,6 +91,11 @@ try{
  await expect(pendingCard.locator('.linked-lesson-plan')).toHaveCount(0);
  await expect(pendingCard.locator('[data-term-slot]')).toHaveCount(2);
  await expect(pendingCard.locator('.pending-bind-link')).toHaveCount(1);
+ await expect(pendingCard.getByRole('textbox',{name:'生徒メモ'})).toBeDisabled();
+ assert.equal(await pendingCard.getByRole('textbox').filter({visible:true}).count(),3);
+ assert.equal(await pendingCard.locator('.student-memo-editor,.owner-memo-editor,[data-record-ref]').count(),0);
+ await expect(pendingCard).not.toContainText('予定単位のD1下書き');
+ await expect(pendingCard.getByRole('link',{name:'生徒・クラスの紐づけを確認'})).toHaveAttribute('href','/tutor/history.html?calendar_id=qa&event_id=pending-lesson');
  await pendingCard.locator('[data-term-previous] summary').click();
  await expect(pendingCard.getByText(previousEventDraft,{exact:true})).toBeVisible();
  // Keep the same app instance when moving to the student's curriculum.
@@ -112,13 +120,15 @@ try{
  await open(1);
  await page.locator('[data-page-tab="record"]').click();
  await expect(pendingCard.getByRole('textbox',{name:'第3回の授業予定'})).toHaveValue('');
+ await expect(pendingCard.getByText(previousEventDraft,{exact:true})).toBeHidden();
+ await pendingCard.locator('[data-term-previous] summary').click();
  await expect(pendingCard.getByText(previousEventDraft,{exact:true})).toBeVisible();
  await open(0);
  await page.locator('[data-page-tab="record"]').click();
  await expect(page.locator('#record-tbody').getByRole('textbox',{name:'第2回の授業予定',exact:true})).toHaveValue('未紐づけでも回数に保存');
  assert.deepEqual(legacyPlanRequests,[]);
  assert.deepEqual(errors,[]);
- console.log('PASS /tutor/ 390px: numbered plans survive reordered dates and IDs, including unassigned lessons with independent legacy drafts.');
+ console.log(`PASS /tutor/ ${width}px: compact numbered cards and separate legacy drafts survive reordered dates and IDs.`);
 } finally{
  await browser?.close();
  await f.close();

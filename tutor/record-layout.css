@@ -32,3 +32,12 @@
 .term-plan-editor details { font-size: .8rem; }
 .term-plan-editor details summary { cursor: pointer; }
 .term-plan-editor button { min-height: 36px; }
+
+/* Unassigned numbered lessons keep the two safe plan editors and the memo entry point. */
+.record-panel .record-numbered-unassigned td { width: 100%; box-sizing: border-box; }
+.record-panel .record-numbered-unassigned .record-card-heading { margin-bottom: .4rem; }
+.record-panel .record-numbered-unassigned .record-numbered-current > label { display:block; font-size:.82rem; }
+.record-panel .record-numbered-unassigned textarea { display:block; width:100%; box-sizing:border-box; }
+.record-panel .record-numbered-unassigned .record-memo-lookup {
+  display:inline-flex; align-items:center; min-height:44px; font-size:.78rem;
+}
