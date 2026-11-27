@@ -1,5 +1,5 @@
 import {termLessonPositions,termPosition,termUsesNumberedPlans} from '../shared/term-lesson-plan.mjs';
-import {createTermPlanEditors} from './term-lesson-editors.mjs';
+import {createTermPlanEditors} from './term-lesson-editors.mjs?v=compact-card-1';
 import { createPeriodSettings } from "./period-settings.mjs";
 import { defaultPeriodProfiles, lessonPeriodDisplay, lessonPeriodText, readPeriodProfiles } from "../shared/tutor-period-display.mjs";
 import {createStudentTodos} from './student-todos.mjs?v=1';
@@ -11,7 +11,7 @@ import {readPendingRecovery,persistPendingRecovery,clearPendingRecovery,pendingR
 import {createOwnerMemoEditors} from '../shared/owner-memo.mjs?v=2-autosave';
 import {boundedRead,precedingLegacyEvents,precedingOwnerEvents,recordTermScope,studentNavigationEvent} from './record-read.mjs?v=3-navigation';
 import {readNextLessonWithTemplate} from "../shared/next-lesson-read.mjs?v=1";
-import { lessonRecordRows, renderPlanEditors, renderMemoEditors, previousOwnerRecord } from "../shared/lesson-record-view.mjs?v=term-plan-2";
+import { lessonRecordRows, renderPlanEditors, renderMemoEditors, previousOwnerRecord } from "../shared/lesson-record-view.mjs?v=term-plan-3";
 import { setUserAvatar } from "../shared/avatar.mjs?v=1";
 import { attachRecordCarousel } from "./record-carousel.mjs?v=4";
 import { attachRecordToasts } from "./record-toasts.mjs?v=3-name";
@@ -730,7 +730,7 @@ function previousEventPlan(record,ref) {
 function termEditorsForRow(row) {
   if (!row.termPosition) return {current:'<small role="status">'+escapeHtml(row.termNotice || '')+'</small>'+previousEventPlan(row.record,row.ref),next:''};
   const {current,next,nextRef}=row.termPosition;
-  return {current:termPlans.markup(current,`第${current.ordinal}回の授業予定`,row.record.attribution_status==='owner_unassigned' ? unassignedLessonDisplay(row.record,row.ref)?.lessonPlan : row.lessonPlan),
+  return {current:termPlans.markup(current,`第${current.ordinal}回の授業予定`,row.record.attribution_status==='owner_unassigned' ? unassignedLessonDisplay(row.record,row.ref)?.lessonPlan : row.lessonPlan,{compact:true}),
     next:termPlans.markup(next,`次回授業予定（第${next.ordinal}回${nextRef ? '・'+lessonPlanDate(nextRef) : '・日程未定'}）`)};
 }
 
