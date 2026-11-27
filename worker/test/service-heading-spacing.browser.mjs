@@ -41,6 +41,7 @@ try {
         const title = view.locator(`${titleSelector}:visible`);
         await expect(title).toBeVisible();
         const tabs = tabSelector ? await view.locator(tabSelector).all() : [null];
+        let tutorBar;
         for (const tab of tabs) {
           if (tab) {
             await tab.focus();
@@ -69,6 +70,21 @@ try {
           if (tab) {
             const layout = await tab.evaluate(el => getComputedStyle(el.closest('.page-tabs')).position);
             assert.equal(layout, width <= 640 ? 'fixed' : 'sticky', message);
+            if (service === 'tutor' && width <= 640) {
+              const bar = await tab.evaluate(el => {
+                const menu = el.closest('.page-tabs'), bounds = menu.getBoundingClientRect();
+                return {
+                  left: bounds.left, top: bounds.top, width: bounds.width, height: bounds.height,
+                  targets: [...menu.querySelectorAll('button')].map(button => button.getBoundingClientRect().width),
+                };
+              });
+              const expectedWidth = Math.min(width - 32, 360);
+              assert.ok(Math.abs(bar.width - expectedWidth) < 1, `Tutor bottom bar at ${width}px: ${JSON.stringify(bar)}`);
+              assert.ok(Math.abs(bar.left - (width - expectedWidth) / 2) < 1);
+              assert.ok(bar.targets.every(target => target >= 48));
+              if (tutorBar) assert.deepEqual(bar, tutorBar, 'all Tutor tabs use identical mobile menu geometry');
+              tutorBar = bar;
+            }
           }
         }
         if (width === 390 || width === 1440) {

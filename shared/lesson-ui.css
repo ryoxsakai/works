@@ -151,7 +151,11 @@ body.tutor-bootstrap > main {
   padding: var(--works-service-top) var(--works-service-gutter) 48px;
 }
 body.tutor-bootstrap [data-page-tab-panel] > .panel { max-width: none; margin: 0; }
-body.tutor-bootstrap .curriculum-panel > .page-tabs { justify-self: start; }
+@media screen and (min-width: 1180px) {
+  /* Align the sticky tablist in the wide student-info grid only. Applying
+     justify-self to the fixed phone bar shrinks it to its icon contents. */
+  body.tutor-bootstrap .curriculum-panel > .page-tabs { justify-self: start; }
+}
 @media screen and (max-width: 640px) {
   /* Preserve the carousel’s established scroll/snap gutter, not the heading gutter. */
   body.tutor-bootstrap .record-panel > .table-scroll {
