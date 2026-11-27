@@ -110,8 +110,15 @@ const folders = [{id:'synthetic-folder',name:'合成フォルダ',parent_id:null
       failWrite=true;
       await page.getByRole('button',{name:filename+'の名前・教材コードを編集',exact:true}).click();
       await checkDialog('#rename-material-modal');
+      // The dialog selects the original filename on the next animation frame.
+      await page.waitForFunction(() => {
+        const input = document.querySelector('#rename-material-name');
+        return document.activeElement === input && input.selectionStart === 0 && input.selectionEnd === input.value.length;
+      });
       await page.locator('#rename-material-name').fill('合成教材の変更名.txt');
       await page.locator('#material-code').fill('fixture-02');
+      assert.equal(await page.locator('#rename-material-name').inputValue(),'合成教材の変更名.txt');
+      assert.equal(await page.locator('#material-code').inputValue(),'fixture-02');
       await page.locator('#rename-material-form button[type="submit"]').click();
       await page.locator('#rename-material-modal [role="alert"]:not([hidden])').waitFor();
       assert.equal(await page.locator('#rename-material-name').inputValue(),'合成教材の変更名.txt');
