@@ -760,6 +760,8 @@ body .todo-page .todo-main { background: var(--works-page); color: var(--works-i
 
 /* Narrow dialogs must not force dates or long select labels beyond the sheet. */
 .todo-page dialog :is(.form-grid > *, .inline > *, label, fieldset) { min-width: 0; }
+/* Keep category actions at their documented touch size instead of shrinking them with form fields. */
+.todo-page #categories-dialog .category-row .inline > button { min-width: 44px; }
 .todo-page dialog :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) { max-width: 100%; }
 .todo-page #detail .dialog-actions .danger { margin-inline-end: auto; }
 @media (max-width: 420px) {
