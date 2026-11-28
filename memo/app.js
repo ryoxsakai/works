@@ -1,6 +1,6 @@
 import { startMemoPresentation } from "../shared/ui/memo-presentation.mjs";
 startMemoPresentation();
-import { watchAuth, signIn, signOutUser as worksSignOut, getSessionToken } from '../shared/auth.js?v=14';
+import { watchAuth, signIn, signOutUser as worksSignOut, getSessionToken } from '../shared/auth.js?v=15';
     import { categoryDialog } from '../shared/category-dialog.js?v=1';
     const categoryUI = categoryDialog(closeCategoryModal);
     // ─── State ───────────────────────────────────────────────

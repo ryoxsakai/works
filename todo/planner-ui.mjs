@@ -1227,7 +1227,39 @@ function createPlanner({
     next.planner = { ...p(), calendar: $("calendar-sync").checked };
     await save(next, "カレンダー連携の設定を保存しました");
   };
+  // Google ToDo リスト同期のオン・オフと状態表示
+  const formatTime = (iso) => new Date(iso).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" });
+  const showGoogleTasks = (v) => {
+    $("gtasks-sync").checked = !!v.enabled;
+    $("gtasks-state").textContent = !v.enabled
+      ? ""
+      : v.error || (v.lastRun ? `同期中(${v.linked}件)・最終同期 ${formatTime(v.lastRun)}` : "初回の同期を待っています(1分ほどかかります)");
+  };
+  const refreshGoogleTasks = async () => {
+    try {
+      showGoogleTasks(await api("/integrations/gtasks"));
+    } catch {
+      $("gtasks-state").textContent = "Google ToDo リストの同期状態を取得できませんでした";
+    }
+  };
+  document.querySelector(".planner-settings")?.addEventListener("toggle", (event) => {
+    if (event.target.open) refreshGoogleTasks();
+  });
+  $("gtasks-sync").onchange = async () => {
+    const enabled = $("gtasks-sync").checked;
+    $("gtasks-sync").disabled = true;
+    try {
+      showGoogleTasks(await api("/integrations/gtasks", { method: "PUT", body: JSON.stringify({ enabled }) }));
+      message(enabled ? "Google ToDo リストとの同期をオンにしました" : "Google ToDo リストとの同期をオフにしました");
+    } catch {
+      $("gtasks-sync").checked = !enabled;
+      $("gtasks-state").textContent = "設定を保存できませんでした。再試行してください";
+    } finally {
+      $("gtasks-sync").disabled = false;
+    }
+  };
   $("sync-status").onclick = async () => {
+    refreshGoogleTasks();
     try {
       const v = await api("/integrations/status");
       $("delivery-state").textContent =

@@ -9,7 +9,7 @@ import {
   signIn,
   signOutUser,
   getSessionToken,
-} from "/shared/auth.js?v=14";
+} from "/shared/auth.js?v=15";
 const $ = (x) => document.querySelector(x);
 const states = {
   planned: "計画のみ（未実行）",

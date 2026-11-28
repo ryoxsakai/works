@@ -73,6 +73,9 @@
               <button id="push-settings">この端末の通知を有効にする</button><button id="push-disable">この端末の通知を解除</button>
               <label><input type="checkbox" id="calendar-sync"> Googleカレンダーに反映</label>
               <small>予定日がある未完了タスクをメインカレンダーに反映します。オフにすると連携した予定を取り除きます。</small>
+              <label><input type="checkbox" id="gtasks-sync"> Google ToDo リストと同期</label>
+              <small>未完了と直近30日に完了したタスクを、Google ToDo リストの「Works」リストと双方向に同期します。Works の変更は約1分以内、Google 側の変更は約5分ごとに反映します。初めてオンにする前に、ログインし直して ToDo リストへのアクセスを許可してください。</small>
+              <output id="gtasks-state" aria-live="polite"></output>
               <button id="sync-status">連携状態を確認</button><output id="delivery-state" aria-live="polite"></output>
             </div></details>
           </div>
@@ -423,6 +426,6 @@
       </form>
     </dialog>
     </div>
-    <script type="module" src="/shared/service-entry.mjs?v=5" data-service-app="/todo/todo.js?v=agenda-2"></script>
+    <script type="module" src="/shared/service-entry.mjs?v=5" data-service-app="/todo/todo.js?v=gtasks-1"></script>
   </body>
 </html>

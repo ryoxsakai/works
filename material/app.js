@@ -6,7 +6,7 @@ import {
   watchAuth,
   signOutUser,
   getSessionToken,
-} from "../shared/auth.js?v=14";
+} from "../shared/auth.js?v=15";
 
 const API_BASE = "/api/material-library";
 const ACTIVE_TAB_KEY = "works_material_active_tab";

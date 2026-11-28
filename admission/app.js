@@ -1,7 +1,7 @@
 import { setUserAvatar } from "../shared/avatar.mjs?v=1";
 import { startAdmissionPresentation } from "../shared/ui/admission-presentation.mjs";
 startAdmissionPresentation();
-import { getSessionToken, signOutUser, watchAuth } from "../shared/auth.js?v=14";
+import { getSessionToken, signOutUser, watchAuth } from "../shared/auth.js?v=15";
 
 const VIEW_KEY = "works_admission_view";
 const FILTER_KEY = "works_admission_filters";

@@ -15,7 +15,7 @@
   <main hidden><h1>Works</h1><button type="button">Googleでログイン</button></main>
   <script type="module">
     import { lastService } from '/shared/resume-service.mjs';
-    import { signIn } from '/shared/auth.js?v=14';
+    import { signIn } from '/shared/auth.js?v=15';
     let session;
     try { session = localStorage.getItem('works_session_token'); } catch {}
     if (session) location.replace(lastService());
