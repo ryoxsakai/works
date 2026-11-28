@@ -55,6 +55,7 @@ jobs:
       - run: node test/admission-ui.browser.mjs
       - run: node test/material-ui.browser.mjs
       - run: node test/tutor-ui.browser.mjs
+      - run: node test/student-school-primary-order.browser.mjs
       - run: node test/tutor-bounded-reads.browser.mjs
       - run: node test/tutor-startup-read.browser.mjs
       - run: node test/tutor-read-side-effect.browser.mjs
