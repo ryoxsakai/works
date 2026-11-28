@@ -15,6 +15,8 @@ export const PULL_INTERVAL_MS = 5 * 60000;
 const PUSH_LIMIT = 20;
 const DONE_WINDOW_MS = 30 * 86400000;
 const LEASE_MS = 115000;
+// Google 側で削除されたタスクの印(todo_gtasks.gtask に入れる。Google のIDと重ならない)。
+const TOMBSTONE = "deleted:";
 
 const schemas = [
   "CREATE TABLE IF NOT EXISTS todo_gtasks (task TEXT PRIMARY KEY, gtask TEXT NOT NULL UNIQUE, fingerprint TEXT NOT NULL DEFAULT '', remote TEXT NOT NULL DEFAULT '')",
@@ -94,8 +96,11 @@ export function applyRemote(state, task, item, now) {
   task.memo = String(item.notes || "").slice(0, 10000);
   const day = typeof item.due === "string" && /^\d{4}-\d\d-\d\d/.test(item.due) ? item.due.slice(0, 10) : null;
   // 期限は、もともと予定日を使っていたなら予定日へ、締切だけのタスクなら締切へ戻す。
-  if (task.plannedDay || !task.deadline) task.plannedDay = day;
-  else task.deadline = day;
+  // 時刻や繰り返しは予定日が必須なので、Google 側で期限を外しても予定日は残す(次回の送信で期限が戻る)。
+  const needsDay = !!(task.plan?.time || task.plan?.repeat);
+  if (task.plannedDay || !task.deadline) {
+    if (day || !needsDay) task.plannedDay = day;
+  } else task.deadline = day;
   const done = statusOf(task) === "done";
   if (item.status === "completed" && !done) {
     task.status = "done";
@@ -171,7 +176,7 @@ async function pull(env, ctx, list, now) {
   const { results: rows } = await db.prepare("SELECT * FROM todo_gtasks").all();
   const byRemote = new Map(rows.map((row) => [row.gtask, row]));
   const tasks = new Map(state.tasks.map((task) => [task.id, task]));
-  const rowUpdates = [], rowDeletes = [], rowInserts = [];
+  const rowUpdates = [], rowTombstones = [], rowInserts = [];
   let changed = false;
   for (const item of items) {
     const row = byRemote.get(item.id);
@@ -187,7 +192,8 @@ async function pull(env, ctx, list, now) {
           task.completedAt = new Date(now).toISOString();
           changed = true;
         }
-        rowDeletes.push(row.task);
+        // Google 側で削除されたことを記録し、Works で未完了に戻すまでは作り直さない。
+        rowTombstones.push(row.task);
         continue;
       }
       if (localChanged) continue; // 両方で変更: Works を優先して送信側で上書きする
@@ -206,7 +212,7 @@ async function pull(env, ctx, list, now) {
   const statements = [
     ...rowInserts.map((args) => db.prepare("INSERT OR REPLACE INTO todo_gtasks(task,gtask,fingerprint,remote) VALUES (?,?,?,?)").bind(...args)),
     ...rowUpdates.map((args) => db.prepare("UPDATE todo_gtasks SET fingerprint=?, remote=? WHERE task=?").bind(...args)),
-    ...rowDeletes.map((task) => db.prepare("DELETE FROM todo_gtasks WHERE task=?").bind(task)),
+    ...rowTombstones.map((task) => db.prepare("UPDATE todo_gtasks SET gtask=?, fingerprint='', remote='' WHERE task=?").bind(TOMBSTONE + task, task)),
     db.prepare("INSERT OR REPLACE INTO todo_gtasks_config VALUES ('lastPull',?)").bind(String(now)),
   ];
   await db.batch(statements);
@@ -222,10 +228,19 @@ async function push(env, ctx, list, now) {
   for (const task of state.tasks) {
     if (!inScope(task, now)) continue;
     const body = remoteBody(state, task), row = byTask.get(task.id);
+    if (row?.gtask.startsWith(TOMBSTONE)) {
+      // Google で削除済み: 完了のままなら送らない。Works で未完了に戻したら新しく作る。
+      if (statusOf(task) !== "done") jobs.push({ kind: "create", task, body, row: null });
+      continue;
+    }
     if (!row || row.fingerprint !== fingerprint(body)) jobs.push({ kind: row ? "patch" : "create", task, body, row });
   }
   for (const row of rows) {
     const task = present.get(row.task);
+    if (row.gtask.startsWith(TOMBSTONE)) {
+      if (!task || !inScope(task, now)) jobs.push({ kind: "unlink", row });
+      continue;
+    }
     if (!task) jobs.push({ kind: "delete", row });
     else if (!inScope(task, now)) jobs.push({ kind: "unlink", row }); // 古い完了タスクは Google 側に残し、同期だけ止める
   }
@@ -291,7 +306,13 @@ export async function syncGoogleTasks(env, { read, write, mint, now = Date.now()
       await pull(env, ctx, list, now);
       await push(env, ctx, list, now);
     } catch (error) {
-      if (error.status === 404 && list) await del(db, "list"); // リストが消えていれば次回作り直す
+      if (error.status === 404 && list) {
+        // 「Works」リストが Google 側で消えていれば、対応表と取得位置も捨てて次回すべて送り直す。
+        await db.batch([
+          db.prepare("DELETE FROM todo_gtasks"),
+          db.prepare("DELETE FROM todo_gtasks_config WHERE id IN ('list','lastPull')"),
+        ]);
+      }
       throw error;
     }
     if (await cfg(db, "error")) await put(db, "error", "");

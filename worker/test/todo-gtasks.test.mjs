@@ -11,7 +11,7 @@ const task = (id, extra = {}) => ({ id, name: id, category: "授業", priority: 
 // Google Tasks API の合成サーバー(1つのリストと、そのタスクだけを保持する)
 function fakeGoogle() {
   const lists = new Map(), tasks = new Map();
-  let clock = 0, scopeError = false;
+  let clock = 0, serial = 0, scopeError = false;
   const calls = [];
   const time = { now: 0 };
   // 更新時刻は「その時点の時刻+連番ミリ秒」(updatedMin による絞り込みが本物と同じように働く)
@@ -24,12 +24,12 @@ function fakeGoogle() {
     if (scopeError) return new Response(JSON.stringify({ error: { status: "PERMISSION_DENIED", details: [{ reason: "ACCESS_TOKEN_SCOPE_INSUFFICIENT" }] } }), { status: 403 });
     const body = options.body ? JSON.parse(options.body) : null;
     if (u.pathname === "/tasks/v1/users/@me/lists") {
-      if (method === "POST") { const id = "list-" + (lists.size + 1); lists.set(id, { id, title: body.title }); return Response.json(lists.get(id)); }
+      if (method === "POST") { const id = "list-" + ++serial; lists.set(id, { id, title: body.title }); return Response.json(lists.get(id)); }
       return Response.json({ items: [...lists.values()] });
     }
     const match = u.pathname.match(/^\/tasks\/v1\/lists\/([^/]+)\/tasks(?:\/([^/]+))?$/);
     assert.ok(match, u.pathname);
-    assert.ok(lists.has(decodeURIComponent(match[1])));
+    if (!lists.has(decodeURIComponent(match[1]))) return new Response("{}", { status: 404 });
     const id = match[2] && decodeURIComponent(match[2]);
     if (!id && method === "GET") {
       const since = u.searchParams.get("updatedMin");
@@ -37,7 +37,7 @@ function fakeGoogle() {
       return Response.json({ items: [...tasks.values()].filter((t) => !since || t.updated >= since) });
     }
     if (!id && method === "POST") {
-      const created = { id: "g" + (tasks.size + 1), ...body, updated: stamp() };
+      const created = { id: "g" + ++serial, ...body, updated: stamp() };
       tasks.set(created.id, created);
       return Response.json(created);
     }
@@ -49,7 +49,7 @@ function fakeGoogle() {
   return {
     handler, lists, tasks, calls, time,
     editRemote(id, change) { tasks.set(id, { ...tasks.get(id), ...change, updated: stamp() }); },
-    addRemote(item) { const id = "remote-" + (tasks.size + 1); tasks.set(id, { id, status: "needsAction", ...item, updated: stamp() }); return id; },
+    addRemote(item) { const id = "remote-" + ++serial; tasks.set(id, { id, status: "needsAction", ...item, updated: stamp() }); return id; },
     setScopeError(value) { scopeError = value; },
   };
 }
@@ -154,6 +154,13 @@ test("Google ToDo リスト: 有効化・送信・取り込み・削除・権限
   await run(20);
   const removed = state.tasks.find((item) => item.id === "締切だけ");
   assert.equal(removed.status, "done");
+  await run(21);
+  assert.equal(remote().some((item) => item.title.startsWith("締切だけ") && !item.deleted), false, "Google で削除したタスクを作り直さない");
+  // Works で未完了に戻したら、新しく作り直す
+  const reopened = state.tasks.find((item) => item.id === "締切だけ");
+  Object.assign(reopened, { status: "pending", progress: 0, completedAt: null });
+  await run(22);
+  assert.equal(remote().filter((item) => item.title === "締切だけ(改)" && !item.deleted).length, 1);
 
   // ToDo の保存と重なったら取り込みを中断し、次回やり直す
   google.time.now = start + 21 * 60000;
@@ -173,11 +180,34 @@ test("Google ToDo リスト: 有効化・送信・取り込み・削除・権限
   assert.match(status.error, /ログインし直し/);
   google.setScopeError(false);
 
+  // 時刻・繰り返しのあるタスクは、Google 側で期限を外しても予定日を残す(保存の検証で同期が止まらないように)
+  state.tasks.push(task("時刻つき", { plannedDay: day, plan: { time: "10:00" } }));
+  await run(29);
+  const timed = remote().find((item) => item.title === "時刻つき");
+  google.time.now = start + 30 * 60000;
+  google.editRemote(timed.id, { due: null, notes: "期限を外した" });
+  await run(34);
+  const timedLocal = state.tasks.find((item) => item.id === "時刻つき");
+  assert.equal(timedLocal.memo, "期限を外した");
+  assert.equal(timedLocal.plannedDay, day);
+
+  // 「Works」リストが Google 側で消えたら、新しいリストにすべて送り直す
+  const linkedBefore = (await request("GET")).linked;
+  google.lists.clear();
+  google.tasks.clear();
+  await run(40);
+  assert.match((await request("GET")).error, /再試行/);
+  await run(41);
+  await run(42);
+  assert.equal(google.lists.size, 1);
+  assert.ok(remote().length >= 3, "新しいリストへ送り直す");
+  assert.ok((await request("GET")).linked > 0 && linkedBefore > 0);
+
   // オフにすると同期は止まる
   await request("PUT", { enabled: false });
   const callsWhenOff = google.calls.length;
   state.tasks.push(task("オフ中"));
-  await run(40);
+  await run(50);
   assert.equal(google.calls.length, callsWhenOff);
 });
 
