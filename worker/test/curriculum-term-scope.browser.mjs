@@ -37,7 +37,13 @@ try {
   const page=await context.newPage();
   const errors=[];
   page.on('pageerror',error=>errors.push(error.message));
-  const open=event=>page.goto(fixture.base+'/tutor/?'+new URLSearchParams({record_date:event.start.dateTime.slice(0,10),student_calendar:'qa',student_event:event.id}));
+  const open=async event=>{
+    await page.goto(fixture.base+'/tutor/?'+new URLSearchParams({record_date:event.start.dateTime.slice(0,10),student_calendar:'qa',student_event:event.id}));
+    // Startup can first render the remembered student, then replace those rows
+    // while resolving the explicit link. Wait for the link's actual render.
+    await expect.poll(()=>new URL(page.url()).searchParams.has('student_event')).toBe(false);
+    await expect(page.locator('#student-selector')).toHaveAttribute('aria-busy','false');
+  };
   const row=event=>page.locator('#curriculum-tbody').locator('tr[data-event-id="'+event.id+'"]');
   const heading=event=>row(event).evaluate(el=>{
     let previous=el.previousElementSibling;
