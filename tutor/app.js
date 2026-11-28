@@ -3551,7 +3551,7 @@ function admissionSeason(dateStr) {
   return m >= 4 ? y + 1 : y;
 }
 
-function admissionProgramsFor(schoolName) {
+function admissionProgramsFor(schoolName, currentSeason) {
   const key = admissionSchoolKey(schoolName);
   if (!key) return [];
   const programs = new Map();
@@ -3561,11 +3561,10 @@ function admissionProgramsFor(schoolName) {
     if (!programs.has(id)) programs.set(id, { university: ev.university, type: ev.selection_type || "general", events: [] });
     programs.get(id).events.push(ev);
   });
-  const todaySeason = admissionSeason(formatDateOnly(new Date()));
   return [...programs.values()]
     .map((program) => {
       const seasons = [...new Set(program.events.map((ev) => admissionSeason(ev.schedule_date)))];
-      const season = seasons.includes(todaySeason) ? todaySeason : Math.max(...seasons);
+      const season = seasons.includes(currentSeason) ? currentSeason : Math.max(...seasons);
       const stages = {};
       program.events
         .filter((ev) => admissionSeason(ev.schedule_date) === season)
@@ -3577,7 +3576,7 @@ function admissionProgramsFor(schoolName) {
       const typeLabel = ADMISSION_TYPE_LABELS[program.type];
       if (typeLabel && !qualifiers.some((q) => q.includes(typeLabel))) qualifiers.unshift(typeLabel);
       const first = Object.values(stages).flat().sort()[0] || "";
-      return { label: qualifiers.join("・") || "一般", stages, first };
+      return { label: qualifiers.join("・") || "一般", type: program.type, season, stages, first };
     })
     .sort((a, b) => a.first.localeCompare(b.first));
 }
@@ -3624,21 +3623,31 @@ function renderSchoolsSummary() {
   if (!admissionEventsState.loaded && !admissionEventsPromise) {
     loadAdmissionEvents().then(() => renderSchoolsSummary());
   }
+  const today = tokyoDateKey();
+  const season = admissionSeason(today);
   const ordered = [
     ...[1, 2, 3].map((rank) => candidateSchools.find((s) => s.rank === rank)).filter(Boolean),
     ...candidateSchools.filter((s) => ![1, 2, 3].includes(s.rank)),
-  ];
-  const today = formatDateOnly(new Date());
+  ].map((school) => {
+    const programs = admissionEventsState.loaded ? admissionProgramsFor(school.school_name, season) : [];
+    // Use the earliest general first-round exam in the current season.
+    // Stable sort keeps preference order for ties and for undated schools.
+    const firstPrimary = programs
+      .filter((program) => program.type === "general" && program.season === season)
+      .flatMap((program) => program.stages.primary || [])
+      .sort()[0] || "";
+    return { school, programs, firstPrimary };
+  }).sort((a, b) => Number(!a.firstPrimary) - Number(!b.firstPrimary)
+    || a.firstPrimary.localeCompare(b.firstPrimary));
   const head = `<div class="school-schedule-row school-schedule-head" aria-hidden="true">
       <span>方式</span>${ADMISSION_STAGES.map(([, label]) => `<span>${label}</span>`).join("")}
     </div>`;
   const rows = ordered
-    .map((school) => {
+    .map(({ school, programs }) => {
       const rankBadge = school.rank
         ? `<span class="school-rank school-rank-${school.rank}">第${school.rank}志望</span>`
         : "";
       const typeLabel = school.school_type === "national" ? "国公立" : "私立";
-      const programs = admissionEventsState.loaded ? admissionProgramsFor(school.school_name) : [];
       const open = openSchoolIds.has(String(school.id));
       const nameCell = `<button type="button" class="school-name" data-school-toggle="${escapeHtml(String(school.id))}" aria-expanded="${open}">${rankBadge}<strong>${escapeHtml(school.school_name)}</strong><span class="school-type">${typeLabel}</span><i class="bx bx-chevron-down school-chevron" aria-hidden="true"></i></button>`;
       if (!programs.length) {
