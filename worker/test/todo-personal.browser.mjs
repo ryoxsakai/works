@@ -836,6 +836,8 @@ async function verifyPlanner(page,db,origin,nav,rowMenu) {
   assert.equal(scheduled.plan.labels.length,2);
   assert.equal(scheduled.plan.reminder,planned+"T15:30");
   assert.equal(scheduled.deadline,"2026-12-11");
+  // The shortcut ignores keys aimed at a dialog; wait until focus has left the closed sheet.
+  await page.waitForFunction(()=>!document.activeElement?.closest("dialog"));
   await page.keyboard.press("q");
   await expect(page.locator("#quick-title")).toBeFocused();
   await page.keyboard.press("Escape");

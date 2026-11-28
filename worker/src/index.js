@@ -6004,6 +6004,9 @@ export default {
   async scheduled(event, env, ctx) {
     const {deliverTodoWork} = await import("./todo-delivery.js");
     ctx.waitUntil(deliverTodoWork(env, () => readTodo(env), () => mintGoogleAccessToken(env)));
+    // Google ToDo リストとの双方向同期(設定でオンのときだけ動き、変更がなければ Google には問い合わせない)。
+    const {syncGoogleTasks} = await import("./todo-gtasks.js");
+    ctx.waitUntil(syncGoogleTasks(env, {read: () => readTodo(env), write: (state) => writeTodo(env, state), mint: () => mintGoogleAccessToken(env)}));
   },
   async fetch(request, env) {
     const origin = env.ALLOWED_ORIGIN;
@@ -6098,8 +6101,13 @@ export default {
       }
       if (url.pathname.startsWith("/api/todo/integrations/")) {
         if (browserSession.aud || browserSession.scope || browserSession.fid) throw httpError(401, "browser session required");
+        const action = url.pathname.split("/").pop();
+        if (action === "gtasks") {
+          const {googleTasksRequest} = await import("./todo-gtasks.js");
+          return json(await googleTasksRequest(request, env), {...headers, "Cache-Control":"no-store"});
+        }
         const {integrationRequest} = await import("./todo-delivery.js");
-        return json(await integrationRequest(request, env, url.pathname.split("/").pop()), {...headers, "Cache-Control":"no-store"});
+        return json(await integrationRequest(request, env, action), {...headers, "Cache-Control":"no-store"});
       }
       if (url.pathname === "/api/todo/clone" && request.method === "POST") return json(await cloneTodo(env, await request.json()), headers);
       if (url.pathname === "/api/todo/clone" && request.method === "GET") return json((await readTodo(env)).cloneRequests?.[url.searchParams.get("request_id")]?.result ?? { found: false }, headers);

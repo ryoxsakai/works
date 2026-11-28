@@ -1,4 +1,4 @@
-import * as auth from '../shared/auth.js?v=14';
+import * as auth from '../shared/auth.js?v=15';
 import {matchingStudents, studentHint, studentProfileUrl, studentMark} from '../shared/todo-students.mjs?v=1';
 
 async function read(path) {

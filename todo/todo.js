@@ -1,5 +1,5 @@
 import {colorValue, isHexColor} from "./model.mjs?v=color-picker-1";
-import {createPlanner} from "./planner-ui.mjs?v=agenda-2";
+import {createPlanner} from "./planner-ui.mjs?v=gtasks-1";
 import { startTodoPresentation } from "../shared/ui/todo-presentation.mjs?v=2";
 startTodoPresentation();
 import {
@@ -7,7 +7,7 @@ import {
   signIn,
   signOutUser,
   getSessionToken,
-} from "../shared/auth.js?v=14";
+} from "../shared/auth.js?v=15";
 const $ = (id) => document.getElementById(id);
 const esc = (value) =>
   String(value ?? "").replace(

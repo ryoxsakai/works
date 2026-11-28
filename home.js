@@ -7,7 +7,7 @@ import {
   watchAuth,
   getSessionToken,
   getGoogleAccessToken,
-} from "./shared/auth.js?v=14";
+} from "./shared/auth.js?v=15";
 import { getTheme, setTheme } from "./shared/theme.js?v=7";
 
 import { createDashboard } from "./dashboard/dashboard.mjs?v=period-profiles-1";
