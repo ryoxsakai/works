@@ -2951,12 +2951,13 @@ async function renderCurriculumTable(events, context = captureStudentContext(), 
 
   els.curriculumTbody.innerHTML = events
     .map((ev) => {
-      const term = numberedTerms.find((t) => eventInTerm(ev, t)) || null;
-      const displayTerm = displayTerms.length > 1 ? displayTerms.find((t) => eventInTerm(ev, t)) : null;
+      // Resolve membership once so an overlap cannot show one term and save another.
+      const ownTerm = (displayTerms.length ? displayTerms : numberedTerms).find((t) => eventInTerm(ev, t));
+      const term = ownTerm && termPositionsById.has(ownTerm.id) ? ownTerm : null;
+      const displayTerm = displayTerms.length > 1 ? ownTerm : null;
       const termHeading = displayTerm && displayTerm.id !== previousTermId
         ? `<tr class="curriculum-term-heading"><th colspan="6" scope="rowgroup">${escapeHtml(displayTerm.label)}</th></tr>` : "";
       if (displayTerm) previousTermId = displayTerm.id;
-      const ownTerm = displayTerms.find((t) => eventInTerm(ev, t));
       const termCountEvents = ownTerm && displayTerms.length > 1 ? countEvents.filter((item) => eventInTerm(item, ownTerm)) : countEvents;
       return termHeading + curriculumRowMarkup(ev, term, termCountEvents);
     })
